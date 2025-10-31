@@ -2,7 +2,7 @@
 description: what happened since my last commit?
 ---
 
-!`!git fetch || true`
+!`!git fetch --prune || true`
 
 useful:
 ```bash
