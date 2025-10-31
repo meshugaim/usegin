@@ -85,9 +85,22 @@ cd nextjs-app && bun run build && cd ..
 
 #### 3.5 Push to Main
 
-### Step 4: Cleanup (Optional)
+### Step 4: Cleanup
 
-After successful merge, close the issue, delete the branches both local and remote
+After successful merge:
+
+1. Close the issue with a comment referencing the merge commit
+2. Delete local branch: `git branch -D <branch-name>`
+3. Delete remote branch: `git push origin --delete <branch-name>` or `gh api repos/<owner>/<repo>/git/refs/heads/<branch-name> -X DELETE`
+4. Prune stale remote references: `git fetch --prune`
+
+Example:
+```bash
+gh issue close <issue-number> --comment "Merged in <commit-hash>"
+git branch -D merge-biome
+git push origin --delete claude/issue-3-20251031-1612
+git fetch --prune
+```
 
 ### Step 5: Move to Next Branch
 
