@@ -50,6 +50,9 @@ the assistant then...
 
 But with more fluent language, and preserving the happenings.
 Important: who initiated what?
+
+Write your summary into a new file in the Agent Records repository with the exact same name as the original file, only with a summary suffix: `<file_name_without_extension>.summary.md` 
+Don't commit the summary file
 ```
 
 when all sub agents are done, you now do the same for the arc of all conversations based on the sub agents reports.
