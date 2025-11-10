@@ -37,6 +37,8 @@ done
 find ~/agent-records/ -path "*/2025-11-08/*" -name "*.txt" 2>/dev/null | filter_warmups
 
 then for each conversation do:
+If there exists a `.summary.md` file, then use directly this one. This is basically the output of a previously executed sub-agent. 
+However, if it does not exist, then use a sub-agent as explained below. 
 in a sub-agent, provide these instructions to the sub-agent please:
 
 ```
@@ -52,7 +54,7 @@ But with more fluent language, and preserving the happenings.
 Important: who initiated what?
 
 Write your summary into a new file in the Agent Records repository with the exact same name as the original file, only with a summary suffix: `<file_name_without_extension>.summary.md` 
-Don't commit the summary file
+Commit the summary file
 ```
 
 when all sub agents are done, you now do the same for the arc of all conversations based on the sub agents reports.
