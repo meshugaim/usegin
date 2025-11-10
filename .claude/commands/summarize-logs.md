@@ -1,6 +1,7 @@
 ---
 description: Summarize agent logs
 ---
+!`date`
 
 I'll retrieve and summarize the agent conversation logs focusing on: $ARGUMENTS.
 
@@ -21,20 +22,7 @@ see `~/agent-records/`
 ## Workflow
 
 find all conversations relevant to $ARGUMENTS
-ignore warmup conversations:
-### Create helper function in the slash command
-filter_warmups() {
-while IFS= read -r file; do
-    first_two=$(head -n 2 "$file" 2>/dev/null)
-    if [ "$first_two" != "USER:
-Warmup" ]; then
-    echo "$file"
-    fi
-done
-}
-
-### Use it
-find ~/agent-records/ -path "*/2025-11-08/*" -name "*.txt" 2>/dev/null | filter_warmups
+You can use the following command: `just agent-records help` (start with the overview)
 
 then for each conversation do:
 If there exists a `.summary.md` file, then use directly this one. This is basically the output of a previously executed sub-agent. 
