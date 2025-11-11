@@ -22,7 +22,7 @@ see `~/agent-records/`
 
 ## Workflow
 
-find all conversations relevant to $ARGUMENTS, excluding sub-agent conversations and conversations with the `/summarize...` command; the `just agent-records find` sub command will exclude those by default.
+find all conversations relevant to $ARGUMENTS, excluding sub-agent conversations and conversations with the `/summarize...` command; the `just agent-records find` sub command will exclude those by default.****
 You can use the following command: `just agent-records help`, and then start with the `just agent-records overview`.
 
 then for each conversation do:
