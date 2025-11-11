@@ -25,7 +25,7 @@ see `~/agent-records/`
 find all conversations relevant to $ARGUMENTS, excluding sub-agent conversations; the `just agent-records find` sub command will exclude those by default.
 You can use the following command: `just agent-records help`, and then start with the `just agent-records overview`.
 
-please avoid meta-summaries (summaries of summaries); avoid the parts of conversations that use the `/summaries...` commands, and be explicit about which sections were avoided. 
+please avoid meta-summaries (summaries of summaries); avoid the parts of conversations that use the `/summaries...` commands, and be explicit about which sections were avoided by saying "(Summary section excluded to avoid meta-summary)".
 
 then for each conversation do:
 If there exists a `.summary.md` file, then use directly this one. This is basically the output of a previously executed sub-agent. 
