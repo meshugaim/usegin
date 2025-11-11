@@ -1,6 +1,7 @@
 ---
 description: Summarize agent logs
 ---
+
 !`date`
 
 I'll retrieve and summarize the agent conversation logs focusing on: $ARGUMENTS.
