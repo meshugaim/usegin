@@ -7,83 +7,31 @@ description: This skill should be used when searching through bash command histo
 
 ## Overview
 
-Search through bash command history using atuin to find previously executed commands. All bash commands executed by Claude Code are automatically logged to atuin via the posttool hook.
+Search through bash command history using atuin. All bash commands executed by Claude Code are automatically logged to atuin via the PostToolUse hook.
 
-## When to Use
+## Getting Started
 
-Use this skill when:
-- User asks to find commands they or Claude ran previously
-- Need to recall specific commands or patterns
-- Looking for examples of how something was done before
-- Investigating what commands were executed in a session
+**First, use `atuin --help` and `atuin history --help` to understand available commands.**
 
-## Workflow
+## Common Examples
 
-### 1. Search for Commands
-
-Use `atuin search` with a query term:
-
+### Search for commands with timestamps
 ```bash
-atuin search "query"
+atuin search "git"
 ```
 
-This will interactively search history. For non-interactive use, pipe output or use list commands.
-
-### 2. List Recent Commands
-
-Show recent command history:
-
+### List recent commands (newest first)
 ```bash
 atuin history list --cmd-only --reverse false | head -20
 ```
 
-Options:
-- `--cmd-only`: Show only the command text (no timestamps/metadata)
-- `--reverse false`: Show newest first (default is oldest first)
-- Pipe to `head -N` to limit results
-
-### 3. Search with Filters
-
-Search using grep patterns on the history list:
-
+### Find specific patterns
 ```bash
-atuin history list --cmd-only | grep "pattern"
-```
-
-### 4. Get Last Command
-
-Retrieve the most recently executed command:
-
-```bash
-atuin history last
-```
-
-## Examples
-
-### Find all git commands
-```bash
-atuin history list --cmd-only | grep "^git"
-```
-
-### Show last 10 npm commands
-```bash
-atuin history list --cmd-only | grep "npm" | head -10
-```
-
-### Find commands with specific keywords
-```bash
-atuin history list --cmd-only | grep -i "docker\|container"
-```
-
-### View recent activity
-```bash
-atuin history list --cmd-only --reverse false | head -30
+atuin history list --cmd-only | grep "npm"
 ```
 
 ## Tips
 
-- All Claude Code bash commands are automatically logged via the PostToolUse hook
-- Search is case-sensitive by default, use `grep -i` for case-insensitive
-- Use `--cmd-only` to get clean output without timestamps
-- Combine with grep/head/tail for powerful filtering
-- The history includes commands from both interactive shell and Claude Code
+- Use `atuin --help` and subcommand help (e.g., `atuin search --help`) to explore options
+- Combine with grep/head/tail for filtering
+- All Claude Code bash commands are automatically logged
