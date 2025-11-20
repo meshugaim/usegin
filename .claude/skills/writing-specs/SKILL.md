@@ -54,6 +54,7 @@ For each section:
 1. Write the section directly into the spec file
 2. Commit the change with a clear message
 3. ¡PAUSE! User reviews and provides feedback
+   - use the `AskUserQuestion` tool to get feedback. Two questions: 1. any feedback (quick option - "none") 2. choices for next section to write including an option to end the process
 4. If changes needed, edit and commit again
 5. Move to next section when approved
 
