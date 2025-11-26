@@ -23,23 +23,47 @@ Use this skill when:
 - Chrome running with remote debugging (via `just chrome-start` or pm2)
 - Dev server running: start it with `just dev`
 - App accessible at http://localhost:3000
+- Chrome DevTools MCP tools available (tools starting with `mcp__chrome-devtools__`)
 
 ## Workflow
 
-### Step 1: Ensure Chrome and Dev Server are Running
+### Step 1: Verify Chrome DevTools MCP is Available
+
+**IMPORTANT**: Before proceeding, verify you have access to Chrome DevTools MCP tools.
+
+Try calling `mcp__chrome-devtools__list_pages`. If this fails with "No such tool available":
+
+1. **Verify Chrome is running**:
+   ```bash
+   just chrome-status
+   # Should show "online" status
+
+   # Also verify the debug port is responding:
+   curl -s http://127.0.0.1:9222/json/version
+   ```
+
+2. **If Chrome is running but MCP tools aren't available**:
+   - STOP and ask the user to **restart Claude Code** so the MCP server connection is re-established
+   - The Chrome DevTools MCP needs to be loaded at Claude startup
+   - Say: "Chrome is running but I don't have access to the Chrome DevTools MCP tools. Please restart Claude Code to reload the MCP connection, then try again."
+
+3. **If Chrome is not running**:
+   ```bash
+   just chrome-start
+   ```
+   Then ask the user to restart Claude Code.
+
+### Step 2: Ensure Dev Server is Running
 
 ```bash
-# Check if Chrome is running
-bun pm2 status chrome-devtools
-
-# If not running, start it
-just chrome-start
-
 # Check if dev server is running
 lsof -ti:3000,8000
+
+# If not running, start it
+just dev
 ```
 
-### Step 2: Connect to Chrome and Navigate to App
+### Step 3: Connect to Chrome and Navigate to App
 
 ```bash
 # List pages to confirm connection
@@ -49,7 +73,7 @@ mcp__chrome-devtools__list_pages
 mcp__chrome-devtools__navigate_page --type url --url http://localhost:3000
 ```
 
-### Step 3: Sign In (if needed)
+### Step 4: Sign In (if needed)
 
 If redirected to sign-in page:
 
@@ -64,9 +88,9 @@ mcp__chrome-devtools__fill --uid <email-input-uid> --value "nitsan@askeffi.ai"
 
 4. Navigate to the magic link URL to complete authentication
 
-### Step 4: Navigate to Relevant Page
+### Step 5: Navigate to Relevant Page
 
 Navigate to the page you need to work on (e.g., `/dashboard`, `/settings`, etc.)
 
-### Step 5: Iterate
+### Step 6: Iterate
 
