@@ -36,3 +36,31 @@ The doc itself should state its purpose: "This is not a full plan upfront. It tr
 
 Update it as you go. It's a living record, not a contract.
 
+## Workflow Guidelines
+
+These are guidelines, not a strict process. Adapt to the situation.
+
+### Pick a Slice
+
+Choose the smallest vertical slice that delivers value. End-to-end, not layer-by-layer.
+
+### Test First
+
+Write a failing test that describes the expected behavior. Then make it pass.
+
+### Implement Locally
+
+Get it working on your machine. Use self-verification loops: run tests, check UI, hit endpoints.
+
+### Push to Prod
+
+Don't wait for "done." Push early, use feature toggles if needed. Verify it works on prod.
+
+### Checkpoint
+
+Summarize what was done. Ask if alignment is still good. Update the progress doc.
+
+### Repeat
+
+Pick the next slice. Ask: "Is this the right size step? Should we go smaller?"
+
