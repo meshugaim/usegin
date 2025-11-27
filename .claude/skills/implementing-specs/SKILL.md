@@ -22,3 +22,17 @@ Turn specs into working software through vertical slices, TDD, and continuous al
 | **Self-verification** | Get into feedback loops to verify your own work (run tests, check UI, hit endpoints). |
 | **Feature toggles** | Use them to get incomplete work to prod safely. |
 
+## Progress Doc
+
+Keep a `PROGRESS.md` next to the spec (e.g., `docs/specs/auth/PROGRESS.md`).
+
+**Purpose:** Track what's been decided and where we stand. Not a plan for everything ahead.
+
+**What to include:**
+- Decisions made along the way
+- Current status / next step
+- Links to relevant commits or PRs
+- Open questions
+
+Update it as you go. It's a living record, not a contract.
+
