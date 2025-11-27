@@ -1,78 +1,52 @@
 ---
 name: writing-specs
-description: This skill should be used when the user wants to write a spec document. Triggered by phrases like "let's write a spec", "spec for XXX", "document this feature", or "create a spec". Helps interactively build specification documents in docs/ through structured dialogue.
+description: This skill writes spec documents interactively. Triggered by "let's write a spec", "spec for XXX", "document this feature", or "create a spec".
 ---
 
 # Writing Specs
 
-## Overview
+Build specs collaboratively through understanding, questioning, and section-by-section refinement.
 
-This skill facilitates an interactive, iterative process for writing technical specification documents. Instead of writing everything at once, we build specs collaboratively through understanding, questioning, and section-by-section refinement.
-
-**Core principle:** Build understanding first, write second. Specs emerge from conversation, not dictation.
-
-## When to Use
-
-Use this skill when the user wants to create a specification document. Common trigger phrases include:
-
-- "let's write a spec"
-- "spec for XXX"
-- "document this feature"
-- "create a spec"
-- "we need a spec for..."
+**Core principle:** Understand first, write second.
 
 ## Workflow
 
-### Step 1: Mind Dump & Understanding
+### 1. Understand
 
-User brain-dumps their ideas messily into the conversation. Your job: understand.
-
-Gather context by exploring:
+User brain-dumps ideas. You gather context:
 - Related code in the repo
-- Relevant documentation (context7, web search)
-- Open source repos for local reference if needed (add to `.gitignore`)
+- Relevant docs (context7, web search)
+- Open source repos for reference (add to `.gitignore`)
 
-Don't write anything yet. Just understand.
+Don't write yet. Just understand.
 
-### Step 2: Ask Questions
+### 2. Ask Questions
 
-Use the `AskUserQuestion` tool to clarify until you reach baseline understanding.
+Use `AskUserQuestion` to clarify until aligned on what needs spec'd.
 
-Keep asking until both of you are aligned on what needs to be spec'd.
+### 3. Propose Sections
 
-### Step 3: Propose Section Structure
+Present section outline. Get approval or adjust.
 
-Based on understanding, propose a list of sections for the spec.
+### 4. Write Section by Section
 
-Present the section outline to the user. Get approval or adjust.
+Create `docs/thing.spec.md`. For each section:
 
-### Step 4: Create Spec File and Build Section by Section Pausing for User Feedback
+| Step | Action                                         |
+| ---- | ---------------------------------------------- |
+| 1    | Write section to file                          |
+| 2    | Commit and push to `main`                      |
+| 3    | PAUSE - ask for feedback via `AskUserQuestion` |
+| 4    | Edit if needed, commit again                   |
+| 5    | Move to next section when approved             |
 
-Create `docs/thing.spec.md` and write sections directly into it, one at a time.
+Git commits after every change = easy rollback, clear history, checkpoints.
 
-For each section:
-1. Write the section directly into the spec file
-2. Commit the change with a clear message, and push it to `main`
-3. ¡PAUSE! User reviews and provides feedback
-   - use the `AskUserQuestion` tool to get feedback. Two questions: 1. any feedback (quick option - "none") 2. choices for next section to write including an option to end the process
-4. If changes needed, edit and commit again
-5. Move to next section when approved
+## Spec Style
 
-**Git commit after every change.** This creates:
-- Easy rollback to better versions
-- History of thought process
-- Clear diff showing what changed between versions
-- Checkpoint at each step
-
-**Only proceed to next section after user approves current one.**
-
-## Spec Style Guidelines
-
-**Critical:** Specs should be short, informal, no bloat.
-
-- ✅ **Concise** - get to the point
-- ✅ **Informal** - conversational tone
-- ✅ **Focused** - only what matters
-- ❌ **No fluff** - cut the corporate speak
-- ❌ **No bloat** - every sentence earns its place
-- ❌ **No formality** - we're building, not presenting to a board
+| Do                | Don't           |
+| ----------------- | --------------- |
+| Concise           | Fluff           |
+| Informal          | Corporate speak |
+| Focused           | Bloat           |
+| Tables over prose | Walls of text   |
