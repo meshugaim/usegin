@@ -42,11 +42,11 @@ Guidelines, not a strict process. Adapt to the situation.
 
 | Step | What | Notes |
 |------|------|-------|
-| **Pick a slice** | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. |
+| **Pick a slice** | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. Discuss feature toggle strategy early. |
 | **Test first** | Write a failing test. Then make it pass. | TDD. |
 | **Implement locally** | Get it working. Run tests, check UI, hit endpoints. | Self-verification loops. |
 | **Checkpoint** | Summarize progress. Ask user if still aligned. | Do this often. |
-| **Push to prod** | Don't wait for "done." Feature toggle if needed. | Verify on prod. |
+| **Push to prod** | Don't wait for "done." Feature toggle if needed. | Verify on prod. Be careful not to break things. |
 | **Update progress doc** | Record decisions, next step. | Keep it current. |
 | **Repeat** | Propose next slice. Ask: "Right size? Go smaller?" | Continuous alignment. |
 
@@ -69,5 +69,19 @@ Checkpoint often. Use `AskUserQuestion` to stay aligned.
 | Next step | "I'm thinking we do X next. Sound right?" |
 | Meta | "Should we take smaller steps?" "Is this pace working?" |
 
-**Summaries:** Keep them concise. Focus on decisions made, not implementation details.
+**Summaries:** Keep them concise. Focus on decisions made, not implementation details. Offer deeper discussion if user wants it.
+
+## Self-Verification
+
+Get into feedback loops to verify your own work before asking the user.
+
+| Technique | When |
+|-----------|------|
+| Run tests | After any code change |
+| Check UI | After frontend changes (use `closed-loop-web-development` patterns) |
+| Hit endpoints | After API changes |
+| Check logs | When debugging or verifying prod |
+| Build locally | Before pushing |
+
+Don't wait for user to tell you something is broken. Catch it yourself.
 
