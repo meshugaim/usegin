@@ -77,5 +77,7 @@ Get into feedback loops to verify your own work before asking the user.
 
 **Examples:** Run tests, check UI visually, hit endpoints, check logs, build locally. Use whatever makes sense for the change.
 
+**Note:** There may be relevant skills for specific feedback loops (e.g., `closed-loop-web-development` for UI verification). Check available skills.
+
 Don't wait for user to tell you something is broken. Catch it yourself.
 
