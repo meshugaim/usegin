@@ -65,25 +65,41 @@ This prevents lost work, makes rollback easier, and keeps the progress visible t
 
 ## Automated Tests
 
-**Every slice needs tests.** Don't ship code without test coverage.
+**Every slice needs tests.** Don't ship code without test coverage. This is non-negotiable.
 
-| Rule | Why |
-|------|-----|
-| **Write tests for every slice** | Untested code is a liability. Tests are not optional. |
-| **TDD when possible** | Write failing test first, then make it pass. Catches design issues early. |
-| **Run tests before committing** | Never commit code that breaks existing tests. |
-| **Check coverage gaps** | After implementing, ask: "What isn't tested?" Add tests before moving on. |
+### TDD Flow
 
-**Red flags to watch for:**
+1. **Write the test first** - Before any implementation
+2. **Watch it fail** - Confirms the test is actually testing something
+3. **Write minimal code to pass** - Only what's needed
+4. **Refactor if needed** - Now that you have a safety net
+5. **Repeat**
+
+### What to Test
+
+| Component | Test It |
+|-----------|---------|
+| **Pure functions** | Always. Easy to test, no excuses. |
+| **Argument parsing** | Yes. CLI args, config parsing, etc. |
+| **File I/O wrappers** | Yes. Use temp dirs in beforeAll/afterAll. |
+| **External integrations** | Yes. Mock or use test fixtures. |
+| **Side effects (git, network)** | At minimum: dry-run/integration tests. |
+
+### Coverage Checklist
+
+Before declaring a slice complete, ask:
+
+- [ ] Are all exported functions tested?
+- [ ] Are edge cases covered (empty input, errors, boundaries)?
+- [ ] Did I run the tests and see them pass?
+- [ ] If I manually tested something, is there an automated test for it?
+
+**Red flags to catch yourself on:**
 - "I'll add tests later" → Add them now
 - "It's just a small change" → Small changes still need tests
-- Manual testing only → If you tested it manually, write an automated test for it
-- Existing tests don't cover new code → Add tests before the slice is "done"
-
-**Before marking a slice complete, verify:**
-1. Tests exist for the new functionality
-2. All tests pass
-3. Edge cases are covered
+- "I tested it manually" → Write an automated test for it
+- "Tests pass but I only tested the happy path" → Add edge case tests
+- "I only tested pure functions" → Test the integration points too
 
 ## Checkpoints
 
