@@ -48,9 +48,20 @@ Guidelines, not a strict process. Adapt to the situation.
 | **Test first**          | Write a failing test. Then make it pass.                    | TDD. Always write automated tests when possible.                                        |
 | **Implement locally**   | Get it working. Run tests, check UI, hit endpoints.         | Self-verification loops.                                                                |
 | **Checkpoint**          | Summarize progress. Ask user if still aligned.              | Do this often.                                                                          |
-| **Push to prod**        | Don't wait for "done." Feature toggle if needed.            | Verify on prod. Be careful not to break things.                                         |
+| **Commit & push**       | Commit after each slice. Don't accumulate uncommitted work. | Small commits, pushed frequently. Avoids lost work and enables easier rollback.         |
 | **Update progress doc** | Record decisions, next step.                                | Keep it current.                                                                        |
 | **Repeat**              | Propose next slice. Ask: "Right size? Go smaller?"          | Continuous alignment.                                                                   |
+
+## Commit Often
+
+**Don't stay in uncommitted state.** Commit and push after completing each slice or meaningful unit of work.
+
+- Completed a slice? Commit and push.
+- Fixed a bug along the way? Commit and push.
+- Added a small feature? Commit and push.
+- About to start something risky? Commit current state first.
+
+This prevents lost work, makes rollback easier, and keeps the progress visible to collaborators.
 
 ## Automated Tests
 
