@@ -36,6 +36,8 @@ The doc itself should state its purpose: "This is not a full plan upfront. It tr
 
 Update it as you go. It's a living record, not a contract.
 
+**Style:** Keep it concise. Don't list files created or flags added - just show usage examples. Focus on what matters for the next person reading it.
+
 ## Workflow Guidelines
 
 Guidelines, not a strict process. Adapt to the situation.
@@ -43,12 +45,19 @@ Guidelines, not a strict process. Adapt to the situation.
 | Step                    | What                                                        | Notes                                                                                   |
 | ----------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | **Pick a slice**        | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. Discuss feature toggle strategy early. |
-| **Test first**          | Write a failing test. Then make it pass.                    | TDD.                                                                                    |
+| **Test first**          | Write a failing test. Then make it pass.                    | TDD. Always write automated tests when possible.                                        |
 | **Implement locally**   | Get it working. Run tests, check UI, hit endpoints.         | Self-verification loops.                                                                |
 | **Checkpoint**          | Summarize progress. Ask user if still aligned.              | Do this often.                                                                          |
 | **Push to prod**        | Don't wait for "done." Feature toggle if needed.            | Verify on prod. Be careful not to break things.                                         |
 | **Update progress doc** | Record decisions, next step.                                | Keep it current.                                                                        |
 | **Repeat**              | Propose next slice. Ask: "Right size? Go smaller?"          | Continuous alignment.                                                                   |
+
+## Automated Tests
+
+Try to write automated tests when possible.
+
+- Write tests before or alongside implementation (TDD preferred)
+- Run tests after implementing to verify
 
 ## Checkpoints
 
@@ -81,3 +90,12 @@ Get into feedback loops to verify your own work before asking the user.
 
 Don't wait for user to tell you something is broken. Catch it yourself.
 
+## Using Context7 for Latest APIs
+
+When working with libraries/frameworks (Bun, React, etc.), use Context7 MCP to fetch latest docs:
+
+1. Check if `context7` MCP server is available
+2. Use `mcp__context7__resolve-library-id` to find the library
+3. Use `mcp__context7__get-library-docs` to get current API docs
+
+This prevents using outdated patterns. If Context7 isn't connected, remind the user to activate it.
