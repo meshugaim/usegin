@@ -54,14 +54,17 @@ Guidelines, not a strict process. Adapt to the situation.
 
 ## Commit Often
 
-**Don't stay in uncommitted state.** Commit and push after completing each slice or meaningful unit of work.
+**Always commit.** Don't ask "should I commit?" - the answer is yes.
 
-- Completed a slice? Commit and push.
-- Fixed a bug along the way? Commit and push.
-- Added a small feature? Commit and push.
-- About to start something risky? Commit current state first.
+| Situation | Action |
+|-----------|--------|
+| Completed a slice | Commit and push |
+| Tests passing | Commit and push |
+| Fixed a bug | Commit and push |
+| About to start something risky | Commit current state first |
+| User says "ready for next step" | Commit first, then proceed |
 
-This prevents lost work, makes rollback easier, and keeps the progress visible to collaborators.
+**Never** stay in uncommitted state between slices. If you're about to move on to the next thing, commit what you have first.
 
 ## Automated Tests
 
