@@ -50,3 +50,24 @@ Guidelines, not a strict process. Adapt to the situation.
 | **Update progress doc** | Record decisions, next step. | Keep it current. |
 | **Repeat** | Propose next slice. Ask: "Right size? Go smaller?" | Continuous alignment. |
 
+## Checkpoints
+
+Checkpoint often. Use `AskUserQuestion` to stay aligned.
+
+**When to checkpoint:**
+- After completing a slice
+- Before starting something new
+- When uncertain about direction
+- When pace feels off
+
+**What to cover:**
+
+| Type | Examples |
+|------|----------|
+| Summary | "Here's what I just did..." |
+| Alignment | "Does this match what you expected?" |
+| Next step | "I'm thinking we do X next. Sound right?" |
+| Meta | "Should we take smaller steps?" "Is this pace working?" |
+
+**Summaries:** Keep them concise. Focus on decisions made, not implementation details.
+
