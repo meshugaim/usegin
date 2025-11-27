@@ -24,6 +24,7 @@ Look for:
 - Failed approaches that had to be retried
 - Long outputs that weren't used
 - Subagents spawned but abandoned
+- Rewinds (marked `[REWIND]` in parser output) - conversation branched
 
 **Skill Gaps:**
 - Domain patterns Claude didn't know
