@@ -38,29 +38,15 @@ Update it as you go. It's a living record, not a contract.
 
 ## Workflow Guidelines
 
-These are guidelines, not a strict process. Adapt to the situation.
+Guidelines, not a strict process. Adapt to the situation.
 
-### Pick a Slice
-
-Choose the smallest vertical slice that delivers value. End-to-end, not layer-by-layer.
-
-### Test First
-
-Write a failing test that describes the expected behavior. Then make it pass.
-
-### Implement Locally
-
-Get it working on your machine. Use self-verification loops: run tests, check UI, hit endpoints.
-
-### Push to Prod
-
-Don't wait for "done." Push early, use feature toggles if needed. Verify it works on prod.
-
-### Checkpoint
-
-Summarize what was done. Ask if alignment is still good. Update the progress doc.
-
-### Repeat
-
-Pick the next slice. Ask: "Is this the right size step? Should we go smaller?"
+| Step | What | Notes |
+|------|------|-------|
+| **Pick a slice** | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. |
+| **Test first** | Write a failing test. Then make it pass. | TDD. |
+| **Implement locally** | Get it working. Run tests, check UI, hit endpoints. | Self-verification loops. |
+| **Checkpoint** | Summarize progress. Ask user if still aligned. | Do this often. |
+| **Push to prod** | Don't wait for "done." Feature toggle if needed. | Verify on prod. |
+| **Update progress doc** | Record decisions, next step. | Keep it current. |
+| **Repeat** | Propose next slice. Ask: "Right size? Go smaller?" | Continuous alignment. |
 
