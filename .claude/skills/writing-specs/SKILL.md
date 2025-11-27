@@ -32,13 +32,23 @@ Present section outline. Get approval or adjust.
 
 Create `docs/thing.spec.md`. For each section:
 
-| Step | Action                                         |
-| ---- | ---------------------------------------------- |
-| 1    | Write section to file                          |
-| 2    | Commit and push to `main`                      |
-| 3    | PAUSE - ask for feedback via `AskUserQuestion` |
-| 4    | Edit if needed, commit again                   |
-| 5    | Move to next section when approved             |
+| Step | Action |
+|------|--------|
+| 1 | Write section to file |
+| 2 | Commit and push to `main` |
+| 3 | PAUSE - get feedback (see below) |
+| 4 | Apply changes if needed, commit and push again |
+| 5 | Move to next section when approved |
+
+**Feedback via `AskUserQuestion` - three questions:**
+
+| Question | Options |
+|----------|---------|
+| Feedback on this section? | "None/looks good", "Needs changes" |
+| Other thoughts? (updates to previous sections, new ideas...) | "No", "Yes - I'll describe" |
+| Next section? | List from outline + "Done" |
+
+If other thoughts require changes to previous sections: edit them, commit and push, then continue.
 
 Git commits after every change = easy rollback, clear history, checkpoints.
 
