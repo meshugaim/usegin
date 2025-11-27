@@ -7,24 +7,42 @@ description: Analyze Claude Code sessions for retrospective improvements. Trigge
 
 Analyze a Claude Code session to identify friction points and propose improvements.
 
-## Usage
+## Workflow
+
+### Step 1: Parse the Session
 
 ```bash
-# Parse session first
 bun session-parser/src/cli.ts <session.jsonl> --tool-input --subagents
 ```
 
-## What to Look For
+### Step 2: Identify Issues
 
-### Friction Points
+Look for:
+
+**Friction Points:**
 - Multiple similar tool calls (searching/guessing)
 - Failed approaches that had to be retried
 - Long outputs that weren't used
 - Subagents spawned but abandoned
 
-### Skill Gaps
+**Skill Gaps:**
 - Domain patterns Claude didn't know
 - Missing guidance that would have helped
+
+### Step 3: Propose Improvements
+
+For each issue, determine:
+- **Type:** skill-refinement | new-skill | skill-deprecation | claude-md | tooling
+- **Confidence:** high | medium | low
+- **What to change** and why
+
+### Step 4: Create Proposals (CI only)
+
+In CI, for HIGH or MEDIUM confidence proposals, use the `creating-retro-proposals` skill to create proposal branches.
+
+Read: `.claude/skills/creating-retro-proposals/SKILL.md`
+
+Skip LOW confidence proposals - just note them in output.
 
 ## Output Format
 
@@ -41,6 +59,12 @@ bun session-parser/src/cli.ts <session.jsonl> --tool-input --subagents
 **Type:** skill-refinement | new-skill | claude-md
 **Confidence:** high | medium | low
 **Description:** [what to change]
+
+## Proposals Created (CI only)
+- `retro/proposals/<id>-<slug>` - [description]
+
+## Low-Confidence Observations
+- [observations not turned into proposals]
 ```
 
 ## Session File Location
