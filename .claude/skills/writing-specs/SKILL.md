@@ -52,7 +52,7 @@ Create `docs/thing.spec.md` and write sections directly into it, one at a time.
 
 For each section:
 1. Write the section directly into the spec file
-2. Commit the change with a clear message
+2. Commit the change with a clear message, and push it to `main`
 3. ¡PAUSE! User reviews and provides feedback
    - use the `AskUserQuestion` tool to get feedback. Two questions: 1. any feedback (quick option - "none") 2. choices for next section to write including an option to end the process
 4. If changes needed, edit and commit again
