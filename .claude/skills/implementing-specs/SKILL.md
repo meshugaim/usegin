@@ -11,16 +11,16 @@ Turn specs into working software through vertical slices, TDD, and continuous al
 
 ## Core Principles
 
-| Principle | Why |
-|-----------|-----|
-| **Vertical slices** | End-to-end functionality over horizontal layers. Get to prod fast. |
-| **No upfront master plan** | Only plan the next step. Discover as you go. |
-| **TDD** | Tests first. Start local, verify the slice works, push to prod, verify on prod. |
-| **User in the loop** | Ask questions, verify alignment, summarize often. |
-| **Small iterations** | Short cycles, small commits, frequent checkpoints. |
-| **Meta process** | Check pace with user often. Slow down when uncertain. Ask: "Should we take smaller steps?" |
-| **Self-verification** | Get into feedback loops to verify your own work (run tests, check UI, hit endpoints). |
-| **Feature toggles** | Use them to get incomplete work to prod safely. |
+| Principle                  | Why                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------ |
+| **Vertical slices**        | End-to-end functionality over horizontal layers. Get to prod fast.                         |
+| **No upfront master plan** | Only plan the next step. Discover as you go.                                               |
+| **TDD**                    | Tests first. Start local, verify the slice works, push to prod, verify on prod.            |
+| **User in the loop**       | Ask questions, verify alignment, summarize often.                                          |
+| **Small iterations**       | Short cycles, small commits, frequent checkpoints.                                         |
+| **Meta process**           | Check pace with user often. Slow down when uncertain. Ask: "Should we take smaller steps?" |
+| **Self-verification**      | Get into feedback loops to verify your own work (run tests, check UI, hit endpoints).      |
+| **Feature toggles**        | Use them to get incomplete work to prod safely.                                            |
 
 ## Progress Doc
 
@@ -40,15 +40,15 @@ Update it as you go. It's a living record, not a contract.
 
 Guidelines, not a strict process. Adapt to the situation.
 
-| Step | What | Notes |
-|------|------|-------|
-| **Pick a slice** | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. Discuss feature toggle strategy early. |
-| **Test first** | Write a failing test. Then make it pass. | TDD. |
-| **Implement locally** | Get it working. Run tests, check UI, hit endpoints. | Self-verification loops. |
-| **Checkpoint** | Summarize progress. Ask user if still aligned. | Do this often. |
-| **Push to prod** | Don't wait for "done." Feature toggle if needed. | Verify on prod. Be careful not to break things. |
-| **Update progress doc** | Record decisions, next step. | Keep it current. |
-| **Repeat** | Propose next slice. Ask: "Right size? Go smaller?" | Continuous alignment. |
+| Step                    | What                                                        | Notes                                                                                   |
+| ----------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Pick a slice**        | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. Discuss feature toggle strategy early. |
+| **Test first**          | Write a failing test. Then make it pass.                    | TDD.                                                                                    |
+| **Implement locally**   | Get it working. Run tests, check UI, hit endpoints.         | Self-verification loops.                                                                |
+| **Checkpoint**          | Summarize progress. Ask user if still aligned.              | Do this often.                                                                          |
+| **Push to prod**        | Don't wait for "done." Feature toggle if needed.            | Verify on prod. Be careful not to break things.                                         |
+| **Update progress doc** | Record decisions, next step.                                | Keep it current.                                                                        |
+| **Repeat**              | Propose next slice. Ask: "Right size? Go smaller?"          | Continuous alignment.                                                                   |
 
 ## Checkpoints
 
@@ -62,12 +62,12 @@ Checkpoint often. Use `AskUserQuestion` to stay aligned.
 
 **What to cover:**
 
-| Type | Examples |
-|------|----------|
-| Summary | "Here's what I just did..." |
-| Alignment | "Does this match what you expected?" |
-| Next step | "I'm thinking we do X next. Sound right?" |
-| Meta | "Should we take smaller steps?" "Is this pace working?" |
+| Type      | Examples                                                |
+| --------- | ------------------------------------------------------- |
+| Summary   | "Here's what I just did..."                             |
+| Alignment | "Does this match what you expected?"                    |
+| Next step | "I'm thinking we do X next. Sound right?"               |
+| Meta      | "Should we take smaller steps?" "Is this pace working?" |
 
 **Summaries:** Keep them concise. Focus on decisions made, not implementation details. Offer deeper discussion if user wants it.
 
