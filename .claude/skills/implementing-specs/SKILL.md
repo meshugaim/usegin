@@ -65,10 +65,25 @@ This prevents lost work, makes rollback easier, and keeps the progress visible t
 
 ## Automated Tests
 
-Try to write automated tests when possible.
+**Every slice needs tests.** Don't ship code without test coverage.
 
-- Write tests before or alongside implementation (TDD preferred)
-- Run tests after implementing to verify
+| Rule | Why |
+|------|-----|
+| **Write tests for every slice** | Untested code is a liability. Tests are not optional. |
+| **TDD when possible** | Write failing test first, then make it pass. Catches design issues early. |
+| **Run tests before committing** | Never commit code that breaks existing tests. |
+| **Check coverage gaps** | After implementing, ask: "What isn't tested?" Add tests before moving on. |
+
+**Red flags to watch for:**
+- "I'll add tests later" → Add them now
+- "It's just a small change" → Small changes still need tests
+- Manual testing only → If you tested it manually, write an automated test for it
+- Existing tests don't cover new code → Add tests before the slice is "done"
+
+**Before marking a slice complete, verify:**
+1. Tests exist for the new functionality
+2. All tests pass
+3. Edge cases are covered
 
 ## Checkpoints
 
