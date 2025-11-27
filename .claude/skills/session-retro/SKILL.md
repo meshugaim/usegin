@@ -7,6 +7,8 @@ description: Analyze Claude Code sessions and create GitHub issues for suggested
 
 Analyze a Claude Code session to identify friction points and create GitHub issues for suggested improvements.
 
+**Skills are the unit of evolution.** Improvements should flow back to skills - refining existing ones or seeding new ones. This creates a flywheel: sessions surface friction → skills get better → future sessions improve.
+
 ## Workflow
 
 ### Step 1: Parse the Session
@@ -30,6 +32,32 @@ Look for:
 - Domain patterns Claude didn't know
 - Missing guidance that would have helped
 
+### Step 2b: Attribute to Skills
+
+If an improvement relates to work done as part of an active skill, target the improvement at that skill.
+
+- Skill was active + friction occurred → update that skill
+- No skill active + repeatable pattern → consider proposing a seed skill
+- Truly project-wide → target CLAUDE.md
+
+**Placeholder skills** are lightweight seeds for patterns not yet mature:
+```markdown
+---
+name: <pattern-name>
+description: <normal description>. Triggered by "<trigger>".
+---
+
+# <Pattern Name>
+
+**Status:** Placeholder - needs more observations
+
+## Pattern Observed
+<what happened>
+
+## Potential Guidance
+<rough ideas, to be refined>
+```
+
 ### Step 3: Create GitHub Issues
 
 For each concrete improvement, create a GitHub issue:
@@ -51,6 +79,10 @@ gh issue create \
 
 - <file or area to change>
 - <what to change>
+
+## Skill Attribution
+
+- **Target:** `<skill-name>` | `CLAUDE.md` | `new placeholder skill: <name>`
 
 ## Source
 
