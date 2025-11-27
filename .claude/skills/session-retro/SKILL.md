@@ -99,3 +99,7 @@ Skip creating issues for:
 - Vague observations without concrete fixes
 - Patterns seen only once (note them, wait for repetition)
 - Changes that need more investigation first
+
+## Known Issues (don't re-create)
+
+- Unnecessary warmup exploration in skill subagents (#13)
