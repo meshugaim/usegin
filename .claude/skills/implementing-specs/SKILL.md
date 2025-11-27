@@ -24,15 +24,15 @@ Turn specs into working software through vertical slices, TDD, and continuous al
 
 ## Progress Doc
 
-Keep a `PROGRESS.md` next to the spec (e.g., `docs/specs/auth/PROGRESS.md`).
-
-**Purpose:** Track what's been decided and where we stand. Not a plan for everything ahead.
+Keep an `<feature>.impl-status.md` next to the spec (e.g., `docs/specs/auth.impl-status.md` alongside `auth.spec.md`).
 
 **What to include:**
+- Meta section at top: purpose of doc, link to spec
+- Next step (keep at top, write in reverse chronological order)
 - Decisions made along the way
-- Current status / next step
-- Links to relevant commits or PRs
 - Open questions
+
+The doc itself should state its purpose: "This is not a full plan upfront. It tracks ongoing decisions and progress."
 
 Update it as you go. It's a living record, not a contract.
 
