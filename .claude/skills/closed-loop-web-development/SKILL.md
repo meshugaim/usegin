@@ -1,96 +1,104 @@
 ---
 name: closed-loop-web-development
-description: This skill should be used for autonomous web development with visual feedback. Triggered by phrases like "fix the UI", "adjust the styling", "add a new feature", or "iterate on this". Uses Chrome DevTools MCP to verify changes in a closed feedback loop.
+description: This skill enables autonomous web development with visual feedback. Triggered by phrases like "fix the UI", "adjust the styling", "add a new feature", or "iterate on this". Uses Chrome DevTools MCP to verify changes in a closed feedback loop.
 ---
 
 # Closed Loop Web Development
 
-## Overview
+Iterate on UI fixes and features by making code changes and visually verifying them using Chrome DevTools MCP.
 
-Iterate on UI fixes and features by making code changes and visually verifying them using Chrome DevTools MCP. This enables a tight feedback loop for UI development.
+**Prerequisites:** Run the `browser-testing-setup` skill first to ensure environment is ready.
 
 ## When to Use
 
-Use this skill when:
 - Fixing UI bugs or styling issues
 - Adding new UI features or components
-- Adjusting layouts, colors, spacing, or other visual elements
+- Adjusting layouts, colors, spacing
 - User asks to test changes in the browser
 - Need to verify UI changes visually
 
-## Prerequisites
+## The Loop
 
-- Chrome running with remote debugging (via `just chrome-start` or pm2)
-- Dev server running: start it with `just dev`
-- App accessible at http://localhost:3000
-- Chrome DevTools MCP tools available (tools starting with `mcp__chrome-devtools__`)
+```
+┌─────────────────────────────────────────┐
+│  1. Take snapshot (understand current)  │
+│              ↓                          │
+│  2. Edit code                           │
+│              ↓                          │
+│  3. Reload page                         │
+│              ↓                          │
+│  4. Take snapshot (verify change)       │
+│              ↓                          │
+│  5. Repeat or done                      │
+└─────────────────────────────────────────┘
+```
 
 ## Workflow
 
-### Step 1: Verify Chrome DevTools MCP is Available
+### 1. Navigate to Target Page
 
-**IMPORTANT**: Before proceeding, verify you have access to Chrome DevTools MCP tools.
-
-Try calling `mcp__chrome-devtools__list_pages`. If this fails with "No such tool available":
-
-1. **Verify Chrome is running**:
-   ```bash
-   just chrome-status
-   # Should show "online" status
-
-   # Also verify the debug port is responding:
-   curl -s http://127.0.0.1:9222/json/version
-   ```
-
-2. **If Chrome is running but MCP tools aren't available**:
-   - STOP and ask the user to **restart Claude Code** so the MCP server connection is re-established
-   - The Chrome DevTools MCP needs to be loaded at Claude startup
-   - Say: "Chrome is running but I don't have access to the Chrome DevTools MCP tools. Please restart Claude Code to reload the MCP connection, then try again."
-
-3. **If Chrome is not running**:
-   ```bash
-   just chrome-start
-   ```
-   Then ask the user to restart Claude Code.
-
-### Step 2: Ensure Dev Server is Running
-
-```bash
-# Check if dev server is running
-lsof -ti:3000,8000
-
-# If not running, start it
-just dev
+```
+mcp__chrome-devtools__navigate_page with url and type="url"
 ```
 
-### Step 3: Connect to Chrome and Navigate to App
+### 2. Take Initial Snapshot
 
-```bash
-# List pages to confirm connection
-mcp__chrome-devtools__list_pages
-
-# Navigate to the app
-mcp__chrome-devtools__navigate_page --type url --url http://localhost:3000
+```
+mcp__chrome-devtools__take_snapshot
 ```
 
-### Step 4: Sign In (if needed)
+Understand current state before making changes.
 
-If redirected to sign-in page:
+### 3. Edit Code
 
-1. Fill in email (use `nitsan@askeffi.ai` or user-specified email):
-```bash
-mcp__chrome-devtools__fill --uid <email-input-uid> --value "nitsan@askeffi.ai"
+Make changes to the relevant component/file.
+
+### 4. Reload and Verify
+
+```
+mcp__chrome-devtools__navigate_page with type="reload"
+mcp__chrome-devtools__take_snapshot
 ```
 
-2. Click send magic link button
+Check if the change had the intended effect.
 
-3. Get magic link from user or check server logs for the verification URL
+### 5. Iterate
 
-4. Navigate to the magic link URL to complete authentication
+Repeat until the UI matches expectations.
 
-### Step 5: Navigate to Relevant Page
+## Authentication
 
-Navigate to the page you need to work on (e.g., `/dashboard`, `/settings`, etc.)
+If redirected to sign-in:
 
-### Step 6: Iterate
+1. Take snapshot → find email input
+2. Fill email (e.g., `owner@test.local`)
+3. Click submit
+4. Navigate to Mailpit (`http://127.0.0.1:54324`)
+5. Find and click magic link
+6. Navigate to magic link URL
 
+### React Form Workaround
+
+If `fill` doesn't trigger React state:
+
+```javascript
+mcp__chrome-devtools__evaluate_script with function:
+(el) => {
+  el.focus();
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  setter.call(el, 'owner@test.local');
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return 'Done';
+}
+// Pass element via args: [{ uid: "<input-uid>" }]
+```
+
+## Tips
+
+| Tip | Why |
+|-----|-----|
+| Prefer `take_snapshot` over `take_screenshot` | More token-efficient |
+| Reload after code changes | Hot reload may not catch all changes |
+| Check console for errors | `mcp__chrome-devtools__list_console_messages` |
+| Multiple iterations are normal | UI work is inherently iterative |
