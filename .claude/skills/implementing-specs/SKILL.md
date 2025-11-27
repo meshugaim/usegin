@@ -75,13 +75,7 @@ Checkpoint often. Use `AskUserQuestion` to stay aligned.
 
 Get into feedback loops to verify your own work before asking the user.
 
-| Technique | When |
-|-----------|------|
-| Run tests | After any code change |
-| Check UI | After frontend changes (use `closed-loop-web-development` patterns) |
-| Hit endpoints | After API changes |
-| Check logs | When debugging or verifying prod |
-| Build locally | Before pushing |
+**Examples:** Run tests, check UI visually, hit endpoints, check logs, build locally. Use whatever makes sense for the change.
 
 Don't wait for user to tell you something is broken. Catch it yourself.
 
