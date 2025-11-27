@@ -67,17 +67,20 @@ For each branch to merge:
 
 **If conflicts are complex:** Ask user for guidance on resolution strategy.
 
-#### 3.3 Test the Build
+#### 3.3 Test the Build (if relevant)
 
-After successful merge (with or without conflicts):
+First, check which files changed:
 
 ```bash
-# For Next.js app
-cd nextjs-app && bun run build && cd ..
-
-# For Python services (if changes touch python-services/)
-# TBD
+git diff --name-only HEAD~1
 ```
+
+Only run builds if relevant code changed:
+- **nextjs-app/**: `cd nextjs-app && bun run build`
+- **python-services/**: `cd python-services && uv run pytest`
+- **session-parser/**: `cd session-parser && bun test`
+- **retro/**: `cd retro && bun test`
+- **Docs/config only** (CLAUDE.md, .github/, etc.): Skip build
 
 #### 3.4 Fix Build Errors (if any)
 
