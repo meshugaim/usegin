@@ -1,5 +1,5 @@
 ---
-description: run retro on current session
+description: push session for retro analysis
 ---
 
-Run retro on this session using the `session-retro` skill.
+Push this session to CI for retro analysis using the `pushing-session-to-retro` skill.
