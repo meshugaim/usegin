@@ -54,7 +54,7 @@ Guidelines, not a strict process. Adapt to the situation.
 
 ## Commit Often
 
-**Always commit.** Don't ask "should I commit?" - the answer is yes.
+Default to committing. When in doubt, commit.
 
 | Situation | Action |
 |-----------|--------|
@@ -62,9 +62,9 @@ Guidelines, not a strict process. Adapt to the situation.
 | Tests passing | Commit and push |
 | Fixed a bug | Commit and push |
 | About to start something risky | Commit current state first |
-| User says "ready for next step" | Commit first, then proceed |
+| Moving to next task | Commit first, then proceed |
 
-**Never** stay in uncommitted state between slices. If you're about to move on to the next thing, commit what you have first.
+Avoid staying in uncommitted state between slices.
 
 ## Automated Tests
 
