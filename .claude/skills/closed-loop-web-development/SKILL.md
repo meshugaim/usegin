@@ -7,7 +7,7 @@ description: This skill enables autonomous web development with visual feedback.
 
 Iterate on UI fixes and features by making code changes and visually verifying them using Chrome DevTools MCP.
 
-**Prerequisites:** !IMPORTANT! Run the `browser-testing-setup` skill first to ensure environment is ready.
+**Prerequisites:** !IMPORTANT! Run the `browser-testing-setup` skill first to ensure environment is ready, and more info about local/prod supabase and users.
 
 ## When to Use
 
