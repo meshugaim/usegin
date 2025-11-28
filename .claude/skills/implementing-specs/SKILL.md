@@ -116,22 +116,9 @@ Does this approach sound right?
 
 The goal is to align on *what* to test and *how* to test it, not to list every test name upfront.
 
-### Test Types Required
+### What to Test
 
-| Layer        | Unit Tests                                | Integration Tests                                  |
-| ------------ | ----------------------------------------- | -------------------------------------------------- |
-| **Backend**  | Service functions, data models, utilities | API endpoints, database queries, external services |
-| **Frontend** | Components, hooks, utilities              | Page rendering, API calls, user flows              |
-
-### What Must Be Tested
-
-| Component             | Required Tests                                    |
-| --------------------- | ------------------------------------------------- |
-| **Service functions** | All public methods with success + error cases     |
-| **API endpoints**     | Request/response validation, auth, error handling |
-| **React components**  | Props handling, user interactions, state changes  |
-| **Data models**       | Validation, serialization, edge cases             |
-| **Database queries**  | RLS policies, constraints, migrations             |
+Both backend and frontend need unit tests (isolated logic) and integration tests (end-to-end flows).
 
 ### Red Flags - Stop and Add Tests
 
