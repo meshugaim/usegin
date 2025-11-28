@@ -44,8 +44,8 @@ Guidelines, not a strict process. Adapt to the situation.
 
 | Step                    | What                                                        | Notes                                                                                   |
 | ----------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Pick a slice**        | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. Discuss feature toggle strategy early. |
-| **Plan tests first**    | Draft test plan for the slice. Get user approval.           | Use `AskUserQuestion` to confirm test approach before writing code.                     |
+| **Pick a slice**        | Propose the smallest vertical slice to user. Get alignment. | End-to-end, not layer-by-layer. Decide together. Discuss **feature toggle** strategy early. |
+| **Plan tests first**    | Discuss with the user which tests to write.                 | Use `AskUserQuestion` to confirm test approach before writing code.                     |
 | **Write failing tests** | Write the tests. Watch them fail.                           | TDD. Tests first, implementation second. No exceptions.                                 |
 | **Implement**           | Write minimal code to pass tests.                           | Only what's needed to make tests green.                                                 |
 | **Self-verify**         | Run tests, check UI, hit endpoints.                         | Use `closed-loop-web-development` skill for UI verification.                            |
@@ -58,13 +58,13 @@ Guidelines, not a strict process. Adapt to the situation.
 
 Default to committing. When in doubt, commit.
 
-| Situation | Action |
-|-----------|--------|
-| Completed a slice | Commit and push |
-| Tests passing | Commit and push |
-| Fixed a bug | Commit and push |
+| Situation                      | Action                     |
+| ------------------------------ | -------------------------- |
+| Completed a slice              | Commit and push            |
+| Tests passing                  | Commit and push            |
+| Fixed a bug                    | Commit and push            |
 | About to start something risky | Commit current state first |
-| Moving to next task | Commit first, then proceed |
+| Moving to next task            | Commit first, then proceed |
 
 Avoid staying in uncommitted state between slices.
 
@@ -118,10 +118,10 @@ Options:
 
 ### Test Types Required
 
-| Layer | Unit Tests | Integration Tests |
-|-------|------------|-------------------|
-| **Backend (Python)** | Service functions, data models, utilities | API endpoints, database queries, external services |
-| **Frontend (TypeScript)** | Components, hooks, utilities | Page rendering, API calls, user flows |
+| Layer                     | Unit Tests                                | Integration Tests                                  |
+| ------------------------- | ----------------------------------------- | -------------------------------------------------- |
+| **Backend (Python)**      | Service functions, data models, utilities | API endpoints, database queries, external services |
+| **Frontend (TypeScript)** | Components, hooks, utilities              | Page rendering, API calls, user flows              |
 
 ### Backend Testing (Python)
 
@@ -154,13 +154,13 @@ test("ProjectChatPage shows project name", async () => {
 
 ### What Must Be Tested
 
-| Component | Required Tests |
-|-----------|----------------|
-| **Service functions** | All public methods with success + error cases |
-| **API endpoints** | Request/response validation, auth, error handling |
-| **React components** | Props handling, user interactions, state changes |
-| **Data models** | Validation, serialization, edge cases |
-| **Database queries** | RLS policies, constraints, migrations |
+| Component             | Required Tests                                    |
+| --------------------- | ------------------------------------------------- |
+| **Service functions** | All public methods with success + error cases     |
+| **API endpoints**     | Request/response validation, auth, error handling |
+| **React components**  | Props handling, user interactions, state changes  |
+| **Data models**       | Validation, serialization, edge cases             |
+| **Database queries**  | RLS policies, constraints, migrations             |
 
 ### Red Flags - Stop and Add Tests
 
