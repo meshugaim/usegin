@@ -92,65 +92,36 @@ Ask yourself before each slice:
 
 If yes to any, add a feature flag. Discuss strategy with user via `AskUserQuestion`.
 
-**Example `AskUserQuestion` for test plan approval:**
+**Example `AskUserQuestion` for pre-implementation approval:**
 ```
-Before implementing this slice, I need your approval on the approach:
+Before implementing this slice, I need your approval:
 
 **Feature Flag:** Not needed - this is additive and won't break existing functionality.
 
-**Test Plan:**
+**Testing Approach:**
 
-Backend (Python):
-- Unit: test_project_service_get_project_success
-- Unit: test_project_service_get_project_not_found
-- Integration: test_chat_service_with_project_context
+Backend:
+- Unit tests for the new service function (success + error cases)
+- Mock Supabase client to test in isolation
 
-Frontend (TypeScript):
-- Unit: test_chat_interface_passes_project_id
-- Integration: test_project_chat_page_renders
+Frontend:
+- Component test to verify prop is passed correctly
+- Integration test via Chrome DevTools to verify end-to-end flow
 
-Options:
-1. Looks good, proceed
-2. Add more tests (specify)
-3. Need feature flag (explain why)
-4. Other changes needed
+**What I won't test (and why):**
+- Existing dashboard chat - already covered, just manual regression check
+
+Does this approach sound right?
 ```
+
+The goal is to align on *what* to test and *how* to test it, not to list every test name upfront.
 
 ### Test Types Required
 
-| Layer                     | Unit Tests                                | Integration Tests                                  |
-| ------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| **Backend (Python)**      | Service functions, data models, utilities | API endpoints, database queries, external services |
-| **Frontend (TypeScript)** | Components, hooks, utilities              | Page rendering, API calls, user flows              |
-
-### Backend Testing (Python)
-
-```python
-# Unit test - mock external dependencies
-def test_project_service_get_project_success(monkeypatch):
-    monkeypatch.setenv("SUPABASE_URL", "https://fake.supabase.co")
-    with patch("agent_api.project_service.create_client") as mock:
-        # ... test logic
-
-# Integration test - real database (local Supabase)
-@pytest.mark.asyncio
-async def test_chat_with_project_context():
-    # Uses real local Supabase, tests full flow
-```
-
-### Frontend Testing (TypeScript)
-
-```typescript
-// Unit test - component behavior
-test("ChatInterface passes projectId to API", async () => {
-  // Mock fetch, verify projectId in request body
-});
-
-// Integration test - page rendering
-test("ProjectChatPage shows project name", async () => {
-  // Render page, verify project context displayed
-});
-```
+| Layer        | Unit Tests                                | Integration Tests                                  |
+| ------------ | ----------------------------------------- | -------------------------------------------------- |
+| **Backend**  | Service functions, data models, utilities | API endpoints, database queries, external services |
+| **Frontend** | Components, hooks, utilities              | Page rendering, API calls, user flows              |
 
 ### What Must Be Tested
 
