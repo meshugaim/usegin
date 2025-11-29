@@ -24,41 +24,28 @@ Use this skill when the user:
 
 ## Workflow
 
-### 1. Check tmux availability
+### 1. Open session picker (single command!)
+
+Run this command - it handles everything (tmux popup, polling, cleanup):
 
 ```bash
-echo "TMUX: ${TMUX:-not set}"
+bun /workspaces/test-mvp/session-parser/src/cli.ts pick
 ```
 
-If not in tmux, inform the user they need to run Claude inside tmux for this feature.
+Options:
+- `--all-projects` - Show sessions from all projects
+- `--since 1d` - Filter to recent sessions
 
-### 2. Open session browser via tmux popup
+This:
+1. Opens a tmux popup with the session browser
+2. User searches/selects a session and presses Enter
+3. Outputs JSON with session info
 
-Run this command to open an interactive session picker:
+**Tell the user:** "I've opened the session browser. Please select a session and press Enter."
 
-```bash
-tmux popup -E -w 80% -h 80% "bun /workspaces/test-mvp/session-parser/src/cli.ts find --output-file /tmp/claude-session-ref.json"
-```
+### 2. Parse the output
 
-This opens a popup with fzf session browser. The user can:
-- Search/filter sessions
-- Preview session content
-- Press Enter to select
-
-### 3. Wait for user selection
-
-Tell the user:
-> I've opened the session browser. Please select a session and press Enter.
-
-### 4. Read the selected session
-
-After the popup closes, read the output file:
-
-```bash
-cat /tmp/claude-session-ref.json
-```
-
-This returns JSON with:
+The command outputs JSON:
 ```json
 {
   "path": "/path/to/session.jsonl",
@@ -69,7 +56,7 @@ This returns JSON with:
 }
 ```
 
-### 5. Parse the session content
+### 3. Parse the session content
 
 Use a subagent to parse and summarize the session:
 
@@ -83,7 +70,7 @@ Instructions for subagent:
 4. Return a concise summary to help continue the conversation
 ```
 
-### 6. Provide context to user
+### 4. Provide context to user
 
 Share the summary with the user and offer to:
 - Continue where that session left off
@@ -96,14 +83,14 @@ Share the summary with the user and offer to:
 User: "Remember that session where we implemented the auth flow? I want to do something similar."
 
 Claude: I'll open the session browser for you to find that session.
-[Runs tmux popup command]
+[Runs: bun /workspaces/test-mvp/session-parser/src/cli.ts pick]
 
 Claude: Please select the session in the popup and press Enter.
 
-[User selects session, popup closes]
+[User selects session, popup closes, command outputs JSON]
 
-Claude: [Reads /tmp/claude-session-ref.json]
-Claude: [Spawns subagent to parse session]
+Claude: [Parses JSON output]
+Claude: [Spawns subagent to parse session file]
 
 Claude: Found it! In that session from Nov 15th, we implemented JWT-based authentication:
 - Created auth middleware in src/middleware/auth.ts
@@ -119,11 +106,11 @@ Would you like me to use a similar approach for the current task?
 - If user is vague, suggest they search for keywords in the session browser
 - The session browser shows summaries and user messages to help identification
 - Multiple sessions can be referenced by running the workflow multiple times
-- Clean up temp files after use: `rm /tmp/claude-session-ref.json`
+- Use `--all-projects` if the session might be from a different project
 
 ## Fallback
 
-If not in tmux:
+If not in tmux (command will error):
 > To reference previous sessions interactively, please run Claude inside tmux.
 > Alternatively, you can manually find and provide the session path, and I can parse it directly.
 
