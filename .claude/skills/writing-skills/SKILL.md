@@ -59,3 +59,4 @@ Create `.claude/skills/<name>/SKILL.md`. For each section:
 | Tables over prose | Walls of text |
 | Actionable steps | Vague guidance |
 | Specific examples | Abstract descriptions |
+| TL;DR at the top | Bury the key points |
