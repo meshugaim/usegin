@@ -73,7 +73,7 @@ If redirected to sign-in:
 1. Take snapshot → find email input
 2. Fill email (e.g., `owner@test.local`)
 3. Click submit
-4. Navigate to Mailpit (`http://127.0.0.1:54324`)
+4. Navigate to (or curl) Mailpit (`http://127.0.0.1:54324`)
 5. Find and click magic link
 6. Navigate to magic link URL
 
@@ -94,6 +94,34 @@ mcp__chrome-devtools__evaluate_script with function:
 // Pass element via args: [{ uid: "<input-uid>" }]
 ```
 
+## Multi-Agent Browser Sharing
+
+When multiple agents may be working in the same browser simultaneously, each agent should use its own dedicated tab to avoid conflicts.
+
+### Setup Your Own Tab
+
+1. **List existing pages** to see what's open:
+   ```
+   mcp__chrome-devtools__list_pages
+   ```
+
+2. **Create a new tab** for your work:
+   ```
+   mcp__chrome-devtools__new_page with url="<your-target-url>"
+   ```
+
+3. **Select your tab** by index before any operation:
+   ```
+   mcp__chrome-devtools__select_page with pageIdx=<your-tab-index>
+   ```
+
+### Best Practices
+
+- Always create a **new tab** at the start of your session instead of reusing existing ones
+- **Remember your tab index** and re-select it if you suspect another agent may have changed the active page
+- Before taking snapshots or interacting, verify you're on the correct page with `list_pages`
+- When done, you can close your tab with `mcp__chrome-devtools__close_page` (optional, but keeps things tidy)
+
 ## Tips
 
 | Tip | Why |
@@ -102,3 +130,4 @@ mcp__chrome-devtools__evaluate_script with function:
 | Reload after code changes | Hot reload may not catch all changes |
 | Check console for errors | `mcp__chrome-devtools__list_console_messages` |
 | Multiple iterations are normal | UI work is inherently iterative |
+| Use your own tab in multi-agent setups | Prevents conflicts with other agents |
