@@ -20,20 +20,20 @@ Sync `~/.claude/` data between Gitpod environments for conversation continuity. 
 
 ```bash
 # List available environments
-bun run gitpod-claude-sync envs
-bun run gitpod-claude-sync envs --running
+claude-sync envs
+claude-sync envs --running
 
 # Pull sessions FROM remote TO local
-bun run gitpod-claude-sync pull <env> --all
-bun run gitpod-claude-sync pull <env> --all --dry-run
-bun run gitpod-claude-sync pull <env> abc123 def456  # specific sessions
+claude-sync pull <env> --all
+claude-sync pull <env> --all --dry-run
+claude-sync pull <env> abc123 def456  # specific sessions
 
 # Push sessions FROM local TO remote
-bun run gitpod-claude-sync push <env> --all
-bun run gitpod-claude-sync push <env> --full-sync   # includes todos, plans, etc.
+claude-sync push <env> --all
+claude-sync push <env> --full-sync   # includes todos, plans, etc.
 
 # List sessions on remote env
-bun run gitpod-claude-sync list <env>
+claude-sync list <env>
 ```
 
 ## Environment Targeting
@@ -49,19 +49,19 @@ bun run gitpod-claude-sync list <env>
 ### 1. Check Available Environments
 
 ```bash
-bun run gitpod-claude-sync envs --running
+claude-sync envs --running
 ```
 
 ### 2. Preview What Would Sync
 
 ```bash
-bun run gitpod-claude-sync pull <env> --all --dry-run
+claude-sync pull <env> --all --dry-run
 ```
 
 ### 3. Pull Sessions
 
 ```bash
-bun run gitpod-claude-sync pull <env> --all
+claude-sync pull <env> --all
 ```
 
 ### 4. Full Sync (Optional)
@@ -69,7 +69,7 @@ bun run gitpod-claude-sync pull <env> --all
 For todos, plans, history, and more:
 
 ```bash
-bun run gitpod-claude-sync pull <env> --full-sync
+claude-sync pull <env> --full-sync
 ```
 
 ## Sync Modes
