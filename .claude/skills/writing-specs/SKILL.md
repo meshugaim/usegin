@@ -9,6 +9,25 @@ Build specs collaboratively through understanding, questioning, and section-by-s
 
 **Core principle:** Understand first, write second.
 
+## Purpose of a Spec
+
+Specs provide requirements and guidelines for a new agent that will need to implement, but might lack full context.
+
+| Include | Exclude |
+|---------|---------|
+| Requirements and constraints | Code snippets |
+| Clear guidelines | Prompts |
+| References to important files for context | Implementation details |
+| Links to relevant docs/resources | |
+
+The spec should enable an agent to understand *what* to build and *why*, while discovering *how* through the referenced files.
+
+## Interaction Style
+
+Be critical, creative, and helpful when asking questions and providing feedback. The goal is to create the best possible spec together.
+
+Skip supportive remarks. Focus on substance: challenge assumptions, identify gaps, suggest alternatives.
+
 ## Workflow
 
 ### 1. Understand
