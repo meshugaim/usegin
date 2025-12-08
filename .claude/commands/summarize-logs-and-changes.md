@@ -4,50 +4,87 @@ description: Summarize agent logs and related git history
 
 !`date`
 
-I'll retrieve and summarize the agent conversation logs and related git history focusing on: $ARGUMENTS.
+I'll retrieve and summarize the agent conversation logs and related git history.
 
-see `~/agent-records/`
+## Arguments
+
+| Argument | Example | Description |
+|----------|---------|-------------|
+| `--date` | `--date 2025-12-07` | Specific date |
+| `--from` | `--from 2025-12-05` | Start of range |
+| `--to` | `--to 2025-12-07` | End of range |
+| `--username` | `--username nitsan-avni` | Filter by user |
+
+Examples:
+- `/summarize-logs-and-changes --date 2025-12-07`
+- `/summarize-logs-and-changes --from 2025-12-05 --username nitsan-avni`
+
+Current arguments: $ARGUMENTS
 
 ## Agent Records Structure
 
+```
 ~/agent-records/
 ├── {username}/
 │   └── YYYY-MM/
 │       └── YYYY-MM-DD/
 │           └── HHMMSS-conversation-*.txt
+```
 
 - Files are organized by: username → year-month → day → timestamp
 - Conversations are .txt files with HHMMSS timestamp prefixes
 - Warmup conversations start with exactly: USER:\nWarmup
 
-## Workflow
+## Step 1: Get Overview
 
-find all conversations relevant to $ARGUMENTS, excluding sub-agent conversations; the `just agent-records find` sub command will exclude those by default.
-You can use the following command: `just agent-records help`, and then start with the `just agent-records overview`.
-
-please avoid meta-summaries (summaries of summaries); avoid the parts of conversations that use the `/summaries...` commands, and be explicit about which sections were avoided by saying "(Summary section excluded to avoid meta-summary)".
-
-then for each conversation do:
-If there exists a `.summary.md` file, then use directly this one. This is basically the output of a previously executed sub-agent. 
-However, if it does not exist, then use a sub-agent as explained below. 
-in a sub-agent, provide these instructions to the sub-agent please:
-
-```markdown
-summarize the conversation. In your summary, please preserve the dialogue nature and the summary should tell the story of what happened and how it unfolded with key important moments. Don't need to preserve the full details.
-
-Ex:
-the user asked to ...
-the assistant suggested a few approaches to...
-the user then...
-the assistant then...
-
-But with more fluent language, and preserving the happenings.
-Important: who initiated what?
-
-Additionally, please find the relevant git changes in the main test-mvp repo (if there are any), and use them for a better understanding of the development process. start with `git log --oneline`, and for relevant commits use `git log --name-only` and potentially `git show`.
-
-Write your summary into a new file in the Agent Records repository with the exact same name as the original file, only with a summary suffix: `<file_name_without_extension>.summary.md` 
-Commit the summary file
+```bash
+just agent-records overview --from 2025-12-05 --to 2025-12-07
 ```
 
-when all sub agents are done, you now do the same for the arc of all conversations based on the sub agents reports.
+## Step 2: Find Conversations
+
+```bash
+just agent-records find --date 2025-12-07 --username nitsan-avni
+```
+
+## Workflow
+
+1. Run `just agent-records overview` with the relevant date arguments
+2. Run `just agent-records find` to locate specific conversations
+3. Exclude sub-agent conversations (excluded by default in `find`)
+4. Avoid meta-summaries - skip sections using `/summaries...` commands and note "(Summary section excluded to avoid meta-summary)"
+
+## Processing Each Conversation
+
+For each conversation found:
+
+**If `.summary.md` exists:** Use it directly (this is output from a previous sub-agent).
+
+**If no summary exists:** Spawn a sub-agent with these instructions:
+
+## Subagent Instructions for Missing Summaries
+
+For each conversation without a `.summary.md`:
+
+1. Read the conversation file
+2. Find related git commits: `git log --oneline --since="{date}" --until="{next_day}"`
+3. Write summary preserving dialogue nature - tell the story of what happened:
+   - Who initiated what?
+   - Key moments and how they unfolded
+   - Don't preserve full details, but capture the happenings
+4. For relevant commits, use `git log --name-only` and `git show` for context
+5. Save to: `{conversation_path_without_extension}.summary.md`
+6. Commit: `cd ~/agent-records && git add {file} && git commit -m "Add summary for {filename}"`
+
+## Arc Summary
+
+After all individual summaries are created, synthesize an arc summary:
+
+1. Review all sub-agent reports
+2. Write the arc summary covering the full narrative across all conversations
+3. Save to: `~/agent-records/{YYYY-MM-DD}-daily-summary.md`
+4. Commit and push:
+
+```bash
+cd ~/agent-records && git add . && git commit -m "Add daily summary for {date}" && git push
+```
