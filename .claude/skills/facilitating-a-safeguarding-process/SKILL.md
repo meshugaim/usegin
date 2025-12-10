@@ -29,7 +29,14 @@ Facilitate the 25-minute safeguarding process after a bug is fixed. Claude acts 
 
 ### Phase 0: Context Gathering (Proactive)
 
-**Orient yourself** before engaging deeply:
+**Step 1: Initial interview** - get user's starting context:
+
+| Question | Purpose |
+|----------|---------|
+| "What bug are we safeguarding?" | Identify the target |
+| "What's your understanding of it?" | Get their mental model first |
+
+**Step 2: Self-orient** - explore independently:
 
 | Activity | How |
 |----------|-----|
@@ -38,11 +45,11 @@ Facilitate the 25-minute safeguarding process after a bug is fixed. Claude acts 
 | Understand the code | Read affected files, understand what changed |
 | Gather timeline | When reported → when fixed → who involved |
 
-**Then interview the user** for their context:
+**Step 3: Follow-up interview** - dig deeper with new context:
 
 | Question | Purpose |
 |----------|---------|
-| "What's your understanding of the bug?" | Get their mental model |
+| "I found [X], does that match your understanding?" | Validate findings |
 | "What surprised you during the fix?" | Uncover hidden complexity |
 | "Who else was involved?" | Identify other perspectives |
 
