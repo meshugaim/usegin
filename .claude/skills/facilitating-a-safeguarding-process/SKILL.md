@@ -29,29 +29,9 @@ Facilitate the 25-minute safeguarding process after a bug is fixed. Claude acts 
 
 ### Phase 0: Context Gathering (Proactive)
 
-**Step 1: Initial interview** - get user's starting context:
-
-| Question | Purpose |
-|----------|---------|
-| "What bug are we safeguarding?" | Identify the target |
-| "What's your understanding of it?" | Get their mental model first |
-
-**Step 2: Self-orient** - explore independently:
-
-| Activity | How |
-|----------|-----|
-| Find bug docs | Search `docs/bugs/`, Sentry issues, GitHub issues |
-| Find the fix | Recent commits, PRs related to the bug |
-| Understand the code | Read affected files, understand what changed |
-| Gather timeline | When reported → when fixed → who involved |
-
-**Step 3: Follow-up interview** - dig deeper with new context:
-
-| Question | Purpose |
-|----------|---------|
-| "I found [X], does that match your understanding?" | Validate findings |
-| "What surprised you during the fix?" | Uncover hidden complexity |
-| "Who else was involved?" | Identify other perspectives |
+1. **Initial interview** - get user's starting context (identify the bug, their mental model)
+2. **Self-orient** - explore independently (bug docs, commits, code, timeline)
+3. **Follow-up interview** - dig deeper with your new context
 
 Summarize combined findings before starting RCA.
 
