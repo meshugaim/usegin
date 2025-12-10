@@ -13,7 +13,7 @@ Push the current session to CI for automated retro analysis.
 2. Push it using the script:
 
 ```bash
-bun retro/src/push-session.ts <session.jsonl>
+bun tools/retro/src/push-session.ts <session.jsonl>
 ```
 
 ## Session Location
@@ -38,5 +38,5 @@ ls -t ~/.claude/projects/*/*.jsonl | grep -v agent- | head -1
 
 Preview without pushing:
 ```bash
-bun retro/src/push-session.ts <session.jsonl> --dry-run
+bun tools/retro/src/push-session.ts <session.jsonl> --dry-run
 ```
