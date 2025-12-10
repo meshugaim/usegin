@@ -29,7 +29,7 @@ Facilitate the 25-minute safeguarding process after a bug is fixed. Claude acts 
 
 ### Phase 0: Context Gathering (Proactive)
 
-Before engaging the user, **orient yourself**:
+**Orient yourself** before engaging deeply:
 
 | Activity | How |
 |----------|-----|
@@ -37,7 +37,16 @@ Before engaging the user, **orient yourself**:
 | Find the fix | Recent commits, PRs related to the bug |
 | Understand the code | Read affected files, understand what changed |
 | Gather timeline | When reported → when fixed → who involved |
-| Summarize | Present findings: "Here's what I found about this bug..." |
+
+**Then interview the user** for their context:
+
+| Question | Purpose |
+|----------|---------|
+| "What's your understanding of the bug?" | Get their mental model |
+| "What surprised you during the fix?" | Uncover hidden complexity |
+| "Who else was involved?" | Identify other perspectives |
+
+Summarize combined findings before starting RCA.
 
 ### Phase 1: Root Cause Analysis — 10 min
 
