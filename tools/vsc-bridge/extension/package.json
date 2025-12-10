@@ -1,0 +1,27 @@
+{
+  "name": "vsc-bridge",
+  "displayName": "VSC Bridge",
+  "description": "HTTP bridge for CLI control of VSCode terminals",
+  "version": "0.1.13",
+  "publisher": "askeffi",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {},
+  "scripts": {
+    "compile": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "bun run compile -- --watch",
+    "package": "bun run compile && vsce package --no-dependencies --skip-license"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "esbuild": "^0.20.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

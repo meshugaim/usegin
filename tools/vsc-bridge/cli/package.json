@@ -1,0 +1,9 @@
+{
+  "name": "vsc-bridge-cli",
+  "version": "0.1.9",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "citty": "^0.1.6"
+  }
+}

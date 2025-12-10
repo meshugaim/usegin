@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# VSC Bridge CLI wrapper - runs via bun instead of compiled binary
+exec bun run "$(dirname "$0")/../cli/src/index.ts" "$@"
