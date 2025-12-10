@@ -1,6 +1,6 @@
 ---
 name: facilitating-a-safeguarding-process
-description: Facilitate the 25-minute safeguarding process after bug fixes. Triggered by "let's safeguard", "safeguarding session", or "safeguard this bug". Uses background sub-agents for independent brainstorming.
+description: Facilitate safeguarding after bug fixes. Triggered by "let's safeguard", "safeguarding session".
 ---
 
 # Facilitating a Safeguarding Process
