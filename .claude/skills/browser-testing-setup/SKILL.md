@@ -68,6 +68,15 @@ gitpod env ports list
 
 The Playwright MCP runs via Docker and provides browser automation tools. Use `mcp__playwright__*` tools for navigation, snapshots, clicking, typing, etc.
 
+### Persistent Sessions
+
+Browser sessions persist across Claude Code restarts. Once you sign in, the session is saved to `.ignored/playwright-storage/` and reused automatically. No need to go through the magic link flow every time.
+
+To clear the session (e.g., to test as a different user), delete the profile:
+```bash
+rm -rf .ignored/playwright-storage/profile
+```
+
 ### Troubleshooting
 
 | Issue | Solution |

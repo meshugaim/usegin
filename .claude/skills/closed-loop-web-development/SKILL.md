@@ -45,7 +45,9 @@ Use `mcp__playwright__*` tools for all browser interactions:
 
 ## Authentication
 
-If redirected to sign-in:
+Sessions persist across Claude Code restarts, so you usually won't need to sign in.
+
+If redirected to sign-in (first time or after clearing profile):
 
 1. Take snapshot → find email input
 2. Type email (e.g., `owner@test.local`) with `browser_type`
@@ -53,6 +55,8 @@ If redirected to sign-in:
 4. Navigate to Mailpit (`http://127.0.0.1:54324`)
 5. Find and click magic link
 6. Navigate to magic link URL
+
+To switch users, clear the profile: `rm -rf .ignored/playwright-storage/profile`
 
 ## Tips
 
