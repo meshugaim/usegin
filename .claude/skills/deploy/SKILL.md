@@ -18,9 +18,24 @@ Interactive pre-deployment checklist. Gather information, present status clearly
 
 **Key insight:** Pushing to `main` deploys to BOTH staging and production on Railway.
 
-## Pre-Deployment Checklist
+## Quick Start: Use the CLI
 
-Run these checks and present a clear summary before any deploy action.
+Run the preflight CLI to get instant status:
+
+```bash
+bun tools/preflight/src/cli.ts
+```
+
+Options:
+- `--json` - Output JSON for scripting
+- `--skip-railway` - Skip Railway checks
+- `--skip-supabase` - Skip Supabase checks
+
+The CLI runs all checks and provides a go/no-go recommendation.
+
+## Manual Checklist
+
+If you need to run checks individually:
 
 ### 1. Git Status
 
@@ -159,12 +174,22 @@ Then monitor:
 bun railway logs --build
 ```
 
-## Future: CLI Companion
+## CLI Details
 
-This skill is designed to eventually have a CLI companion that:
+The `preflight` CLI lives at `tools/preflight/` and automates all the checks above.
 
-1. Runs all checks automatically
-2. Produces a structured report (JSON/Markdown)
-3. Can be integrated into CI or pre-push hooks
+### Output Modes
 
-The skill documents the checks; the CLI automates them.
+**Pretty (default):** Colored tables with status icons
+**JSON (`--json`):** Machine-readable for scripting/CI
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | All checks pass or only warnings |
+| 1 | Blocking issues (no-go) |
+
+### Extending
+
+To add new checks, edit `tools/preflight/src/checks.ts` and add to the CLI in `tools/preflight/src/cli.ts`.
