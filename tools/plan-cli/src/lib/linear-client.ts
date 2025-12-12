@@ -163,6 +163,70 @@ export class LinearClient {
   }
 
   /**
+   * Get labels by name for a team
+   */
+  async getLabelIds(teamId: string, labelNames: string[]): Promise<string[]> {
+    const labels = await this.sdk.issueLabels({
+      filter: { team: { id: { eq: teamId } } },
+    });
+
+    const labelIds: string[] = [];
+    for (const name of labelNames) {
+      const label = labels.nodes.find(
+        (l) => l.name.toLowerCase() === name.toLowerCase()
+      );
+      if (label) {
+        labelIds.push(label.id);
+      } else {
+        // Try to find workspace-level label (no team filter)
+        const workspaceLabels = await this.sdk.issueLabels();
+        const workspaceLabel = workspaceLabels.nodes.find(
+          (l) => l.name.toLowerCase() === name.toLowerCase()
+        );
+        if (workspaceLabel) {
+          labelIds.push(workspaceLabel.id);
+        }
+        // If not found, skip silently (or could throw)
+      }
+    }
+    return labelIds;
+  }
+
+  /**
+   * Get workflow state ID by name for a team
+   */
+  async getStateId(teamId: string, stateName: string): Promise<string | null> {
+    const states = await this.sdk.workflowStates({
+      filter: { team: { id: { eq: teamId } } },
+    });
+
+    const state = states.nodes.find(
+      (s) => s.name.toLowerCase() === stateName.toLowerCase()
+    );
+    return state?.id ?? null;
+  }
+
+  /**
+   * Get project by name or ID
+   */
+  async getProjectId(projectNameOrId: string): Promise<string | null> {
+    // Try by ID first
+    try {
+      const project = await this.sdk.project(projectNameOrId);
+      if (project) return project.id;
+    } catch {
+      // Not a valid ID, try by name
+    }
+
+    // Search by name
+    const projects = await this.sdk.projects();
+    const project = projects.nodes.find(
+      (p) => p.name.toLowerCase() === projectNameOrId.toLowerCase()
+    );
+    return project?.id ?? null;
+  }
+
+  /**
    * Create a new issue
    */
   async createIssue(options: {
@@ -170,6 +234,9 @@ export class LinearClient {
     description?: string;
     team?: string;
     parentId?: string;
+    labels?: string[];
+    project?: string;
+    status?: string;
   }): Promise<PlanIssue> {
     // Get team ID
     let teamId: string;
@@ -202,12 +269,41 @@ export class LinearClient {
       }
     }
 
+    // Resolve labels
+    let labelIds: string[] | undefined;
+    if (options.labels && options.labels.length > 0) {
+      labelIds = await this.getLabelIds(teamId, options.labels);
+    }
+
+    // Resolve project
+    let projectId: string | undefined;
+    if (options.project) {
+      const id = await this.getProjectId(options.project);
+      if (!id) {
+        throw new Error(`Project "${options.project}" not found`);
+      }
+      projectId = id;
+    }
+
+    // Resolve status/state
+    let stateId: string | undefined;
+    if (options.status) {
+      const id = await this.getStateId(teamId, options.status);
+      if (!id) {
+        throw new Error(`Status "${options.status}" not found for this team`);
+      }
+      stateId = id;
+    }
+
     // Create the issue
     const result = await this.sdk.createIssue({
       teamId,
       title: options.title,
       description: options.description,
       parentId,
+      labelIds,
+      projectId,
+      stateId,
     });
 
     const issue = await result.issue;

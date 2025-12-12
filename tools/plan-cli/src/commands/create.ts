@@ -8,6 +8,9 @@ export function createCreateCommand(): Command {
     .option("--team <key>", "Team key (e.g., ENG)")
     .option("--parent <id>", "Parent issue identifier (e.g., ENG-20)")
     .option("--description <text>", "Issue description")
+    .option("--label <name>", "Add label (can be used multiple times)", collect, [])
+    .option("--project <name>", "Add to project")
+    .option("--status <name>", "Set initial status (e.g., 'In Progress', 'Todo')")
     .option("--json", "Output as JSON")
     .option("--quiet", "Only output the issue identifier")
     .action(async (title: string, opts) => {
@@ -17,12 +20,20 @@ export function createCreateCommand(): Command {
   return cmd;
 }
 
+// Helper to collect multiple --label flags
+function collect(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
 async function runCreate(
   title: string,
   opts: {
     team?: string;
     parent?: string;
     description?: string;
+    label?: string[];
+    project?: string;
+    status?: string;
     json?: boolean;
     quiet?: boolean;
   }
@@ -45,6 +56,9 @@ async function runCreate(
       description: opts.description,
       team,
       parentId: opts.parent,
+      labels: opts.label,
+      project: opts.project,
+      status: opts.status,
     });
 
     if (opts.quiet) {

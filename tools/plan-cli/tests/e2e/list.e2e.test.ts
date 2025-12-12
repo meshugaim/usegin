@@ -36,29 +36,33 @@ describe("E2E: plan list against real Linear", () => {
     expect(Array.isArray(parsed.items)).toBe(true);
   });
 
-  it("filters by team when --team is provided", async () => {
-    // First, get all issues to find a valid team
-    const allResult = await $`bun ${CLI_PATH} list --json`.text();
-    const all = JSON.parse(allResult);
+  it(
+    "filters by team when --team is provided",
+    async () => {
+      // First, get all issues to find a valid team
+      const allResult = await $`bun ${CLI_PATH} list --json`.text();
+      const all = JSON.parse(allResult);
 
-    if (all.items.length === 0) {
-      console.log("Skipping team filter test - no issues found");
-      return;
-    }
+      if (all.items.length === 0) {
+        console.log("Skipping team filter test - no issues found");
+        return;
+      }
 
-    // Extract team from first issue identifier (e.g., "ENG-12" -> "ENG")
-    const firstIssue = all.items[0];
-    const teamKey = firstIssue.identifier.split("-")[0];
+      // Extract team from first issue identifier (e.g., "ENG-12" -> "ENG")
+      const firstIssue = all.items[0];
+      const teamKey = firstIssue.identifier.split("-")[0];
 
-    // Now filter by that team
-    const teamResult = await $`bun ${CLI_PATH} list --team ${teamKey} --json`.text();
-    const teamIssues = JSON.parse(teamResult);
+      // Now filter by that team
+      const teamResult = await $`bun ${CLI_PATH} list --team ${teamKey} --json`.text();
+      const teamIssues = JSON.parse(teamResult);
 
-    // All issues should be from that team
-    for (const issue of teamIssues.items) {
-      expect(issue.identifier.startsWith(teamKey + "-")).toBe(true);
-    }
-  });
+      // All issues should be from that team
+      for (const issue of teamIssues.items) {
+        expect(issue.identifier.startsWith(teamKey + "-")).toBe(true);
+      }
+    },
+    15000 // Increased timeout for two API calls
+  );
 
   it("returns issues sorted by sortOrder", async () => {
     const result = await $`bun ${CLI_PATH} list --json`.text();
