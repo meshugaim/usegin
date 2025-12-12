@@ -1,5 +1,17 @@
 import { LinearClient as LinearSDK } from "@linear/sdk";
 import type { PlanIssue, PlanIssueDetail, ListOptions } from "../types";
+import {
+  getCachedTeam,
+  setCachedTeam,
+  getCachedStates,
+  setCachedStates,
+  getCachedLabels,
+  setCachedLabels,
+  getCachedProject,
+  setCachedProject,
+  getCachedViewer,
+  setCachedViewer,
+} from "./cache";
 
 export interface LinearClientOptions {
   apiKey: string;
@@ -19,10 +31,17 @@ export class LinearClient {
    * Get a team by its key (e.g., "ENG")
    */
   async getTeamByKey(key: string): Promise<{ id: string; key: string; name: string } | null> {
+    // Check cache first
+    const cached = await getCachedTeam(key);
+    if (cached) return cached;
+
     const teams = await this.sdk.teams();
     const team = teams.nodes.find((t) => t.key === key);
     if (!team) return null;
-    return { id: team.id, key: team.key, name: team.name };
+
+    const result = { id: team.id, key: team.key, name: team.name };
+    await setCachedTeam(key, result);
+    return result;
   }
 
   /**
@@ -33,6 +52,19 @@ export class LinearClient {
     const team = teams.nodes[0];
     if (!team) return null;
     return { id: team.id, key: team.key, name: team.name };
+  }
+
+  /**
+   * Get current user (viewer) with caching
+   */
+  async getViewer(): Promise<{ id: string; name: string; displayName: string }> {
+    const cached = await getCachedViewer();
+    if (cached) return cached;
+
+    const me = await this.sdk.viewer;
+    const result = { id: me.id, name: me.name, displayName: me.displayName };
+    await setCachedViewer(result);
+    return result;
   }
 
   /**
@@ -90,27 +122,34 @@ export class LinearClient {
       filter,
     });
 
-    // Transform to PlanIssue format
+    // Transform to PlanIssue format - fetch relations in parallel
     const planIssues: PlanIssue[] = [];
 
-    for (const issue of issues.nodes) {
-      const state = await issue.state;
-      const assignee = await issue.assignee;
-      const parent = await issue.parent;
-      const labelsConnection = await issue.labels();
-      const project = await issue.project;
-      const childrenConnection = await issue.children();
+    // Process all issues in parallel
+    const issuePromises = issues.nodes.map(async (issue) => {
+      // Fetch all relations in parallel
+      const [state, assignee, parent, labelsConnection, project, childrenConnection] =
+        await Promise.all([
+          issue.state,
+          issue.assignee,
+          issue.parent,
+          issue.labels(),
+          issue.project,
+          issue.children(),
+        ]);
 
       const labelNames = labelsConnection.nodes.map((l) => l.name);
       const projectName = project?.name;
 
-      const children: PlanIssue[] = [];
-      for (const child of childrenConnection.nodes) {
-        const childState = await child.state;
-        const childAssignee = await child.assignee;
-        const childLabels = await child.labels();
-        const childProject = await child.project;
-        children.push({
+      // Process children in parallel too
+      const childPromises = childrenConnection.nodes.map(async (child) => {
+        const [childState, childAssignee, childLabels, childProject] = await Promise.all([
+          child.state,
+          child.assignee,
+          child.labels(),
+          child.project,
+        ]);
+        return {
           id: child.id,
           identifier: child.identifier,
           title: child.title,
@@ -129,11 +168,19 @@ export class LinearClient {
             : undefined,
           labels: childLabels.nodes.map((l) => l.name),
           project: childProject?.name,
-          children: [],
-        });
-      }
+          children: [] as PlanIssue[],
+        };
+      });
 
-      // Only include top-level issues (no parent)
+      const children = await Promise.all(childPromises);
+
+      return { issue, state, assignee, parent, labelNames, projectName, children };
+    });
+
+    const resolvedIssues = await Promise.all(issuePromises);
+
+    // Filter to top-level and build final array
+    for (const { issue, state, assignee, parent, labelNames, projectName, children } of resolvedIssues) {
       if (!parent) {
         planIssues.push({
           id: issue.id,
@@ -204,53 +251,53 @@ export class LinearClient {
       const issue = await this.sdk.issue(identifier);
       if (!issue) return null;
 
-      const state = await issue.state;
-      const assignee = await issue.assignee;
-      const parent = await issue.parent;
-      const labelsConnection = await issue.labels();
-      const project = await issue.project;
-      const childrenConnection = await issue.children();
+      // Fetch all relations in parallel
+      const [
+        state,
+        assignee,
+        parent,
+        labelsConnection,
+        project,
+        childrenConnection,
+        relations,
+        inverseRelations,
+        team,
+      ] = await Promise.all([
+        issue.state,
+        issue.assignee,
+        issue.parent,
+        issue.labels(),
+        issue.project,
+        issue.children(),
+        issue.relations(),
+        issue.inverseRelations(),
+        issue.team,
+      ]);
 
-      // Get relationships via inverse relations
-      const relations = await issue.relations();
-      const inverseRelations = await issue.inverseRelations();
-
-      // Process blocking relationships
-      const blockedBy: PlanIssueDetail["blockedBy"] = [];
-      const blocks: PlanIssueDetail["blocks"] = [];
-
-      // Relations where this issue is the source
-      for (const rel of relations.nodes) {
-        if (rel.type === "blocks") {
+      // Process blocking relationships in parallel
+      const blockPromises = relations.nodes
+        .filter((rel) => rel.type === "blocks")
+        .map(async (rel) => {
           const related = await rel.relatedIssue;
-          blocks.push({
-            id: related.id,
-            identifier: related.identifier,
-            title: related.title,
-          });
-        }
-      }
+          return { id: related.id, identifier: related.identifier, title: related.title };
+        });
 
-      // Inverse relations where this issue is the target
-      for (const rel of inverseRelations.nodes) {
-        if (rel.type === "blocks") {
+      const blockedByPromises = inverseRelations.nodes
+        .filter((rel) => rel.type === "blocks")
+        .map(async (rel) => {
           const source = await rel.issue;
-          blockedBy.push({
-            id: source.id,
-            identifier: source.identifier,
-            title: source.title,
-          });
-        }
-      }
+          return { id: source.id, identifier: source.identifier, title: source.title };
+        });
 
-      // Process children
-      const children: PlanIssue[] = [];
-      for (const child of childrenConnection.nodes) {
-        const childState = await child.state;
-        const childAssignee = await child.assignee;
-        const childLabels = await child.labels();
-        const childProject = await child.project;
-        children.push({
+      // Process children in parallel
+      const childPromises = childrenConnection.nodes.map(async (child) => {
+        const [childState, childAssignee, childLabels, childProject] = await Promise.all([
+          child.state,
+          child.assignee,
+          child.labels(),
+          child.project,
+        ]);
+        return {
           id: child.id,
           identifier: child.identifier,
           title: child.title,
@@ -267,12 +314,11 @@ export class LinearClient {
           parent: { id: issue.id, identifier: issue.identifier },
           labels: childLabels.nodes.map((l) => l.name),
           project: childProject?.name,
-          children: [],
-        });
-      }
+          children: [] as PlanIssue[],
+        };
+      });
 
-      // Calculate position (fetch sibling issues to determine)
-      const team = await issue.team;
+      // Calculate position (fetch sibling issues)
       const siblingIssues = await this.sdk.issues({
         filter: {
           team: { id: { eq: team.id } },
@@ -280,6 +326,14 @@ export class LinearClient {
           state: { type: { nin: ["completed", "canceled"] } },
         },
       });
+
+      // Wait for all parallel operations
+      const [blocks, blockedBy, children] = await Promise.all([
+        Promise.all(blockPromises),
+        Promise.all(blockedByPromises),
+        Promise.all(childPromises),
+      ]);
+
       const sortedSiblings = siblingIssues.nodes.sort((a, b) => a.sortOrder - b.sortOrder);
       const position = sortedSiblings.findIndex((i) => i.id === issue.id) + 1;
 
@@ -316,27 +370,38 @@ export class LinearClient {
    * Get labels by name for a team
    */
   async getLabelIds(teamId: string, labelNames: string[]): Promise<string[]> {
-    const labels = await this.sdk.issueLabels({
-      filter: { team: { id: { eq: teamId } } },
-    });
+    // Check cache first
+    let teamLabels = await getCachedLabels(teamId);
+    let workspaceLabels = await getCachedLabels("_workspace");
+
+    if (!teamLabels) {
+      const result = await this.sdk.issueLabels({
+        filter: { team: { id: { eq: teamId } } },
+      });
+      teamLabels = result.nodes.map((l) => ({ id: l.id, name: l.name }));
+      await setCachedLabels(teamId, teamLabels);
+    }
 
     const labelIds: string[] = [];
     for (const name of labelNames) {
-      const label = labels.nodes.find(
+      const label = teamLabels.find(
         (l) => l.name.toLowerCase() === name.toLowerCase()
       );
       if (label) {
         labelIds.push(label.id);
       } else {
-        // Try to find workspace-level label (no team filter)
-        const workspaceLabels = await this.sdk.issueLabels();
-        const workspaceLabel = workspaceLabels.nodes.find(
+        // Try workspace-level labels
+        if (!workspaceLabels) {
+          const result = await this.sdk.issueLabels();
+          workspaceLabels = result.nodes.map((l) => ({ id: l.id, name: l.name }));
+          await setCachedLabels("_workspace", workspaceLabels);
+        }
+        const workspaceLabel = workspaceLabels.find(
           (l) => l.name.toLowerCase() === name.toLowerCase()
         );
         if (workspaceLabel) {
           labelIds.push(workspaceLabel.id);
         }
-        // If not found, skip silently (or could throw)
       }
     }
     return labelIds;
@@ -346,11 +411,18 @@ export class LinearClient {
    * Get workflow state ID by name for a team
    */
   async getStateId(teamId: string, stateName: string): Promise<string | null> {
-    const states = await this.sdk.workflowStates({
-      filter: { team: { id: { eq: teamId } } },
-    });
+    // Check cache first
+    let states = await getCachedStates(teamId);
 
-    const state = states.nodes.find(
+    if (!states) {
+      const result = await this.sdk.workflowStates({
+        filter: { team: { id: { eq: teamId } } },
+      });
+      states = result.nodes.map((s) => ({ id: s.id, name: s.name, type: s.type }));
+      await setCachedStates(teamId, states);
+    }
+
+    const state = states.find(
       (s) => s.name.toLowerCase() === stateName.toLowerCase()
     );
     return state?.id ?? null;
@@ -360,10 +432,17 @@ export class LinearClient {
    * Get project by name or ID
    */
   async getProjectId(projectNameOrId: string): Promise<string | null> {
+    // Check cache first (by name)
+    const cached = await getCachedProject(projectNameOrId);
+    if (cached) return cached.id;
+
     // Try by ID first
     try {
       const project = await this.sdk.project(projectNameOrId);
-      if (project) return project.id;
+      if (project) {
+        await setCachedProject(project.name, { id: project.id, name: project.name });
+        return project.id;
+      }
     } catch {
       // Not a valid ID, try by name
     }
@@ -373,7 +452,11 @@ export class LinearClient {
     const project = projects.nodes.find(
       (p) => p.name.toLowerCase() === projectNameOrId.toLowerCase()
     );
-    return project?.id ?? null;
+    if (project) {
+      await setCachedProject(project.name, { id: project.id, name: project.name });
+      return project.id;
+    }
+    return null;
   }
 
   /**
@@ -521,7 +604,7 @@ export class LinearClient {
 
     if (options.assignee !== undefined) {
       if (options.assignee === "@me") {
-        const me = await this.sdk.viewer;
+        const me = await this.getViewer();
         input.assigneeId = me.id;
       } else if (options.assignee === "" || options.assignee === "none") {
         input.assigneeId = null;
