@@ -81,6 +81,15 @@ export class LinearClient {
   }
 
   /**
+   * Get all available teams (for error messages)
+   */
+  async getAllTeams(): Promise<Array<{ id: string; key: string; name: string }>> {
+    this.trackCall();
+    const teams = await this.sdk.teams();
+    return teams.nodes.map((t) => ({ id: t.id, key: t.key, name: t.name }));
+  }
+
+  /**
    * Get current user (viewer) with caching
    */
   async getViewer(): Promise<{ id: string; name: string; displayName: string }> {
@@ -104,7 +113,9 @@ export class LinearClient {
     if (options.team) {
       const team = await this.getTeamByKey(options.team);
       if (!team) {
-        throw new Error(`Team "${options.team}" not found`);
+        const teams = await this.getAllTeams();
+        const available = teams.map((t) => t.key).join(", ");
+        throw new Error(`Team "${options.team}" not found. Available teams: ${available}`);
       }
       filterParts.push(`team: { key: { eq: "${options.team}" } }`);
     }
@@ -503,6 +514,17 @@ export class LinearClient {
    * Get workflow state ID by name for a team
    */
   async getStateId(teamId: string, stateName: string): Promise<string | null> {
+    const states = await this.getStatesForTeam(teamId);
+    const state = states.find(
+      (s) => s.name.toLowerCase() === stateName.toLowerCase()
+    );
+    return state?.id ?? null;
+  }
+
+  /**
+   * Get all workflow states for a team (with caching)
+   */
+  async getStatesForTeam(teamId: string): Promise<Array<{ id: string; name: string; type: string }>> {
     // Check cache first
     let states = await getCachedStates(teamId);
 
@@ -515,10 +537,34 @@ export class LinearClient {
       await setCachedStates(teamId, states);
     }
 
-    const state = states.find(
-      (s) => s.name.toLowerCase() === stateName.toLowerCase()
-    );
-    return state?.id ?? null;
+    return states;
+  }
+
+  /**
+   * Get all labels for a team (with caching)
+   */
+  async getLabelsForTeam(teamId: string): Promise<Array<{ id: string; name: string }>> {
+    let teamLabels = await getCachedLabels(teamId);
+
+    if (!teamLabels) {
+      this.trackCall();
+      const result = await this.sdk.issueLabels({
+        filter: { team: { id: { eq: teamId } } },
+      });
+      teamLabels = result.nodes.map((l) => ({ id: l.id, name: l.name }));
+      await setCachedLabels(teamId, teamLabels);
+    }
+
+    return teamLabels;
+  }
+
+  /**
+   * Get all projects
+   */
+  async getAllProjects(): Promise<Array<{ id: string; name: string }>> {
+    this.trackCall();
+    const projects = await this.sdk.projects();
+    return projects.nodes.map((p) => ({ id: p.id, name: p.name }));
   }
 
   /**
@@ -571,7 +617,9 @@ export class LinearClient {
     if (options.team) {
       const team = await this.getTeamByKey(options.team);
       if (!team) {
-        throw new Error(`Team "${options.team}" not found`);
+        const teams = await this.getAllTeams();
+        const available = teams.map((t) => t.key).join(", ");
+        throw new Error(`Team "${options.team}" not found. Available teams: ${available}`);
       }
       teamId = team.id;
     } else {
@@ -608,7 +656,11 @@ export class LinearClient {
     if (options.project) {
       const id = await this.getProjectId(options.project);
       if (!id) {
-        throw new Error(`Project "${options.project}" not found`);
+        const projects = await this.getAllProjects();
+        const available = projects.length > 0
+          ? projects.map((p) => `"${p.name}"`).join(", ")
+          : "(no projects found)";
+        throw new Error(`Project "${options.project}" not found. Available projects: ${available}`);
       }
       projectId = id;
     }
@@ -618,7 +670,9 @@ export class LinearClient {
     if (options.status) {
       const id = await this.getStateId(teamId, options.status);
       if (!id) {
-        throw new Error(`Status "${options.status}" not found for this team`);
+        const states = await this.getStatesForTeam(teamId);
+        const available = states.map((s) => `"${s.name}"`).join(", ");
+        throw new Error(`Status "${options.status}" not found. Available statuses: ${available}`);
       }
       stateId = id;
     }
@@ -694,7 +748,9 @@ export class LinearClient {
     if (options.status !== undefined) {
       const stateId = await this.getStateId(teamId, options.status);
       if (!stateId) {
-        throw new Error(`Status "${options.status}" not found for this team`);
+        const states = await this.getStatesForTeam(teamId);
+        const available = states.map((s) => `"${s.name}"`).join(", ");
+        throw new Error(`Status "${options.status}" not found. Available statuses: ${available}`);
       }
       input.stateId = stateId;
     }
@@ -716,7 +772,8 @@ export class LinearClient {
         if (user) {
           input.assigneeId = user.id;
         } else {
-          throw new Error(`User "${options.assignee}" not found`);
+          const available = users.nodes.map((u) => u.displayName || u.name).join(", ");
+          throw new Error(`User "${options.assignee}" not found. Available users: ${available}. Use @me for yourself.`);
         }
       }
     }
@@ -741,7 +798,11 @@ export class LinearClient {
     if (options.project !== undefined) {
       const projectId = await this.getProjectId(options.project);
       if (!projectId) {
-        throw new Error(`Project "${options.project}" not found`);
+        const projects = await this.getAllProjects();
+        const available = projects.length > 0
+          ? projects.map((p) => `"${p.name}"`).join(", ")
+          : "(no projects found)";
+        throw new Error(`Project "${options.project}" not found. Available projects: ${available}`);
       }
       input.projectId = projectId;
     }
