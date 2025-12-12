@@ -5,6 +5,8 @@ import { createCreateCommand } from "./commands/create";
 import { createUpdateCommand } from "./commands/update";
 import { createShowCommand } from "./commands/show";
 import { createBrowseCommand } from "./commands/browse";
+import { createCaptureCommand } from "./commands/capture";
+import { createInboxCommand } from "./commands/inbox";
 
 const program = new Command()
   .name("plan")
@@ -17,6 +19,8 @@ program.addCommand(createCreateCommand());
 program.addCommand(createUpdateCommand());
 program.addCommand(createShowCommand());
 program.addCommand(createBrowseCommand());
+program.addCommand(createCaptureCommand());
+program.addCommand(createInboxCommand());
 
 // Parse arguments
 program.parse();
