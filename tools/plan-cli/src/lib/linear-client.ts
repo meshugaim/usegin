@@ -468,9 +468,12 @@ export class LinearClient {
   }
 
   /**
-   * Get labels by name for a team
+   * Get labels by name for a team, with info about missing labels
    */
-  async getLabelIds(teamId: string, labelNames: string[]): Promise<string[]> {
+  async getLabelIds(
+    teamId: string,
+    labelNames: string[]
+  ): Promise<{ ids: string[]; missing: string[] }> {
     // Check cache first
     let teamLabels = await getCachedLabels(teamId);
     let workspaceLabels = await getCachedLabels("_workspace");
@@ -485,6 +488,8 @@ export class LinearClient {
     }
 
     const labelIds: string[] = [];
+    const missing: string[] = [];
+
     for (const name of labelNames) {
       const label = teamLabels.find(
         (l) => l.name.toLowerCase() === name.toLowerCase()
@@ -504,10 +509,32 @@ export class LinearClient {
         );
         if (workspaceLabel) {
           labelIds.push(workspaceLabel.id);
+        } else {
+          missing.push(name);
         }
       }
     }
-    return labelIds;
+    return { ids: labelIds, missing };
+  }
+
+  /**
+   * Create a new label for a team
+   */
+  async createLabel(teamId: string, name: string): Promise<{ id: string; name: string }> {
+    this.trackCall();
+    const result = await this.sdk.createIssueLabel({
+      teamId,
+      name,
+    });
+    const label = await result.issueLabel;
+    if (!label) {
+      throw new Error(`Failed to create label "${name}"`);
+    }
+
+    // Invalidate cache
+    await setCachedLabels(teamId, null as unknown as Array<{ id: string; name: string }>);
+
+    return { id: label.id, name: label.name };
   }
 
   /**
@@ -627,7 +654,8 @@ export class LinearClient {
     labels?: string[];
     project?: string;
     status?: string;
-  }): Promise<PlanIssue> {
+    createMissingLabels?: boolean;
+  }): Promise<{ issue: PlanIssue; missingLabels: string[] }> {
     // Get team ID
     let teamId: string;
     if (options.team) {
@@ -663,8 +691,22 @@ export class LinearClient {
 
     // Resolve labels
     let labelIds: string[] | undefined;
+    const missingLabels: string[] = [];
     if (options.labels && options.labels.length > 0) {
-      labelIds = await this.getLabelIds(teamId, options.labels);
+      const result = await this.getLabelIds(teamId, options.labels);
+      labelIds = result.ids;
+
+      // Handle missing labels
+      if (result.missing.length > 0) {
+        if (options.createMissingLabels) {
+          for (const name of result.missing) {
+            const newLabel = await this.createLabel(teamId, name);
+            labelIds.push(newLabel.id);
+          }
+        } else {
+          missingLabels.push(...result.missing);
+        }
+      }
     }
 
     // Resolve project
@@ -713,13 +755,16 @@ export class LinearClient {
     const state = await issue.state;
 
     return {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      description: issue.description ?? undefined,
-      status: state?.name ?? "Unknown",
-      sortOrder: issue.sortOrder,
-      children: [],
+      issue: {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description ?? undefined,
+        status: state?.name ?? "Unknown",
+        sortOrder: issue.sortOrder,
+        children: [],
+      },
+      missingLabels,
     };
   }
 
@@ -736,8 +781,9 @@ export class LinearClient {
       parentId?: string | null; // null to remove parent
       labels?: string[];
       project?: string;
+      createMissingLabels?: boolean;
     }
-  ): Promise<PlanIssue> {
+  ): Promise<{ issue: PlanIssue; missingLabels: string[] }> {
     // Get the issue first
     const issue = await this.getIssueByIdentifier(identifier);
     if (!issue) {
@@ -806,8 +852,23 @@ export class LinearClient {
       }
     }
 
+    const missingLabels: string[] = [];
     if (options.labels !== undefined) {
-      const labelIds = await this.getLabelIds(teamId, options.labels);
+      const result = await this.getLabelIds(teamId, options.labels);
+      const labelIds = result.ids;
+
+      // Handle missing labels
+      if (result.missing.length > 0) {
+        if (options.createMissingLabels) {
+          for (const name of result.missing) {
+            const newLabel = await this.createLabel(teamId, name);
+            labelIds.push(newLabel.id);
+          }
+        } else {
+          missingLabels.push(...result.missing);
+        }
+      }
+
       input.labelIds = labelIds;
     }
 
@@ -828,7 +889,8 @@ export class LinearClient {
     await this.sdk.updateIssue(issue.id, input);
 
     // Return updated issue
-    return (await this.getIssueByIdentifier(identifier))!;
+    const updatedIssue = await this.getIssueByIdentifier(identifier);
+    return { issue: updatedIssue!, missingLabels };
   }
 
   /**

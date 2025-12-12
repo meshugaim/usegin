@@ -22,6 +22,7 @@ export function createUpdateCommand(): Command {
     .option("--json", "Output as JSON")
     .option("--quiet", "No output on success")
     .option("--stats", "Show API call statistics")
+    .option("--create-missing-labels", "Create labels that don't exist")
     .action(async (id: string, opts) => {
       await runUpdate(id, opts);
     });
@@ -52,6 +53,7 @@ async function runUpdate(
     json?: boolean;
     quiet?: boolean;
     stats?: boolean;
+    createMissingLabels?: boolean;
   }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
@@ -113,7 +115,7 @@ async function runUpdate(
       opts.project !== undefined;
 
     if (hasFieldUpdates) {
-      const issue = await client.updateIssue(identifier, {
+      const { issue, missingLabels } = await client.updateIssue(identifier, {
         title: opts.title,
         description: opts.description,
         status: opts.status,
@@ -121,7 +123,14 @@ async function runUpdate(
         parentId: opts.parent === false ? null : opts.parent,
         labels: opts.label,
         project: opts.project,
+        createMissingLabels: opts.createMissingLabels,
       });
+
+      // Warn about missing labels
+      if (missingLabels.length > 0) {
+        console.error(`Warning: Labels not found (skipped): ${missingLabels.join(", ")}`);
+        console.error(`  Use --create-missing-labels to create them`);
+      }
 
       if (opts.quiet) {
         // No output

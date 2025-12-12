@@ -18,6 +18,7 @@ export function createCreateCommand(): Command {
     .option("--json", "Output as JSON")
     .option("--quiet", "Only output the issue identifier")
     .option("--stats", "Show API call statistics")
+    .option("--create-missing-labels", "Create labels that don't exist")
     .action(async (title: string, opts) => {
       await runCreate(title, opts);
     });
@@ -45,6 +46,7 @@ async function runCreate(
     json?: boolean;
     quiet?: boolean;
     stats?: boolean;
+    createMissingLabels?: boolean;
   }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
@@ -60,7 +62,7 @@ async function runCreate(
 
     const team = opts.team ?? process.env.PLAN_TEAM;
 
-    const issue = await client.createIssue({
+    const { issue, missingLabels } = await client.createIssue({
       title,
       description: opts.description,
       team,
@@ -68,7 +70,14 @@ async function runCreate(
       labels: opts.label,
       project: opts.project,
       status: opts.status,
+      createMissingLabels: opts.createMissingLabels,
     });
+
+    // Warn about missing labels
+    if (missingLabels.length > 0) {
+      console.error(`Warning: Labels not found (skipped): ${missingLabels.join(", ")}`);
+      console.error(`  Use --create-missing-labels to create them`);
+    }
 
     // Add relationships after creation
     if (opts.blockedBy) {

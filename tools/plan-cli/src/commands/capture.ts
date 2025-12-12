@@ -43,13 +43,19 @@ async function runCapture(
 
     const team = opts.team ?? process.env.PLAN_TEAM;
 
-    // Create issue with inbox label
-    const issue = await client.createIssue({
+    // Create issue with inbox label (auto-create if missing)
+    const { issue, missingLabels } = await client.createIssue({
       title,
       description: opts.description,
       team,
       labels: [DEFAULT_INBOX_LABEL],
+      createMissingLabels: true, // Always create inbox label if missing
     });
+
+    if (missingLabels.length > 0) {
+      // This shouldn't happen with createMissingLabels, but just in case
+      console.error(`Warning: Created "inbox" label for inbox workflow`);
+    }
 
     if (opts.quiet) {
       console.log(issue.identifier);
