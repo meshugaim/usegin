@@ -649,4 +649,47 @@ export class LinearClient {
       body,
     });
   }
+
+  /**
+   * Get all top-level issues with sortOrder for reordering
+   */
+  async getIssuesForReordering(teamKey?: string): Promise<Array<{
+    id: string;
+    identifier: string;
+    sortOrder: number;
+  }>> {
+    let teamId: string | undefined;
+    if (teamKey) {
+      const team = await this.getTeamByKey(teamKey);
+      if (!team) throw new Error(`Team "${teamKey}" not found`);
+      teamId = team.id;
+    }
+
+    const filter: Record<string, unknown> = {
+      parent: { null: true }, // Top-level only
+      state: { type: { nin: ["completed", "canceled"] } },
+    };
+
+    if (teamId) {
+      filter.team = { id: { eq: teamId } };
+    }
+
+    const issues = await this.sdk.issues({ filter });
+
+    return issues.nodes.map((issue) => ({
+      id: issue.id,
+      identifier: issue.identifier,
+      sortOrder: issue.sortOrder,
+    }));
+  }
+
+  /**
+   * Update an issue's sortOrder
+   */
+  async updateSortOrder(identifier: string, sortOrder: number): Promise<void> {
+    const issue = await this.getIssueByIdentifier(identifier);
+    if (!issue) throw new Error(`Issue "${identifier}" not found`);
+
+    await this.sdk.updateIssue(issue.id, { sortOrder });
+  }
 }
