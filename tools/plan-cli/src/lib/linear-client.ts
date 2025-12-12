@@ -977,6 +977,34 @@ export class LinearClient {
   }
 
   /**
+   * Remove a label from an issue by name
+   */
+  async removeLabel(identifier: string, labelName: string): Promise<void> {
+    // Get full issue with labels
+    this.trackCall();
+    const rawIssue = await this.sdk.issue(identifier);
+    if (!rawIssue) throw new Error(`Issue "${identifier}" not found`);
+
+    const labels = await rawIssue.labels();
+    const currentLabelIds = labels.nodes.map((l) => l.id);
+    const labelToRemove = labels.nodes.find(
+      (l) => l.name.toLowerCase() === labelName.toLowerCase()
+    );
+
+    if (!labelToRemove) {
+      // Label not on issue, nothing to do
+      return;
+    }
+
+    // Filter out the label to remove
+    const newLabelIds = currentLabelIds.filter((id) => id !== labelToRemove.id);
+
+    // Update the issue with new labels
+    this.trackCall();
+    await this.sdk.updateIssue(rawIssue.id, { labelIds: newLabelIds });
+  }
+
+  /**
    * Get all top-level issues with sortOrder for reordering
    */
   async getIssuesForReordering(teamKey?: string): Promise<Array<{

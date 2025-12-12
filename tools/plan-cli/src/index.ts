@@ -12,6 +12,7 @@ import { createCacheCommand } from "./commands/cache";
 import { createLabelsCommand } from "./commands/labels";
 import { createStartCommand } from "./commands/start";
 import { createCloseCommand } from "./commands/close";
+import { createPromoteCommand } from "./commands/promote";
 
 const program = new Command()
   .name("plan")
@@ -31,6 +32,7 @@ program.addCommand(createCacheCommand());
 program.addCommand(createLabelsCommand());
 program.addCommand(createStartCommand());
 program.addCommand(createCloseCommand());
+program.addCommand(createPromoteCommand());
 
 // Parse arguments
 program.parse();
