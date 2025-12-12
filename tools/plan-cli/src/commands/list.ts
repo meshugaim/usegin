@@ -1,13 +1,17 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
-import { formatListHuman, formatListJson } from "../lib/output";
-import type { ListOptions } from "../types";
+import { formatListHuman, formatListJson, formatGroupedList } from "../lib/output";
+import type { ListOptions, PlanIssue } from "../types";
 
 export function createListCommand(): Command {
   const cmd = new Command("list")
+    .alias("ls")
     .description("List issues from Linear")
     .option("--team <key>", "Team key (e.g., ENG)")
-    .option("--project <id>", "Project ID")
+    .option("--project <name>", "Filter by project name")
+    .option("--label <name>", "Filter by label (can repeat)", collect, [])
+    .option("--search <text>", "Search in title and description")
+    .option("--group-by <field>", "Group by: label, project, or status")
     .option("--json", "Output as JSON")
     .option("--depth <n>", "Include sub-issues (0=none, 1=one level)", "0")
     .option("--inbox", "Show inbox items only")
@@ -21,9 +25,17 @@ export function createListCommand(): Command {
   return cmd;
 }
 
+// Helper to collect multiple flags
+function collect(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
 async function runList(opts: {
   team?: string;
   project?: string;
+  label?: string[];
+  search?: string;
+  groupBy?: string;
   json?: boolean;
   depth?: string;
   inbox?: boolean;
@@ -48,6 +60,9 @@ async function runList(opts: {
     const options: ListOptions = {
       team,
       project: opts.project ?? process.env.PLAN_PROJECT,
+      label: opts.label,
+      search: opts.search,
+      groupBy: opts.groupBy as ListOptions["groupBy"],
       depth: parseInt(opts.depth ?? "0", 10),
       inbox: opts.inbox,
       all: opts.all,
@@ -60,6 +75,12 @@ async function runList(opts: {
 
     if (opts.json) {
       console.log(formatListJson(issues));
+    } else if (opts.groupBy) {
+      if (issues.length === 0) {
+        console.log("No issues found");
+      } else {
+        console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status"));
+      }
     } else {
       if (issues.length === 0) {
         console.log("No issues found");

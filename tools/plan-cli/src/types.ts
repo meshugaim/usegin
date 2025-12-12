@@ -18,6 +18,8 @@ export interface PlanIssue {
     id: string;
     identifier: string;
   };
+  labels?: string[];
+  project?: string;
   children: PlanIssue[];
 }
 
@@ -30,6 +32,9 @@ export interface ListOptions {
   assignee?: string;
   team?: string;
   project?: string;
+  label?: string[];
+  search?: string;
+  groupBy?: "label" | "project" | "status";
 }
 
 export interface ListResult {

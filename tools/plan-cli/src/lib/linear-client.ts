@@ -61,10 +61,33 @@ export class LinearClient {
       type: { nin: ["completed", "canceled"] },
     };
 
+    // Filter by project
+    if (options.project) {
+      const projectId = await this.getProjectId(options.project);
+      if (projectId) {
+        filter.project = { id: { eq: projectId } };
+      }
+    }
+
+    // Filter by label(s)
+    if (options.label && options.label.length > 0) {
+      // Linear uses "or" for multiple labels by default
+      filter.labels = {
+        name: { in: options.label },
+      };
+    }
+
+    // Search filter (title or description contains)
+    if (options.search) {
+      filter.or = [
+        { title: { containsIgnoreCase: options.search } },
+        { description: { containsIgnoreCase: options.search } },
+      ];
+    }
+
     // Fetch issues
     const issues = await this.sdk.issues({
       filter,
-      orderBy: LinearSDK.prototype.constructor.name ? undefined : undefined, // Placeholder
     });
 
     // Transform to PlanIssue format
@@ -74,12 +97,19 @@ export class LinearClient {
       const state = await issue.state;
       const assignee = await issue.assignee;
       const parent = await issue.parent;
+      const labelsConnection = await issue.labels();
+      const project = await issue.project;
       const childrenConnection = await issue.children();
+
+      const labelNames = labelsConnection.nodes.map((l) => l.name);
+      const projectName = project?.name;
 
       const children: PlanIssue[] = [];
       for (const child of childrenConnection.nodes) {
         const childState = await child.state;
         const childAssignee = await child.assignee;
+        const childLabels = await child.labels();
+        const childProject = await child.project;
         children.push({
           id: child.id,
           identifier: child.identifier,
@@ -97,6 +127,8 @@ export class LinearClient {
           parent: parent
             ? { id: parent.id, identifier: parent.identifier }
             : undefined,
+          labels: childLabels.nodes.map((l) => l.name),
+          project: childProject?.name,
           children: [],
         });
       }
@@ -117,6 +149,8 @@ export class LinearClient {
                 displayName: assignee.displayName,
               }
             : undefined,
+          labels: labelNames,
+          project: projectName,
           children: children.sort((a, b) => a.sortOrder - b.sortOrder),
         });
       }

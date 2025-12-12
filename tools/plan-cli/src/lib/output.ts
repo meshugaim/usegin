@@ -77,6 +77,8 @@ export function formatListJson(issues: PlanIssue[]): string {
     position: index + 1,
     sortOrder: issue.sortOrder,
     assignee: issue.assignee,
+    labels: issue.labels,
+    project: issue.project,
     children: issue.children.map((child) => ({
       id: child.id,
       identifier: child.identifier,
@@ -85,10 +87,56 @@ export function formatListJson(issues: PlanIssue[]): string {
       status: child.status,
       sortOrder: child.sortOrder,
       assignee: child.assignee,
+      labels: child.labels,
+      project: child.project,
     })),
   }));
 
   return JSON.stringify({ items }, null, 2);
+}
+
+/**
+ * Format issues grouped by a field
+ */
+export function formatGroupedList(
+  issues: PlanIssue[],
+  groupBy: "label" | "project" | "status"
+): string {
+  const groups = new Map<string, PlanIssue[]>();
+
+  for (const issue of issues) {
+    let keys: string[];
+
+    if (groupBy === "label") {
+      keys = issue.labels && issue.labels.length > 0 ? issue.labels : ["(no label)"];
+    } else if (groupBy === "project") {
+      keys = [issue.project ?? "(no project)"];
+    } else {
+      keys = [issue.status];
+    }
+
+    for (const key of keys) {
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(issue);
+    }
+  }
+
+  const lines: string[] = [];
+  const sortedKeys = Array.from(groups.keys()).sort();
+
+  for (const key of sortedKeys) {
+    const groupIssues = groups.get(key)!;
+    lines.push(`\n## ${key} (${groupIssues.length})`);
+    lines.push("");
+
+    for (const issue of groupIssues) {
+      lines.push(`  ${issue.identifier}  ${truncate(issue.title, 50)}  [${issue.status}]`);
+    }
+  }
+
+  return lines.join("\n").trim();
 }
 
 // Helper functions
