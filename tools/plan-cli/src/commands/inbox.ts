@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { formatListHuman, formatListJson } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
+import { printApiStats } from "../lib/stats";
 import { $ } from "bun";
 
 export function createInboxCommand(): Command {
@@ -11,6 +12,7 @@ export function createInboxCommand(): Command {
     .option("--json", "Output as JSON")
     .option("--fzf", "Interactive selection with fzf")
     .option("--multi", "Allow multiple selection (with --fzf)")
+    .option("--stats", "Show API call statistics")
     .action(async (opts) => {
       await runInbox(opts);
     });
@@ -23,6 +25,7 @@ async function runInbox(opts: {
   json?: boolean;
   fzf?: boolean;
   multi?: boolean;
+  stats?: boolean;
 }): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -68,6 +71,8 @@ async function runInbox(opts: {
     } else {
       console.log(formatListHuman(issues));
     }
+
+    printApiStats(client.apiCallCount, opts.stats ?? false);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

@@ -1,8 +1,8 @@
 /**
- * Print API call statistics to stderr
+ * Print API call statistics to stderr (opt-in via --stats flag)
  */
-export function printApiStats(callCount: number): void {
-  if (process.env.PLAN_STATS !== "0") {
+export function printApiStats(callCount: number, enabled: boolean): void {
+  if (enabled) {
     console.error(`[${callCount} API call${callCount !== 1 ? "s" : ""}]`);
   }
 }

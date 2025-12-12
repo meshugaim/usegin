@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
+import { printApiStats } from "../lib/stats";
 
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
@@ -16,6 +17,7 @@ export function createCreateCommand(): Command {
     .option("--related-to <id>", "Set related-to relationship after creation")
     .option("--json", "Output as JSON")
     .option("--quiet", "Only output the issue identifier")
+    .option("--stats", "Show API call statistics")
     .action(async (title: string, opts) => {
       await runCreate(title, opts);
     });
@@ -42,6 +44,7 @@ async function runCreate(
     relatedTo?: string;
     json?: boolean;
     quiet?: boolean;
+    stats?: boolean;
   }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
@@ -100,6 +103,8 @@ async function runCreate(
       // Human-readable output
       console.log(`Created: ${issue.identifier} - ${issue.title}`);
     }
+
+    printApiStats(client.apiCallCount, opts.stats ?? false);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

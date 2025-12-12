@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
+import { printApiStats } from "../lib/stats";
 import {
   calculateBefore,
   calculateAfter,
@@ -17,6 +18,7 @@ export function createReorderCommand(): Command {
     .argument("[target]", "Target identifier or count (depends on action)")
     .option("--team <key>", "Team key (e.g., ENG)")
     .option("--quiet", "No output on success")
+    .option("--stats", "Show API call statistics")
     .action(async (id: string, action: string, target: string | undefined, opts) => {
       await runReorder(id, action, target, opts);
     });
@@ -28,7 +30,7 @@ async function runReorder(
   identifier: string,
   action: string,
   target: string | undefined,
-  opts: { team?: string; quiet?: boolean }
+  opts: { team?: string; quiet?: boolean; stats?: boolean }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -135,6 +137,8 @@ async function runReorder(
     if (!opts.quiet) {
       console.log(`Moved ${identifier} ${description}`);
     }
+
+    printApiStats(client.apiCallCount, opts.stats ?? false);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

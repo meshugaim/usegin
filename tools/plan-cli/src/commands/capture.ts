@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
+import { printApiStats } from "../lib/stats";
 
 const DEFAULT_INBOX_LABEL = "inbox";
 
@@ -11,6 +12,7 @@ export function createCaptureCommand(): Command {
     .option("--description <text>", "Additional details")
     .option("--json", "Output as JSON")
     .option("--quiet", "Only output the issue identifier")
+    .option("--stats", "Show API call statistics")
     .action(async (title: string, opts) => {
       await runCapture(title, opts);
     });
@@ -25,6 +27,7 @@ async function runCapture(
     description?: string;
     json?: boolean;
     quiet?: boolean;
+    stats?: boolean;
   }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
@@ -67,6 +70,8 @@ async function runCapture(
     } else {
       console.log(`Captured: ${issue.identifier} - ${issue.title}`);
     }
+
+    printApiStats(client.apiCallCount, opts.stats ?? false);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
+import { printApiStats } from "../lib/stats";
 
 export function createUpdateCommand(): Command {
   const cmd = new Command("update")
@@ -20,6 +21,7 @@ export function createUpdateCommand(): Command {
     .option("--comment <text>", "Add a comment to the issue")
     .option("--json", "Output as JSON")
     .option("--quiet", "No output on success")
+    .option("--stats", "Show API call statistics")
     .action(async (id: string, opts) => {
       await runUpdate(id, opts);
     });
@@ -49,6 +51,7 @@ async function runUpdate(
     comment?: string;
     json?: boolean;
     quiet?: boolean;
+    stats?: boolean;
   }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
@@ -142,6 +145,8 @@ async function runUpdate(
       console.error("Error: No updates specified. Use --help to see options.");
       process.exit(1);
     }
+
+    printApiStats(client.apiCallCount, opts.stats ?? false);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

@@ -23,6 +23,7 @@ export function createListCommand(): Command {
     .option("--assignee <user>", "Filter by assignee (@me for self)")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
+    .option("--stats", "Show API call statistics")
     .action(async (opts) => {
       await runList(opts);
     });
@@ -49,6 +50,7 @@ async function runList(opts: {
   assignee?: string;
   fzf?: boolean;
   multi?: boolean;
+  stats?: boolean;
 }): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -116,7 +118,7 @@ async function runList(opts: {
           if (id) console.log(id);
         }
       }
-      printApiStats(client.apiCallCount);
+      printApiStats(client.apiCallCount, opts.stats ?? false);
       return;
     }
 
@@ -129,7 +131,7 @@ async function runList(opts: {
       console.log(formatListHuman(issues, { depth: options.depth }));
     }
 
-    printApiStats(client.apiCallCount);
+    printApiStats(client.apiCallCount, opts.stats ?? false);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

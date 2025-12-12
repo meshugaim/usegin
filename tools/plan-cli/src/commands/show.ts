@@ -8,6 +8,7 @@ export function createShowCommand(): Command {
     .description("Show details of a single issue")
     .argument("<identifier>", "Issue identifier (e.g., ENG-123)")
     .option("--json", "Output as JSON")
+    .option("--stats", "Show API call statistics")
     .action(async (identifier: string, opts) => {
       await runShow(identifier, opts);
     });
@@ -17,7 +18,7 @@ export function createShowCommand(): Command {
 
 async function runShow(
   identifier: string,
-  opts: { json?: boolean }
+  opts: { json?: boolean; stats?: boolean }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -42,7 +43,7 @@ async function runShow(
       console.log(formatShowHuman(issue));
     }
 
-    printApiStats(client.apiCallCount);
+    printApiStats(client.apiCallCount, opts.stats ?? false);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);
