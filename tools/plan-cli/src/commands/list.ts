@@ -66,6 +66,26 @@ async function runList(opts: {
     // Use team from env if not specified
     const team = opts.team ?? process.env.PLAN_TEAM;
 
+    // Validate --status if provided
+    if (opts.status) {
+      const teamData = team
+        ? await client.getTeamByKey(team)
+        : await client.getDefaultTeam();
+
+      if (teamData) {
+        const states = await client.getStatesForTeam(teamData.id);
+        const validStatus = states.find(
+          (s) => s.name.toLowerCase() === opts.status!.toLowerCase()
+        );
+        if (!validStatus) {
+          const available = states.map((s) => `"${s.name}"`).join(", ");
+          console.error(`Error: Status "${opts.status}" not found.`);
+          console.error(`Available statuses: ${available}`);
+          process.exit(1);
+        }
+      }
+    }
+
     const options: ListOptions = {
       team,
       project: opts.project ?? process.env.PLAN_PROJECT,

@@ -31,11 +31,17 @@ function outputJSON(): void {
       ordering: "Position in list = priority. Top = next up.",
       flow: ["capture", "promote", "start", "close"],
     },
-    agreements: [
-      "Use plan for task tracking",
-      "Check plan list for ready work",
-      "Linear is source of truth",
+    values: [
+      "Connectedness - build a web of related issues",
+      "Clarity - simple titles, labels carry type",
+      "Traceability - commits mention issues",
+      "Presence - start what you work on, close what you finish",
     ],
+    practices: {
+      labels: "Use labels for type: bug, feature, chore, docs",
+      connectBeforeCreating: "Consider how new issues fit into existing work",
+      oneSourceOfTruth: "Linear is where work lives - not markdown files or other todo tools",
+    },
   };
 
   console.log(JSON.stringify(data, null, 2));

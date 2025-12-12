@@ -75,6 +75,7 @@ async function runCapture(
       );
     } else {
       console.log(`Captured: ${issue.identifier} - ${issue.title}`);
+      console.log(`  Tip: When promoting, consider how this connects to existing work`);
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);

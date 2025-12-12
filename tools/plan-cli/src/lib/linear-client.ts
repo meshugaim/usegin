@@ -120,8 +120,12 @@ export class LinearClient {
       filterParts.push(`team: { key: { eq: "${options.team}" } }`);
     }
 
-    // Exclude completed/canceled by default
-    filterParts.push(`state: { type: { nin: ["completed", "canceled"] } }`);
+    // Filter by status if specified, otherwise exclude completed/canceled by default
+    if (options.status) {
+      filterParts.push(`state: { name: { eqIgnoreCase: "${options.status}" } }`);
+    } else {
+      filterParts.push(`state: { type: { nin: ["completed", "canceled"] } }`);
+    }
 
     // Filter by project
     if (options.project) {

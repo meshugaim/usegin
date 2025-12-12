@@ -17,3 +17,11 @@ We track work in Linear using `plan`. Run `plan --help` to explore commands.
 **Traceability** — Commits mention the issue they serve. The story of how things came to be is worth preserving.
 
 **Presence** — We start what we're working on, close what we've finished. The list reflects where we actually are.
+
+## Practices
+
+**Labels** — Use labels for the type of work: `bug`, `feature`, `chore`, `docs`. This keeps titles focused on *what*, while labels signal *what kind*.
+
+**Connect before creating** — Before adding a new issue, consider how it fits into what already exists. Is it a sub-issue? Does it block something? Is it related to existing work? The graph of connections is as valuable as the issues themselves.
+
+**One source of truth** — Linear is where work lives. Don't track tasks in markdown files, todo lists, or other tools. If it's worth tracking, it goes in Linear via `plan`.

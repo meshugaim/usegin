@@ -90,6 +90,9 @@ async function runCreate(
       await client.addRelatedTo(issue.identifier, opts.relatedTo);
     }
 
+    // Check if any connections were made
+    const hasConnections = opts.parent || opts.blockedBy || opts.blocking || opts.relatedTo;
+
     if (opts.quiet) {
       // Just output the identifier
       console.log(issue.identifier);
@@ -111,6 +114,9 @@ async function runCreate(
     } else {
       // Human-readable output
       console.log(`Created: ${issue.identifier} - ${issue.title}`);
+      if (!hasConnections) {
+        console.log(`  Tip: Consider connecting with --parent, --blocked-by, or --related-to`);
+      }
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);
