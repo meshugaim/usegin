@@ -3,6 +3,7 @@ import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
 import { formatListHuman, formatListJson, formatGroupedList } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
+import { printApiStats } from "../lib/stats";
 import type { ListOptions, PlanIssue } from "../types";
 
 export function createListCommand(): Command {
@@ -115,6 +116,7 @@ async function runList(opts: {
           if (id) console.log(id);
         }
       }
+      printApiStats(client.apiCallCount);
       return;
     }
 
@@ -126,6 +128,8 @@ async function runList(opts: {
     } else {
       console.log(formatListHuman(issues, { depth: options.depth }));
     }
+
+    printApiStats(client.apiCallCount);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

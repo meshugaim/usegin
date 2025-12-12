@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { formatShowHuman, formatShowJson } from "../lib/output";
+import { printApiStats } from "../lib/stats";
 
 export function createShowCommand(): Command {
   const cmd = new Command("show")
@@ -40,6 +41,8 @@ async function runShow(
     } else {
       console.log(formatShowHuman(issue));
     }
+
+    printApiStats(client.apiCallCount);
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);

@@ -19,6 +19,7 @@ export interface LinearClientOptions {
 
 export class LinearClient {
   private sdk: LinearSDK;
+  private _apiCallCount = 0;
 
   constructor(options: LinearClientOptions) {
     if (!options.apiKey) {
@@ -28,11 +29,26 @@ export class LinearClient {
   }
 
   /**
-   * Execute raw GraphQL query
+   * Get the number of API calls made
+   */
+  get apiCallCount(): number {
+    return this._apiCallCount;
+  }
+
+  /**
+   * Execute raw GraphQL query (tracks call count)
    */
   private async graphql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+    this._apiCallCount++;
     const result = await this.sdk.client.rawRequest<T>(query, variables);
     return result.data;
+  }
+
+  /**
+   * Wrap SDK call to track count
+   */
+  private trackCall(): void {
+    this._apiCallCount++;
   }
 
   /**
@@ -43,6 +59,7 @@ export class LinearClient {
     const cached = await getCachedTeam(key);
     if (cached) return cached;
 
+    this.trackCall();
     const teams = await this.sdk.teams();
     const team = teams.nodes.find((t) => t.key === key);
     if (!team) return null;
@@ -56,6 +73,7 @@ export class LinearClient {
    * Get the first available team (for default behavior)
    */
   async getDefaultTeam(): Promise<{ id: string; key: string; name: string } | null> {
+    this.trackCall();
     const teams = await this.sdk.teams();
     const team = teams.nodes[0];
     if (!team) return null;
@@ -69,6 +87,7 @@ export class LinearClient {
     const cached = await getCachedViewer();
     if (cached) return cached;
 
+    this.trackCall();
     const me = await this.sdk.viewer;
     const result = { id: me.id, name: me.name, displayName: me.displayName };
     await setCachedViewer(result);
@@ -227,6 +246,7 @@ export class LinearClient {
    */
   async getIssueByIdentifier(identifier: string): Promise<PlanIssue | null> {
     try {
+      this.trackCall();
       const issue = await this.sdk.issue(identifier);
       if (!issue) return null;
 
@@ -445,6 +465,7 @@ export class LinearClient {
     let workspaceLabels = await getCachedLabels("_workspace");
 
     if (!teamLabels) {
+      this.trackCall();
       const result = await this.sdk.issueLabels({
         filter: { team: { id: { eq: teamId } } },
       });
@@ -462,6 +483,7 @@ export class LinearClient {
       } else {
         // Try workspace-level labels
         if (!workspaceLabels) {
+          this.trackCall();
           const result = await this.sdk.issueLabels();
           workspaceLabels = result.nodes.map((l) => ({ id: l.id, name: l.name }));
           await setCachedLabels("_workspace", workspaceLabels);
@@ -485,6 +507,7 @@ export class LinearClient {
     let states = await getCachedStates(teamId);
 
     if (!states) {
+      this.trackCall();
       const result = await this.sdk.workflowStates({
         filter: { team: { id: { eq: teamId } } },
       });
@@ -508,6 +531,7 @@ export class LinearClient {
 
     // Try by ID first
     try {
+      this.trackCall();
       const project = await this.sdk.project(projectNameOrId);
       if (project) {
         await setCachedProject(project.name, { id: project.id, name: project.name });
@@ -518,6 +542,7 @@ export class LinearClient {
     }
 
     // Search by name
+    this.trackCall();
     const projects = await this.sdk.projects();
     const project = projects.nodes.find(
       (p) => p.name.toLowerCase() === projectNameOrId.toLowerCase()
@@ -599,6 +624,7 @@ export class LinearClient {
     }
 
     // Create the issue
+    this.trackCall();
     const result = await this.sdk.createIssue({
       teamId,
       title: options.title,
@@ -649,6 +675,7 @@ export class LinearClient {
     }
 
     // Get team for state/label resolution
+    this.trackCall();
     const rawIssue = await this.sdk.issue(identifier);
     const team = await rawIssue.team;
     const teamId = team.id;
@@ -680,6 +707,7 @@ export class LinearClient {
         input.assigneeId = null;
       } else {
         // Try to find user by name
+        this.trackCall();
         const users = await this.sdk.users();
         const user = users.nodes.find(
           (u) => u.name.toLowerCase() === options.assignee!.toLowerCase() ||
@@ -719,6 +747,7 @@ export class LinearClient {
     }
 
     // Update the issue
+    this.trackCall();
     await this.sdk.updateIssue(issue.id, input);
 
     // Return updated issue
@@ -734,6 +763,7 @@ export class LinearClient {
     if (!issue) throw new Error(`Issue "${identifier}" not found`);
     if (!blocks) throw new Error(`Issue "${blocksIdentifier}" not found`);
 
+    this.trackCall();
     await this.sdk.createIssueRelation({
       issueId: issue.id,
       relatedIssueId: blocks.id,
@@ -751,6 +781,7 @@ export class LinearClient {
     if (!issue) throw new Error(`Issue "${identifier}" not found`);
     if (!blocker) throw new Error(`Issue "${blockedByIdentifier}" not found`);
 
+    this.trackCall();
     await this.sdk.createIssueRelation({
       issueId: blocker.id,
       relatedIssueId: issue.id,
@@ -767,6 +798,7 @@ export class LinearClient {
     if (!issue) throw new Error(`Issue "${identifier}" not found`);
     if (!related) throw new Error(`Issue "${relatedIdentifier}" not found`);
 
+    this.trackCall();
     await this.sdk.createIssueRelation({
       issueId: issue.id,
       relatedIssueId: related.id,
@@ -783,6 +815,7 @@ export class LinearClient {
     if (!issue) throw new Error(`Issue "${identifier}" not found`);
     if (!original) throw new Error(`Issue "${duplicateOfIdentifier}" not found`);
 
+    this.trackCall();
     await this.sdk.createIssueRelation({
       issueId: issue.id,
       relatedIssueId: original.id,
@@ -797,6 +830,7 @@ export class LinearClient {
     const issue = await this.getIssueByIdentifier(identifier);
     if (!issue) throw new Error(`Issue "${identifier}" not found`);
 
+    this.trackCall();
     await this.sdk.createComment({
       issueId: issue.id,
       body,
@@ -850,6 +884,7 @@ export class LinearClient {
     const issue = await this.getIssueByIdentifier(identifier);
     if (!issue) throw new Error(`Issue "${identifier}" not found`);
 
+    this.trackCall();
     await this.sdk.updateIssue(issue.id, { sortOrder });
   }
 }
