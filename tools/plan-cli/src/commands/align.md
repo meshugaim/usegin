@@ -25,3 +25,5 @@ We track work in Linear using `plan`. Run `plan --help` to explore commands.
 **Connect before creating** — Before adding a new issue, consider how it fits into what already exists. Is it a sub-issue? Does it block something? Is it related to existing work? The graph of connections is as valuable as the issues themselves.
 
 **One source of truth** — Linear is where work lives. Don't track tasks in markdown files, todo lists, or other tools. If it's worth tracking, it goes in Linear via `plan`.
+
+**Commit often** — Small, frequent commits. Mention the Linear issue in the commit body (e.g., `Closes: ENG-123` or `Part of: ENG-123`). The commit history tells the story.

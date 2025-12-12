@@ -41,6 +41,7 @@ function outputJSON(): void {
       labels: "Use labels for type: bug, feature, chore, docs",
       connectBeforeCreating: "Consider how new issues fit into existing work",
       oneSourceOfTruth: "Linear is where work lives - not markdown files or other todo tools",
+      commitOften: "Small frequent commits, mention Linear issue in body (Closes: ENG-123)",
     },
   };
 
