@@ -83,17 +83,12 @@ describe("E2E: plan list against real Linear", () => {
     }
   });
 
-  it("handles empty results gracefully", async () => {
-    // Try to list with a status that likely has no issues
-    const result = await $`bun ${CLI_PATH} list --status nonexistent_status --json 2>&1`.text();
+  it("handles invalid status with helpful error", async () => {
+    // Try to list with an invalid status
+    const result = await $`bun ${CLI_PATH} list --status nonexistent_status 2>&1`.nothrow().text();
 
-    // Should either return empty items or an error, not crash
-    try {
-      const parsed = JSON.parse(result);
-      expect(parsed.items).toEqual([]);
-    } catch {
-      // If it's an error message, that's also acceptable
-      expect(result.length).toBeGreaterThan(0);
-    }
+    // Should show a helpful error message with available statuses
+    expect(result).toContain('Status "nonexistent_status" not found');
+    expect(result).toContain("Available statuses:");
   });
 });
