@@ -1,4 +1,4 @@
-import type { PlanIssue } from "../types";
+import type { PlanIssue, PlanIssueDetail } from "../types";
 
 export interface FormatOptions {
   depth?: number;
@@ -170,4 +170,100 @@ function formatRow(
     title.padEnd(widths.titleWidth),
     status,
   ].join("   ");
+}
+
+/**
+ * Format a single issue for `plan show` - human readable
+ */
+export function formatShowHuman(issue: PlanIssueDetail): string {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`${issue.identifier}: ${issue.title}`);
+  lines.push(`Status: ${issue.status}`);
+
+  // Assignee
+  const assigneeName = issue.assignee ? `@${issue.assignee.name}` : "(unassigned)";
+  lines.push(`Assignee: ${assigneeName}`);
+
+  // Position
+  lines.push(`Position: #${issue.position}`);
+
+  // Labels (if present)
+  if (issue.labels && issue.labels.length > 0) {
+    lines.push(`Labels: ${issue.labels.join(", ")}`);
+  }
+
+  // Project (if present)
+  if (issue.project) {
+    lines.push(`Project: ${issue.project}`);
+  }
+
+  // Description
+  if (issue.description) {
+    lines.push("");
+    lines.push("Description:");
+    // Indent description lines
+    const descLines = issue.description.split("\n");
+    for (const line of descLines) {
+      lines.push(`  ${line}`);
+    }
+  }
+
+  // Sub-issues
+  if (issue.children.length > 0) {
+    lines.push("");
+    lines.push("Sub-issues:");
+    for (const child of issue.children) {
+      lines.push(`  ${child.identifier}  ${child.title}  [${child.status}]`);
+    }
+  }
+
+  // Relationships
+  lines.push("");
+  if (issue.blockedBy.length > 0) {
+    const blockers = issue.blockedBy.map((b) => b.identifier).join(", ");
+    lines.push(`Blocked by: ${blockers}`);
+  } else {
+    lines.push("Blocked by: (none)");
+  }
+
+  if (issue.blocks.length > 0) {
+    const blocking = issue.blocks.map((b) => b.identifier).join(", ");
+    lines.push(`Blocks: ${blocking}`);
+  } else {
+    lines.push("Blocks: (none)");
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Format a single issue for `plan show` - JSON output
+ */
+export function formatShowJson(issue: PlanIssueDetail): string {
+  return JSON.stringify(
+    {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description,
+      status: issue.status,
+      sortOrder: issue.sortOrder,
+      position: issue.position,
+      assignee: issue.assignee,
+      labels: issue.labels,
+      project: issue.project,
+      children: issue.children.map((child) => ({
+        id: child.id,
+        identifier: child.identifier,
+        title: child.title,
+        status: child.status,
+      })),
+      blockedBy: issue.blockedBy,
+      blocks: issue.blocks,
+    },
+    null,
+    2
+  );
 }

@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { createListCommand } from "./commands/list";
 import { createCreateCommand } from "./commands/create";
 import { createUpdateCommand } from "./commands/update";
+import { createShowCommand } from "./commands/show";
 
 const program = new Command()
   .name("plan")
@@ -13,6 +14,7 @@ const program = new Command()
 program.addCommand(createListCommand());
 program.addCommand(createCreateCommand());
 program.addCommand(createUpdateCommand());
+program.addCommand(createShowCommand());
 
 // Parse arguments
 program.parse();

@@ -17,6 +17,7 @@ export function createUpdateCommand(): Command {
     .option("--blocking <id>", "Add blocking relationship (this blocks another)")
     .option("--related-to <id>", "Add related-to relationship")
     .option("--duplicate-of <id>", "Mark as duplicate of another issue")
+    .option("--comment <text>", "Add a comment to the issue")
     .option("--json", "Output as JSON")
     .option("--quiet", "No output on success")
     .action(async (id: string, opts) => {
@@ -45,6 +46,7 @@ async function runUpdate(
     blocking?: string;
     relatedTo?: string;
     duplicateOf?: string;
+    comment?: string;
     json?: boolean;
     quiet?: boolean;
   }
@@ -89,6 +91,14 @@ async function runUpdate(
       }
     }
 
+    // Handle comment
+    if (opts.comment) {
+      await client.addComment(identifier, opts.comment);
+      if (!opts.quiet && !opts.json) {
+        console.log(`Added comment to ${identifier}`);
+      }
+    }
+
     // Handle field updates
     const hasFieldUpdates =
       opts.title !== undefined ||
@@ -128,7 +138,7 @@ async function runUpdate(
       } else {
         console.log(`Updated: ${issue.identifier} - ${issue.title}`);
       }
-    } else if (!opts.blockedBy && !opts.blocking && !opts.relatedTo && !opts.duplicateOf) {
+    } else if (!opts.blockedBy && !opts.blocking && !opts.relatedTo && !opts.duplicateOf && !opts.comment) {
       console.error("Error: No updates specified. Use --help to see options.");
       process.exit(1);
     }

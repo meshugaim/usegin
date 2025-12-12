@@ -1,5 +1,5 @@
 import { LinearClient as LinearSDK } from "@linear/sdk";
-import type { PlanIssue, ListOptions } from "../types";
+import type { PlanIssue, PlanIssueDetail, ListOptions } from "../types";
 
 export interface LinearClientOptions {
   apiKey: string;
@@ -190,6 +190,122 @@ export class LinearClient {
           ? { id: parent.id, identifier: parent.identifier }
           : undefined,
         children: [],
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Get detailed issue info for `plan show` including relationships
+   */
+  async getIssueDetail(identifier: string): Promise<PlanIssueDetail | null> {
+    try {
+      const issue = await this.sdk.issue(identifier);
+      if (!issue) return null;
+
+      const state = await issue.state;
+      const assignee = await issue.assignee;
+      const parent = await issue.parent;
+      const labelsConnection = await issue.labels();
+      const project = await issue.project;
+      const childrenConnection = await issue.children();
+
+      // Get relationships via inverse relations
+      const relations = await issue.relations();
+      const inverseRelations = await issue.inverseRelations();
+
+      // Process blocking relationships
+      const blockedBy: PlanIssueDetail["blockedBy"] = [];
+      const blocks: PlanIssueDetail["blocks"] = [];
+
+      // Relations where this issue is the source
+      for (const rel of relations.nodes) {
+        if (rel.type === "blocks") {
+          const related = await rel.relatedIssue;
+          blocks.push({
+            id: related.id,
+            identifier: related.identifier,
+            title: related.title,
+          });
+        }
+      }
+
+      // Inverse relations where this issue is the target
+      for (const rel of inverseRelations.nodes) {
+        if (rel.type === "blocks") {
+          const source = await rel.issue;
+          blockedBy.push({
+            id: source.id,
+            identifier: source.identifier,
+            title: source.title,
+          });
+        }
+      }
+
+      // Process children
+      const children: PlanIssue[] = [];
+      for (const child of childrenConnection.nodes) {
+        const childState = await child.state;
+        const childAssignee = await child.assignee;
+        const childLabels = await child.labels();
+        const childProject = await child.project;
+        children.push({
+          id: child.id,
+          identifier: child.identifier,
+          title: child.title,
+          description: child.description ?? undefined,
+          status: childState?.name ?? "Unknown",
+          sortOrder: child.sortOrder,
+          assignee: childAssignee
+            ? {
+                id: childAssignee.id,
+                name: childAssignee.name,
+                displayName: childAssignee.displayName,
+              }
+            : undefined,
+          parent: { id: issue.id, identifier: issue.identifier },
+          labels: childLabels.nodes.map((l) => l.name),
+          project: childProject?.name,
+          children: [],
+        });
+      }
+
+      // Calculate position (fetch sibling issues to determine)
+      const team = await issue.team;
+      const siblingIssues = await this.sdk.issues({
+        filter: {
+          team: { id: { eq: team.id } },
+          parent: { null: true },
+          state: { type: { nin: ["completed", "canceled"] } },
+        },
+      });
+      const sortedSiblings = siblingIssues.nodes.sort((a, b) => a.sortOrder - b.sortOrder);
+      const position = sortedSiblings.findIndex((i) => i.id === issue.id) + 1;
+
+      return {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description ?? undefined,
+        status: state?.name ?? "Unknown",
+        sortOrder: issue.sortOrder,
+        position: position > 0 ? position : 1,
+        assignee: assignee
+          ? {
+              id: assignee.id,
+              name: assignee.name,
+              displayName: assignee.displayName,
+            }
+          : undefined,
+        parent: parent
+          ? { id: parent.id, identifier: parent.identifier }
+          : undefined,
+        labels: labelsConnection.nodes.map((l) => l.name),
+        project: project?.name,
+        children: children.sort((a, b) => a.sortOrder - b.sortOrder),
+        blockedBy,
+        blocks,
       };
     } catch {
       return null;
@@ -518,6 +634,19 @@ export class LinearClient {
       issueId: issue.id,
       relatedIssueId: original.id,
       type: "duplicate",
+    });
+  }
+
+  /**
+   * Add a comment to an issue
+   */
+  async addComment(identifier: string, body: string): Promise<void> {
+    const issue = await this.getIssueByIdentifier(identifier);
+    if (!issue) throw new Error(`Issue "${identifier}" not found`);
+
+    await this.sdk.createComment({
+      issueId: issue.id,
+      body,
     });
   }
 }
