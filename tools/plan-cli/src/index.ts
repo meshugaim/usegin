@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { createListCommand } from "./commands/list";
+import { createCreateCommand } from "./commands/create";
 
 const program = new Command()
   .name("plan")
@@ -9,6 +10,7 @@ const program = new Command()
 
 // Add commands
 program.addCommand(createListCommand());
+program.addCommand(createCreateCommand());
 
 // Parse arguments
 program.parse();

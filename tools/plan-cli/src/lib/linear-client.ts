@@ -125,4 +125,106 @@ export class LinearClient {
     // Sort by sortOrder
     return planIssues.sort((a, b) => a.sortOrder - b.sortOrder);
   }
+
+  /**
+   * Get an issue by its identifier (e.g., "ENG-123")
+   */
+  async getIssueByIdentifier(identifier: string): Promise<PlanIssue | null> {
+    try {
+      const issue = await this.sdk.issue(identifier);
+      if (!issue) return null;
+
+      const state = await issue.state;
+      const assignee = await issue.assignee;
+      const parent = await issue.parent;
+
+      return {
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description ?? undefined,
+        status: state?.name ?? "Unknown",
+        sortOrder: issue.sortOrder,
+        assignee: assignee
+          ? {
+              id: assignee.id,
+              name: assignee.name,
+              displayName: assignee.displayName,
+            }
+          : undefined,
+        parent: parent
+          ? { id: parent.id, identifier: parent.identifier }
+          : undefined,
+        children: [],
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Create a new issue
+   */
+  async createIssue(options: {
+    title: string;
+    description?: string;
+    team?: string;
+    parentId?: string;
+  }): Promise<PlanIssue> {
+    // Get team ID
+    let teamId: string;
+    if (options.team) {
+      const team = await this.getTeamByKey(options.team);
+      if (!team) {
+        throw new Error(`Team "${options.team}" not found`);
+      }
+      teamId = team.id;
+    } else {
+      const defaultTeam = await this.getDefaultTeam();
+      if (!defaultTeam) {
+        throw new Error("No teams found. Please specify a team with --team");
+      }
+      teamId = defaultTeam.id;
+    }
+
+    // Resolve parent identifier to ID if provided
+    let parentId: string | undefined;
+    if (options.parentId) {
+      // Check if it's already a UUID or an identifier
+      if (options.parentId.includes("-") && options.parentId.length > 20) {
+        parentId = options.parentId;
+      } else {
+        const parent = await this.getIssueByIdentifier(options.parentId);
+        if (!parent) {
+          throw new Error(`Parent issue "${options.parentId}" not found`);
+        }
+        parentId = parent.id;
+      }
+    }
+
+    // Create the issue
+    const result = await this.sdk.createIssue({
+      teamId,
+      title: options.title,
+      description: options.description,
+      parentId,
+    });
+
+    const issue = await result.issue;
+    if (!issue) {
+      throw new Error("Failed to create issue");
+    }
+
+    const state = await issue.state;
+
+    return {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description ?? undefined,
+      status: state?.name ?? "Unknown",
+      sortOrder: issue.sortOrder,
+      children: [],
+    };
+  }
 }
