@@ -28,6 +28,14 @@ export class LinearClient {
   }
 
   /**
+   * Execute raw GraphQL query
+   */
+  private async graphql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+    const result = await this.sdk.client.rawRequest<T>(query, variables);
+    return result.data;
+  }
+
+  /**
    * Get a team by its key (e.g., "ENG")
    */
   async getTeamByKey(key: string): Promise<{ id: string; key: string; name: string } | null> {
@@ -68,139 +76,146 @@ export class LinearClient {
   }
 
   /**
-   * List issues from Linear
+   * List issues from Linear (single GraphQL query)
    */
   async listIssues(options: ListOptions = {}): Promise<PlanIssue[]> {
-    // Get team
-    let teamId: string | undefined;
+    // Build filter
+    const filterParts: string[] = [];
+
     if (options.team) {
       const team = await this.getTeamByKey(options.team);
       if (!team) {
         throw new Error(`Team "${options.team}" not found`);
       }
-      teamId = team.id;
-    }
-
-    // Build filter
-    const filter: Record<string, unknown> = {};
-
-    if (teamId) {
-      filter.team = { id: { eq: teamId } };
+      filterParts.push(`team: { key: { eq: "${options.team}" } }`);
     }
 
     // Exclude completed/canceled by default
-    filter.state = {
-      type: { nin: ["completed", "canceled"] },
-    };
+    filterParts.push(`state: { type: { nin: ["completed", "canceled"] } }`);
 
     // Filter by project
     if (options.project) {
       const projectId = await this.getProjectId(options.project);
       if (projectId) {
-        filter.project = { id: { eq: projectId } };
+        filterParts.push(`project: { id: { eq: "${projectId}" } }`);
       }
     }
 
     // Filter by label(s)
     if (options.label && options.label.length > 0) {
-      // Linear uses "or" for multiple labels by default
-      filter.labels = {
-        name: { in: options.label },
-      };
+      const labelList = options.label.map((l) => `"${l}"`).join(", ");
+      filterParts.push(`labels: { name: { in: [${labelList}] } }`);
     }
 
-    // Search filter (title or description contains)
-    if (options.search) {
-      filter.or = [
-        { title: { containsIgnoreCase: options.search } },
-        { description: { containsIgnoreCase: options.search } },
-      ];
+    // Filter for inbox
+    if (options.inbox) {
+      filterParts.push(`labels: { name: { eq: "inbox" } }`);
     }
 
-    // Fetch issues
-    const issues = await this.sdk.issues({
-      filter,
-    });
+    const filterStr = filterParts.length > 0 ? `filter: { ${filterParts.join(", ")} }` : "";
 
-    // Transform to PlanIssue format - fetch relations in parallel
+    // Single GraphQL query with all nested relations
+    const query = `
+      query ListIssues {
+        issues(${filterStr}, first: 100) {
+          nodes {
+            id
+            identifier
+            title
+            description
+            sortOrder
+            state { name }
+            assignee { id name displayName }
+            parent { id identifier }
+            labels { nodes { name } }
+            project { name }
+            children {
+              nodes {
+                id
+                identifier
+                title
+                description
+                sortOrder
+                state { name }
+                assignee { id name displayName }
+                labels { nodes { name } }
+                project { name }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    interface GqlIssue {
+      id: string;
+      identifier: string;
+      title: string;
+      description: string | null;
+      sortOrder: number;
+      state: { name: string } | null;
+      assignee: { id: string; name: string; displayName: string } | null;
+      parent: { id: string; identifier: string } | null;
+      labels: { nodes: Array<{ name: string }> };
+      project: { name: string } | null;
+      children: { nodes: GqlIssue[] };
+    }
+
+    const data = await this.graphql<{ issues: { nodes: GqlIssue[] } }>(query);
+
+    // Transform to PlanIssue format
     const planIssues: PlanIssue[] = [];
 
-    // Process all issues in parallel
-    const issuePromises = issues.nodes.map(async (issue) => {
-      // Fetch all relations in parallel
-      const [state, assignee, parent, labelsConnection, project, childrenConnection] =
-        await Promise.all([
-          issue.state,
-          issue.assignee,
-          issue.parent,
-          issue.labels(),
-          issue.project,
-          issue.children(),
-        ]);
+    for (const issue of data.issues.nodes) {
+      // Skip if has parent (we only want top-level)
+      if (issue.parent) continue;
 
-      const labelNames = labelsConnection.nodes.map((l) => l.name);
-      const projectName = project?.name;
-
-      // Process children in parallel too
-      const childPromises = childrenConnection.nodes.map(async (child) => {
-        const [childState, childAssignee, childLabels, childProject] = await Promise.all([
-          child.state,
-          child.assignee,
-          child.labels(),
-          child.project,
-        ]);
-        return {
-          id: child.id,
-          identifier: child.identifier,
-          title: child.title,
-          description: child.description ?? undefined,
-          status: childState?.name ?? "Unknown",
-          sortOrder: child.sortOrder,
-          assignee: childAssignee
-            ? {
-                id: childAssignee.id,
-                name: childAssignee.name,
-                displayName: childAssignee.displayName,
-              }
-            : undefined,
-          parent: parent
-            ? { id: parent.id, identifier: parent.identifier }
-            : undefined,
-          labels: childLabels.nodes.map((l) => l.name),
-          project: childProject?.name,
-          children: [] as PlanIssue[],
-        };
-      });
-
-      const children = await Promise.all(childPromises);
-
-      return { issue, state, assignee, parent, labelNames, projectName, children };
-    });
-
-    const resolvedIssues = await Promise.all(issuePromises);
-
-    // Filter to top-level and build final array
-    for (const { issue, state, assignee, parent, labelNames, projectName, children } of resolvedIssues) {
-      if (!parent) {
-        planIssues.push({
-          id: issue.id,
-          identifier: issue.identifier,
-          title: issue.title,
-          description: issue.description ?? undefined,
-          status: state?.name ?? "Unknown",
-          sortOrder: issue.sortOrder,
-          assignee: assignee
-            ? {
-                id: assignee.id,
-                name: assignee.name,
-                displayName: assignee.displayName,
-              }
-            : undefined,
-          labels: labelNames,
-          project: projectName,
-          children: children.sort((a, b) => a.sortOrder - b.sortOrder),
-        });
+      // Apply search filter (client-side since GraphQL filter is limited)
+      if (options.search) {
+        const searchLower = options.search.toLowerCase();
+        const inTitle = issue.title.toLowerCase().includes(searchLower);
+        const inDesc = issue.description?.toLowerCase().includes(searchLower);
+        if (!inTitle && !inDesc) continue;
       }
+
+      const children: PlanIssue[] = issue.children.nodes.map((child) => ({
+        id: child.id,
+        identifier: child.identifier,
+        title: child.title,
+        description: child.description ?? undefined,
+        status: child.state?.name ?? "Unknown",
+        sortOrder: child.sortOrder,
+        assignee: child.assignee
+          ? {
+              id: child.assignee.id,
+              name: child.assignee.name,
+              displayName: child.assignee.displayName,
+            }
+          : undefined,
+        parent: { id: issue.id, identifier: issue.identifier },
+        labels: child.labels.nodes.map((l) => l.name),
+        project: child.project?.name,
+        children: [],
+      }));
+
+      planIssues.push({
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        description: issue.description ?? undefined,
+        status: issue.state?.name ?? "Unknown",
+        sortOrder: issue.sortOrder,
+        assignee: issue.assignee
+          ? {
+              id: issue.assignee.id,
+              name: issue.assignee.name,
+              displayName: issue.assignee.displayName,
+            }
+          : undefined,
+        labels: issue.labels.nodes.map((l) => l.name),
+        project: issue.project?.name,
+        children: children.sort((a, b) => a.sortOrder - b.sortOrder),
+      });
     }
 
     // Sort by sortOrder
@@ -247,94 +262,145 @@ export class LinearClient {
    * Get detailed issue info for `plan show` including relationships
    */
   async getIssueDetail(identifier: string): Promise<PlanIssueDetail | null> {
+    // Single GraphQL query for issue details
+    const query = `
+      query GetIssueDetail($id: String!) {
+        issue(id: $id) {
+          id
+          identifier
+          title
+          description
+          sortOrder
+          state { name }
+          assignee { id name displayName }
+          parent { id identifier }
+          labels { nodes { name } }
+          project { name }
+          team { id }
+          children {
+            nodes {
+              id
+              identifier
+              title
+              description
+              sortOrder
+              state { name }
+              assignee { id name displayName }
+              labels { nodes { name } }
+              project { name }
+            }
+          }
+          relations {
+            nodes {
+              type
+              relatedIssue { id identifier title }
+            }
+          }
+          inverseRelations {
+            nodes {
+              type
+              issue { id identifier title }
+            }
+          }
+        }
+      }
+    `;
+
+    interface GqlRelation {
+      type: string;
+      relatedIssue?: { id: string; identifier: string; title: string };
+      issue?: { id: string; identifier: string; title: string };
+    }
+
+    interface GqlChild {
+      id: string;
+      identifier: string;
+      title: string;
+      description: string | null;
+      sortOrder: number;
+      state: { name: string } | null;
+      assignee: { id: string; name: string; displayName: string } | null;
+      labels: { nodes: Array<{ name: string }> };
+      project: { name: string } | null;
+    }
+
+    interface GqlIssueDetail {
+      id: string;
+      identifier: string;
+      title: string;
+      description: string | null;
+      sortOrder: number;
+      state: { name: string } | null;
+      assignee: { id: string; name: string; displayName: string } | null;
+      parent: { id: string; identifier: string } | null;
+      labels: { nodes: Array<{ name: string }> };
+      project: { name: string } | null;
+      team: { id: string };
+      children: { nodes: GqlChild[] };
+      relations: { nodes: GqlRelation[] };
+      inverseRelations: { nodes: GqlRelation[] };
+    }
+
     try {
-      const issue = await this.sdk.issue(identifier);
+      const data = await this.graphql<{ issue: GqlIssueDetail | null }>(query, { id: identifier });
+      const issue = data.issue;
       if (!issue) return null;
 
-      // Fetch all relations in parallel
-      const [
-        state,
-        assignee,
-        parent,
-        labelsConnection,
-        project,
-        childrenConnection,
-        relations,
-        inverseRelations,
-        team,
-      ] = await Promise.all([
-        issue.state,
-        issue.assignee,
-        issue.parent,
-        issue.labels(),
-        issue.project,
-        issue.children(),
-        issue.relations(),
-        issue.inverseRelations(),
-        issue.team,
-      ]);
+      // Process blocking relationships
+      const blocks = issue.relations.nodes
+        .filter((rel) => rel.type === "blocks" && rel.relatedIssue)
+        .map((rel) => ({
+          id: rel.relatedIssue!.id,
+          identifier: rel.relatedIssue!.identifier,
+          title: rel.relatedIssue!.title,
+        }));
 
-      // Process blocking relationships in parallel
-      const blockPromises = relations.nodes
-        .filter((rel) => rel.type === "blocks")
-        .map(async (rel) => {
-          const related = await rel.relatedIssue;
-          return { id: related.id, identifier: related.identifier, title: related.title };
-        });
+      const blockedBy = issue.inverseRelations.nodes
+        .filter((rel) => rel.type === "blocks" && rel.issue)
+        .map((rel) => ({
+          id: rel.issue!.id,
+          identifier: rel.issue!.identifier,
+          title: rel.issue!.title,
+        }));
 
-      const blockedByPromises = inverseRelations.nodes
-        .filter((rel) => rel.type === "blocks")
-        .map(async (rel) => {
-          const source = await rel.issue;
-          return { id: source.id, identifier: source.identifier, title: source.title };
-        });
+      // Process children
+      const children: PlanIssue[] = issue.children.nodes.map((child) => ({
+        id: child.id,
+        identifier: child.identifier,
+        title: child.title,
+        description: child.description ?? undefined,
+        status: child.state?.name ?? "Unknown",
+        sortOrder: child.sortOrder,
+        assignee: child.assignee
+          ? {
+              id: child.assignee.id,
+              name: child.assignee.name,
+              displayName: child.assignee.displayName,
+            }
+          : undefined,
+        parent: { id: issue.id, identifier: issue.identifier },
+        labels: child.labels.nodes.map((l) => l.name),
+        project: child.project?.name,
+        children: [],
+      }));
 
-      // Process children in parallel
-      const childPromises = childrenConnection.nodes.map(async (child) => {
-        const [childState, childAssignee, childLabels, childProject] = await Promise.all([
-          child.state,
-          child.assignee,
-          child.labels(),
-          child.project,
-        ]);
-        return {
-          id: child.id,
-          identifier: child.identifier,
-          title: child.title,
-          description: child.description ?? undefined,
-          status: childState?.name ?? "Unknown",
-          sortOrder: child.sortOrder,
-          assignee: childAssignee
-            ? {
-                id: childAssignee.id,
-                name: childAssignee.name,
-                displayName: childAssignee.displayName,
-              }
-            : undefined,
-          parent: { id: issue.id, identifier: issue.identifier },
-          labels: childLabels.nodes.map((l) => l.name),
-          project: childProject?.name,
-          children: [] as PlanIssue[],
-        };
-      });
-
-      // Calculate position (fetch sibling issues)
-      const siblingIssues = await this.sdk.issues({
-        filter: {
-          team: { id: { eq: team.id } },
-          parent: { null: true },
-          state: { type: { nin: ["completed", "canceled"] } },
-        },
-      });
-
-      // Wait for all parallel operations
-      const [blocks, blockedBy, children] = await Promise.all([
-        Promise.all(blockPromises),
-        Promise.all(blockedByPromises),
-        Promise.all(childPromises),
-      ]);
-
-      const sortedSiblings = siblingIssues.nodes.sort((a, b) => a.sortOrder - b.sortOrder);
+      // Get position from siblings (second query - unavoidable for position)
+      const siblingsQuery = `
+        query GetSiblings($teamId: ID!) {
+          issues(filter: {
+            team: { id: { eq: $teamId } },
+            parent: { null: true },
+            state: { type: { nin: ["completed", "canceled"] } }
+          }, first: 100) {
+            nodes { id sortOrder }
+          }
+        }
+      `;
+      const siblingsData = await this.graphql<{ issues: { nodes: Array<{ id: string; sortOrder: number }> } }>(
+        siblingsQuery,
+        { teamId: issue.team.id }
+      );
+      const sortedSiblings = siblingsData.issues.nodes.sort((a, b) => a.sortOrder - b.sortOrder);
       const position = sortedSiblings.findIndex((i) => i.id === issue.id) + 1;
 
       return {
@@ -342,26 +408,30 @@ export class LinearClient {
         identifier: issue.identifier,
         title: issue.title,
         description: issue.description ?? undefined,
-        status: state?.name ?? "Unknown",
+        status: issue.state?.name ?? "Unknown",
         sortOrder: issue.sortOrder,
         position: position > 0 ? position : 1,
-        assignee: assignee
+        assignee: issue.assignee
           ? {
-              id: assignee.id,
-              name: assignee.name,
-              displayName: assignee.displayName,
+              id: issue.assignee.id,
+              name: issue.assignee.name,
+              displayName: issue.assignee.displayName,
             }
           : undefined,
-        parent: parent
-          ? { id: parent.id, identifier: parent.identifier }
+        parent: issue.parent
+          ? { id: issue.parent.id, identifier: issue.parent.identifier }
           : undefined,
-        labels: labelsConnection.nodes.map((l) => l.name),
-        project: project?.name,
+        labels: issue.labels.nodes.map((l) => l.name),
+        project: issue.project?.name,
         children: children.sort((a, b) => a.sortOrder - b.sortOrder),
         blockedBy,
         blocks,
       };
-    } catch {
+    } catch (error) {
+      // Log error for debugging
+      if (process.env.DEBUG) {
+        console.error("getIssueDetail error:", error);
+      }
       return null;
     }
   }
@@ -741,29 +811,36 @@ export class LinearClient {
     identifier: string;
     sortOrder: number;
   }>> {
-    let teamId: string | undefined;
+    // Build filter
+    const filterParts = [
+      `parent: { null: true }`,
+      `state: { type: { nin: ["completed", "canceled"] } }`,
+    ];
+
     if (teamKey) {
-      const team = await this.getTeamByKey(teamKey);
-      if (!team) throw new Error(`Team "${teamKey}" not found`);
-      teamId = team.id;
+      filterParts.push(`team: { key: { eq: "${teamKey}" } }`);
     }
 
-    const filter: Record<string, unknown> = {
-      parent: { null: true }, // Top-level only
-      state: { type: { nin: ["completed", "canceled"] } },
-    };
+    const query = `
+      query GetIssuesForReordering {
+        issues(filter: { ${filterParts.join(", ")} }, first: 100) {
+          nodes {
+            id
+            identifier
+            sortOrder
+          }
+        }
+      }
+    `;
 
-    if (teamId) {
-      filter.team = { id: { eq: teamId } };
+    interface GqlIssue {
+      id: string;
+      identifier: string;
+      sortOrder: number;
     }
 
-    const issues = await this.sdk.issues({ filter });
-
-    return issues.nodes.map((issue) => ({
-      id: issue.id,
-      identifier: issue.identifier,
-      sortOrder: issue.sortOrder,
-    }));
+    const data = await this.graphql<{ issues: { nodes: GqlIssue[] } }>(query);
+    return data.issues.nodes;
   }
 
   /**
