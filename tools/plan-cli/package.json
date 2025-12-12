@@ -1,0 +1,18 @@
+{
+  "name": "plan-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "test:e2e": "bun test tests/e2e",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@linear/sdk": "^29.0.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  }
+}
