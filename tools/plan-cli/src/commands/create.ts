@@ -11,6 +11,9 @@ export function createCreateCommand(): Command {
     .option("--label <name>", "Add label (can be used multiple times)", collect, [])
     .option("--project <name>", "Add to project")
     .option("--status <name>", "Set initial status (e.g., 'In Progress', 'Todo')")
+    .option("--blocked-by <id>", "Set blocked-by relationship after creation")
+    .option("--blocking <id>", "Set blocking relationship after creation")
+    .option("--related-to <id>", "Set related-to relationship after creation")
     .option("--json", "Output as JSON")
     .option("--quiet", "Only output the issue identifier")
     .action(async (title: string, opts) => {
@@ -34,6 +37,9 @@ async function runCreate(
     label?: string[];
     project?: string;
     status?: string;
+    blockedBy?: string;
+    blocking?: string;
+    relatedTo?: string;
     json?: boolean;
     quiet?: boolean;
   }
@@ -60,6 +66,17 @@ async function runCreate(
       project: opts.project,
       status: opts.status,
     });
+
+    // Add relationships after creation
+    if (opts.blockedBy) {
+      await client.addBlockedBy(issue.identifier, opts.blockedBy);
+    }
+    if (opts.blocking) {
+      await client.addBlocking(issue.identifier, opts.blocking);
+    }
+    if (opts.relatedTo) {
+      await client.addRelatedTo(issue.identifier, opts.relatedTo);
+    }
 
     if (opts.quiet) {
       // Just output the identifier

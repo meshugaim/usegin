@@ -25,16 +25,20 @@ describe("E2E: plan list against real Linear", () => {
     expect(result.length).toBeGreaterThan(0);
   });
 
-  it("returns valid JSON with --json flag", async () => {
-    const result = await $`bun ${CLI_PATH} list --json`.text();
+  it(
+    "returns valid JSON with --json flag",
+    async () => {
+      const result = await $`bun ${CLI_PATH} list --json`.text();
 
-    // Should be valid JSON
-    expect(() => JSON.parse(result)).not.toThrow();
+      // Should be valid JSON
+      expect(() => JSON.parse(result)).not.toThrow();
 
-    const parsed = JSON.parse(result);
-    expect(parsed).toHaveProperty("items");
-    expect(Array.isArray(parsed.items)).toBe(true);
-  });
+      const parsed = JSON.parse(result);
+      expect(parsed).toHaveProperty("items");
+      expect(Array.isArray(parsed.items)).toBe(true);
+    },
+    15000
+  );
 
   it(
     "filters by team when --team is provided",

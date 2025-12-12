@@ -357,4 +357,167 @@ export class LinearClient {
       children: [],
     };
   }
+
+  /**
+   * Update an existing issue
+   */
+  async updateIssue(
+    identifier: string,
+    options: {
+      title?: string;
+      description?: string;
+      status?: string;
+      assignee?: string;
+      parentId?: string | null; // null to remove parent
+      labels?: string[];
+      project?: string;
+    }
+  ): Promise<PlanIssue> {
+    // Get the issue first
+    const issue = await this.getIssueByIdentifier(identifier);
+    if (!issue) {
+      throw new Error(`Issue "${identifier}" not found`);
+    }
+
+    // Get team for state/label resolution
+    const rawIssue = await this.sdk.issue(identifier);
+    const team = await rawIssue.team;
+    const teamId = team.id;
+
+    // Build update input
+    const input: Record<string, unknown> = {};
+
+    if (options.title !== undefined) {
+      input.title = options.title;
+    }
+
+    if (options.description !== undefined) {
+      input.description = options.description;
+    }
+
+    if (options.status !== undefined) {
+      const stateId = await this.getStateId(teamId, options.status);
+      if (!stateId) {
+        throw new Error(`Status "${options.status}" not found for this team`);
+      }
+      input.stateId = stateId;
+    }
+
+    if (options.assignee !== undefined) {
+      if (options.assignee === "@me") {
+        const me = await this.sdk.viewer;
+        input.assigneeId = me.id;
+      } else if (options.assignee === "" || options.assignee === "none") {
+        input.assigneeId = null;
+      } else {
+        // Try to find user by name
+        const users = await this.sdk.users();
+        const user = users.nodes.find(
+          (u) => u.name.toLowerCase() === options.assignee!.toLowerCase() ||
+                 u.displayName.toLowerCase() === options.assignee!.toLowerCase()
+        );
+        if (user) {
+          input.assigneeId = user.id;
+        } else {
+          throw new Error(`User "${options.assignee}" not found`);
+        }
+      }
+    }
+
+    if (options.parentId !== undefined) {
+      if (options.parentId === null) {
+        input.parentId = null;
+      } else {
+        const parent = await this.getIssueByIdentifier(options.parentId);
+        if (!parent) {
+          throw new Error(`Parent issue "${options.parentId}" not found`);
+        }
+        input.parentId = parent.id;
+      }
+    }
+
+    if (options.labels !== undefined) {
+      const labelIds = await this.getLabelIds(teamId, options.labels);
+      input.labelIds = labelIds;
+    }
+
+    if (options.project !== undefined) {
+      const projectId = await this.getProjectId(options.project);
+      if (!projectId) {
+        throw new Error(`Project "${options.project}" not found`);
+      }
+      input.projectId = projectId;
+    }
+
+    // Update the issue
+    await this.sdk.updateIssue(issue.id, input);
+
+    // Return updated issue
+    return (await this.getIssueByIdentifier(identifier))!;
+  }
+
+  /**
+   * Add a blocking relationship (this issue blocks another)
+   */
+  async addBlocking(identifier: string, blocksIdentifier: string): Promise<void> {
+    const issue = await this.getIssueByIdentifier(identifier);
+    const blocks = await this.getIssueByIdentifier(blocksIdentifier);
+    if (!issue) throw new Error(`Issue "${identifier}" not found`);
+    if (!blocks) throw new Error(`Issue "${blocksIdentifier}" not found`);
+
+    await this.sdk.createIssueRelation({
+      issueId: issue.id,
+      relatedIssueId: blocks.id,
+      type: "blocks",
+    });
+  }
+
+  /**
+   * Add a blocked-by relationship (this issue is blocked by another)
+   */
+  async addBlockedBy(identifier: string, blockedByIdentifier: string): Promise<void> {
+    // In Linear, "blocks" is directional - so we reverse the relationship
+    const issue = await this.getIssueByIdentifier(identifier);
+    const blocker = await this.getIssueByIdentifier(blockedByIdentifier);
+    if (!issue) throw new Error(`Issue "${identifier}" not found`);
+    if (!blocker) throw new Error(`Issue "${blockedByIdentifier}" not found`);
+
+    await this.sdk.createIssueRelation({
+      issueId: blocker.id,
+      relatedIssueId: issue.id,
+      type: "blocks",
+    });
+  }
+
+  /**
+   * Add a related-to relationship
+   */
+  async addRelatedTo(identifier: string, relatedIdentifier: string): Promise<void> {
+    const issue = await this.getIssueByIdentifier(identifier);
+    const related = await this.getIssueByIdentifier(relatedIdentifier);
+    if (!issue) throw new Error(`Issue "${identifier}" not found`);
+    if (!related) throw new Error(`Issue "${relatedIdentifier}" not found`);
+
+    await this.sdk.createIssueRelation({
+      issueId: issue.id,
+      relatedIssueId: related.id,
+      type: "related",
+    });
+  }
+
+  /**
+   * Mark as duplicate of another issue
+   */
+  async markDuplicateOf(identifier: string, duplicateOfIdentifier: string): Promise<void> {
+    const issue = await this.getIssueByIdentifier(identifier);
+    const original = await this.getIssueByIdentifier(duplicateOfIdentifier);
+    if (!issue) throw new Error(`Issue "${identifier}" not found`);
+    if (!original) throw new Error(`Issue "${duplicateOfIdentifier}" not found`);
+
+    await this.sdk.createIssueRelation({
+      issueId: issue.id,
+      relatedIssueId: original.id,
+      type: "duplicate",
+    });
+  }
 }
