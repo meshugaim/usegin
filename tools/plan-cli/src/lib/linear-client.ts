@@ -568,6 +568,22 @@ export class LinearClient {
   }
 
   /**
+   * Get workspace-level labels (not team-specific)
+   */
+  async getWorkspaceLabels(): Promise<Array<{ id: string; name: string }>> {
+    let workspaceLabels = await getCachedLabels("_workspace");
+
+    if (!workspaceLabels) {
+      this.trackCall();
+      const result = await this.sdk.issueLabels();
+      workspaceLabels = result.nodes.map((l) => ({ id: l.id, name: l.name }));
+      await setCachedLabels("_workspace", workspaceLabels);
+    }
+
+    return workspaceLabels;
+  }
+
+  /**
    * Get project by name or ID
    */
   async getProjectId(projectNameOrId: string): Promise<string | null> {

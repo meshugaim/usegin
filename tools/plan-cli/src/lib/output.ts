@@ -17,15 +17,23 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
   const maxTitleLen = Math.max(5, ...allIssues.map((i) => i.title.length));
   const maxStatusLen = Math.max(6, ...allIssues.map((i) => i.status.length));
 
+  // Check if any issues have labels
+  const hasLabels = allIssues.some((i) => i.labels && i.labels.length > 0);
+  const maxLabelLen = hasLabels
+    ? Math.max(6, ...allIssues.map((i) => formatLabels(i.labels).length))
+    : 0;
+  const labelLen = Math.min(maxLabelLen, 20);
+
   // Clamp title length for readability
-  const titleLen = Math.min(maxTitleLen, 40);
+  const titleLen = Math.min(maxTitleLen, hasLabels ? 35 : 40);
 
   // Header
-  const header = formatRow("#", "ID", "Title", "Status", {
+  const header = formatRow("#", "ID", "Title", "Status", hasLabels ? "Labels" : undefined, {
     numWidth: 3,
     idWidth: maxIdLen,
     titleWidth: titleLen,
     statusWidth: maxStatusLen,
+    labelWidth: labelLen,
   });
   lines.push(header);
 
@@ -35,13 +43,15 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     position++;
     const posStr = String(position);
     const title = truncate(issue.title, titleLen);
+    const labels = hasLabels ? truncate(formatLabels(issue.labels), labelLen) : undefined;
 
     lines.push(
-      formatRow(posStr, issue.identifier, title, issue.status, {
+      formatRow(posStr, issue.identifier, title, issue.status, labels, {
         numWidth: 3,
         idWidth: maxIdLen,
         titleWidth: titleLen,
         statusWidth: maxStatusLen,
+        labelWidth: labelLen,
       })
     );
 
@@ -49,12 +59,14 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     if (depth > 0 && issue.children.length > 0) {
       for (const child of issue.children) {
         const childTitle = truncate(child.title, titleLen - 2);
+        const childLabels = hasLabels ? truncate(formatLabels(child.labels), labelLen) : undefined;
         lines.push(
-          formatRow("", child.identifier, `└ ${childTitle}`, child.status, {
+          formatRow("", child.identifier, `└ ${childTitle}`, child.status, childLabels, {
             numWidth: 3,
             idWidth: maxIdLen,
             titleWidth: titleLen,
             statusWidth: maxStatusLen,
+            labelWidth: labelLen,
           })
         );
       }
@@ -62,6 +74,11 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
   }
 
   return lines.join("\n");
+}
+
+function formatLabels(labels?: string[]): string {
+  if (!labels || labels.length === 0) return "";
+  return labels.join(", ");
 }
 
 /**
@@ -162,14 +179,21 @@ function formatRow(
   id: string,
   title: string,
   status: string,
-  widths: { numWidth: number; idWidth: number; titleWidth: number; statusWidth: number }
+  labels: string | undefined,
+  widths: { numWidth: number; idWidth: number; titleWidth: number; statusWidth: number; labelWidth: number }
 ): string {
-  return [
+  const parts = [
     num.padStart(widths.numWidth),
     id.padEnd(widths.idWidth),
     title.padEnd(widths.titleWidth),
-    status,
-  ].join("   ");
+    status.padEnd(widths.statusWidth),
+  ];
+
+  if (labels !== undefined) {
+    parts.push(labels);
+  }
+
+  return parts.join("   ");
 }
 
 /**

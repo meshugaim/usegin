@@ -9,6 +9,7 @@ import { createCaptureCommand } from "./commands/capture";
 import { createInboxCommand } from "./commands/inbox";
 import { createReorderCommand } from "./commands/reorder";
 import { createCacheCommand } from "./commands/cache";
+import { createLabelsCommand } from "./commands/labels";
 
 const program = new Command()
   .name("plan")
@@ -25,6 +26,7 @@ program.addCommand(createCaptureCommand());
 program.addCommand(createInboxCommand());
 program.addCommand(createReorderCommand());
 program.addCommand(createCacheCommand());
+program.addCommand(createLabelsCommand());
 
 // Parse arguments
 program.parse();
