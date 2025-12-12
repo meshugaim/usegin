@@ -45,6 +45,7 @@ export interface ListResult {
  * Extended issue type for show command with relationships
  */
 export interface PlanIssueDetail extends PlanIssue {
+  url: string;
   position: number;
   blockedBy: Array<{ id: string; identifier: string; title: string }>;
   blocks: Array<{ id: string; identifier: string; title: string }>;

@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
 import { formatShowHuman, formatShowJson } from "../lib/output";
 import { printApiStats } from "../lib/stats";
@@ -8,6 +9,7 @@ export function createShowCommand(): Command {
     .description("Show details of a single issue")
     .argument("<identifier>", "Issue identifier (e.g., ENG-123)")
     .option("--json", "Output as JSON")
+    .option("--web", "Open issue in web browser")
     .option("--stats", "Show API call statistics")
     .action(async (identifier: string, opts) => {
       await runShow(identifier, opts);
@@ -18,7 +20,7 @@ export function createShowCommand(): Command {
 
 async function runShow(
   identifier: string,
-  opts: { json?: boolean; stats?: boolean }
+  opts: { json?: boolean; web?: boolean; stats?: boolean }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -35,6 +37,12 @@ async function runShow(
     if (!issue) {
       console.error(`Error: Issue "${identifier}" not found`);
       process.exit(3);
+    }
+
+    if (opts.web) {
+      // Open in browser - use xdg-open on Linux, open on macOS
+      const openCmd = process.platform === "darwin" ? "open" : "xdg-open";
+      await $`${openCmd} ${issue.url}`.quiet();
     }
 
     if (opts.json) {

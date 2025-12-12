@@ -302,6 +302,7 @@ export class LinearClient {
           title
           description
           sortOrder
+          url
           state { name }
           assignee { id name displayName }
           parent { id identifier }
@@ -361,6 +362,7 @@ export class LinearClient {
       title: string;
       description: string | null;
       sortOrder: number;
+      url: string;
       state: { name: string } | null;
       assignee: { id: string; name: string; displayName: string } | null;
       parent: { id: string; identifier: string } | null;
@@ -441,6 +443,7 @@ export class LinearClient {
         description: issue.description ?? undefined,
         status: issue.state?.name ?? "Unknown",
         sortOrder: issue.sortOrder,
+        url: issue.url,
         position: position > 0 ? position : 1,
         assignee: issue.assignee
           ? {

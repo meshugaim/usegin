@@ -204,6 +204,7 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
 
   // Header
   lines.push(`${issue.identifier}: ${issue.title}`);
+  lines.push(`URL: ${issue.url}`);
   lines.push(`Status: ${issue.status}`);
 
   // Assignee
@@ -271,6 +272,7 @@ export function formatShowJson(issue: PlanIssueDetail): string {
       id: issue.id,
       identifier: issue.identifier,
       title: issue.title,
+      url: issue.url,
       description: issue.description,
       status: issue.status,
       sortOrder: issue.sortOrder,
