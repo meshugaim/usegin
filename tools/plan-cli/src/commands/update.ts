@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { readFileSync } from "fs";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 
@@ -8,6 +9,8 @@ export function createUpdateCommand(): Command {
     .argument("<id>", "Issue identifier (e.g., ENG-20)")
     .option("--title <text>", "Update title")
     .option("--description <text>", "Update description")
+    .option("--description-file <path>", "Read description from file")
+    .option("--append-description <text>", "Append to existing description")
     .option("--status <name>", "Update status (e.g., 'In Progress')")
     .option("--assignee <user>", "Assign to user (@me for self, 'none' to unassign)")
     .option("--parent <id>", "Set parent issue (makes this a sub-issue)")
@@ -40,6 +43,8 @@ async function runUpdate(
   opts: {
     title?: string;
     description?: string;
+    descriptionFile?: string;
+    appendDescription?: string;
     status?: string;
     assignee?: string;
     parent?: string | false;
@@ -66,6 +71,35 @@ async function runUpdate(
 
   try {
     const client = new LinearClient({ apiKey });
+
+    // Resolve description from various sources
+    let finalDescription = opts.description;
+
+    // --description-file takes precedence over --description
+    if (opts.descriptionFile) {
+      try {
+        finalDescription = readFileSync(opts.descriptionFile, "utf-8");
+      } catch (err) {
+        console.error(`Error reading file: ${opts.descriptionFile}`);
+        process.exit(1);
+      }
+    }
+
+    // --append-description appends to existing description
+    if (opts.appendDescription) {
+      const issue = await client.getIssueByIdentifier(identifier);
+      if (!issue) {
+        console.error(`Error: Issue ${identifier} not found`);
+        process.exit(3);
+      }
+      const existing = issue.description ?? "";
+      finalDescription = existing + (existing ? "\n\n" : "") + opts.appendDescription;
+    }
+
+    // Update opts.description for downstream logic
+    if (finalDescription !== undefined) {
+      opts.description = finalDescription;
+    }
 
     // Handle relationships first
     if (opts.blockedBy) {
