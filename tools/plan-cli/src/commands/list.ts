@@ -1,6 +1,8 @@
 import { Command } from "commander";
+import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
 import { formatListHuman, formatListJson, formatGroupedList } from "../lib/output";
+import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import type { ListOptions, PlanIssue } from "../types";
 
 export function createListCommand(): Command {
@@ -18,6 +20,8 @@ export function createListCommand(): Command {
     .option("--all", "Show both inbox and list items")
     .option("--status <status>", "Filter by status")
     .option("--assignee <user>", "Filter by assignee (@me for self)")
+    .option("--fzf", "Interactive selection with fzf (returns identifier)")
+    .option("--multi", "Allow multiple selection (with --fzf)")
     .action(async (opts) => {
       await runList(opts);
     });
@@ -42,6 +46,8 @@ async function runList(opts: {
   all?: boolean;
   status?: string;
   assignee?: string;
+  fzf?: boolean;
+  multi?: boolean;
 }): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -73,20 +79,52 @@ async function runList(opts: {
 
     const issues = await client.listIssues(options);
 
+    if (issues.length === 0) {
+      console.log("No issues found");
+      return;
+    }
+
+    // FZF mode
+    if (opts.fzf) {
+      const fzfInput = formatIssuesForFzf(issues);
+      const binPath = new URL("../../../bin/plan", import.meta.url).pathname;
+      const previewCmd = `echo {} | grep -oE '[A-Z]+-[0-9]+' | head -1 | xargs ${binPath} show`;
+
+      const fzfArgs = [
+        "--ansi",
+        "--preview",
+        previewCmd,
+        "--preview-window",
+        "right:50%:wrap",
+      ];
+
+      if (opts.multi) {
+        fzfArgs.push("--multi");
+      }
+
+      const result = await $`echo ${fzfInput} | fzf ${fzfArgs}`
+        .text()
+        .catch(() => {
+          process.exit(0);
+        });
+
+      if (result && result.trim()) {
+        const selectedLines = result.trim().split("\n");
+        for (const line of selectedLines) {
+          const id = extractIdentifier(line);
+          if (id) console.log(id);
+        }
+      }
+      return;
+    }
+
+    // Standard output modes
     if (opts.json) {
       console.log(formatListJson(issues));
     } else if (opts.groupBy) {
-      if (issues.length === 0) {
-        console.log("No issues found");
-      } else {
-        console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status"));
-      }
+      console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status"));
     } else {
-      if (issues.length === 0) {
-        console.log("No issues found");
-      } else {
-        console.log(formatListHuman(issues, { depth: options.depth }));
-      }
+      console.log(formatListHuman(issues, { depth: options.depth }));
     }
   } catch (error) {
     if (error instanceof Error) {
