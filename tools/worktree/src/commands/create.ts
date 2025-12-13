@@ -27,11 +27,7 @@ async function runCreate(name: string): Promise<void> {
   // Create the worktree with a new branch
   try {
     await $`git worktree add ${worktreePath} -b ${branchName}`.quiet();
-
-    // Symlink .husky so git hooks work in the worktree
-    // (core.hooksPath is relative, so worktree needs its own .husky)
-    await $`ln -s ../../.husky ${worktreePath}/.husky`.quiet();
-
+    // .husky is tracked in git, so it's already checked out in the worktree
     console.log(`Created: ${worktreePath} (branch: ${branchName})`);
   } catch (error) {
     console.error(`Error creating worktree: ${error}`);
