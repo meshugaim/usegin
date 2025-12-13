@@ -2,6 +2,15 @@ import type { PlanIssue, PlanIssueDetail } from "../types";
 
 export interface FormatOptions {
   depth?: number;
+  showDone?: boolean;
+}
+
+/**
+ * Filter children based on showDone option
+ */
+function filterChildren(children: PlanIssue[], showDone: boolean): PlanIssue[] {
+  if (showDone) return children;
+  return children.filter((child) => child.status !== "Done");
 }
 
 /**
@@ -9,10 +18,11 @@ export interface FormatOptions {
  */
 export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}): string {
   const depth = options.depth ?? 0;
+  const showDone = options.showDone ?? false;
   const lines: string[] = [];
 
-  // Calculate column widths
-  const allIssues = flattenIssues(issues, depth);
+  // Calculate column widths (need to apply filter for accurate column sizing)
+  const allIssues = flattenIssues(issues, depth, showDone);
   const maxIdLen = Math.max(4, ...allIssues.map((i) => i.identifier.length));
   const maxTitleLen = Math.max(5, ...allIssues.map((i) => i.title.length));
   const maxStatusLen = Math.max(6, ...allIssues.map((i) => i.status.length));
@@ -57,7 +67,8 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
 
     // Children (if depth > 0)
     if (depth > 0 && issue.children.length > 0) {
-      for (const child of issue.children) {
+      const filteredChildren = filterChildren(issue.children, showDone);
+      for (const child of filteredChildren) {
         const childTitle = truncate(child.title, titleLen - 2);
         const childLabels = hasLabels ? truncate(formatLabels(child.labels), labelLen) : undefined;
         lines.push(
@@ -84,7 +95,8 @@ function formatLabels(labels?: string[]): string {
 /**
  * Format issues as JSON
  */
-export function formatListJson(issues: PlanIssue[]): string {
+export function formatListJson(issues: PlanIssue[], options: FormatOptions = {}): string {
+  const showDone = options.showDone ?? false;
   const items = issues.map((issue, index) => ({
     id: issue.id,
     identifier: issue.identifier,
@@ -96,7 +108,7 @@ export function formatListJson(issues: PlanIssue[]): string {
     assignee: issue.assignee,
     labels: issue.labels,
     project: issue.project,
-    children: issue.children.map((child) => ({
+    children: filterChildren(issue.children, showDone).map((child) => ({
       id: child.id,
       identifier: child.identifier,
       title: child.title,
@@ -117,8 +129,11 @@ export function formatListJson(issues: PlanIssue[]): string {
  */
 export function formatGroupedList(
   issues: PlanIssue[],
-  groupBy: "label" | "project" | "status"
+  groupBy: "label" | "project" | "status",
+  _options: FormatOptions = {}
 ): string {
+  // Note: grouped list currently only shows top-level issues, not children
+  // _options.showDone would be relevant if we add child display
   const groups = new Map<string, PlanIssue[]>();
 
   for (const issue of issues) {
@@ -158,12 +173,12 @@ export function formatGroupedList(
 
 // Helper functions
 
-function flattenIssues(issues: PlanIssue[], depth: number): PlanIssue[] {
+function flattenIssues(issues: PlanIssue[], depth: number, showDone: boolean = false): PlanIssue[] {
   const result: PlanIssue[] = [];
   for (const issue of issues) {
     result.push(issue);
     if (depth > 0) {
-      result.push(...issue.children);
+      result.push(...filterChildren(issue.children, showDone));
     }
   }
   return result;

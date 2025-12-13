@@ -23,6 +23,7 @@ export function createListCommand(): Command {
     .option("--assignee <user>", "Filter by assignee (@me for self)")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
+    .option("--show-done", "Show Done sub-issues (hidden by default)")
     .option("--stats", "Show API call statistics")
     .action(async (opts) => {
       await runList(opts);
@@ -50,6 +51,7 @@ async function runList(opts: {
   assignee?: string;
   fzf?: boolean;
   multi?: boolean;
+  showDone?: boolean;
   stats?: boolean;
 }): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
@@ -143,12 +145,13 @@ async function runList(opts: {
     }
 
     // Standard output modes
+    const showDone = opts.showDone ?? false;
     if (opts.json) {
-      console.log(formatListJson(issues));
+      console.log(formatListJson(issues, { showDone }));
     } else if (opts.groupBy) {
-      console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status"));
+      console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status", { showDone }));
     } else {
-      console.log(formatListHuman(issues, { depth: options.depth }));
+      console.log(formatListHuman(issues, { depth: options.depth, showDone }));
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);

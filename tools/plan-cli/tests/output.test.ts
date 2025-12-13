@@ -40,6 +40,36 @@ const mockIssues: PlanIssue[] = [
   },
 ];
 
+const mockIssuesWithDoneChildren: PlanIssue[] = [
+  {
+    id: "issue-10",
+    identifier: "ENG-100",
+    title: "Parent issue",
+    status: "In Progress",
+    sortOrder: 1.0,
+    children: [
+      {
+        id: "issue-11",
+        identifier: "ENG-101",
+        title: "Child in progress",
+        status: "In Progress",
+        sortOrder: 1.1,
+        parent: { id: "issue-10", identifier: "ENG-100" },
+        children: [],
+      },
+      {
+        id: "issue-12",
+        identifier: "ENG-102",
+        title: "Child done",
+        status: "Done",
+        sortOrder: 1.2,
+        parent: { id: "issue-10", identifier: "ENG-100" },
+        children: [],
+      },
+    ],
+  },
+];
+
 describe("formatListHuman", () => {
   it("formats issues as a table with position numbers", () => {
     const output = formatListHuman(mockIssues);
@@ -83,6 +113,24 @@ describe("formatListHuman", () => {
     // This is a basic check - columns should be consistent
     expect(lines.length).toBeGreaterThan(1);
   });
+
+  it("hides Done sub-issues by default", () => {
+    const output = formatListHuman(mockIssuesWithDoneChildren, { depth: 1 });
+
+    // Should show non-Done children
+    expect(output).toContain("ENG-101");
+
+    // Should NOT show Done children
+    expect(output).not.toContain("ENG-102");
+  });
+
+  it("shows Done sub-issues when showDone is true", () => {
+    const output = formatListHuman(mockIssuesWithDoneChildren, { depth: 1, showDone: true });
+
+    // Should show all children including Done
+    expect(output).toContain("ENG-101");
+    expect(output).toContain("ENG-102");
+  });
 });
 
 describe("formatListJson", () => {
@@ -124,5 +172,24 @@ describe("formatListJson", () => {
     expect(issue).toHaveProperty("status");
     expect(issue).toHaveProperty("position");
     expect(issue).toHaveProperty("children");
+  });
+
+  it("hides Done children by default in JSON", () => {
+    const output = formatListJson(mockIssuesWithDoneChildren);
+    const parsed = JSON.parse(output);
+
+    const parent = parsed.items[0];
+    expect(parent.children).toHaveLength(1);
+    expect(parent.children[0].identifier).toBe("ENG-101");
+  });
+
+  it("shows Done children when showDone is true in JSON", () => {
+    const output = formatListJson(mockIssuesWithDoneChildren, { showDone: true });
+    const parsed = JSON.parse(output);
+
+    const parent = parsed.items[0];
+    expect(parent.children).toHaveLength(2);
+    expect(parent.children.map((c: any) => c.identifier)).toContain("ENG-101");
+    expect(parent.children.map((c: any) => c.identifier)).toContain("ENG-102");
   });
 });
