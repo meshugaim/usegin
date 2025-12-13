@@ -33,7 +33,7 @@ describe("plan list command", () => {
 
       expect(result).toContain("list");
       expect(result).toContain("--team");
-      expect(result).toContain("--json");
+      expect(result).toContain("--depth");
     });
 
     it("shows version with --version on main command", async () => {

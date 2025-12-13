@@ -121,7 +121,8 @@ export class LinearClient {
   }
 
   /**
-   * Build the issue fields fragment for GraphQL, with nested children up to specified depth
+   * Build the issue fields fragment for GraphQL, with nested children up to specified depth.
+   * At the deepest level, we still fetch children IDs to show counts of hidden sub-issues.
    */
   private buildIssueFields(depth: number, currentDepth: number = 0): string {
     const baseFields = `
@@ -148,24 +149,40 @@ export class LinearClient {
       }`;
     }
 
-    return baseFields + parentField;
+    // At max depth, still fetch children IDs to show count hint
+    return `${baseFields}${parentField}
+      children {
+        nodes { id }
+      }`;
   }
 
   /**
-   * Transform a GraphQL issue response to PlanIssue format recursively
+   * Transform a GraphQL issue response to PlanIssue format recursively.
+   * At the deepest level, children only have `id` - we count these but don't transform them.
    */
   private transformGqlIssue(
     gqlIssue: GqlIssue,
     parentInfo?: { id: string; identifier: string }
   ): PlanIssue {
-    const children: PlanIssue[] = gqlIssue.children?.nodes
-      ? gqlIssue.children.nodes.map((child) =>
+    let children: PlanIssue[] = [];
+    let childCount: number | undefined;
+
+    if (gqlIssue.children?.nodes && gqlIssue.children.nodes.length > 0) {
+      // Check if children have full data (identifier exists) or just IDs
+      const firstChild = gqlIssue.children.nodes[0];
+      if (firstChild.identifier) {
+        // Full children - transform recursively
+        children = gqlIssue.children.nodes.map((child) =>
           this.transformGqlIssue(child, {
             id: gqlIssue.id,
             identifier: gqlIssue.identifier,
           })
-        ).sort((a, b) => a.sortOrder - b.sortOrder)
-      : [];
+        ).sort((a, b) => a.sortOrder - b.sortOrder);
+      } else {
+        // Only IDs - this is the deepest level, just count them
+        childCount = gqlIssue.children.nodes.length;
+      }
+    }
 
     return {
       id: gqlIssue.id,
@@ -185,6 +202,7 @@ export class LinearClient {
       labels: gqlIssue.labels.nodes.map((l) => l.name),
       project: gqlIssue.project?.name,
       children,
+      childCount,
     };
   }
 

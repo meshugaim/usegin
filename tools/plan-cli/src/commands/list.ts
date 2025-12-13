@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
-import { formatListHuman, formatListJson, formatGroupedList } from "../lib/output";
+import { formatListHuman, formatGroupedList } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import { printApiStats } from "../lib/stats";
 import type { ListOptions, PlanIssue } from "../types";
@@ -15,7 +15,6 @@ export function createListCommand(): Command {
     .option("--label <name>", "Filter by label (can repeat)", collect, [])
     .option("--search <text>", "Search in title and description")
     .option("--group-by <field>", "Group by: label, project, or status")
-    .option("--json", "Output as JSON")
     .option("--depth <n>", "Include sub-issues (0=none, 1, 2, ...)", "2")
     .option("--inbox", "Show inbox items only")
     .option("--all", "Show both inbox and list items")
@@ -43,7 +42,6 @@ async function runList(opts: {
   label?: string[];
   search?: string;
   groupBy?: string;
-  json?: boolean;
   depth?: string;
   inbox?: boolean;
   all?: boolean;
@@ -99,7 +97,6 @@ async function runList(opts: {
       all: opts.all,
       status: opts.status,
       assignee: opts.assignee,
-      json: opts.json,
     };
 
     const issues = await client.listIssues(options);
@@ -146,9 +143,7 @@ async function runList(opts: {
 
     // Standard output modes
     const showDone = opts.showDone ?? false;
-    if (opts.json) {
-      console.log(formatListJson(issues, { showDone }));
-    } else if (opts.groupBy) {
+    if (opts.groupBy) {
       console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status", { showDone }));
     } else {
       console.log(formatListHuman(issues, { depth: options.depth, showDone }));

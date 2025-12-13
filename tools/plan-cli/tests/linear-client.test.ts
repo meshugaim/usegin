@@ -29,34 +29,37 @@ describe("LinearClient", () => {
     const client = new LinearClient({ apiKey: "test_key" });
     const buildIssueFields = (client as any).buildIssueFields.bind(client);
 
-    it("returns base fields without children at depth 0", () => {
+    it("returns base fields with children count query at depth 0", () => {
       const fields = buildIssueFields(0);
       expect(fields).toContain("id");
       expect(fields).toContain("identifier");
       expect(fields).toContain("title");
       expect(fields).toContain("parent { id identifier }");
-      expect(fields).not.toContain("children");
+      // At depth 0, we still fetch children IDs for counting
+      expect(fields).toContain("children {");
+      expect(fields).toContain("nodes { id }");
     });
 
-    it("includes one level of children at depth 1", () => {
+    it("includes children with count query at depth 1", () => {
       const fields = buildIssueFields(1);
       expect(fields).toContain("children {");
-      // Count occurrences of "children {" - should be exactly 1
-      const matches = fields.match(/children \{/g) || [];
-      expect(matches.length).toBe(1);
-    });
-
-    it("includes nested children at depth 2", () => {
-      const fields = buildIssueFields(2);
-      // Count occurrences of "children {" - should be exactly 2
+      // Count occurrences of "children {" - 1 for full data + 1 for counting
       const matches = fields.match(/children \{/g) || [];
       expect(matches.length).toBe(2);
     });
 
-    it("includes 3 levels of nested children at depth 3", () => {
-      const fields = buildIssueFields(3);
+    it("includes nested children at depth 2", () => {
+      const fields = buildIssueFields(2);
+      // Count occurrences of "children {" - 2 for full data + 1 for counting
       const matches = fields.match(/children \{/g) || [];
       expect(matches.length).toBe(3);
+    });
+
+    it("includes 3 levels of nested children at depth 3", () => {
+      const fields = buildIssueFields(3);
+      // 3 for full data + 1 for counting
+      const matches = fields.match(/children \{/g) || [];
+      expect(matches.length).toBe(4);
     });
 
     it("only includes parent field at top level", () => {

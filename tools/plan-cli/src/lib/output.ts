@@ -52,7 +52,13 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
   for (const issue of issues) {
     position++;
     const posStr = String(position);
-    const title = truncate(issue.title, titleLen);
+
+    // Build title with optional child count hint (shown when children exist but not displayed)
+    const hint = (issue.childCount && issue.childCount > 0 && depth === 0)
+      ? ` (+${issue.childCount})`
+      : "";
+    // Truncate title first, leaving room for hint, then append hint
+    const title = truncate(issue.title, titleLen - hint.length) + hint;
     const labels = hasLabels ? truncate(formatLabels(issue.labels), labelLen) : undefined;
 
     lines.push(
@@ -67,61 +73,67 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
 
     // Children (if depth > 0)
     if (depth > 0 && issue.children.length > 0) {
-      const filteredChildren = filterChildren(issue.children, showDone);
-      for (const child of filteredChildren) {
-        const childTitle = truncate(child.title, titleLen - 2);
-        const childLabels = hasLabels ? truncate(formatLabels(child.labels), labelLen) : undefined;
-        lines.push(
-          formatRow("", child.identifier, `└ ${childTitle}`, child.status, childLabels, {
-            numWidth: 3,
-            idWidth: maxIdLen,
-            titleWidth: titleLen,
-            statusWidth: maxStatusLen,
-            labelWidth: labelLen,
-          })
-        );
-      }
+      renderChildren(filterChildren(issue.children, showDone), 1, depth, lines, {
+        maxIdLen,
+        titleLen,
+        maxStatusLen,
+        labelLen,
+        hasLabels,
+        showDone,
+      });
     }
   }
 
   return lines.join("\n");
 }
 
+/**
+ * Recursively render children with increasing indentation
+ */
+function renderChildren(
+  children: PlanIssue[],
+  currentDepth: number,
+  maxDepth: number,
+  lines: string[],
+  opts: {
+    maxIdLen: number;
+    titleLen: number;
+    maxStatusLen: number;
+    labelLen: number;
+    hasLabels: boolean;
+    showDone: boolean;
+  }
+): void {
+  const indent = "  ".repeat(currentDepth);
+  const prefix = `${indent}└ `;
+  const prefixLen = prefix.length;
+
+  for (const child of children) {
+    // Build title with optional child count hint
+    const hint = (child.childCount && child.childCount > 0) ? ` (+${child.childCount})` : "";
+    // Truncate title first, leaving room for prefix and hint, then append hint
+    const childTitle = truncate(child.title, opts.titleLen - prefixLen - hint.length) + hint;
+    const childLabels = opts.hasLabels ? truncate(formatLabels(child.labels), opts.labelLen) : undefined;
+    lines.push(
+      formatRow("", child.identifier, `${prefix}${childTitle}`, child.status, childLabels, {
+        numWidth: 3,
+        idWidth: opts.maxIdLen,
+        titleWidth: opts.titleLen,
+        statusWidth: opts.maxStatusLen,
+        labelWidth: opts.labelLen,
+      })
+    );
+
+    // Recurse if we have children and haven't reached max depth
+    if (currentDepth < maxDepth && child.children.length > 0) {
+      renderChildren(filterChildren(child.children, opts.showDone), currentDepth + 1, maxDepth, lines, opts);
+    }
+  }
+}
+
 function formatLabels(labels?: string[]): string {
   if (!labels || labels.length === 0) return "";
   return labels.join(", ");
-}
-
-/**
- * Format issues as JSON
- */
-export function formatListJson(issues: PlanIssue[], options: FormatOptions = {}): string {
-  const showDone = options.showDone ?? false;
-  const items = issues.map((issue, index) => ({
-    id: issue.id,
-    identifier: issue.identifier,
-    title: issue.title,
-    description: issue.description,
-    status: issue.status,
-    position: index + 1,
-    sortOrder: issue.sortOrder,
-    assignee: issue.assignee,
-    labels: issue.labels,
-    project: issue.project,
-    children: filterChildren(issue.children, showDone).map((child) => ({
-      id: child.id,
-      identifier: child.identifier,
-      title: child.title,
-      description: child.description,
-      status: child.status,
-      sortOrder: child.sortOrder,
-      assignee: child.assignee,
-      labels: child.labels,
-      project: child.project,
-    })),
-  }));
-
-  return JSON.stringify({ items }, null, 2);
 }
 
 /**
@@ -173,12 +185,13 @@ export function formatGroupedList(
 
 // Helper functions
 
-function flattenIssues(issues: PlanIssue[], depth: number, showDone: boolean = false): PlanIssue[] {
+function flattenIssues(issues: PlanIssue[], depth: number, showDone: boolean, currentDepth: number = 0): PlanIssue[] {
   const result: PlanIssue[] = [];
   for (const issue of issues) {
     result.push(issue);
-    if (depth > 0) {
-      result.push(...filterChildren(issue.children, showDone));
+    if (currentDepth < depth && issue.children.length > 0) {
+      const filtered = filterChildren(issue.children, showDone);
+      result.push(...flattenIssues(filtered, depth, showDone, currentDepth + 1));
     }
   }
   return result;

@@ -21,10 +21,11 @@ export interface PlanIssue {
   labels?: string[];
   project?: string;
   children: PlanIssue[];
+  /** Count of children beyond the fetched depth (for display hints) */
+  childCount?: number;
 }
 
 export interface ListOptions {
-  json?: boolean;
   inbox?: boolean;
   all?: boolean;
   depth?: number;

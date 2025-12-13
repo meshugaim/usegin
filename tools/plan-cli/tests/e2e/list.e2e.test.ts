@@ -26,61 +26,28 @@ describe("E2E: plan list against real Linear", () => {
   });
 
   it(
-    "returns valid JSON with --json flag",
+    "filters by team when --team is provided",
     async () => {
-      const result = await $`bun ${CLI_PATH} list --json`.text();
+      // First list issues to ensure we have some
+      const result = await $`bun ${CLI_PATH} list --team ENG`.text();
 
-      // Should be valid JSON
-      expect(() => JSON.parse(result)).not.toThrow();
-
-      const parsed = JSON.parse(result);
-      expect(parsed).toHaveProperty("items");
-      expect(Array.isArray(parsed.items)).toBe(true);
+      // Should contain the header or "No issues found"
+      expect(result.length).toBeGreaterThan(0);
+      // If we have issues, they should show ENG identifiers
+      if (!result.includes("No issues found")) {
+        expect(result).toContain("ENG-");
+      }
     },
     15000
   );
 
-  it(
-    "filters by team when --team is provided",
-    async () => {
-      // First, get all issues to find a valid team
-      const allResult = await $`bun ${CLI_PATH} list --json`.text();
-      const all = JSON.parse(allResult);
+  it("shows sub-issues with depth flag", async () => {
+    const result = await $`bun ${CLI_PATH} list --depth 1`.text();
 
-      if (all.items.length === 0) {
-        console.log("Skipping team filter test - no issues found");
-        return;
-      }
-
-      // Extract team from first issue identifier (e.g., "ENG-12" -> "ENG")
-      const firstIssue = all.items[0];
-      const teamKey = firstIssue.identifier.split("-")[0];
-
-      // Now filter by that team
-      const teamResult = await $`bun ${CLI_PATH} list --team ${teamKey} --json`.text();
-      const teamIssues = JSON.parse(teamResult);
-
-      // All issues should be from that team
-      for (const issue of teamIssues.items) {
-        expect(issue.identifier.startsWith(teamKey + "-")).toBe(true);
-      }
-    },
-    15000 // Increased timeout for two API calls
-  );
-
-  it("returns issues sorted by sortOrder", async () => {
-    const result = await $`bun ${CLI_PATH} list --json`.text();
-    const parsed = JSON.parse(result);
-
-    if (parsed.items.length < 2) {
-      console.log("Skipping sort test - fewer than 2 issues");
-      return;
-    }
-
-    // Position numbers should be sequential
-    for (let i = 0; i < parsed.items.length; i++) {
-      expect(parsed.items[i].position).toBe(i + 1);
-    }
+    // Should output something
+    expect(result.length).toBeGreaterThan(0);
+    // With depth > 0, we might see tree characters if there are sub-issues
+    // (not guaranteed, depends on data)
   });
 
   it("handles invalid status with helpful error", async () => {

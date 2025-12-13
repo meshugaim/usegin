@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { formatListHuman, formatListJson } from "../src/lib/output";
+import { formatListHuman } from "../src/lib/output";
 import type { PlanIssue } from "../src/types";
 
 const mockIssues: PlanIssue[] = [
@@ -133,63 +133,3 @@ describe("formatListHuman", () => {
   });
 });
 
-describe("formatListJson", () => {
-  it("returns valid JSON with items array", () => {
-    const output = formatListJson(mockIssues);
-    const parsed = JSON.parse(output);
-
-    expect(parsed).toHaveProperty("items");
-    expect(Array.isArray(parsed.items)).toBe(true);
-    expect(parsed.items).toHaveLength(3);
-  });
-
-  it("includes position numbers in JSON", () => {
-    const output = formatListJson(mockIssues);
-    const parsed = JSON.parse(output);
-
-    expect(parsed.items[0].position).toBe(1);
-    expect(parsed.items[1].position).toBe(2);
-    expect(parsed.items[2].position).toBe(3);
-  });
-
-  it("nests children in parent objects", () => {
-    const output = formatListJson(mockIssues);
-    const parsed = JSON.parse(output);
-
-    const parent = parsed.items.find((i: any) => i.identifier === "ENG-20");
-    expect(parent.children).toHaveLength(1);
-    expect(parent.children[0].identifier).toBe("ENG-21");
-  });
-
-  it("includes all required fields", () => {
-    const output = formatListJson(mockIssues);
-    const parsed = JSON.parse(output);
-
-    const issue = parsed.items[0];
-    expect(issue).toHaveProperty("id");
-    expect(issue).toHaveProperty("identifier");
-    expect(issue).toHaveProperty("title");
-    expect(issue).toHaveProperty("status");
-    expect(issue).toHaveProperty("position");
-    expect(issue).toHaveProperty("children");
-  });
-
-  it("hides Done children by default in JSON", () => {
-    const output = formatListJson(mockIssuesWithDoneChildren);
-    const parsed = JSON.parse(output);
-
-    const parent = parsed.items[0];
-    expect(parent.children).toHaveLength(1);
-    expect(parent.children[0].identifier).toBe("ENG-101");
-  });
-
-  it("shows Done children when showDone is true in JSON", () => {
-    const output = formatListJson(mockIssuesWithDoneChildren, { showDone: true });
-    const parsed = JSON.parse(output);
-
-    const parent = parsed.items[0];
-    expect(parent.children).toHaveLength(2);
-    expect(parent.children.map((c: any) => c.identifier)).toContain("ENG-101");
-    expect(parent.children.map((c: any) => c.identifier)).toContain("ENG-102");
-  });
-});

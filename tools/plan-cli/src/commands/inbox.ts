@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
-import { formatListHuman, formatListJson } from "../lib/output";
+import { formatListHuman } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import { printApiStats } from "../lib/stats";
 import { $ } from "bun";
@@ -9,7 +9,6 @@ export function createInboxCommand(): Command {
   const cmd = new Command("inbox")
     .description("List inbox items (shorthand for: list --inbox)")
     .option("--team <key>", "Team key (e.g., ENG)")
-    .option("--json", "Output as JSON")
     .option("--fzf", "Interactive selection with fzf")
     .option("--multi", "Allow multiple selection (with --fzf)")
     .option("--stats", "Show API call statistics")
@@ -22,7 +21,6 @@ export function createInboxCommand(): Command {
 
 async function runInbox(opts: {
   team?: string;
-  json?: boolean;
   fzf?: boolean;
   multi?: boolean;
   stats?: boolean;
@@ -66,8 +64,6 @@ async function runInbox(opts: {
           if (id) console.log(id);
         }
       }
-    } else if (opts.json) {
-      console.log(formatListJson(issues));
     } else {
       console.log(formatListHuman(issues));
     }
