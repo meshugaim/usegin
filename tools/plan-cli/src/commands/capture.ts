@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { colors, dim } from "../lib/colors";
 
 const DEFAULT_INBOX_LABEL = "inbox";
 
@@ -74,8 +75,8 @@ async function runCapture(
         )
       );
     } else {
-      console.log(`Captured: ${issue.identifier} - ${issue.title}`);
-      console.log(`  Tip: When promoting, consider how this connects to existing work`);
+      console.log(`${colors.success("Captured")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
+      console.log(dim(`  Tip: When promoting, consider how this connects to existing work`));
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);

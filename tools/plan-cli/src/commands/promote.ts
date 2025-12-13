@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { calculateTop } from "../lib/ordering";
+import { colors } from "../lib/colors";
 
 const INBOX_LABEL = "inbox";
 
@@ -75,9 +76,9 @@ async function runPromote(
       );
     } else {
       if (position === "top") {
-        console.log(`Promoted to top: ${issue.identifier} - ${issue.title}`);
+        console.log(`${colors.success("Promoted to top")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
       } else {
-        console.log(`Promoted: ${issue.identifier} - ${issue.title}`);
+        console.log(`${colors.success("Promoted")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
       }
     }
 

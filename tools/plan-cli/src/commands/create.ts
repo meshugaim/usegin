@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { colors, dim } from "../lib/colors";
 
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
@@ -76,8 +77,8 @@ async function runCreate(
 
     // Warn about missing labels
     if (missingLabels.length > 0) {
-      console.error(`Warning: Labels not found (skipped): ${missingLabels.join(", ")}`);
-      console.error(`  Use --create-missing-labels to create them`);
+      console.error(`${colors.warning("Warning")}: Labels not found (skipped): ${missingLabels.join(", ")}`);
+      console.error(dim(`  Use --create-missing-labels to create them`));
     }
 
     // Add relationships after creation
@@ -114,9 +115,9 @@ async function runCreate(
       );
     } else {
       // Human-readable output
-      console.log(`Created: ${issue.identifier} - ${issue.title}`);
+      console.log(`${colors.success("Created")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
       if (!hasConnections) {
-        console.log(`  Tip: Consider connecting with --parent, --blocked-by, or --related-to`);
+        console.log(dim(`  Tip: Consider connecting with --parent, --blocked-by, or --related-to`));
       }
     }
 

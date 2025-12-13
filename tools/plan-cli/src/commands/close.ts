@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { colors, dim } from "../lib/colors";
 
 export function createCloseCommand(): Command {
   const cmd = new Command("close")
@@ -64,9 +65,9 @@ async function runClose(
       );
     } else {
       if (opts.reason) {
-        console.log(`Closed: ${issue.identifier} - ${issue.title} (${opts.reason})`);
+        console.log(`${colors.success("Closed")}: ${colors.identifier(issue.identifier)} - ${issue.title} ${dim(`(${opts.reason})`)}`);
       } else {
-        console.log(`Closed: ${issue.identifier} - ${issue.title}`);
+        console.log(`${colors.success("Closed")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
       }
     }
 

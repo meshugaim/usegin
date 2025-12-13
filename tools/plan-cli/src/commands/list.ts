@@ -4,6 +4,7 @@ import { LinearClient } from "../lib/linear-client";
 import { formatListHuman, formatGroupedList } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import { printApiStats } from "../lib/stats";
+import { dim } from "../lib/colors";
 import type { ListOptions, PlanIssue } from "../types";
 
 export function createListCommand(): Command {
@@ -153,7 +154,7 @@ async function runList(opts: {
 
       // Show hint about depth if using default and there are hidden children
       if (result.hasHiddenChildren && !depthExplicit) {
-        console.log(`\n(showing up to depth ${options.depth}, use --depth N to see more)`);
+        console.log(dim(`\n(showing up to depth ${options.depth}, use --depth N to see more)`));
       }
     }
 

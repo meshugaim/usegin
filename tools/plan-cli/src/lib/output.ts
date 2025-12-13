@@ -1,4 +1,13 @@
 import type { PlanIssue, PlanIssueDetail } from "../types";
+import {
+  colors,
+  colorizeStatus,
+  padEnd,
+  padStart,
+  visibleLength,
+  dim,
+  bold,
+} from "./colors";
 
 export interface FormatOptions {
   depth?: number;
@@ -60,6 +69,7 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
       statusWidth: maxStatusLen,
       labelWidth: labelLen,
       moreWidth: 5,
+      isHeader: true,
     }
   );
   lines.push(header);
@@ -136,8 +146,12 @@ function renderChildren(
       ? (child.childCount && child.childCount > 0 ? `+${child.childCount}` : "")
       : undefined;
 
+    // Colorize the tree prefix and title
+    const coloredPrefix = colors.tree(prefix);
+    const coloredTitle = `${coloredPrefix}${childTitle}`;
+
     lines.push(
-      formatRow("", child.identifier, `${prefix}${childTitle}`, child.status, childLabels, more, {
+      formatRow("", child.identifier, coloredTitle, child.status, childLabels, more, {
         numWidth: 3,
         idWidth: opts.maxIdLen,
         titleWidth: opts.titleLen,
@@ -195,11 +209,19 @@ export function formatGroupedList(
 
   for (const key of sortedKeys) {
     const groupIssues = groups.get(key)!;
-    lines.push(`\n## ${key} (${groupIssues.length})`);
+    // Color the group header based on the groupBy type
+    let coloredKey = key;
+    if (groupBy === "label") {
+      coloredKey = colors.label(key);
+    } else if (groupBy === "status") {
+      coloredKey = colorizeStatus(key);
+    }
+    lines.push(`\n${bold("##")} ${coloredKey} ${dim(`(${groupIssues.length})`)}`);
     lines.push("");
 
     for (const issue of groupIssues) {
-      lines.push(`  ${issue.identifier}  ${truncate(issue.title, 50)}  [${issue.status}]`);
+      const statusColored = colorizeStatus(issue.status);
+      lines.push(`  ${colors.identifier(issue.identifier)}  ${truncate(issue.title, 50)}  [${statusColored}]`);
     }
   }
 
@@ -225,6 +247,16 @@ function truncate(str: string, maxLen: number): string {
   return str.slice(0, maxLen - 1) + "…";
 }
 
+interface RowOptions {
+  numWidth: number;
+  idWidth: number;
+  titleWidth: number;
+  statusWidth: number;
+  labelWidth: number;
+  moreWidth: number;
+  isHeader?: boolean;
+}
+
 function formatRow(
   num: string,
   id: string,
@@ -232,21 +264,42 @@ function formatRow(
   status: string,
   labels: string | undefined,
   more: string | undefined,
-  widths: { numWidth: number; idWidth: number; titleWidth: number; statusWidth: number; labelWidth: number; moreWidth: number }
+  widths: RowOptions
 ): string {
+  if (widths.isHeader) {
+    // Header row - dimmed
+    const parts = [
+      padStart(colors.header(num), widths.numWidth),
+      padEnd(colors.header(id), widths.idWidth),
+      padEnd(colors.header(title), widths.titleWidth),
+      padEnd(colors.header(status), widths.statusWidth),
+    ];
+
+    if (labels !== undefined) {
+      parts.push(padEnd(colors.header(labels), widths.labelWidth));
+    }
+
+    if (more !== undefined) {
+      parts.push(colors.header(more));
+    }
+
+    return parts.join("   ");
+  }
+
+  // Data row - colorized
   const parts = [
-    num.padStart(widths.numWidth),
-    id.padEnd(widths.idWidth),
-    title.padEnd(widths.titleWidth),
-    status.padEnd(widths.statusWidth),
+    padStart(colors.position(num), widths.numWidth),
+    padEnd(colors.identifier(id), widths.idWidth),
+    padEnd(title, widths.titleWidth), // title may already have colors from tree prefix
+    padEnd(colorizeStatus(status), widths.statusWidth),
   ];
 
   if (labels !== undefined) {
-    parts.push(labels.padEnd(widths.labelWidth));
+    parts.push(padEnd(labels ? colors.label(labels) : "", widths.labelWidth));
   }
 
   if (more !== undefined) {
-    parts.push(more);
+    parts.push(more ? dim(more) : "");
   }
 
   return parts.join("   ");
@@ -258,32 +311,35 @@ function formatRow(
 export function formatShowHuman(issue: PlanIssueDetail): string {
   const lines: string[] = [];
 
-  // Header
-  lines.push(`${issue.identifier}: ${issue.title}`);
-  lines.push(`URL: ${issue.url}`);
-  lines.push(`Status: ${issue.status}`);
+  // Header - identifier bold cyan, title bold
+  lines.push(`${colors.identifier(bold(issue.identifier))}: ${bold(issue.title)}`);
+  lines.push(`${colors.fieldName("URL:")} ${colors.url(issue.url)}`);
+  lines.push(`${colors.fieldName("Status:")} ${colorizeStatus(issue.status)}`);
 
   // Assignee
-  const assigneeName = issue.assignee ? `@${issue.assignee.name}` : "(unassigned)";
-  lines.push(`Assignee: ${assigneeName}`);
+  const assigneeName = issue.assignee
+    ? colors.assignee(`@${issue.assignee.name}`)
+    : dim("(unassigned)");
+  lines.push(`${colors.fieldName("Assignee:")} ${assigneeName}`);
 
   // Position
-  lines.push(`Position: #${issue.position}`);
+  lines.push(`${colors.fieldName("Position:")} #${issue.position}`);
 
   // Labels (if present)
   if (issue.labels && issue.labels.length > 0) {
-    lines.push(`Labels: ${issue.labels.join(", ")}`);
+    const labelStr = issue.labels.map((l) => colors.label(l)).join(", ");
+    lines.push(`${colors.fieldName("Labels:")} ${labelStr}`);
   }
 
   // Project (if present)
   if (issue.project) {
-    lines.push(`Project: ${issue.project}`);
+    lines.push(`${colors.fieldName("Project:")} ${issue.project}`);
   }
 
   // Description
   if (issue.description) {
     lines.push("");
-    lines.push("Description:");
+    lines.push(colors.fieldName("Description:"));
     // Indent description lines
     const descLines = issue.description.split("\n");
     for (const line of descLines) {
@@ -294,26 +350,27 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
   // Sub-issues
   if (issue.children.length > 0) {
     lines.push("");
-    lines.push("Sub-issues:");
+    lines.push(colors.fieldName("Sub-issues:"));
     for (const child of issue.children) {
-      lines.push(`  ${child.identifier}  ${child.title}  [${child.status}]`);
+      const statusColored = colorizeStatus(child.status);
+      lines.push(`  ${colors.identifier(child.identifier)}  ${child.title}  [${statusColored}]`);
     }
   }
 
   // Relationships
   lines.push("");
   if (issue.blockedBy.length > 0) {
-    const blockers = issue.blockedBy.map((b) => b.identifier).join(", ");
-    lines.push(`Blocked by: ${blockers}`);
+    const blockers = issue.blockedBy.map((b) => colors.identifier(b.identifier)).join(", ");
+    lines.push(`${colors.fieldName("Blocked by:")} ${blockers}`);
   } else {
-    lines.push("Blocked by: (none)");
+    lines.push(`${colors.fieldName("Blocked by:")} ${dim("(none)")}`);
   }
 
   if (issue.blocks.length > 0) {
-    const blocking = issue.blocks.map((b) => b.identifier).join(", ");
-    lines.push(`Blocks: ${blocking}`);
+    const blocking = issue.blocks.map((b) => colors.identifier(b.identifier)).join(", ");
+    lines.push(`${colors.fieldName("Blocks:")} ${blocking}`);
   } else {
-    lines.push("Blocks: (none)");
+    lines.push(`${colors.fieldName("Blocks:")} ${dim("(none)")}`);
   }
 
   return lines.join("\n");

@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { readFileSync } from "fs";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { colors, dim } from "../lib/colors";
 
 export function createUpdateCommand(): Command {
   const cmd = new Command("update")
@@ -105,28 +106,28 @@ async function runUpdate(
     if (opts.blockedBy) {
       await client.addBlockedBy(identifier, opts.blockedBy);
       if (!opts.quiet && !opts.json) {
-        console.log(`Added: ${identifier} blocked by ${opts.blockedBy}`);
+        console.log(`${colors.success("Added")}: ${colors.identifier(identifier)} blocked by ${colors.identifier(opts.blockedBy)}`);
       }
     }
 
     if (opts.blocking) {
       await client.addBlocking(identifier, opts.blocking);
       if (!opts.quiet && !opts.json) {
-        console.log(`Added: ${identifier} blocks ${opts.blocking}`);
+        console.log(`${colors.success("Added")}: ${colors.identifier(identifier)} blocks ${colors.identifier(opts.blocking)}`);
       }
     }
 
     if (opts.relatedTo) {
       await client.addRelatedTo(identifier, opts.relatedTo);
       if (!opts.quiet && !opts.json) {
-        console.log(`Added: ${identifier} related to ${opts.relatedTo}`);
+        console.log(`${colors.success("Added")}: ${colors.identifier(identifier)} related to ${colors.identifier(opts.relatedTo)}`);
       }
     }
 
     if (opts.duplicateOf) {
       await client.markDuplicateOf(identifier, opts.duplicateOf);
       if (!opts.quiet && !opts.json) {
-        console.log(`Marked: ${identifier} duplicate of ${opts.duplicateOf}`);
+        console.log(`${colors.success("Marked")}: ${colors.identifier(identifier)} duplicate of ${colors.identifier(opts.duplicateOf)}`);
       }
     }
 
@@ -134,7 +135,7 @@ async function runUpdate(
     if (opts.comment) {
       await client.addComment(identifier, opts.comment);
       if (!opts.quiet && !opts.json) {
-        console.log(`Added comment to ${identifier}`);
+        console.log(`${colors.success("Added comment")} to ${colors.identifier(identifier)}`);
       }
     }
 
@@ -162,8 +163,8 @@ async function runUpdate(
 
       // Warn about missing labels
       if (missingLabels.length > 0) {
-        console.error(`Warning: Labels not found (skipped): ${missingLabels.join(", ")}`);
-        console.error(`  Use --create-missing-labels to create them`);
+        console.error(`${colors.warning("Warning")}: Labels not found (skipped): ${missingLabels.join(", ")}`);
+        console.error(dim(`  Use --create-missing-labels to create them`));
       }
 
       if (opts.quiet) {
@@ -182,7 +183,7 @@ async function runUpdate(
           )
         );
       } else {
-        console.log(`Updated: ${issue.identifier} - ${issue.title}`);
+        console.log(`${colors.success("Updated")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
       }
     } else if (!opts.blockedBy && !opts.blocking && !opts.relatedTo && !opts.duplicateOf && !opts.comment) {
       console.error("Error: No updates specified. Use --help to see options.");

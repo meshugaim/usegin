@@ -9,6 +9,7 @@ import {
   calculatePull,
   calculatePush,
 } from "../lib/ordering";
+import { colors } from "../lib/colors";
 
 export function createReorderCommand(): Command {
   const cmd = new Command("reorder")
@@ -135,7 +136,7 @@ async function runReorder(
     await client.updateSortOrder(identifier, newSortOrder);
 
     if (!opts.quiet) {
-      console.log(`Moved ${identifier} ${description}`);
+      console.log(`${colors.success("Moved")} ${colors.identifier(identifier)} ${description}`);
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);

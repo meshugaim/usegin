@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { colors } from "../lib/colors";
 
 export function createStartCommand(): Command {
   const cmd = new Command("start")
@@ -57,7 +58,7 @@ async function runStart(
         )
       );
     } else {
-      console.log(`Started: ${issue.identifier} - ${issue.title}`);
+      console.log(`${colors.success("Started")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);
