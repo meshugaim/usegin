@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { createPromptCommand } from "./commands/prompt";
 import { createWorktreeCommand } from "./commands/worktree";
+import { createStatusCommand } from "./commands/status";
 
 const program = new Command()
   .name("delegate")
@@ -11,13 +12,6 @@ const program = new Command()
 // Commands
 program.addCommand(createPromptCommand());
 program.addCommand(createWorktreeCommand());
-
-// Placeholder - will be implemented in subsequent issue
-program
-  .command("status")
-  .description("Show active delegations")
-  .action(() => {
-    console.log("TODO: Show active delegations");
-  });
+program.addCommand(createStatusCommand());
 
 program.parse();
