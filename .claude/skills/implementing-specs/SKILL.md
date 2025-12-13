@@ -52,6 +52,7 @@ Guidelines, not a strict process. Adapt to the situation.
 | **Checkpoint**          | Summarize progress. Ask user if still aligned.              | Do this often.                                                                          |
 | **Commit & push**       | Commit after each slice. Don't accumulate uncommitted work. | Small commits, pushed frequently. Avoids lost work and enables easier rollback.         |
 | **Update progress doc** | Record decisions, next step.                                | Keep it current.                                                                        |
+| **Check context**       | Run `/context` to assess context window usage.              | If getting full, `/compact` or create handoff. See "Context Management" section.        |
 | **Repeat**              | Propose next slice. Ask: "Right size? Go smaller?"          | Continuous alignment.                                                                   |
 
 ## Commit Often
@@ -159,6 +160,72 @@ Checkpoint often. Use `AskUserQuestion` to stay aligned.
 | Meta      | "Should we take smaller steps?" "Is this pace working?" |
 
 **Summaries:** Keep them concise. Focus on decisions made, not implementation details. Offer deeper discussion if user wants it.
+
+## Context Management & Handoffs
+
+Long implementations can exhaust context. Proactively manage this to avoid degraded performance.
+
+### After Each Slice
+
+Run `/context` to check context usage. This shows a visual grid of how much context window is used.
+
+| Context State | Action |
+| ------------- | ------ |
+| Plenty of room | Continue to next slice |
+| Getting full (~70%+) | Consider `/compact` with focus instructions |
+| Nearly full (~85%+) | Create handoff, suggest new session |
+
+### When to Create a Handoff
+
+- Context is nearly full
+- You're losing track of details
+- Session has been running very long
+- About to start a complex new slice
+
+### Handoff Process
+
+1. **Commit all current work** - Nothing uncommitted
+2. **Update impl-status.md** - Mark completed slices, document current state
+3. **Create handoff prompt** - Either in impl-status.md or share directly with user
+
+### Handoff Prompt Structure
+
+Include in impl-status.md or provide to user:
+
+```markdown
+## Handoff: [Feature Name]
+
+### Session Summary
+- Slices completed: 1, 2, 3
+- Current branch: feature/xyz
+- Last commit: abc123 "feat: add user auth endpoint"
+- Tests: all passing / X failing
+
+### Current State
+- [What's working]
+- [What's partially done]
+- [Known issues]
+
+### Next Steps
+- Slice 4: [specific tasks]
+- Slice 5: [specific tasks]
+
+### Key Context
+- [Important decisions made]
+- [Gotchas discovered]
+- [Patterns established]
+```
+
+### Continuing from Handoff
+
+When starting a new session to continue:
+
+1. Read the spec and impl-status.md
+2. Check git log for recent commits
+3. Run tests to verify current state
+4. Pick up from documented next steps
+
+The goal: A fresh session can continue seamlessly without re-discovering context.
 
 ## Self-Verification
 
