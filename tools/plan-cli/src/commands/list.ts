@@ -16,7 +16,7 @@ export function createListCommand(): Command {
     .option("--search <text>", "Search in title and description")
     .option("--group-by <field>", "Group by: label, project, or status")
     .option("--json", "Output as JSON")
-    .option("--depth <n>", "Include sub-issues (0=none, 1=one level)", "0")
+    .option("--depth <n>", "Include sub-issues (0=none, 1, 2, ...)", "2")
     .option("--inbox", "Show inbox items only")
     .option("--all", "Show both inbox and list items")
     .option("--status <status>", "Filter by status")
