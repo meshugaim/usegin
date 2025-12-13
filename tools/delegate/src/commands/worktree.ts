@@ -45,7 +45,7 @@ async function launchAgent(issueId: string): Promise<void> {
   const prompt = await $`delegate prompt ${issueId}`.text();
 
   // Launch claude in the worktree directory, blocking until it exits
-  await $`cd ${worktreePath} && bun run --bun claude --dangerously-skip-permissions -p ${prompt}`;
+  await $`bun --cwd=${worktreePath} run --bun claude --dangerously-skip-permissions -p ${prompt}`;
 }
 
 async function runWorktree(issueId: string, options: WorktreeOptions): Promise<void> {
