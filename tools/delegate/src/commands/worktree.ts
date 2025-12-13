@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { $ } from "bun";
+import { generateBrief } from "./prompt";
 
 interface WorktreeOptions {
   dryRun?: boolean;
@@ -43,7 +44,7 @@ async function destroyWorktree(issueId: string): Promise<void> {
 
 async function launchAgent(issueId: string): Promise<void> {
   const worktreePath = `.worktrees/${issueId}`;
-  const prompt = await $`delegate prompt ${issueId}`.text();
+  const prompt = generateBrief(issueId);
 
   // Launch claude in the worktree directory, blocking until it exits
   await $`bun --cwd=${worktreePath} run --bun claude --dangerously-skip-permissions -p ${prompt}`;

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import DELEGATION_BRIEF_TEMPLATE from "../templates/delegation-brief.md" with { type: "text" };
 
-function generateBrief(issueId: string): string {
+export function generateBrief(issueId: string): string {
   return DELEGATION_BRIEF_TEMPLATE.replace(/\{\{ id \}\}/g, issueId);
 }
 
