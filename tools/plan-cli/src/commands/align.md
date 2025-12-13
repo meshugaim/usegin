@@ -27,3 +27,12 @@ We track work in Linear using `plan`. Run `plan --help` to explore commands.
 **One source of truth** — Linear is where work lives. Don't track tasks in markdown files, todo lists, or other tools. If it's worth tracking, it goes in Linear via `plan`.
 
 **Commit often** — Small, frequent commits. Mention the Linear issue in the commit body (e.g., `Closes: ENG-123` or `Part of: ENG-123`). The commit history tells the story.
+
+**Iterative descriptions** — For complex issue descriptions, use the temp file pattern:
+
+1. Write description to `/tmp/desc.md`
+2. `plan update ENG-xxx --description-file /tmp/desc.md`
+3. Get feedback, edit `/tmp/desc.md`
+4. Repeat until done
+
+This lets you refine descriptions collaboratively using the Edit tool, rather than passing long strings inline.
