@@ -23,4 +23,47 @@ describe("LinearClient", () => {
   // Note: Most LinearClient methods require API calls.
   // Those are tested in E2E tests (tests/e2e/list.e2e.test.ts)
   // Here we only test pure logic that doesn't require API calls.
+
+  describe("buildIssueFields (depth nesting)", () => {
+    // Access private method for testing
+    const client = new LinearClient({ apiKey: "test_key" });
+    const buildIssueFields = (client as any).buildIssueFields.bind(client);
+
+    it("returns base fields without children at depth 0", () => {
+      const fields = buildIssueFields(0);
+      expect(fields).toContain("id");
+      expect(fields).toContain("identifier");
+      expect(fields).toContain("title");
+      expect(fields).toContain("parent { id identifier }");
+      expect(fields).not.toContain("children");
+    });
+
+    it("includes one level of children at depth 1", () => {
+      const fields = buildIssueFields(1);
+      expect(fields).toContain("children {");
+      // Count occurrences of "children {" - should be exactly 1
+      const matches = fields.match(/children \{/g) || [];
+      expect(matches.length).toBe(1);
+    });
+
+    it("includes nested children at depth 2", () => {
+      const fields = buildIssueFields(2);
+      // Count occurrences of "children {" - should be exactly 2
+      const matches = fields.match(/children \{/g) || [];
+      expect(matches.length).toBe(2);
+    });
+
+    it("includes 3 levels of nested children at depth 3", () => {
+      const fields = buildIssueFields(3);
+      const matches = fields.match(/children \{/g) || [];
+      expect(matches.length).toBe(3);
+    });
+
+    it("only includes parent field at top level", () => {
+      const fields = buildIssueFields(2);
+      // parent should only appear once (at top level)
+      const parentMatches = fields.match(/parent \{/g) || [];
+      expect(parentMatches.length).toBe(1);
+    });
+  });
 });

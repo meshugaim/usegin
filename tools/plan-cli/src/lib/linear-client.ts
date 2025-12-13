@@ -17,6 +17,23 @@ export interface LinearClientOptions {
   apiKey: string;
 }
 
+/**
+ * GraphQL response type for issues with recursive children
+ */
+interface GqlIssue {
+  id: string;
+  identifier: string;
+  title: string;
+  description: string | null;
+  sortOrder: number;
+  state: { name: string } | null;
+  assignee: { id: string; name: string; displayName: string } | null;
+  parent?: { id: string; identifier: string } | null;
+  labels: { nodes: Array<{ name: string }> };
+  project: { name: string } | null;
+  children?: { nodes: GqlIssue[] };
+}
+
 export class LinearClient {
   private sdk: LinearSDK;
   private _apiCallCount = 0;
@@ -104,6 +121,74 @@ export class LinearClient {
   }
 
   /**
+   * Build the issue fields fragment for GraphQL, with nested children up to specified depth
+   */
+  private buildIssueFields(depth: number, currentDepth: number = 0): string {
+    const baseFields = `
+      id
+      identifier
+      title
+      description
+      sortOrder
+      state { name }
+      assignee { id name displayName }
+      labels { nodes { name } }
+      project { name }`;
+
+    // Add parent only at top level
+    const parentField = currentDepth === 0 ? "\n      parent { id identifier }" : "";
+
+    // Recursively add children if we haven't reached max depth
+    if (currentDepth < depth) {
+      const childFields = this.buildIssueFields(depth, currentDepth + 1);
+      return `${baseFields}${parentField}
+      children {
+        nodes {${childFields}
+        }
+      }`;
+    }
+
+    return baseFields + parentField;
+  }
+
+  /**
+   * Transform a GraphQL issue response to PlanIssue format recursively
+   */
+  private transformGqlIssue(
+    gqlIssue: GqlIssue,
+    parentInfo?: { id: string; identifier: string }
+  ): PlanIssue {
+    const children: PlanIssue[] = gqlIssue.children?.nodes
+      ? gqlIssue.children.nodes.map((child) =>
+          this.transformGqlIssue(child, {
+            id: gqlIssue.id,
+            identifier: gqlIssue.identifier,
+          })
+        ).sort((a, b) => a.sortOrder - b.sortOrder)
+      : [];
+
+    return {
+      id: gqlIssue.id,
+      identifier: gqlIssue.identifier,
+      title: gqlIssue.title,
+      description: gqlIssue.description ?? undefined,
+      status: gqlIssue.state?.name ?? "Unknown",
+      sortOrder: gqlIssue.sortOrder,
+      assignee: gqlIssue.assignee
+        ? {
+            id: gqlIssue.assignee.id,
+            name: gqlIssue.assignee.name,
+            displayName: gqlIssue.assignee.displayName,
+          }
+        : undefined,
+      parent: parentInfo,
+      labels: gqlIssue.labels.nodes.map((l) => l.name),
+      project: gqlIssue.project?.name,
+      children,
+    };
+  }
+
+  /**
    * List issues from Linear (single GraphQL query)
    */
   async listIssues(options: ListOptions = {}): Promise<PlanIssue[]> {
@@ -148,52 +233,18 @@ export class LinearClient {
 
     const filterStr = filterParts.length > 0 ? `filter: { ${filterParts.join(", ")} }` : "";
 
-    // Single GraphQL query with all nested relations
+    // Build GraphQL query with dynamic depth for nested children
+    const depth = options.depth ?? 0;
+    const issueFields = this.buildIssueFields(depth);
+
     const query = `
       query ListIssues {
         issues(${filterStr}, first: 100) {
-          nodes {
-            id
-            identifier
-            title
-            description
-            sortOrder
-            state { name }
-            assignee { id name displayName }
-            parent { id identifier }
-            labels { nodes { name } }
-            project { name }
-            children {
-              nodes {
-                id
-                identifier
-                title
-                description
-                sortOrder
-                state { name }
-                assignee { id name displayName }
-                labels { nodes { name } }
-                project { name }
-              }
-            }
+          nodes {${issueFields}
           }
         }
       }
     `;
-
-    interface GqlIssue {
-      id: string;
-      identifier: string;
-      title: string;
-      description: string | null;
-      sortOrder: number;
-      state: { name: string } | null;
-      assignee: { id: string; name: string; displayName: string } | null;
-      parent: { id: string; identifier: string } | null;
-      labels: { nodes: Array<{ name: string }> };
-      project: { name: string } | null;
-      children: { nodes: GqlIssue[] };
-    }
 
     const data = await this.graphql<{ issues: { nodes: GqlIssue[] } }>(query);
 
@@ -212,44 +263,7 @@ export class LinearClient {
         if (!inTitle && !inDesc) continue;
       }
 
-      const children: PlanIssue[] = issue.children.nodes.map((child) => ({
-        id: child.id,
-        identifier: child.identifier,
-        title: child.title,
-        description: child.description ?? undefined,
-        status: child.state?.name ?? "Unknown",
-        sortOrder: child.sortOrder,
-        assignee: child.assignee
-          ? {
-              id: child.assignee.id,
-              name: child.assignee.name,
-              displayName: child.assignee.displayName,
-            }
-          : undefined,
-        parent: { id: issue.id, identifier: issue.identifier },
-        labels: child.labels.nodes.map((l) => l.name),
-        project: child.project?.name,
-        children: [],
-      }));
-
-      planIssues.push({
-        id: issue.id,
-        identifier: issue.identifier,
-        title: issue.title,
-        description: issue.description ?? undefined,
-        status: issue.state?.name ?? "Unknown",
-        sortOrder: issue.sortOrder,
-        assignee: issue.assignee
-          ? {
-              id: issue.assignee.id,
-              name: issue.assignee.name,
-              displayName: issue.assignee.displayName,
-            }
-          : undefined,
-        labels: issue.labels.nodes.map((l) => l.name),
-        project: issue.project?.name,
-        children: children.sort((a, b) => a.sortOrder - b.sortOrder),
-      });
+      planIssues.push(this.transformGqlIssue(issue));
     }
 
     // Sort by sortOrder
