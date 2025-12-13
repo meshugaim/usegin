@@ -3,6 +3,14 @@ import type { PlanIssue, PlanIssueDetail } from "../types";
 export interface FormatOptions {
   depth?: number;
   showDone?: boolean;
+  /** Whether depth was explicitly set by user (vs default) */
+  depthExplicit?: boolean;
+}
+
+export interface FormatResult {
+  output: string;
+  /** True if there are hidden children beyond the displayed depth */
+  hasHiddenChildren: boolean;
 }
 
 /**
@@ -16,7 +24,7 @@ function filterChildren(children: PlanIssue[], showDone: boolean): PlanIssue[] {
 /**
  * Format issues as a human-readable table
  */
-export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}): string {
+export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}): FormatResult {
   const depth = options.depth ?? 0;
   const showDone = options.showDone ?? false;
   const lines: string[] = [];
@@ -34,17 +42,26 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     : 0;
   const labelLen = Math.min(maxLabelLen, 20);
 
+  // Check if any issues have hidden children (childCount > 0)
+  const hasHiddenChildren = allIssues.some((i) => i.childCount && i.childCount > 0);
+
   // Clamp title length for readability
-  const titleLen = Math.min(maxTitleLen, hasLabels ? 35 : 40);
+  const titleLen = Math.min(maxTitleLen, hasLabels ? 35 : (hasHiddenChildren ? 38 : 40));
 
   // Header
-  const header = formatRow("#", "ID", "Title", "Status", hasLabels ? "Labels" : undefined, {
-    numWidth: 3,
-    idWidth: maxIdLen,
-    titleWidth: titleLen,
-    statusWidth: maxStatusLen,
-    labelWidth: labelLen,
-  });
+  const header = formatRow(
+    "#", "ID", "Title", "Status",
+    hasLabels ? "Labels" : undefined,
+    hasHiddenChildren ? "More" : undefined,
+    {
+      numWidth: 3,
+      idWidth: maxIdLen,
+      titleWidth: titleLen,
+      statusWidth: maxStatusLen,
+      labelWidth: labelLen,
+      moreWidth: 5,
+    }
+  );
   lines.push(header);
 
   // Issues
@@ -53,21 +70,20 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     position++;
     const posStr = String(position);
 
-    // Build title with optional child count hint (shown when children exist but not displayed)
-    const hint = (issue.childCount && issue.childCount > 0 && depth === 0)
-      ? ` (+${issue.childCount})`
-      : "";
-    // Truncate title first, leaving room for hint, then append hint
-    const title = truncate(issue.title, titleLen - hint.length) + hint;
+    const title = truncate(issue.title, titleLen);
     const labels = hasLabels ? truncate(formatLabels(issue.labels), labelLen) : undefined;
+    const more = hasHiddenChildren
+      ? (issue.childCount && issue.childCount > 0 ? `+${issue.childCount}` : "")
+      : undefined;
 
     lines.push(
-      formatRow(posStr, issue.identifier, title, issue.status, labels, {
+      formatRow(posStr, issue.identifier, title, issue.status, labels, more, {
         numWidth: 3,
         idWidth: maxIdLen,
         titleWidth: titleLen,
         statusWidth: maxStatusLen,
         labelWidth: labelLen,
+        moreWidth: 5,
       })
     );
 
@@ -80,11 +96,15 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
         labelLen,
         hasLabels,
         showDone,
+        hasHiddenChildren,
       });
     }
   }
 
-  return lines.join("\n");
+  return {
+    output: lines.join("\n"),
+    hasHiddenChildren,
+  };
 }
 
 /**
@@ -102,6 +122,7 @@ function renderChildren(
     labelLen: number;
     hasLabels: boolean;
     showDone: boolean;
+    hasHiddenChildren: boolean;
   }
 ): void {
   const indent = "  ".repeat(currentDepth);
@@ -109,18 +130,20 @@ function renderChildren(
   const prefixLen = prefix.length;
 
   for (const child of children) {
-    // Build title with optional child count hint
-    const hint = (child.childCount && child.childCount > 0) ? ` (+${child.childCount})` : "";
-    // Truncate title first, leaving room for prefix and hint, then append hint
-    const childTitle = truncate(child.title, opts.titleLen - prefixLen - hint.length) + hint;
+    const childTitle = truncate(child.title, opts.titleLen - prefixLen);
     const childLabels = opts.hasLabels ? truncate(formatLabels(child.labels), opts.labelLen) : undefined;
+    const more = opts.hasHiddenChildren
+      ? (child.childCount && child.childCount > 0 ? `+${child.childCount}` : "")
+      : undefined;
+
     lines.push(
-      formatRow("", child.identifier, `${prefix}${childTitle}`, child.status, childLabels, {
+      formatRow("", child.identifier, `${prefix}${childTitle}`, child.status, childLabels, more, {
         numWidth: 3,
         idWidth: opts.maxIdLen,
         titleWidth: opts.titleLen,
         statusWidth: opts.maxStatusLen,
         labelWidth: opts.labelLen,
+        moreWidth: 5,
       })
     );
 
@@ -208,7 +231,8 @@ function formatRow(
   title: string,
   status: string,
   labels: string | undefined,
-  widths: { numWidth: number; idWidth: number; titleWidth: number; statusWidth: number; labelWidth: number }
+  more: string | undefined,
+  widths: { numWidth: number; idWidth: number; titleWidth: number; statusWidth: number; labelWidth: number; moreWidth: number }
 ): string {
   const parts = [
     num.padStart(widths.numWidth),
@@ -218,7 +242,11 @@ function formatRow(
   ];
 
   if (labels !== undefined) {
-    parts.push(labels);
+    parts.push(labels.padEnd(widths.labelWidth));
+  }
+
+  if (more !== undefined) {
+    parts.push(more);
   }
 
   return parts.join("   ");

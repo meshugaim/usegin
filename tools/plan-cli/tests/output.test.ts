@@ -72,7 +72,7 @@ const mockIssuesWithDoneChildren: PlanIssue[] = [
 
 describe("formatListHuman", () => {
   it("formats issues as a table with position numbers", () => {
-    const output = formatListHuman(mockIssues);
+    const { output } = formatListHuman(mockIssues);
 
     // Should have header
     expect(output).toContain("#");
@@ -90,7 +90,7 @@ describe("formatListHuman", () => {
   });
 
   it("shows sub-issues with tree prefix", () => {
-    const output = formatListHuman(mockIssues, { depth: 1 });
+    const { output } = formatListHuman(mockIssues, { depth: 1 });
 
     // Sub-issue should have tree prefix, not position number
     expect(output).toContain("ENG-21");
@@ -99,14 +99,14 @@ describe("formatListHuman", () => {
   });
 
   it("hides sub-issues when depth is 0", () => {
-    const output = formatListHuman(mockIssues, { depth: 0 });
+    const { output } = formatListHuman(mockIssues, { depth: 0 });
 
     expect(output).not.toContain("ENG-21");
     expect(output).not.toContain("Extract types");
   });
 
   it("aligns columns properly", () => {
-    const output = formatListHuman(mockIssues);
+    const { output } = formatListHuman(mockIssues);
     const lines = output.split("\n").filter(Boolean);
 
     // All data rows should align with header
@@ -115,7 +115,7 @@ describe("formatListHuman", () => {
   });
 
   it("hides Done sub-issues by default", () => {
-    const output = formatListHuman(mockIssuesWithDoneChildren, { depth: 1 });
+    const { output } = formatListHuman(mockIssuesWithDoneChildren, { depth: 1 });
 
     // Should show non-Done children
     expect(output).toContain("ENG-101");
@@ -125,11 +125,44 @@ describe("formatListHuman", () => {
   });
 
   it("shows Done sub-issues when showDone is true", () => {
-    const output = formatListHuman(mockIssuesWithDoneChildren, { depth: 1, showDone: true });
+    const { output } = formatListHuman(mockIssuesWithDoneChildren, { depth: 1, showDone: true });
 
     // Should show all children including Done
     expect(output).toContain("ENG-101");
     expect(output).toContain("ENG-102");
+  });
+
+  it("returns hasHiddenChildren when issues have childCount", () => {
+    const issuesWithChildCount: PlanIssue[] = [
+      {
+        id: "issue-1",
+        identifier: "ENG-1",
+        title: "Parent",
+        status: "Backlog",
+        sortOrder: 1.0,
+        children: [],
+        childCount: 3,
+      },
+    ];
+    const { hasHiddenChildren } = formatListHuman(issuesWithChildCount);
+    expect(hasHiddenChildren).toBe(true);
+  });
+
+  it("shows More column when there are hidden children", () => {
+    const issuesWithChildCount: PlanIssue[] = [
+      {
+        id: "issue-1",
+        identifier: "ENG-1",
+        title: "Parent",
+        status: "Backlog",
+        sortOrder: 1.0,
+        children: [],
+        childCount: 3,
+      },
+    ];
+    const { output } = formatListHuman(issuesWithChildCount);
+    expect(output).toContain("More");
+    expect(output).toContain("+3");
   });
 });
 

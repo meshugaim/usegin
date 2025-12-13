@@ -143,10 +143,18 @@ async function runList(opts: {
 
     // Standard output modes
     const showDone = opts.showDone ?? false;
+    const depthExplicit = process.argv.some(arg => arg.startsWith("--depth"));
+
     if (opts.groupBy) {
       console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status", { showDone }));
     } else {
-      console.log(formatListHuman(issues, { depth: options.depth, showDone }));
+      const result = formatListHuman(issues, { depth: options.depth, showDone });
+      console.log(result.output);
+
+      // Show hint about depth if using default and there are hidden children
+      if (result.hasHiddenChildren && !depthExplicit) {
+        console.log(`\n(showing up to depth ${options.depth}, use --depth N to see more)`);
+      }
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);
