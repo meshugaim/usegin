@@ -52,7 +52,7 @@ Guidelines, not a strict process. Adapt to the situation.
 | **Checkpoint**          | Summarize progress. Ask user if still aligned.              | Do this often.                                                                          |
 | **Commit & push**       | Commit after each slice. Don't accumulate uncommitted work. | Small commits, pushed frequently. Avoids lost work and enables easier rollback.         |
 | **Update progress doc** | Record decisions, next step.                                | Keep it current.                                                                        |
-| **Check context**       | Run `/context` to assess context window usage.              | If getting full, `/compact` or create handoff. See "Context Management" section.        |
+| **Check context**       | Run `/context` to assess context window usage.              | If getting full, prepare/create handoff. See "Context Management" section.              |
 | **Repeat**              | Propose next slice. Ask: "Right size? Go smaller?"          | Continuous alignment.                                                                   |
 
 ## Commit Often
@@ -172,8 +172,10 @@ Run `/context` to check context usage. This shows a visual grid of how much cont
 | Context State | Action |
 | ------------- | ------ |
 | Plenty of room | Continue to next slice |
-| Getting full (~70%+) | Consider `/compact` with focus instructions |
+| Getting full (~70%+) | Prepare for handoff, update impl-status.md proactively |
 | Nearly full (~85%+) | Create handoff, suggest new session |
+
+**Note:** `/compact` can reduce context by summarizing, but it may be disabled in settings. Don't rely on it - treat handoffs as the primary strategy for managing long implementations.
 
 ### When to Create a Handoff
 
