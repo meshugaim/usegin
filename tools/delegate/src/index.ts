@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { createPromptCommand } from "./commands/prompt";
+import { createWorktreeCommand } from "./commands/worktree";
 
 const program = new Command()
   .name("delegate")
@@ -9,19 +10,9 @@ const program = new Command()
 
 // Commands
 program.addCommand(createPromptCommand());
+program.addCommand(createWorktreeCommand());
 
-// Placeholder commands - will be implemented in subsequent issues
-program
-  .command("worktree <issue-id>")
-  .description("Delegate issue to agent in worktree (blocks until done)")
-  .option("--dry-run", "Show what would happen, don't execute")
-  .option("--keep-worktree", "Don't cleanup worktree on completion")
-  .action((issueId: string, options: { dryRun?: boolean; keepWorktree?: boolean }) => {
-    console.log(`TODO: Delegate ${issueId} to worktree agent`);
-    if (options.dryRun) console.log("  (dry-run mode)");
-    if (options.keepWorktree) console.log("  (keeping worktree)");
-  });
-
+// Placeholder - will be implemented in subsequent issue
 program
   .command("status")
   .description("Show active delegations")
