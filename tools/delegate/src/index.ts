@@ -1,19 +1,16 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
+import { createPromptCommand } from "./commands/prompt";
 
 const program = new Command()
   .name("delegate")
   .description("Agent delegation patterns CLI")
   .version("0.1.0");
 
-// Placeholder commands - will be implemented in subsequent issues
-program
-  .command("prompt <issue-id>")
-  .description("Output delegation brief for an issue")
-  .action((issueId: string) => {
-    console.log(`TODO: Generate delegation brief for ${issueId}`);
-  });
+// Commands
+program.addCommand(createPromptCommand());
 
+// Placeholder commands - will be implemented in subsequent issues
 program
   .command("worktree <issue-id>")
   .description("Delegate issue to agent in worktree (blocks until done)")
