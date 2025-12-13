@@ -4,6 +4,7 @@ import { printApiStats } from "../lib/stats";
 
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
+    .alias("as")
     .description("Create a new issue in the list")
     .argument("<title>", "Issue title")
     .option("--team <key>", "Team key (e.g., ENG)")
