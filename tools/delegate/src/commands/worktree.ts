@@ -4,6 +4,7 @@ import { $ } from "bun";
 interface WorktreeOptions {
   dryRun?: boolean;
   keepWorktree?: boolean;
+  allowParent?: boolean;
 }
 
 interface LinearIssue {
@@ -55,9 +56,9 @@ async function runWorktree(issueId: string, options: WorktreeOptions): Promise<v
   console.log(`  Validating issue...`);
   const issue = await validateIssue(issueId);
 
-  // 2. Check if leaf (no children)
-  if (issue.children && issue.children.length > 0) {
-    console.error(`Error: ${issueId} has ${issue.children.length} sub-issues. Only leaf issues can be delegated.`);
+  // 2. Check if leaf (no children) unless --allow-parent
+  if (issue.children && issue.children.length > 0 && !options.allowParent) {
+    console.error(`Error: ${issueId} has ${issue.children.length} sub-issues. Use --allow-parent to delegate anyway.`);
     process.exit(1);
   }
 
@@ -118,6 +119,7 @@ export function createWorktreeCommand(): Command {
     .argument("<issue-id>", "Issue identifier (e.g., ENG-123)")
     .option("--dry-run", "Show what would happen, don't execute")
     .option("--keep-worktree", "Don't cleanup worktree on completion")
+    .option("--allow-parent", "Allow delegating issues with sub-issues")
     .action(async (issueId: string, options: WorktreeOptions) => {
       try {
         await runWorktree(issueId, options);
