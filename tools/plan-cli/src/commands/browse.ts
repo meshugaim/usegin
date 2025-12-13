@@ -8,7 +8,7 @@ export function createBrowseCommand(): Command {
     .description("Interactive issue browser using fzf")
     .option("--team <key>", "Team key (e.g., ENG)")
     .option("--inbox", "Browse inbox items only")
-    .option("--action <action>", "Action after selection: start, close")
+    .option("--action <action>", "Action after selection: start, close, delegate")
     .option("--multi", "Allow multiple selection")
     .action(async (opts) => {
       await runBrowse(opts);
@@ -82,7 +82,9 @@ async function runBrowse(opts: {
       "--preview-window",
       "right:50%:wrap",
       "--header",
-      "Select issue (enter to select, esc to cancel)",
+      "Select issue (enter to select, ctrl-w to delegate, esc to cancel)",
+      "--expect",
+      "ctrl-w",
     ];
 
     if (opts.multi) {
@@ -101,8 +103,11 @@ async function runBrowse(opts: {
       process.exit(0);
     }
 
-    // Handle multi-select: split by newlines
-    const selectedLines = result.trim().split("\n");
+    // With --expect, first line is the key pressed, remaining lines are selections
+    const outputLines = result.trim().split("\n");
+    const pressedKey = outputLines[0];
+    const selectedLines = outputLines.slice(1);
+
     const identifiers = selectedLines
       .map(extractIdentifier)
       .filter((id): id is string => id !== null);
@@ -112,10 +117,13 @@ async function runBrowse(opts: {
       process.exit(1);
     }
 
+    // Determine action: keybind takes precedence, then --action flag
+    const action = pressedKey === "ctrl-w" ? "delegate" : opts.action;
+
     // Perform action if specified
-    if (opts.action) {
+    if (action) {
       for (const id of identifiers) {
-        await performAction(client, id, opts.action);
+        await performAction(client, id, action);
       }
     } else {
       // Just output the identifiers
@@ -152,6 +160,11 @@ async function performAction(
         status: "Done",
       });
       console.log(`Closed: ${identifier}`);
+      break;
+
+    case "delegate":
+      // Delegate to worktree agent
+      await $`delegate worktree ${identifier}`;
       break;
 
     default:
