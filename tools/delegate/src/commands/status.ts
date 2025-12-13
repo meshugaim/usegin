@@ -96,10 +96,9 @@ async function getLinearStatus(issueId: string): Promise<string> {
 }
 
 async function getCommitCount(issueId: string): Promise<number> {
-  const worktreePath = `.worktrees/${issueId}`;
   try {
-    // Count commits on the worktree branch that aren't on origin/main
-    const result = await $`cd ${worktreePath} && git rev-list --count origin/main..HEAD 2>/dev/null`.quiet().text();
+    // Count commits on main that mention this issue ID
+    const result = await $`git log --oneline --grep=${issueId} origin/main 2>/dev/null | wc -l`.quiet().text();
     return parseInt(result.trim(), 10) || 0;
   } catch {
     return 0;
