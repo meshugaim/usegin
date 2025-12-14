@@ -4,12 +4,14 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
+    "test:mutation": "stryker run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "commander": "^12.1.0"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^9.4.0",
     "@types/bun": "latest",
     "typescript": "^5.7.2"
   }
