@@ -71,6 +71,15 @@ Claude: [Edits /tmp/ENG-456.md]
 You: Looks good!
 ```
 
+## Works well with
+
+This pattern powers several Claude skills that write iteratively:
+- `writing-specs` — spec documents refined section by section
+- `writing-skills` — skill files built collaboratively
+- `implementing-specs` — progress tracked in Linear as you go
+
+The temp file + Edit tool combo is the foundation for any iterative writing workflow.
+
 ## See also
 
 - `plan update --help` — all update options
