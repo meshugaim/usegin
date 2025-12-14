@@ -1,13 +1,29 @@
 import { Command } from "commander";
 import { $ } from "bun";
 
-const WORKTREES_DIR = ".worktrees";
+export const WORKTREES_DIR = ".worktrees";
 
-interface WorktreeInfo {
+export interface WorktreeInfo {
   name: string;
   path: string;
   branch: string;
   commit: string;
+}
+
+export interface ListOptions {
+  json?: boolean;
+}
+
+export interface ListDeps {
+  getWorktreeList: () => Promise<string>;
+  output: (message: string) => void;
+}
+
+export function getDefaultDeps(): ListDeps {
+  return {
+    getWorktreeList: async () => $`git worktree list --porcelain`.text(),
+    output: console.log,
+  };
 }
 
 export function createListCommand(): Command {
@@ -15,39 +31,47 @@ export function createListCommand(): Command {
     .alias("ls")
     .description("List all worktrees")
     .option("--json", "Output as JSON")
-    .action(async (opts: { json?: boolean }) => {
+    .action(async (opts: ListOptions) => {
       await runList(opts);
     });
 }
 
-async function runList(opts: { json?: boolean }): Promise<void> {
-  const output = await $`git worktree list --porcelain`.text();
-  const worktrees = parseWorktrees(output);
+export function filterManagedWorktrees(worktrees: WorktreeInfo[]): WorktreeInfo[] {
+  return worktrees.filter((wt) => wt.path.includes(WORKTREES_DIR));
+}
 
-  // Filter to only .worktrees directory
-  const managed = worktrees.filter((wt) => wt.path.includes(WORKTREES_DIR));
+export function formatTableRow(wt: WorktreeInfo): string {
+  return wt.name.padEnd(15) + wt.branch.padEnd(20) + wt.commit.substring(0, 7);
+}
+
+export function formatTable(worktrees: WorktreeInfo[]): string {
+  const header = "Name".padEnd(15) + "Branch".padEnd(20) + "Commit";
+  const separator = "-".repeat(50);
+  const rows = worktrees.map(formatTableRow);
+  return [header, separator, ...rows].join("\n");
+}
+
+export async function runList(
+  opts: ListOptions,
+  deps: ListDeps = getDefaultDeps()
+): Promise<void> {
+  const output = await deps.getWorktreeList();
+  const worktrees = parseWorktrees(output);
+  const managed = filterManagedWorktrees(worktrees);
 
   if (managed.length === 0) {
-    console.log("No worktrees found");
+    deps.output("No worktrees found");
     return;
   }
 
   if (opts.json) {
-    console.log(JSON.stringify(managed, null, 2));
+    deps.output(JSON.stringify(managed, null, 2));
   } else {
-    console.log("Name".padEnd(15) + "Branch".padEnd(20) + "Commit");
-    console.log("-".repeat(50));
-    for (const wt of managed) {
-      console.log(
-        wt.name.padEnd(15) +
-        wt.branch.padEnd(20) +
-        wt.commit.substring(0, 7)
-      );
-    }
+    deps.output(formatTable(managed));
   }
 }
 
-function parseWorktrees(porcelainOutput: string): WorktreeInfo[] {
+export function parseWorktrees(porcelainOutput: string): WorktreeInfo[] {
   const worktrees: WorktreeInfo[] = [];
   const entries = porcelainOutput.trim().split("\n\n");
 
