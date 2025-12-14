@@ -14,6 +14,7 @@ import { createStartCommand } from "./commands/start";
 import { createCloseCommand } from "./commands/close";
 import { createPromoteCommand } from "./commands/promote";
 import { createAlignCommand } from "./commands/align";
+import { createDocsCommand } from "./commands/docs";
 
 const program = new Command()
   .name("plan")
@@ -35,6 +36,7 @@ program.addCommand(createStartCommand());
 program.addCommand(createCloseCommand());
 program.addCommand(createPromoteCommand());
 program.addCommand(createAlignCommand());
+program.addCommand(createDocsCommand());
 
 // Parse arguments
 program.parse();
