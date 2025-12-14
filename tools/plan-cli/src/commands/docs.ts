@@ -188,8 +188,15 @@ function createShowSubcommand(): Command {
       const doc = findDoc(ref, docs);
 
       if (!doc) {
-        console.error(`Doc not found: ${ref}`);
-        console.error(dim("Run 'plan docs list' to see available docs"));
+        console.error(`Doc not found: ${ref}\n`);
+        if (docs.length > 0) {
+          console.error("Available docs:");
+          for (let i = 0; i < docs.length; i++) {
+            console.error(dim(`  ${i + 1}  ${docs[i].meta.handle}`));
+          }
+        } else {
+          console.error(dim("No docs available."));
+        }
         process.exit(1);
       }
 
