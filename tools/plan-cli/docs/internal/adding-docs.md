@@ -8,13 +8,23 @@ tags: [meta, contributing]
 
 # How to Add a Doc
 
-**TL;DR**: Create a `.md` file in `tools/plan-cli/docs/` with YAML frontmatter.
+**TL;DR**: Create a `.md` file in `docs/` (user) or `docs/internal/` (meta).
+
+## Directory Structure
+
+```
+tools/plan-cli/docs/
+├── your-doc.md              # user-facing docs
+└── internal/
+    └── meta-doc.md          # internal/developer docs
+```
 
 ## Steps
 
-1. Create a new markdown file in the `docs/` directory:
+1. Create a new markdown file:
    ```
-   tools/plan-cli/docs/your-doc-name.md
+   tools/plan-cli/docs/your-doc.md           # user-facing
+   tools/plan-cli/docs/internal/meta-doc.md  # internal
    ```
 
 2. Add required YAML frontmatter at the top:

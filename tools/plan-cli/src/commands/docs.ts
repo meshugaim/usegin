@@ -18,9 +18,10 @@ export interface Doc {
 }
 
 // Get the docs directory path (relative to CLI root)
-function getDocsDir(): string {
+function getDocsDir(internal = false): string {
   // Resolve from src/commands to root/docs
-  return join(dirname(import.meta.dir), "..", "docs");
+  const base = join(dirname(import.meta.dir), "..", "docs");
+  return internal ? join(base, "internal") : base;
 }
 
 // Parse frontmatter from markdown
@@ -88,8 +89,16 @@ export function loadDocsFromDir(docsDir: string): Doc[] {
 }
 
 // Load docs from the default docs directory
-function loadDocs(): Doc[] {
-  return loadDocsFromDir(getDocsDir());
+function loadDocs(internal = false): Doc[] {
+  return loadDocsFromDir(getDocsDir(internal));
+}
+
+// Load all docs (user + internal)
+function loadAllDocs(): { user: Doc[]; internal: Doc[] } {
+  return {
+    user: loadDocsFromDir(getDocsDir(false)),
+    internal: loadDocsFromDir(getDocsDir(true)),
+  };
 }
 
 // Format docs list output (2-line format)
@@ -138,35 +147,48 @@ export function createDocsCommand(): Command {
   return cmd;
 }
 
-function runList(): void {
-  const docs = loadDocs();
+function formatAndPrint(docs: Doc[], startNum = 1): number {
+  for (let i = 0; i < docs.length; i++) {
+    const doc = docs[i];
+    const num = (startNum + i).toString().padStart(2);
+    const typeTag = `[${doc.meta.type}]`;
 
-  if (docs.length === 0) {
+    console.log(`${colors.identifier(num)}  ${doc.meta.name.padEnd(58)} ${dim(typeTag)}`);
+    console.log(dim(`    ${doc.meta.context}`));
+
+    if (i < docs.length - 1) {
+      console.log(); // blank line between items
+    }
+  }
+  return startNum + docs.length;
+}
+
+function runList(): void {
+  const { user, internal } = loadAllDocs();
+
+  if (user.length === 0 && internal.length === 0) {
     console.log(dim("No docs found."));
     console.log(dim(`Add docs to: ${getDocsDir()}`));
     return;
   }
 
-  // Print formatted list
-  const output = formatDocsList(docs);
-  // Apply colors to the output
-  const coloredOutput = output
-    .split("\n")
-    .map((line) => {
-      // Color the number at the start
-      const match = line.match(/^(\s*\d+)(\s+.*)$/);
-      if (match) {
-        return colors.identifier(match[1]) + match[2].replace(/\[(\w+-?\w*)\]/, dim("[$1]"));
-      }
-      // Context lines (indented)
-      if (line.startsWith("    ")) {
-        return dim(line);
-      }
-      return line;
-    })
-    .join("\n");
+  let nextNum = 1;
 
-  console.log(coloredOutput);
+  // User-facing docs
+  if (user.length > 0) {
+    nextNum = formatAndPrint(user, nextNum);
+  }
+
+  // Internal/meta docs
+  if (internal.length > 0) {
+    if (user.length > 0) {
+      console.log();
+    }
+    console.log(dim("─── internal ───"));
+    console.log();
+    nextNum = formatAndPrint(internal, nextNum);
+  }
+
   console.log();
   console.log(dim("Use: plan docs show <handle|number>"));
 }
@@ -186,15 +208,16 @@ function createShowSubcommand(): Command {
     .description("Show a doc by handle or number")
     .argument("<ref>", "Doc handle or number from list")
     .action((ref: string) => {
-      const docs = loadDocs();
-      const doc = findDoc(ref, docs);
+      const { user, internal } = loadAllDocs();
+      const allDocs = [...user, ...internal];
+      const doc = findDoc(ref, allDocs);
 
       if (!doc) {
         console.error(`Doc not found: ${ref}\n`);
-        if (docs.length > 0) {
+        if (allDocs.length > 0) {
           console.error("Available docs:");
-          for (let i = 0; i < docs.length; i++) {
-            console.error(dim(`  ${i + 1}  ${docs[i].meta.handle}`));
+          for (let i = 0; i < allDocs.length; i++) {
+            console.error(dim(`  ${i + 1}  ${allDocs[i].meta.handle}`));
           }
         } else {
           console.error(dim("No docs available."));
