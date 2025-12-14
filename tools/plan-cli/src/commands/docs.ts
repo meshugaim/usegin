@@ -167,6 +167,8 @@ function runList(): void {
     .join("\n");
 
   console.log(coloredOutput);
+  console.log();
+  console.log(dim("Use: plan docs show <handle|number>"));
 }
 
 function createListSubcommand(): Command {
