@@ -63,7 +63,14 @@ interface SimulatorState {
   getProjectCollaboratorCount: (projectId: string) => number
 }
 
-const initialState = {
+const initialState: {
+  users: User[]
+  workspaces: Workspace[]
+  workspaceMembers: WorkspaceMember[]
+  projects: Project[]
+  projectMembers: ProjectMember[]
+  eventLog: EventLogEntry[]
+} = {
   users: [],
   workspaces: [],
   workspaceMembers: [],
@@ -84,7 +91,7 @@ function getMaxId(state: typeof initialState): number {
   ]
   const nums = allIds.map(id => {
     const match = id.match(/_(\d+)$/)
-    return match ? parseInt(match[1], 10) : 0
+    return match?.[1] ? parseInt(match[1], 10) : 0
   })
   return Math.max(0, ...nums)
 }
