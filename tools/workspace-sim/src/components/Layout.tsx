@@ -1,4 +1,5 @@
 import { ActionPanel } from './ActionPanel'
+import { EntityTables } from './EntityTables'
 import { useSimulatorStore } from '../model/store'
 
 export function Layout() {
@@ -46,9 +47,8 @@ export function Layout() {
 
         {/* Right: Tables & Event Log */}
         <aside className="w-96 border-l bg-white flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 border-b">
-            <h2 className="font-medium mb-3">Entities</h2>
-            <p className="text-sm text-gray-500">Entity tables coming soon...</p>
+          <div className="flex-1 overflow-hidden border-b">
+            <EntityTables />
           </div>
           <div className="h-48 overflow-y-auto p-4">
             <h2 className="font-medium mb-3">Event Log</h2>
