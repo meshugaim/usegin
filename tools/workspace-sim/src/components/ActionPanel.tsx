@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSimulatorStore } from '../model/store'
 import type { UserTier, WorkspaceRole, ProjectRole, WorkspacePlan } from '../model/types'
 
@@ -292,10 +292,12 @@ function InviteToWorkspaceForm({ onResult }: FormProps) {
   const [role, setRole] = useState<WorkspaceRole>('member')
   const [inviterId, setInviterId] = useState('')
 
-  const workspaces = useSimulatorStore(s => s.workspaces.filter(w => w.type === 'group'))
+  const allWorkspaces = useSimulatorStore(s => s.workspaces)
   const workspaceMembers = useSimulatorStore(s => s.workspaceMembers)
   const users = useSimulatorStore(s => s.users)
   const inviteToWorkspace = useSimulatorStore(s => s.inviteToWorkspace)
+
+  const workspaces = useMemo(() => allWorkspaces.filter(w => w.type === 'group'), [allWorkspaces])
 
   const owners = workspaceId
     ? workspaceMembers
@@ -360,10 +362,12 @@ function RemoveFromWorkspaceForm({ onResult }: FormProps) {
   const [workspaceId, setWorkspaceId] = useState('')
   const [userId, setUserId] = useState('')
 
-  const workspaces = useSimulatorStore(s => s.workspaces.filter(w => w.type === 'group'))
+  const allWorkspaces = useSimulatorStore(s => s.workspaces)
   const workspaceMembers = useSimulatorStore(s => s.workspaceMembers)
   const users = useSimulatorStore(s => s.users)
   const removeFromWorkspace = useSimulatorStore(s => s.removeFromWorkspace)
+
+  const workspaces = useMemo(() => allWorkspaces.filter(w => w.type === 'group'), [allWorkspaces])
 
   const members = workspaceId
     ? workspaceMembers
@@ -412,8 +416,10 @@ function RemoveFromWorkspaceForm({ onResult }: FormProps) {
 
 function DeleteWorkspaceForm({ onResult }: FormProps) {
   const [workspaceId, setWorkspaceId] = useState('')
-  const workspaces = useSimulatorStore(s => s.workspaces.filter(w => w.type === 'group'))
+  const allWorkspaces = useSimulatorStore(s => s.workspaces)
   const deleteGroupWorkspace = useSimulatorStore(s => s.deleteGroupWorkspace)
+
+  const workspaces = useMemo(() => allWorkspaces.filter(w => w.type === 'group'), [allWorkspaces])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
