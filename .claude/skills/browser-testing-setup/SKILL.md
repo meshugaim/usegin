@@ -64,6 +64,22 @@ gitpod env ports list
 | Organization | Test Organization | `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` |
 | Project | Demo Project | `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` |
 
+### Admin Access
+
+The `/admin/gfs` page requires users to be in the `admins` table. Seed data does NOT add admins automatically.
+
+**To grant admin access:**
+```bash
+docker exec -i supabase_db_ona-test-mvp psql -U postgres -c \
+  "INSERT INTO admins (user_id) VALUES ('11111111-1111-1111-1111-111111111111') ON CONFLICT DO NOTHING;"
+```
+
+This adds `owner@test.local` as an admin. Verify with:
+```bash
+docker exec -i supabase_db_ona-test-mvp psql -U postgres -c \
+  "SELECT a.*, u.email FROM admins a JOIN auth.users u ON a.user_id = u.id;"
+```
+
 ## Playwright MCP
 
 The Playwright MCP runs via Docker and provides browser automation tools. Use `mcp__playwright__*` tools for navigation, snapshots, clicking, typing, etc.
@@ -83,6 +99,8 @@ rm -rf .ignored/playwright-storage/profile
 |-------|----------|
 | MCP tools unavailable | Restart Claude Code to reconnect MCP servers |
 | Mailpit not showing emails | Check `just supabase-status`, ensure using `@test.local` emails |
+| Redirected to sign-in after db reset | Clear profile: `rm -rf .ignored/playwright-storage/profile` |
+| Admin/GFS returns 500 error | Ensure `SUPABASE_SERVICE_ROLE_KEY` is set (run `bun set-env`) |
 
 ## Production Testing
 
