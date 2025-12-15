@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type {
   User,
   Workspace,
@@ -71,8 +72,27 @@ const initialState = {
   eventLog: [],
 }
 
-export const useSimulatorStore = create<SimulatorState>((set, get) => ({
-  ...initialState,
+// Helper to restore idCounter from persisted state
+function getMaxId(state: typeof initialState): number {
+  const allIds = [
+    ...state.users.map(u => u.id),
+    ...state.workspaces.map(w => w.id),
+    ...state.workspaceMembers.map(wm => wm.id),
+    ...state.projects.map(p => p.id),
+    ...state.projectMembers.map(pm => pm.id),
+    ...state.eventLog.map(e => e.id),
+  ]
+  const nums = allIds.map(id => {
+    const match = id.match(/_(\d+)$/)
+    return match ? parseInt(match[1], 10) : 0
+  })
+  return Math.max(0, ...nums)
+}
+
+export const useSimulatorStore = create<SimulatorState>()(
+  persist(
+    (set, get) => ({
+      ...initialState,
 
   // === USER ACTIONS ===
 
@@ -745,4 +765,50 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => ({
   getProjectCollaboratorCount: (projectId: string) => {
     return get().projectMembers.filter(pm => pm.projectId === projectId).length
   },
-}))
+    }),
+    {
+      name: 'workspace-sim-storage',
+      // Only persist the entity data, not the functions
+      partialize: (state) => ({
+        users: state.users,
+        workspaces: state.workspaces,
+        workspaceMembers: state.workspaceMembers,
+        projects: state.projects,
+        projectMembers: state.projectMembers,
+        eventLog: state.eventLog,
+      }),
+      // Handle Date serialization
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name)
+          if (!str) return null
+          const parsed = JSON.parse(str)
+          // Convert date strings back to Date objects
+          const convertDates = (obj: Record<string, unknown>): Record<string, unknown> => {
+            for (const key in obj) {
+              const val = obj[key]
+              if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
+                obj[key] = new Date(val)
+              } else if (val && typeof val === 'object') {
+                convertDates(val as Record<string, unknown>)
+              }
+            }
+            return obj
+          }
+          if (parsed.state) {
+            convertDates(parsed.state)
+            // Restore idCounter
+            idCounter = getMaxId(parsed.state)
+          }
+          return parsed
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value))
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name)
+        },
+      },
+    }
+  )
+)
