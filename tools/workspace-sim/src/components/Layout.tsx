@@ -1,10 +1,30 @@
+import { ActionPanel } from './ActionPanel'
+import { useSimulatorStore } from '../model/store'
+
 export function Layout() {
+  const reset = useSimulatorStore(s => s.reset)
+  const userCount = useSimulatorStore(s => s.users.length)
+  const workspaceCount = useSimulatorStore(s => s.workspaces.length)
+  const projectCount = useSimulatorStore(s => s.projects.length)
+
   return (
     <div className="h-screen flex flex-col">
       <header className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Workspace Model Simulator</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold">Workspace Model Simulator</h1>
+          <div className="flex gap-2 text-xs text-gray-500">
+            <span>{userCount} users</span>
+            <span>·</span>
+            <span>{workspaceCount} workspaces</span>
+            <span>·</span>
+            <span>{projectCount} projects</span>
+          </div>
+        </div>
         <div className="flex gap-2">
-          <button className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded">
+          <button
+            onClick={reset}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+          >
             Reset
           </button>
         </div>
@@ -14,7 +34,7 @@ export function Layout() {
         {/* Left: Action Panel */}
         <aside className="w-72 border-r bg-white overflow-y-auto p-4">
           <h2 className="font-medium mb-3">Actions</h2>
-          <p className="text-sm text-gray-500">Action panel coming soon...</p>
+          <ActionPanel />
         </aside>
 
         {/* Center: Graph View */}
