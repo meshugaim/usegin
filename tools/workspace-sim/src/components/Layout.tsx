@@ -1,6 +1,7 @@
 import { ActionPanel } from './ActionPanel'
 import { EntityTables } from './EntityTables'
 import { EventLog } from './EventLog'
+import { GraphView } from './GraphView'
 import { useSimulatorStore } from '../model/store'
 
 export function Layout() {
@@ -41,8 +42,8 @@ export function Layout() {
 
         {/* Center: Graph View */}
         <main className="flex-1 flex flex-col">
-          <div className="flex-1 bg-gray-100 flex items-center justify-center">
-            <p className="text-gray-500">Graph visualization coming soon...</p>
+          <div className="flex-1 bg-gray-50">
+            <GraphView />
           </div>
         </main>
 
