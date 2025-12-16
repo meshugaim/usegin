@@ -85,9 +85,19 @@ async function getSessionStatus(issueId: string): Promise<{ status: DelegationSt
   }
 }
 
-async function getLinearStatus(issueId: string): Promise<string> {
+function looksLikeIssueId(name: string): boolean {
+  // Match patterns like ENG-123, PROJ-456, etc.
+  return /^[A-Z]+-\d+$/i.test(name);
+}
+
+async function getLinearStatus(name: string): Promise<string> {
+  // Only try Linear lookup if it looks like an issue ID
+  if (!looksLikeIssueId(name)) {
+    return "—";
+  }
+
   try {
-    const result = await $`plan show ${issueId} --json`.quiet().text();
+    const result = await $`plan show ${name} --json`.quiet().text();
     const issue = JSON.parse(result) as LinearIssue;
     return issue.status;
   } catch {
@@ -95,10 +105,15 @@ async function getLinearStatus(issueId: string): Promise<string> {
   }
 }
 
-async function getCommitCount(issueId: string): Promise<number> {
+async function getCommitCount(name: string): Promise<number> {
+  // Only count commits if it looks like an issue ID
+  if (!looksLikeIssueId(name)) {
+    return 0;
+  }
+
   try {
     // Count commits on main that mention this issue ID
-    const result = await $`git log --oneline --grep=${issueId} origin/main 2>/dev/null | wc -l`.quiet().text();
+    const result = await $`git log --oneline --grep=${name} origin/main 2>/dev/null | wc -l`.quiet().text();
     return parseInt(result.trim(), 10) || 0;
   } catch {
     return 0;
