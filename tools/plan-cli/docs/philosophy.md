@@ -8,7 +8,7 @@ tags: [workflow, values]
 
 # How We Work Together
 
-We track work in Linear using `plan`. Run `plan --help` to explore commands.
+The `plan` CLI is available on the PATH and ready to use. We track work in Linear using `plan`. Run `plan --help` to explore commands.
 
 ## Our Approach
 
