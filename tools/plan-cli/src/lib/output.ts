@@ -1,4 +1,4 @@
-import type { PlanIssue, PlanIssueDetail, PlanComment } from "../types";
+import type { PlanIssue, PlanIssueDetail, PlanComment, IssueHistoryEntry } from "../types";
 import {
   colors,
   colorizeStatus,
@@ -614,7 +614,7 @@ function formatRelativeDate(isoDate: string): string {
 /**
  * Format a single issue for `plan show` - JSON output
  */
-export function formatShowJson(issue: PlanIssueDetail): string {
+export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEntry[]): string {
   const output: Record<string, unknown> = {
     id: issue.id,
     identifier: issue.identifier,
@@ -647,5 +647,152 @@ export function formatShowJson(issue: PlanIssueDetail): string {
     }));
   }
 
+  // Include history if provided
+  if (history) {
+    output.history = history;
+  }
+
   return JSON.stringify(output, null, 2);
+}
+
+/**
+ * Format history entries for human-readable output
+ */
+export function formatHistoryHuman(history: IssueHistoryEntry[]): string {
+  if (history.length === 0) {
+    return dim("(no history)");
+  }
+
+  const lines: string[] = [];
+
+  for (const entry of history) {
+    const changes = describeHistoryChanges(entry);
+    if (changes.length === 0) continue;
+
+    const timestamp = formatTimestamp(entry.createdAt);
+    const actor = entry.actor?.displayName ?? entry.actor?.name ?? "Unknown";
+
+    lines.push(`  ${dim(timestamp)}  ${colors.assignee(`@${actor}`)}`);
+    for (const change of changes) {
+      lines.push(`    ${change}`);
+    }
+  }
+
+  if (lines.length === 0) {
+    return dim("(no meaningful changes recorded)");
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Describe what changed in a history entry
+ */
+function describeHistoryChanges(entry: IssueHistoryEntry): string[] {
+  const changes: string[] = [];
+
+  // State change
+  if (entry.fromState || entry.toState) {
+    if (entry.fromState && entry.toState) {
+      changes.push(`Status: ${colorizeStatus(entry.fromState)} → ${colorizeStatus(entry.toState)}`);
+    } else if (entry.toState) {
+      changes.push(`Status set to ${colorizeStatus(entry.toState)}`);
+    }
+  }
+
+  // Assignment change
+  if (entry.fromAssignee || entry.toAssignee) {
+    if (entry.fromAssignee && entry.toAssignee) {
+      changes.push(`Assignee: ${colors.assignee(`@${entry.fromAssignee}`)} → ${colors.assignee(`@${entry.toAssignee}`)}`);
+    } else if (entry.toAssignee) {
+      changes.push(`Assigned to ${colors.assignee(`@${entry.toAssignee}`)}`);
+    } else if (entry.fromAssignee) {
+      changes.push(`Unassigned from ${colors.assignee(`@${entry.fromAssignee}`)}`);
+    }
+  }
+
+  // Title change
+  if (entry.fromTitle || entry.toTitle) {
+    if (entry.fromTitle && entry.toTitle) {
+      changes.push(`Title changed: "${entry.fromTitle}" → "${entry.toTitle}"`);
+    } else if (entry.toTitle) {
+      changes.push(`Title set to "${entry.toTitle}"`);
+    }
+  }
+
+  // Priority change
+  if (entry.fromPriority !== undefined || entry.toPriority !== undefined) {
+    const priorityNames = ["No priority", "Urgent", "High", "Medium", "Low"];
+    const from = entry.fromPriority !== undefined ? priorityNames[entry.fromPriority] ?? `P${entry.fromPriority}` : undefined;
+    const to = entry.toPriority !== undefined ? priorityNames[entry.toPriority] ?? `P${entry.toPriority}` : undefined;
+    if (from && to) {
+      changes.push(`Priority: ${from} → ${to}`);
+    } else if (to) {
+      changes.push(`Priority set to ${to}`);
+    }
+  }
+
+  // Estimate change
+  if (entry.fromEstimate !== undefined || entry.toEstimate !== undefined) {
+    if (entry.fromEstimate !== undefined && entry.toEstimate !== undefined) {
+      changes.push(`Estimate: ${entry.fromEstimate} → ${entry.toEstimate}`);
+    } else if (entry.toEstimate !== undefined) {
+      changes.push(`Estimate set to ${entry.toEstimate}`);
+    } else {
+      changes.push(`Estimate removed`);
+    }
+  }
+
+  // Due date change
+  if (entry.fromDueDate || entry.toDueDate) {
+    if (entry.fromDueDate && entry.toDueDate) {
+      changes.push(`Due date: ${entry.fromDueDate} → ${entry.toDueDate}`);
+    } else if (entry.toDueDate) {
+      changes.push(`Due date set to ${entry.toDueDate}`);
+    } else {
+      changes.push(`Due date removed`);
+    }
+  }
+
+  // Parent change
+  if (entry.fromParent || entry.toParent) {
+    if (entry.fromParent && entry.toParent) {
+      changes.push(`Parent: ${colors.identifier(entry.fromParent)} → ${colors.identifier(entry.toParent)}`);
+    } else if (entry.toParent) {
+      changes.push(`Parent set to ${colors.identifier(entry.toParent)}`);
+    } else {
+      changes.push(`Parent removed`);
+    }
+  }
+
+  // Archive state
+  if (entry.archived !== undefined) {
+    changes.push(entry.archived ? "Archived" : "Unarchived");
+  }
+
+  return changes;
+}
+
+/**
+ * Format ISO timestamp to human-readable relative or absolute format
+ */
+function formatTimestamp(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  // For older entries, show date
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
 }

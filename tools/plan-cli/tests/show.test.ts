@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { formatShowHuman, formatShowJson } from "../src/lib/output";
-import type { PlanIssueDetail, PlanComment } from "../src/types";
+import { formatShowHuman, formatShowJson, formatHistoryHuman } from "../src/lib/output";
+import type { PlanIssueDetail, PlanComment, IssueHistoryEntry } from "../src/types";
 
 const mockComments: PlanComment[] = [
   {
@@ -185,6 +185,31 @@ describe("formatShowJson", () => {
     expect(parsed.comments[0].body).toContain("first comment");
     expect(parsed.comments[0].user.name).toBe("nitsan");
   });
+
+  it("includes history when provided", () => {
+    const history: IssueHistoryEntry[] = [
+      {
+        id: "h1",
+        createdAt: new Date().toISOString(),
+        actor: { name: "user@test.com", displayName: "Test User" },
+        fromState: "Backlog",
+        toState: "In Progress",
+      },
+    ];
+    const output = formatShowJson(mockIssue, history);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.history).toBeDefined();
+    expect(parsed.history).toHaveLength(1);
+    expect(parsed.history[0].fromState).toBe("Backlog");
+  });
+
+  it("omits history when not provided", () => {
+    const output = formatShowJson(mockIssue);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.history).toBeUndefined();
+  });
 });
 
 describe("formatShowHuman with comments", () => {
@@ -230,5 +255,68 @@ describe("formatShowHuman with comments", () => {
     const output = formatShowHuman(issueWithComment);
     expect(output).toContain("(unknown)");
     expect(output).toContain("Anonymous comment");
+  });
+});
+
+describe("formatHistoryHuman", () => {
+  it("shows (no history) for empty array", () => {
+    const output = formatHistoryHuman([]);
+    expect(output).toContain("(no history)");
+  });
+
+  it("shows status changes", () => {
+    const history: IssueHistoryEntry[] = [
+      {
+        id: "h1",
+        createdAt: new Date().toISOString(),
+        actor: { name: "user@test.com", displayName: "Test User" },
+        fromState: "Backlog",
+        toState: "In Progress",
+      },
+    ];
+    const output = formatHistoryHuman(history);
+    expect(output).toContain("@Test User");
+    expect(output).toContain("Backlog");
+    expect(output).toContain("In Progress");
+  });
+
+  it("shows assignment changes", () => {
+    const history: IssueHistoryEntry[] = [
+      {
+        id: "h1",
+        createdAt: new Date().toISOString(),
+        actor: { name: "admin@test.com", displayName: "Admin" },
+        toAssignee: "Developer",
+      },
+    ];
+    const output = formatHistoryHuman(history);
+    expect(output).toContain("Assigned to @Developer");
+  });
+
+  it("shows title changes", () => {
+    const history: IssueHistoryEntry[] = [
+      {
+        id: "h1",
+        createdAt: new Date().toISOString(),
+        actor: { name: "admin@test.com", displayName: "Admin" },
+        fromTitle: "Old title",
+        toTitle: "New title",
+      },
+    ];
+    const output = formatHistoryHuman(history);
+    expect(output).toContain('Title changed: "Old title" → "New title"');
+  });
+
+  it("shows (no meaningful changes recorded) for entries with no tracked changes", () => {
+    const history: IssueHistoryEntry[] = [
+      {
+        id: "h1",
+        createdAt: new Date().toISOString(),
+        actor: { name: "admin@test.com", displayName: "Admin" },
+        // No actual changes tracked
+      },
+    ];
+    const output = formatHistoryHuman(history);
+    expect(output).toContain("(no meaningful changes recorded)");
   });
 });

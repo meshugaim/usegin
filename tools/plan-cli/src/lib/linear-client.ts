@@ -1,5 +1,5 @@
 import { LinearClient as LinearSDK } from "@linear/sdk";
-import type { PlanIssue, PlanIssueDetail, PlanComment, ListOptions } from "../types";
+import type { PlanIssue, PlanIssueDetail, PlanComment, ListOptions, IssueHistoryEntry } from "../types";
 import {
   getCachedTeam,
   setCachedTeam,
@@ -1147,5 +1147,100 @@ export class LinearClient {
           }
         : undefined,
     }));
+  }
+
+  /**
+   * Get history entries for an issue
+   */
+  async getIssueHistory(identifier: string, limit: number = 20): Promise<IssueHistoryEntry[]> {
+    const query = `
+      query GetIssueHistory($id: String!, $first: Int!) {
+        issue(id: $id) {
+          history(first: $first) {
+            nodes {
+              id
+              createdAt
+              actor { name displayName }
+              fromTitle
+              toTitle
+              fromState { name }
+              toState { name }
+              fromAssignee { name displayName }
+              toAssignee { name displayName }
+              fromPriority
+              toPriority
+              fromEstimate
+              toEstimate
+              fromDueDate
+              toDueDate
+              fromParent { identifier }
+              toParent { identifier }
+              addedLabelIds
+              removedLabelIds
+              archived
+            }
+          }
+        }
+      }
+    `;
+
+    interface GqlHistoryNode {
+      id: string;
+      createdAt: string;
+      actor: { name: string; displayName: string } | null;
+      fromTitle: string | null;
+      toTitle: string | null;
+      fromState: { name: string } | null;
+      toState: { name: string } | null;
+      fromAssignee: { name: string; displayName: string } | null;
+      toAssignee: { name: string; displayName: string } | null;
+      fromPriority: number | null;
+      toPriority: number | null;
+      fromEstimate: number | null;
+      toEstimate: number | null;
+      fromDueDate: string | null;
+      toDueDate: string | null;
+      fromParent: { identifier: string } | null;
+      toParent: { identifier: string } | null;
+      addedLabelIds: string[] | null;
+      removedLabelIds: string[] | null;
+      archived: boolean | null;
+    }
+
+    try {
+      const data = await this.graphql<{
+        issue: { history: { nodes: GqlHistoryNode[] } } | null;
+      }>(query, { id: identifier, first: limit });
+
+      if (!data.issue) return [];
+
+      return data.issue.history.nodes.map((node) => ({
+        id: node.id,
+        createdAt: node.createdAt,
+        actor: node.actor ?? undefined,
+        fromTitle: node.fromTitle ?? undefined,
+        toTitle: node.toTitle ?? undefined,
+        fromState: node.fromState?.name,
+        toState: node.toState?.name,
+        fromAssignee: node.fromAssignee?.displayName ?? node.fromAssignee?.name,
+        toAssignee: node.toAssignee?.displayName ?? node.toAssignee?.name,
+        fromPriority: node.fromPriority ?? undefined,
+        toPriority: node.toPriority ?? undefined,
+        fromEstimate: node.fromEstimate ?? undefined,
+        toEstimate: node.toEstimate ?? undefined,
+        fromDueDate: node.fromDueDate ?? undefined,
+        toDueDate: node.toDueDate ?? undefined,
+        fromParent: node.fromParent?.identifier,
+        toParent: node.toParent?.identifier,
+        addedLabelIds: node.addedLabelIds ?? undefined,
+        removedLabelIds: node.removedLabelIds ?? undefined,
+        archived: node.archived ?? undefined,
+      }));
+    } catch (error) {
+      if (process.env.DEBUG) {
+        console.error("getIssueHistory error:", error);
+      }
+      return [];
+    }
   }
 }

@@ -1,9 +1,10 @@
 import { Command } from "commander";
 import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
-import { formatShowHuman, formatShowJson } from "../lib/output";
+import { formatShowHuman, formatShowJson, formatHistoryHuman } from "../lib/output";
 import { printApiStats } from "../lib/stats";
 import { normalizeIssueId } from "../lib/identifier";
+import { colors } from "../lib/colors";
 
 export function createShowCommand(): Command {
   const cmd = new Command("show")
@@ -12,6 +13,7 @@ export function createShowCommand(): Command {
     .option("--json", "Output as JSON")
     .option("--web", "Open issue in web browser")
     .option("--comments", "Include comments in the output")
+    .option("--with-history", "Include change history")
     .option("--stats", "Show API call statistics")
     .action(async (identifier: string, opts) => {
       await runShow(normalizeIssueId(identifier), opts);
@@ -22,7 +24,7 @@ export function createShowCommand(): Command {
 
 async function runShow(
   identifier: string,
-  opts: { json?: boolean; web?: boolean; comments?: boolean; stats?: boolean }
+  opts: { json?: boolean; web?: boolean; comments?: boolean; withHistory?: boolean; stats?: boolean }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -52,10 +54,22 @@ async function runShow(
       await $`${openCmd} ${issue.url}`.quiet();
     }
 
+    // Fetch history if requested
+    const history = opts.withHistory
+      ? await client.getIssueHistory(identifier)
+      : undefined;
+
     if (opts.json) {
-      console.log(formatShowJson(issue));
+      console.log(formatShowJson(issue, history));
     } else {
       console.log(formatShowHuman(issue));
+
+      // Print history section if requested
+      if (opts.withHistory && history) {
+        console.log("");
+        console.log(colors.fieldName("History:"));
+        console.log(formatHistoryHuman(history));
+      }
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);

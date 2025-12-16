@@ -66,3 +66,41 @@ export interface PlanIssueDetail extends PlanIssue {
   blocks: Array<{ id: string; identifier: string; title: string }>;
   comments?: PlanComment[];
 }
+
+/**
+ * A single history entry for an issue
+ */
+export interface IssueHistoryEntry {
+  id: string;
+  createdAt: string;
+  actor?: {
+    name: string;
+    displayName: string;
+  };
+  // State changes
+  fromState?: string;
+  toState?: string;
+  // Assignment changes
+  fromAssignee?: string;
+  toAssignee?: string;
+  // Title changes
+  fromTitle?: string;
+  toTitle?: string;
+  // Priority changes
+  fromPriority?: number;
+  toPriority?: number;
+  // Estimate changes
+  fromEstimate?: number;
+  toEstimate?: number;
+  // Due date changes
+  fromDueDate?: string;
+  toDueDate?: string;
+  // Parent changes
+  fromParent?: string;
+  toParent?: string;
+  // Label changes
+  addedLabelIds?: string[];
+  removedLabelIds?: string[];
+  // Archive state
+  archived?: boolean;
+}
