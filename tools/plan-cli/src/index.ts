@@ -16,10 +16,22 @@ import { createPromoteCommand } from "./commands/promote";
 import { createAlignCommand } from "./commands/align";
 import { createDocsCommand, getDocsHelpText } from "./commands/docs";
 
+// Help text explaining short ID support
+function getShortIdHelpText(): string {
+  const lines = [
+    "",
+    "Issue IDs:",
+    "  Short IDs are supported: `plan show 365` expands to `plan show ENG-365`",
+    "  Set PLAN_TEAM env var to change the default team prefix (default: ENG)",
+  ];
+  return lines.join("\n");
+}
+
 const program = new Command()
   .name("plan")
   .description("Linear-backed task management CLI")
   .version("0.1.0")
+  .addHelpText("afterAll", getShortIdHelpText)
   .addHelpText("afterAll", getDocsHelpText);
 
 // Add commands
