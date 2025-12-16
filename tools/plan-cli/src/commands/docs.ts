@@ -94,11 +94,30 @@ function loadDocs(internal = false): Doc[] {
 }
 
 // Load all docs (user + internal)
-function loadAllDocs(): { user: Doc[]; internal: Doc[] } {
+export function loadAllDocs(): { user: Doc[]; internal: Doc[] } {
   return {
     user: loadDocsFromDir(getDocsDir(false)),
     internal: loadDocsFromDir(getDocsDir(true)),
   };
+}
+
+// Generate compact docs summary for --help output
+export function getDocsHelpText(): string {
+  const { user, internal } = loadAllDocs();
+  const allDocs = [...user, ...internal];
+
+  if (allDocs.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = ["", "Embedded Docs:"];
+  for (const doc of allDocs) {
+    lines.push(`  ${doc.meta.handle.padEnd(28)} ${doc.meta.name}`);
+  }
+  lines.push("");
+  lines.push("Use: plan docs show <handle>");
+
+  return lines.join("\n");
 }
 
 // Format docs list output (2-line format)

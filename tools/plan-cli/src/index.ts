@@ -14,12 +14,13 @@ import { createStartCommand } from "./commands/start";
 import { createCloseCommand } from "./commands/close";
 import { createPromoteCommand } from "./commands/promote";
 import { createAlignCommand } from "./commands/align";
-import { createDocsCommand } from "./commands/docs";
+import { createDocsCommand, getDocsHelpText } from "./commands/docs";
 
 const program = new Command()
   .name("plan")
   .description("Linear-backed task management CLI")
-  .version("0.1.0");
+  .version("0.1.0")
+  .addHelpText("afterAll", getDocsHelpText);
 
 // Add commands
 program.addCommand(createListCommand());
