@@ -44,7 +44,6 @@ export function EntityTables() {
 
 function UsersTable() {
   const users = useSimulatorStore(s => s.users)
-  const workspaces = useSimulatorStore(s => s.workspaces)
 
   if (users.length === 0) {
     return <EmptyState message="No users yet" />
@@ -55,25 +54,18 @@ function UsersTable() {
       <thead className="bg-gray-50 sticky top-0">
         <tr>
           <th className="text-left p-2 font-medium">Email</th>
-          <th className="text-left p-2 font-medium">Tier</th>
-          <th className="text-left p-2 font-medium">Private WS</th>
+          <th className="text-left p-2 font-medium">Created</th>
         </tr>
       </thead>
       <tbody>
-        {users.map(user => {
-          const privateWs = workspaces.find(w => w.id === user.privateWorkspaceId)
-          return (
-            <tr key={user.id} className="border-t hover:bg-gray-50">
-              <td className="p-2 font-mono">{user.email}</td>
-              <td className="p-2">
-                <TierBadge tier={user.tier} />
-              </td>
-              <td className="p-2 text-gray-500 truncate max-w-[100px]" title={privateWs?.name}>
-                {privateWs?.name}
-              </td>
-            </tr>
-          )
-        })}
+        {users.map(user => (
+          <tr key={user.id} className="border-t hover:bg-gray-50">
+            <td className="p-2 font-mono">{user.email}</td>
+            <td className="p-2 text-gray-500">
+              {user.createdAt.toLocaleDateString()}
+            </td>
+          </tr>
+        ))}
       </tbody>
     </table>
   )
@@ -81,7 +73,6 @@ function UsersTable() {
 
 function WorkspacesTable() {
   const workspaces = useSimulatorStore(s => s.workspaces)
-  const users = useSimulatorStore(s => s.users)
   const projects = useSimulatorStore(s => s.projects)
   const workspaceMembers = useSimulatorStore(s => s.workspaceMembers)
 
@@ -94,7 +85,7 @@ function WorkspacesTable() {
       <thead className="bg-gray-50 sticky top-0">
         <tr>
           <th className="text-left p-2 font-medium">Name</th>
-          <th className="text-left p-2 font-medium">Type</th>
+          <th className="text-left p-2 font-medium">Tier</th>
           <th className="text-left p-2 font-medium">Projects</th>
           <th className="text-left p-2 font-medium">Members</th>
         </tr>
@@ -102,28 +93,19 @@ function WorkspacesTable() {
       <tbody>
         {workspaces.map(ws => {
           const projectCount = projects.filter(p => p.workspaceId === ws.id).length
-          const memberCount = ws.type === 'private'
-            ? 1
-            : workspaceMembers.filter(wm => wm.workspaceId === ws.id).length
-          const owner = ws.type === 'private'
-            ? users.find(u => u.id === ws.ownerUserId)
-            : null
+          const memberCount = workspaceMembers.filter(wm => wm.workspaceId === ws.id).length
 
           return (
             <tr key={ws.id} className="border-t hover:bg-gray-50">
               <td className="p-2 truncate max-w-[120px]" title={ws.name}>{ws.name}</td>
               <td className="p-2">
-                <TypeBadge type={ws.type} plan={ws.plan} />
+                <TierBadge tier={ws.tier} />
               </td>
               <td className="p-2">
                 {projectCount}/{ws.limits.maxProjects}
               </td>
               <td className="p-2">
-                {ws.type === 'private' ? (
-                  <span className="text-gray-500" title={owner?.email}>{owner?.email?.split('@')[0]}</span>
-                ) : (
-                  memberCount
-                )}
+                {memberCount}/{ws.limits.maxMembers}
               </td>
             </tr>
           )
@@ -149,7 +131,6 @@ function WorkspaceMembersTable() {
           <th className="text-left p-2 font-medium">Workspace</th>
           <th className="text-left p-2 font-medium">User</th>
           <th className="text-left p-2 font-medium">Role</th>
-          <th className="text-left p-2 font-medium">Create?</th>
         </tr>
       </thead>
       <tbody>
@@ -166,9 +147,6 @@ function WorkspaceMembersTable() {
               </td>
               <td className="p-2">
                 <RoleBadge role={wm.role} />
-              </td>
-              <td className="p-2">
-                {wm.canCreateProjects ? '✓' : '—'}
               </td>
             </tr>
           )
@@ -193,6 +171,7 @@ function ProjectsTable() {
         <tr>
           <th className="text-left p-2 font-medium">Name</th>
           <th className="text-left p-2 font-medium">Workspace</th>
+          <th className="text-left p-2 font-medium">Public</th>
           <th className="text-left p-2 font-medium">Collaborators</th>
         </tr>
       </thead>
@@ -205,6 +184,13 @@ function ProjectsTable() {
               <td className="p-2 truncate max-w-[100px]" title={proj.name}>{proj.name}</td>
               <td className="p-2 truncate max-w-[80px]" title={workspace?.name}>
                 {workspace?.name}
+              </td>
+              <td className="p-2">
+                {proj.isPublic ? (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">public</span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">private</span>
+                )}
               </td>
               <td className="p-2">
                 {collabCount}/{workspace?.limits.maxCollaboratorsPerProject}
@@ -268,26 +254,6 @@ function TierBadge({ tier }: { tier: string }) {
   return (
     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${colors[tier as keyof typeof colors] ?? colors.free}`}>
       {tier}
-    </span>
-  )
-}
-
-function TypeBadge({ type, plan }: { type: string; plan?: string }) {
-  if (type === 'private') {
-    return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">
-        private
-      </span>
-    )
-  }
-  const colors = {
-    team: 'bg-green-100 text-green-700',
-    business: 'bg-orange-100 text-orange-700',
-    enterprise: 'bg-purple-100 text-purple-700',
-  }
-  return (
-    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${colors[plan as keyof typeof colors] ?? colors.team}`}>
-      {plan}
     </span>
   )
 }

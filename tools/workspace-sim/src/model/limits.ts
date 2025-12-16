@@ -1,54 +1,31 @@
-import type { UserTier, WorkspacePlan, WorkspaceLimits } from './types'
+import type { WorkspaceTier, WorkspaceLimits } from './types'
 
-// Limits for private workspaces based on user tier
-export const PRIVATE_WORKSPACE_LIMITS: Record<UserTier, WorkspaceLimits> = {
+// Limits for workspaces based on tier
+export const WORKSPACE_LIMITS: Record<WorkspaceTier, WorkspaceLimits> = {
   free: {
-    maxProjects: 1,
-    maxCollaboratorsPerProject: 3,
+    maxProjects: 3,
+    maxMembers: 5,
+    maxCollaboratorsPerProject: 5,
     storageGb: 1,
+    canHavePublicProjects: false,
   },
   pro: {
-    maxProjects: 10,
-    maxCollaboratorsPerProject: 100, // effectively unlimited
+    maxProjects: 20,
+    maxMembers: 50,
+    maxCollaboratorsPerProject: 50,
     storageGb: 50,
+    canHavePublicProjects: true,
   },
   enterprise: {
     maxProjects: 1000, // effectively unlimited
-    maxCollaboratorsPerProject: 1000,
+    maxMembers: 1000,
+    maxCollaboratorsPerProject: 500,
     storageGb: 500,
+    canHavePublicProjects: true,
   },
 }
 
-// Limits for group workspaces based on plan
-export const GROUP_WORKSPACE_LIMITS: Record<WorkspacePlan, WorkspaceLimits> = {
-  team: {
-    maxProjects: 20,
-    maxCollaboratorsPerProject: 50,
-    storageGb: 100,
-  },
-  business: {
-    maxProjects: 100,
-    maxCollaboratorsPerProject: 200,
-    storageGb: 500,
-  },
-  enterprise: {
-    maxProjects: 1000,
-    maxCollaboratorsPerProject: 1000,
-    storageGb: 2000,
-  },
-}
-
-// Check if user tier allows creating group workspaces
-export function canCreateGroupWorkspace(tier: UserTier): boolean {
-  return tier === 'pro' || tier === 'enterprise'
-}
-
-// Get limits for a private workspace
-export function getPrivateLimits(tier: UserTier): WorkspaceLimits {
-  return PRIVATE_WORKSPACE_LIMITS[tier]
-}
-
-// Get limits for a group workspace
-export function getGroupLimits(plan: WorkspacePlan): WorkspaceLimits {
-  return GROUP_WORKSPACE_LIMITS[plan]
+// Get limits for a workspace tier
+export function getWorkspaceLimits(tier: WorkspaceTier): WorkspaceLimits {
+  return WORKSPACE_LIMITS[tier]
 }

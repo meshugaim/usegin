@@ -1,20 +1,21 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useSimulatorStore } from '../model/store'
-import type { UserTier, WorkspaceRole, ProjectRole, WorkspacePlan } from '../model/types'
+import type { WorkspaceTier, WorkspaceRole, ProjectRole } from '../model/types'
 
 type ActionType =
   | 'registerUser'
-  | 'upgradeTier'
   | 'deleteUser'
-  | 'createGroupWorkspace'
+  | 'createWorkspace'
+  | 'upgradeWorkspaceTier'
   | 'inviteToWorkspace'
   | 'removeFromWorkspace'
+  | 'deleteWorkspace'
   | 'createProject'
+  | 'setProjectPublic'
   | 'inviteToProject'
   | 'removeFromProject'
   | 'changeProjectRole'
   | 'deleteProject'
-  | 'deleteWorkspace'
 
 interface ActionConfig {
   label: string
@@ -23,13 +24,14 @@ interface ActionConfig {
 
 const ACTIONS: Record<ActionType, ActionConfig> = {
   registerUser: { label: 'Register User', category: 'user' },
-  upgradeTier: { label: 'Upgrade Tier', category: 'user' },
   deleteUser: { label: 'Delete User', category: 'user' },
-  createGroupWorkspace: { label: 'Create Group Workspace', category: 'workspace' },
+  createWorkspace: { label: 'Create Workspace', category: 'workspace' },
+  upgradeWorkspaceTier: { label: 'Upgrade Workspace', category: 'workspace' },
   inviteToWorkspace: { label: 'Invite to Workspace', category: 'workspace' },
   removeFromWorkspace: { label: 'Remove from Workspace', category: 'workspace' },
   deleteWorkspace: { label: 'Delete Workspace', category: 'workspace' },
   createProject: { label: 'Create Project', category: 'project' },
+  setProjectPublic: { label: 'Set Public/Private', category: 'project' },
   inviteToProject: { label: 'Invite to Project', category: 'project' },
   removeFromProject: { label: 'Remove from Project', category: 'project' },
   changeProjectRole: { label: 'Change Project Role', category: 'project' },
@@ -55,12 +57,12 @@ export function ActionPanel() {
     switch (selectedAction) {
       case 'registerUser':
         return <RegisterUserForm onResult={handleResult} />
-      case 'upgradeTier':
-        return <UpgradeTierForm onResult={handleResult} users={store.users} />
       case 'deleteUser':
         return <DeleteUserForm onResult={handleResult} users={store.users} />
-      case 'createGroupWorkspace':
-        return <CreateGroupWorkspaceForm onResult={handleResult} users={store.users} />
+      case 'createWorkspace':
+        return <CreateWorkspaceForm onResult={handleResult} users={store.users} />
+      case 'upgradeWorkspaceTier':
+        return <UpgradeWorkspaceTierForm onResult={handleResult} />
       case 'inviteToWorkspace':
         return <InviteToWorkspaceForm onResult={handleResult} />
       case 'removeFromWorkspace':
@@ -69,6 +71,8 @@ export function ActionPanel() {
         return <DeleteWorkspaceForm onResult={handleResult} />
       case 'createProject':
         return <CreateProjectForm onResult={handleResult} />
+      case 'setProjectPublic':
+        return <SetProjectPublicForm onResult={handleResult} />
       case 'inviteToProject':
         return <InviteToProjectForm onResult={handleResult} />
       case 'removeFromProject':
@@ -144,7 +148,7 @@ function RegisterUserForm({ onResult }: FormProps) {
     e.preventDefault()
     if (!email) return
     const res = registerUser(email)
-    onResult(res, `User ${email} registered`)
+    onResult(res, `User ${email} registered with free workspace`)
     if (res.success) setEmail('')
   }
 
@@ -159,47 +163,6 @@ function RegisterUserForm({ onResult }: FormProps) {
       />
       <button type="submit" className="w-full px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
         Register
-      </button>
-    </form>
-  )
-}
-
-function UpgradeTierForm({ onResult, users }: FormProps & { users: { id: string; email: string; tier: string }[] }) {
-  const [userId, setUserId] = useState('')
-  const [tier, setTier] = useState<UserTier>('pro')
-  const upgradeTier = useSimulatorStore(s => s.upgradeTier)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!userId) return
-    const res = upgradeTier(userId, tier)
-    const user = users.find(u => u.id === userId)
-    onResult(res, `${user?.email} upgraded to ${tier}`)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-2">
-      <select
-        value={userId}
-        onChange={e => setUserId(e.target.value)}
-        className="w-full px-2 py-1 text-sm border rounded"
-      >
-        <option value="">Select user...</option>
-        {users.map(u => (
-          <option key={u.id} value={u.id}>{u.email} ({u.tier})</option>
-        ))}
-      </select>
-      <select
-        value={tier}
-        onChange={e => setTier(e.target.value as UserTier)}
-        className="w-full px-2 py-1 text-sm border rounded"
-      >
-        <option value="free">Free</option>
-        <option value="pro">Pro</option>
-        <option value="enterprise">Enterprise</option>
-      </select>
-      <button type="submit" className="w-full px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-        Upgrade
       </button>
     </form>
   )
@@ -237,16 +200,16 @@ function DeleteUserForm({ onResult, users }: FormProps & { users: { id: string; 
   )
 }
 
-function CreateGroupWorkspaceForm({ onResult, users }: FormProps & { users: { id: string; email: string; tier: string }[] }) {
+function CreateWorkspaceForm({ onResult, users }: FormProps & { users: { id: string; email: string }[] }) {
   const [ownerId, setOwnerId] = useState('')
   const [name, setName] = useState('')
-  const [plan, setPlan] = useState<WorkspacePlan>('team')
-  const createGroupWorkspace = useSimulatorStore(s => s.createGroupWorkspace)
+  const [tier, setTier] = useState<WorkspaceTier>('free')
+  const createWorkspace = useSimulatorStore(s => s.createWorkspace)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!ownerId || !name) return
-    const res = createGroupWorkspace(ownerId, name, plan)
+    const res = createWorkspace(ownerId, name, tier)
     onResult(res, `Workspace "${name}" created`)
     if (res.success) setName('')
   }
@@ -260,7 +223,7 @@ function CreateGroupWorkspaceForm({ onResult, users }: FormProps & { users: { id
       >
         <option value="">Select owner...</option>
         {users.map(u => (
-          <option key={u.id} value={u.id}>{u.email} ({u.tier})</option>
+          <option key={u.id} value={u.id}>{u.email}</option>
         ))}
       </select>
       <input
@@ -271,16 +234,58 @@ function CreateGroupWorkspaceForm({ onResult, users }: FormProps & { users: { id
         className="w-full px-2 py-1 text-sm border rounded"
       />
       <select
-        value={plan}
-        onChange={e => setPlan(e.target.value as WorkspacePlan)}
+        value={tier}
+        onChange={e => setTier(e.target.value as WorkspaceTier)}
         className="w-full px-2 py-1 text-sm border rounded"
       >
-        <option value="team">Team</option>
-        <option value="business">Business</option>
+        <option value="free">Free</option>
+        <option value="pro">Pro</option>
         <option value="enterprise">Enterprise</option>
       </select>
       <button type="submit" className="w-full px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
         Create Workspace
+      </button>
+    </form>
+  )
+}
+
+function UpgradeWorkspaceTierForm({ onResult }: FormProps) {
+  const [workspaceId, setWorkspaceId] = useState('')
+  const [tier, setTier] = useState<WorkspaceTier>('pro')
+  const workspaces = useSimulatorStore(s => s.workspaces)
+  const upgradeWorkspaceTier = useSimulatorStore(s => s.upgradeWorkspaceTier)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!workspaceId) return
+    const ws = workspaces.find(w => w.id === workspaceId)
+    const res = upgradeWorkspaceTier(workspaceId, tier)
+    onResult(res, `${ws?.name} upgraded to ${tier}`)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <select
+        value={workspaceId}
+        onChange={e => setWorkspaceId(e.target.value)}
+        className="w-full px-2 py-1 text-sm border rounded"
+      >
+        <option value="">Select workspace...</option>
+        {workspaces.map(w => (
+          <option key={w.id} value={w.id}>{w.name} ({w.tier})</option>
+        ))}
+      </select>
+      <select
+        value={tier}
+        onChange={e => setTier(e.target.value as WorkspaceTier)}
+        className="w-full px-2 py-1 text-sm border rounded"
+      >
+        <option value="free">Free</option>
+        <option value="pro">Pro</option>
+        <option value="enterprise">Enterprise</option>
+      </select>
+      <button type="submit" className="w-full px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+        Upgrade
       </button>
     </form>
   )
@@ -292,12 +297,10 @@ function InviteToWorkspaceForm({ onResult }: FormProps) {
   const [role, setRole] = useState<WorkspaceRole>('member')
   const [inviterId, setInviterId] = useState('')
 
-  const allWorkspaces = useSimulatorStore(s => s.workspaces)
+  const workspaces = useSimulatorStore(s => s.workspaces)
   const workspaceMembers = useSimulatorStore(s => s.workspaceMembers)
   const users = useSimulatorStore(s => s.users)
   const inviteToWorkspace = useSimulatorStore(s => s.inviteToWorkspace)
-
-  const workspaces = useMemo(() => allWorkspaces.filter(w => w.type === 'group'), [allWorkspaces])
 
   const owners = workspaceId
     ? workspaceMembers
@@ -362,12 +365,10 @@ function RemoveFromWorkspaceForm({ onResult }: FormProps) {
   const [workspaceId, setWorkspaceId] = useState('')
   const [userId, setUserId] = useState('')
 
-  const allWorkspaces = useSimulatorStore(s => s.workspaces)
+  const workspaces = useSimulatorStore(s => s.workspaces)
   const workspaceMembers = useSimulatorStore(s => s.workspaceMembers)
   const users = useSimulatorStore(s => s.users)
   const removeFromWorkspace = useSimulatorStore(s => s.removeFromWorkspace)
-
-  const workspaces = useMemo(() => allWorkspaces.filter(w => w.type === 'group'), [allWorkspaces])
 
   const members = workspaceId
     ? workspaceMembers
@@ -416,16 +417,14 @@ function RemoveFromWorkspaceForm({ onResult }: FormProps) {
 
 function DeleteWorkspaceForm({ onResult }: FormProps) {
   const [workspaceId, setWorkspaceId] = useState('')
-  const allWorkspaces = useSimulatorStore(s => s.workspaces)
-  const deleteGroupWorkspace = useSimulatorStore(s => s.deleteGroupWorkspace)
-
-  const workspaces = useMemo(() => allWorkspaces.filter(w => w.type === 'group'), [allWorkspaces])
+  const workspaces = useSimulatorStore(s => s.workspaces)
+  const deleteWorkspace = useSimulatorStore(s => s.deleteWorkspace)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!workspaceId) return
     const ws = workspaces.find(w => w.id === workspaceId)
-    const res = deleteGroupWorkspace(workspaceId)
+    const res = deleteWorkspace(workspaceId)
     onResult(res, `Workspace "${ws?.name}" deleted`)
     if (res.success) setWorkspaceId('')
   }
@@ -459,14 +458,12 @@ function CreateProjectForm({ onResult }: FormProps) {
   const users = useSimulatorStore(s => s.users)
   const createProject = useSimulatorStore(s => s.createProject)
 
-  const selectedWs = workspaces.find(w => w.id === workspaceId)
+  // Only workspace owners can create projects
   const eligibleCreators = workspaceId
-    ? selectedWs?.type === 'private'
-      ? users.filter(u => u.privateWorkspaceId === workspaceId)
-      : workspaceMembers
-          .filter(wm => wm.workspaceId === workspaceId && (wm.role === 'owner' || wm.canCreateProjects))
-          .map(wm => users.find(u => u.id === wm.userId))
-          .filter(Boolean)
+    ? workspaceMembers
+        .filter(wm => wm.workspaceId === workspaceId && wm.role === 'owner')
+        .map(wm => users.find(u => u.id === wm.userId))
+        .filter(Boolean)
     : []
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -486,7 +483,7 @@ function CreateProjectForm({ onResult }: FormProps) {
       >
         <option value="">Select workspace...</option>
         {workspaces.map(w => (
-          <option key={w.id} value={w.id}>{w.name} ({w.type})</option>
+          <option key={w.id} value={w.id}>{w.name} ({w.tier})</option>
         ))}
       </select>
       <select
@@ -494,7 +491,7 @@ function CreateProjectForm({ onResult }: FormProps) {
         onChange={e => setCreatorId(e.target.value)}
         className="w-full px-2 py-1 text-sm border rounded"
       >
-        <option value="">Select creator...</option>
+        <option value="">Select creator (owner)...</option>
         {eligibleCreators.map(u => u && (
           <option key={u.id} value={u.id}>{u.email}</option>
         ))}
@@ -508,6 +505,78 @@ function CreateProjectForm({ onResult }: FormProps) {
       />
       <button type="submit" className="w-full px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
         Create Project
+      </button>
+    </form>
+  )
+}
+
+function SetProjectPublicForm({ onResult }: FormProps) {
+  const [projectId, setProjectId] = useState('')
+  const [isPublic, setIsPublic] = useState(true)
+  const [actorId, setActorId] = useState('')
+
+  const projects = useSimulatorStore(s => s.projects)
+  const workspaces = useSimulatorStore(s => s.workspaces)
+  const workspaceMembers = useSimulatorStore(s => s.workspaceMembers)
+  const users = useSimulatorStore(s => s.users)
+  const setProjectPublic = useSimulatorStore(s => s.setProjectPublic)
+
+  const selectedProject = projects.find(p => p.id === projectId)
+  const workspaceId = selectedProject?.workspaceId
+
+  // Only workspace owners can set public
+  const eligibleActors = workspaceId
+    ? workspaceMembers
+        .filter(wm => wm.workspaceId === workspaceId && wm.role === 'owner')
+        .map(wm => users.find(u => u.id === wm.userId))
+        .filter(Boolean)
+    : []
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!projectId || !actorId) return
+    const res = setProjectPublic(projectId, isPublic, actorId)
+    const proj = projects.find(p => p.id === projectId)
+    onResult(res, `${proj?.name} set to ${isPublic ? 'public' : 'private'}`)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <select
+        value={projectId}
+        onChange={e => { setProjectId(e.target.value); setActorId('') }}
+        className="w-full px-2 py-1 text-sm border rounded"
+      >
+        <option value="">Select project...</option>
+        {projects.map(p => {
+          const ws = workspaces.find(w => w.id === p.workspaceId)
+          return (
+            <option key={p.id} value={p.id}>
+              {p.name} ({p.isPublic ? 'public' : 'private'}) - {ws?.name}
+            </option>
+          )
+        })}
+      </select>
+      <select
+        value={actorId}
+        onChange={e => setActorId(e.target.value)}
+        className="w-full px-2 py-1 text-sm border rounded"
+      >
+        <option value="">Actor (workspace owner)...</option>
+        {eligibleActors.map(u => u && (
+          <option key={u.id} value={u.id}>{u.email}</option>
+        ))}
+      </select>
+      <select
+        value={isPublic ? 'public' : 'private'}
+        onChange={e => setIsPublic(e.target.value === 'public')}
+        className="w-full px-2 py-1 text-sm border rounded"
+      >
+        <option value="public">Public</option>
+        <option value="private">Private</option>
+      </select>
+      <button type="submit" className="w-full px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+        Set Visibility
       </button>
     </form>
   )

@@ -1,11 +1,5 @@
-// Tier levels for users
-export type UserTier = 'free' | 'pro' | 'enterprise'
-
-// Plan levels for group workspaces
-export type WorkspacePlan = 'team' | 'business' | 'enterprise'
-
-// Workspace types
-export type WorkspaceType = 'private' | 'group'
+// Workspace tiers (billing attached to workspaces, not users)
+export type WorkspaceTier = 'free' | 'pro' | 'enterprise'
 
 // Roles
 export type WorkspaceRole = 'owner' | 'member'
@@ -15,24 +9,21 @@ export type ProjectRole = 'owner' | 'internal' | 'external'
 export interface User {
   id: string
   email: string
-  tier: UserTier
-  privateWorkspaceId: string
   createdAt: Date
 }
 
 export interface WorkspaceLimits {
   maxProjects: number
+  maxMembers: number
   maxCollaboratorsPerProject: number
   storageGb: number
+  canHavePublicProjects: boolean
 }
 
 export interface Workspace {
   id: string
   name: string
-  type: WorkspaceType
-  ownerUserId?: string // for private workspaces
-  plan?: WorkspacePlan // for group workspaces
-  billingContactId?: string // for group workspaces
+  tier: WorkspaceTier
   limits: WorkspaceLimits
   createdAt: Date
 }
@@ -42,7 +33,6 @@ export interface WorkspaceMember {
   workspaceId: string
   userId: string
   role: WorkspaceRole
-  canCreateProjects: boolean
   invitedBy?: string
   joinedAt: Date
 }
@@ -52,6 +42,7 @@ export interface Project {
   workspaceId: string
   name: string
   description?: string
+  isPublic: boolean // visible to all workspace members
   createdAt: Date
 }
 

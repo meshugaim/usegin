@@ -8,12 +8,11 @@ import type {
   ProjectMember,
   EventLogEntry,
   ActionResult,
-  UserTier,
+  WorkspaceTier,
   WorkspaceRole,
   ProjectRole,
-  WorkspacePlan,
 } from './types'
-import { getPrivateLimits, getGroupLimits, canCreateGroupWorkspace } from './limits'
+import { getWorkspaceLimits } from './limits'
 
 // Generate unique IDs
 let idCounter = 0
@@ -32,19 +31,18 @@ interface SimulatorState {
 
   // Actions - Users
   registerUser: (email: string) => ActionResult<User>
-  upgradeTier: (userId: string, newTier: UserTier) => ActionResult
   deleteUser: (userId: string) => ActionResult
 
   // Actions - Workspaces
-  createGroupWorkspace: (ownerUserId: string, name: string, plan?: WorkspacePlan) => ActionResult<Workspace>
+  createWorkspace: (ownerUserId: string, name: string, tier?: WorkspaceTier) => ActionResult<Workspace>
+  upgradeWorkspaceTier: (workspaceId: string, newTier: WorkspaceTier) => ActionResult
   inviteToWorkspace: (workspaceId: string, email: string, role: WorkspaceRole, inviterId: string) => ActionResult<WorkspaceMember>
   removeFromWorkspace: (workspaceId: string, userId: string) => ActionResult
-  setMemberCanCreateProjects: (workspaceId: string, userId: string, canCreate: boolean) => ActionResult
-  transferBillingContact: (workspaceId: string, newContactId: string) => ActionResult
-  deleteGroupWorkspace: (workspaceId: string) => ActionResult
+  deleteWorkspace: (workspaceId: string) => ActionResult
 
   // Actions - Projects
   createProject: (workspaceId: string, creatorUserId: string, name: string) => ActionResult<Project>
+  setProjectPublic: (projectId: string, isPublic: boolean, actorId: string) => ActionResult
   inviteToProject: (projectId: string, email: string, role: ProjectRole, inviterId: string) => ActionResult<ProjectMember>
   removeFromProject: (projectId: string, userId: string) => ActionResult
   changeProjectRole: (projectId: string, userId: string, newRole: ProjectRole) => ActionResult
@@ -61,6 +59,8 @@ interface SimulatorState {
   getProjectMembers: (projectId: string) => ProjectMember[]
   getUserWorkspaces: (userId: string) => Workspace[]
   getProjectCollaboratorCount: (projectId: string) => number
+  isWorkspaceOwner: (workspaceId: string, userId: string) => boolean
+  isProjectOwner: (projectId: string, userId: string) => boolean
 }
 
 const initialState: {
@@ -113,66 +113,44 @@ export const useSimulatorStore = create<SimulatorState>()(
 
     const userId = generateId('user')
     const workspaceId = generateId('ws')
+    const memberId = generateId('wm')
     const now = new Date()
-
-    // Create private workspace
-    const workspace: Workspace = {
-      id: workspaceId,
-      name: `${email}'s Workspace`,
-      type: 'private',
-      ownerUserId: userId,
-      limits: getPrivateLimits('free'),
-      createdAt: now,
-    }
 
     // Create user
     const user: User = {
       id: userId,
       email,
-      tier: 'free',
-      privateWorkspaceId: workspaceId,
       createdAt: now,
+    }
+
+    // Create free-tier workspace for new user
+    const workspace: Workspace = {
+      id: workspaceId,
+      name: `${email.split('@')[0]}'s Workspace`,
+      tier: 'free',
+      limits: getWorkspaceLimits('free'),
+      createdAt: now,
+    }
+
+    // Make user the owner of their workspace
+    const membership: WorkspaceMember = {
+      id: memberId,
+      workspaceId,
+      userId,
+      role: 'owner',
+      joinedAt: now,
     }
 
     set(s => ({
       users: [...s.users, user],
       workspaces: [...s.workspaces, workspace],
+      workspaceMembers: [...s.workspaceMembers, membership],
     }))
 
     get().logEvent('User registered', email, 'user', userId)
-    get().logEvent('Private workspace created', workspace.name, 'workspace', workspaceId)
+    get().logEvent('Workspace created', `${workspace.name} (free tier)`, 'workspace', workspaceId)
 
     return { success: true, data: user }
-  },
-
-  upgradeTier: (userId: string, newTier: UserTier): ActionResult => {
-    const state = get()
-    const user = state.users.find(u => u.id === userId)
-
-    if (!user) {
-      return { success: false, error: 'User not found' }
-    }
-
-    if (user.tier === newTier) {
-      return { success: false, error: `User is already on ${newTier} tier` }
-    }
-
-    // Update user tier
-    set(s => ({
-      users: s.users.map(u =>
-        u.id === userId ? { ...u, tier: newTier } : u
-      ),
-      // Update private workspace limits
-      workspaces: s.workspaces.map(w =>
-        w.id === user.privateWorkspaceId
-          ? { ...w, limits: getPrivateLimits(newTier) }
-          : w
-      ),
-    }))
-
-    get().logEvent('Tier upgraded', `${user.email}: ${user.tier} → ${newTier}`, 'user', userId)
-
-    return { success: true }
   },
 
   deleteUser: (userId: string): ActionResult => {
@@ -183,7 +161,24 @@ export const useSimulatorStore = create<SimulatorState>()(
       return { success: false, error: 'User not found' }
     }
 
-    // Check if user owns any projects (must transfer first)
+    // Check if user is sole owner of any workspace
+    const ownedWorkspaces = state.workspaceMembers.filter(
+      wm => wm.userId === userId && wm.role === 'owner'
+    )
+    for (const wm of ownedWorkspaces) {
+      const otherOwners = state.workspaceMembers.filter(
+        m => m.workspaceId === wm.workspaceId && m.role === 'owner' && m.userId !== userId
+      )
+      if (otherOwners.length === 0) {
+        const workspace = state.workspaces.find(w => w.id === wm.workspaceId)
+        return {
+          success: false,
+          error: `Cannot delete - user is sole owner of workspace "${workspace?.name}". Transfer ownership first.`
+        }
+      }
+    }
+
+    // Check if user is sole owner of any project
     const ownedProjects = state.projectMembers.filter(
       pm => pm.userId === userId && pm.role === 'owner'
     )
@@ -195,66 +190,31 @@ export const useSimulatorStore = create<SimulatorState>()(
         const project = state.projects.find(p => p.id === pm.projectId)
         return {
           success: false,
-          error: `Cannot delete - user is sole owner of project "${project?.name}"`
+          error: `Cannot delete - user is sole owner of project "${project?.name}". Transfer ownership first.`
         }
       }
     }
 
-    // Check if user is sole owner of any group workspace
-    const ownedWorkspaces = state.workspaceMembers.filter(
-      wm => wm.userId === userId && wm.role === 'owner'
-    )
-    for (const wm of ownedWorkspaces) {
-      const workspace = state.workspaces.find(w => w.id === wm.workspaceId)
-      if (workspace?.type === 'group') {
-        const otherOwners = state.workspaceMembers.filter(
-          m => m.workspaceId === wm.workspaceId && m.role === 'owner' && m.userId !== userId
-        )
-        if (otherOwners.length === 0) {
-          return {
-            success: false,
-            error: `Cannot delete - user is sole owner of workspace "${workspace.name}"`
-          }
-        }
-      }
-    }
-
-    // Delete user's private workspace and its projects
-    const privateWorkspace = state.workspaces.find(w => w.id === user.privateWorkspaceId)
-    const privateProjectIds = state.projects
-      .filter(p => p.workspaceId === user.privateWorkspaceId)
-      .map(p => p.id)
-
+    // Remove user from all memberships
     set(s => ({
       users: s.users.filter(u => u.id !== userId),
-      workspaces: s.workspaces.filter(w => w.id !== user.privateWorkspaceId),
       workspaceMembers: s.workspaceMembers.filter(wm => wm.userId !== userId),
-      projects: s.projects.filter(p => !privateProjectIds.includes(p.id)),
-      projectMembers: s.projectMembers.filter(
-        pm => !privateProjectIds.includes(pm.projectId) && pm.userId !== userId
-      ),
+      projectMembers: s.projectMembers.filter(pm => pm.userId !== userId),
     }))
 
     get().logEvent('User deleted', user.email, 'user', userId)
-    if (privateWorkspace) {
-      get().logEvent('Private workspace deleted', privateWorkspace.name, 'workspace', privateWorkspace.id)
-    }
 
     return { success: true }
   },
 
   // === WORKSPACE ACTIONS ===
 
-  createGroupWorkspace: (ownerUserId: string, name: string, plan: WorkspacePlan = 'team'): ActionResult<Workspace> => {
+  createWorkspace: (ownerUserId: string, name: string, tier: WorkspaceTier = 'free'): ActionResult<Workspace> => {
     const state = get()
     const user = state.users.find(u => u.id === ownerUserId)
 
     if (!user) {
       return { success: false, error: 'User not found' }
-    }
-
-    if (!canCreateGroupWorkspace(user.tier)) {
-      return { success: false, error: `Free tier users cannot create group workspaces. Upgrade to Pro or Enterprise.` }
     }
 
     const workspaceId = generateId('ws')
@@ -264,10 +224,8 @@ export const useSimulatorStore = create<SimulatorState>()(
     const workspace: Workspace = {
       id: workspaceId,
       name,
-      type: 'group',
-      plan,
-      billingContactId: ownerUserId,
-      limits: getGroupLimits(plan),
+      tier,
+      limits: getWorkspaceLimits(tier),
       createdAt: now,
     }
 
@@ -276,7 +234,6 @@ export const useSimulatorStore = create<SimulatorState>()(
       workspaceId,
       userId: ownerUserId,
       role: 'owner',
-      canCreateProjects: true,
       joinedAt: now,
     }
 
@@ -285,9 +242,34 @@ export const useSimulatorStore = create<SimulatorState>()(
       workspaceMembers: [...s.workspaceMembers, membership],
     }))
 
-    get().logEvent('Group workspace created', `${name} (owner: ${user.email})`, 'workspace', workspaceId)
+    get().logEvent('Workspace created', `${name} (${tier} tier, owner: ${user.email})`, 'workspace', workspaceId)
 
     return { success: true, data: workspace }
+  },
+
+  upgradeWorkspaceTier: (workspaceId: string, newTier: WorkspaceTier): ActionResult => {
+    const state = get()
+    const workspace = state.workspaces.find(w => w.id === workspaceId)
+
+    if (!workspace) {
+      return { success: false, error: 'Workspace not found' }
+    }
+
+    if (workspace.tier === newTier) {
+      return { success: false, error: `Workspace is already on ${newTier} tier` }
+    }
+
+    set(s => ({
+      workspaces: s.workspaces.map(w =>
+        w.id === workspaceId
+          ? { ...w, tier: newTier, limits: getWorkspaceLimits(newTier) }
+          : w
+      ),
+    }))
+
+    get().logEvent('Workspace tier changed', `${workspace.name}: ${workspace.tier} → ${newTier}`, 'workspace', workspaceId)
+
+    return { success: true }
   },
 
   inviteToWorkspace: (workspaceId: string, email: string, role: WorkspaceRole, inviterId: string): ActionResult<WorkspaceMember> => {
@@ -296,10 +278,6 @@ export const useSimulatorStore = create<SimulatorState>()(
 
     if (!workspace) {
       return { success: false, error: 'Workspace not found' }
-    }
-
-    if (workspace.type === 'private') {
-      return { success: false, error: 'Cannot add members to private workspaces. Invite collaborators to projects instead.' }
     }
 
     // Check inviter is workspace owner
@@ -325,13 +303,21 @@ export const useSimulatorStore = create<SimulatorState>()(
       return { success: false, error: `${email} is already a member of this workspace` }
     }
 
+    // Check member limit
+    const currentMembers = state.workspaceMembers.filter(wm => wm.workspaceId === workspaceId)
+    if (currentMembers.length >= workspace.limits.maxMembers) {
+      return {
+        success: false,
+        error: `Member limit reached (${workspace.limits.maxMembers}). Upgrade workspace tier to add more.`
+      }
+    }
+
     const memberId = generateId('wm')
     const membership: WorkspaceMember = {
       id: memberId,
       workspaceId,
       userId: user.id,
       role,
-      canCreateProjects: role === 'owner',
       invitedBy: inviterId,
       joinedAt: new Date(),
     }
@@ -366,40 +352,19 @@ export const useSimulatorStore = create<SimulatorState>()(
       return { success: false, error: 'User is not a member of this workspace' }
     }
 
-    // Check if user owns projects in this workspace
-    const workspaceProjects = state.projects.filter(p => p.workspaceId === workspaceId)
-    for (const project of workspaceProjects) {
-      const isOwner = state.projectMembers.some(
-        pm => pm.projectId === project.id && pm.userId === userId && pm.role === 'owner'
-      )
-      const otherOwners = state.projectMembers.filter(
-        pm => pm.projectId === project.id && pm.role === 'owner' && pm.userId !== userId
-      )
-      if (isOwner && otherOwners.length === 0) {
-        return {
-          success: false,
-          error: `Cannot remove - user is sole owner of project "${project.name}"`
-        }
-      }
-    }
-
     // Check if last owner
     if (membership.role === 'owner') {
       const otherOwners = state.workspaceMembers.filter(
         wm => wm.workspaceId === workspaceId && wm.role === 'owner' && wm.userId !== userId
       )
       if (otherOwners.length === 0) {
-        return { success: false, error: 'Cannot remove - must transfer ownership first' }
+        return { success: false, error: 'Cannot remove last owner. Transfer ownership first.' }
       }
     }
 
-    // Remove from workspace and all projects in it
+    // Note: Removing from workspace does NOT remove from projects (orthogonal membership)
     set(s => ({
       workspaceMembers: s.workspaceMembers.filter(wm => wm.id !== membership.id),
-      projectMembers: s.projectMembers.filter(pm => {
-        const project = s.projects.find(p => p.id === pm.projectId)
-        return !(project?.workspaceId === workspaceId && pm.userId === userId)
-      }),
     }))
 
     get().logEvent('Member removed from workspace', `${user.email} from ${workspace.name}`, 'membership', membership.id)
@@ -407,70 +372,12 @@ export const useSimulatorStore = create<SimulatorState>()(
     return { success: true }
   },
 
-  setMemberCanCreateProjects: (workspaceId: string, userId: string, canCreate: boolean): ActionResult => {
-    const state = get()
-    const membership = state.workspaceMembers.find(
-      wm => wm.workspaceId === workspaceId && wm.userId === userId
-    )
-
-    if (!membership) {
-      return { success: false, error: 'Membership not found' }
-    }
-
-    set(s => ({
-      workspaceMembers: s.workspaceMembers.map(wm =>
-        wm.id === membership.id ? { ...wm, canCreateProjects: canCreate } : wm
-      ),
-    }))
-
-    const user = state.users.find(u => u.id === userId)
-    get().logEvent(
-      'Project creation permission changed',
-      `${user?.email}: ${canCreate ? 'enabled' : 'disabled'}`,
-      'membership',
-      membership.id
-    )
-
-    return { success: true }
-  },
-
-  transferBillingContact: (workspaceId: string, newContactId: string): ActionResult => {
-    const state = get()
-    const workspace = state.workspaces.find(w => w.id === workspaceId)
-
-    if (!workspace || workspace.type !== 'group') {
-      return { success: false, error: 'Group workspace not found' }
-    }
-
-    const newContact = state.workspaceMembers.find(
-      wm => wm.workspaceId === workspaceId && wm.userId === newContactId && wm.role === 'owner'
-    )
-    if (!newContact) {
-      return { success: false, error: 'New billing contact must be a workspace owner' }
-    }
-
-    set(s => ({
-      workspaces: s.workspaces.map(w =>
-        w.id === workspaceId ? { ...w, billingContactId: newContactId } : w
-      ),
-    }))
-
-    const user = state.users.find(u => u.id === newContactId)
-    get().logEvent('Billing contact transferred', `${workspace.name} → ${user?.email}`, 'workspace', workspaceId)
-
-    return { success: true }
-  },
-
-  deleteGroupWorkspace: (workspaceId: string): ActionResult => {
+  deleteWorkspace: (workspaceId: string): ActionResult => {
     const state = get()
     const workspace = state.workspaces.find(w => w.id === workspaceId)
 
     if (!workspace) {
       return { success: false, error: 'Workspace not found' }
-    }
-
-    if (workspace.type === 'private') {
-      return { success: false, error: 'Cannot delete private workspace. Delete the user instead.' }
     }
 
     // Delete workspace, its projects, and all memberships
@@ -483,7 +390,7 @@ export const useSimulatorStore = create<SimulatorState>()(
       projectMembers: s.projectMembers.filter(pm => !projectIds.includes(pm.projectId)),
     }))
 
-    get().logEvent('Group workspace deleted', workspace.name, 'workspace', workspaceId)
+    get().logEvent('Workspace deleted', workspace.name, 'workspace', workspaceId)
 
     return { success: true }
   },
@@ -499,21 +406,12 @@ export const useSimulatorStore = create<SimulatorState>()(
       return { success: false, error: 'Workspace or user not found' }
     }
 
-    // Check permissions
-    if (workspace.type === 'private') {
-      if (workspace.ownerUserId !== creatorUserId) {
-        return { success: false, error: 'Only the owner can create projects in a private workspace' }
-      }
-    } else {
-      const membership = state.workspaceMembers.find(
-        wm => wm.workspaceId === workspaceId && wm.userId === creatorUserId
-      )
-      if (!membership) {
-        return { success: false, error: 'User is not a member of this workspace' }
-      }
-      if (!membership.canCreateProjects && membership.role !== 'owner') {
-        return { success: false, error: 'User does not have permission to create projects' }
-      }
+    // Only workspace owners can create projects
+    const membership = state.workspaceMembers.find(
+      wm => wm.workspaceId === workspaceId && wm.userId === creatorUserId
+    )
+    if (!membership || membership.role !== 'owner') {
+      return { success: false, error: 'Only workspace owners can create projects' }
     }
 
     // Check project limit
@@ -521,7 +419,7 @@ export const useSimulatorStore = create<SimulatorState>()(
     if (currentProjects.length >= workspace.limits.maxProjects) {
       return {
         success: false,
-        error: `Project limit reached (${workspace.limits.maxProjects}). Upgrade to create more projects.`
+        error: `Project limit reached (${workspace.limits.maxProjects}). Upgrade workspace tier to create more.`
       }
     }
 
@@ -533,10 +431,11 @@ export const useSimulatorStore = create<SimulatorState>()(
       id: projectId,
       workspaceId,
       name,
+      isPublic: false, // default to private
       createdAt: now,
     }
 
-    const membership: ProjectMember = {
+    const projectMembership: ProjectMember = {
       id: memberId,
       projectId,
       userId: creatorUserId,
@@ -546,12 +445,57 @@ export const useSimulatorStore = create<SimulatorState>()(
 
     set(s => ({
       projects: [...s.projects, project],
-      projectMembers: [...s.projectMembers, membership],
+      projectMembers: [...s.projectMembers, projectMembership],
     }))
 
     get().logEvent('Project created', `${name} in ${workspace.name}`, 'project', projectId)
 
     return { success: true, data: project }
+  },
+
+  setProjectPublic: (projectId: string, isPublic: boolean, actorId: string): ActionResult => {
+    const state = get()
+    const project = state.projects.find(p => p.id === projectId)
+
+    if (!project) {
+      return { success: false, error: 'Project not found' }
+    }
+
+    const workspace = state.workspaces.find(w => w.id === project.workspaceId)
+    if (!workspace) {
+      return { success: false, error: 'Workspace not found' }
+    }
+
+    // Only workspace owners can change public status
+    const actorMembership = state.workspaceMembers.find(
+      wm => wm.workspaceId === project.workspaceId && wm.userId === actorId && wm.role === 'owner'
+    )
+    if (!actorMembership) {
+      return { success: false, error: 'Only workspace owners can change project visibility' }
+    }
+
+    // Check if workspace tier allows public projects
+    if (isPublic && !workspace.limits.canHavePublicProjects) {
+      return {
+        success: false,
+        error: 'Public projects require Pro or Enterprise tier. Upgrade workspace to enable.'
+      }
+    }
+
+    set(s => ({
+      projects: s.projects.map(p =>
+        p.id === projectId ? { ...p, isPublic } : p
+      ),
+    }))
+
+    get().logEvent(
+      'Project visibility changed',
+      `${project.name}: ${isPublic ? 'public' : 'private'}`,
+      'project',
+      projectId
+    )
+
+    return { success: true }
   },
 
   inviteToProject: (projectId: string, email: string, role: ProjectRole, inviterId: string): ActionResult<ProjectMember> => {
@@ -595,7 +539,7 @@ export const useSimulatorStore = create<SimulatorState>()(
     if (currentCollaborators.length >= workspace.limits.maxCollaboratorsPerProject) {
       return {
         success: false,
-        error: `Collaborator limit reached (${workspace.limits.maxCollaboratorsPerProject}). Upgrade to add more.`
+        error: `Collaborator limit reached (${workspace.limits.maxCollaboratorsPerProject}). Upgrade workspace tier to add more.`
       }
     }
 
@@ -644,7 +588,7 @@ export const useSimulatorStore = create<SimulatorState>()(
         pm => pm.projectId === projectId && pm.role === 'owner' && pm.userId !== userId
       )
       if (otherOwners.length === 0) {
-        return { success: false, error: 'Cannot remove - must transfer ownership first' }
+        return { success: false, error: 'Cannot remove last project owner. Transfer ownership first.' }
       }
     }
 
@@ -673,7 +617,7 @@ export const useSimulatorStore = create<SimulatorState>()(
         pm => pm.projectId === projectId && pm.role === 'owner' && pm.userId !== userId
       )
       if (otherOwners.length === 0) {
-        return { success: false, error: 'Cannot demote - must have at least one project owner' }
+        return { success: false, error: 'Cannot demote last owner. Promote another owner first.' }
       }
     }
 
@@ -754,27 +698,30 @@ export const useSimulatorStore = create<SimulatorState>()(
 
   getUserWorkspaces: (userId: string) => {
     const state = get()
-    const user = state.users.find(u => u.id === userId)
-    if (!user) return []
-
-    // Private workspace
-    const privateWs = state.workspaces.find(w => w.id === user.privateWorkspaceId)
-
-    // Group workspaces where user is member
-    const groupWsIds = state.workspaceMembers
+    const membershipIds = state.workspaceMembers
       .filter(wm => wm.userId === userId)
       .map(wm => wm.workspaceId)
-    const groupWs = state.workspaces.filter(w => groupWsIds.includes(w.id))
-
-    return privateWs ? [privateWs, ...groupWs] : groupWs
+    return state.workspaces.filter(w => membershipIds.includes(w.id))
   },
 
   getProjectCollaboratorCount: (projectId: string) => {
     return get().projectMembers.filter(pm => pm.projectId === projectId).length
   },
+
+  isWorkspaceOwner: (workspaceId: string, userId: string) => {
+    return get().workspaceMembers.some(
+      wm => wm.workspaceId === workspaceId && wm.userId === userId && wm.role === 'owner'
+    )
+  },
+
+  isProjectOwner: (projectId: string, userId: string) => {
+    return get().projectMembers.some(
+      pm => pm.projectId === projectId && pm.userId === userId && pm.role === 'owner'
+    )
+  },
     }),
     {
-      name: 'workspace-sim-storage',
+      name: 'workspace-sim-storage-v2',
       // Only persist the entity data, not the functions
       partialize: (state) => ({
         users: state.users,

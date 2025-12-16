@@ -13,15 +13,10 @@ import {
 import '@xyflow/react/dist/style.css'
 import { useSimulatorStore } from '../model/store'
 
-// Custom node with handles for proper edge connections
-function UserNode({ data }: { data: { email: string; tier: string } }) {
-  const tierColors = {
-    free: 'border-gray-400 bg-gray-50',
-    pro: 'border-blue-400 bg-blue-50',
-    enterprise: 'border-purple-400 bg-purple-50',
-  }
+// Custom node for users (simplified - no tier shown since tiers are on workspaces now)
+function UserNode({ data }: { data: { email: string } }) {
   return (
-    <div className={`px-4 py-3 rounded-lg border-2 shadow-sm ${tierColors[data.tier as keyof typeof tierColors] ?? tierColors.free}`}>
+    <div className="px-4 py-3 rounded-lg border-2 border-gray-400 bg-gray-50 shadow-sm">
       <Handle type="source" position={Position.Bottom} className="!bg-gray-400" />
       <Handle type="source" position={Position.Right} id="right" className="!bg-gray-400" />
       <div className="flex items-center gap-2">
@@ -30,55 +25,35 @@ function UserNode({ data }: { data: { email: string; tier: string } }) {
         </div>
         <div>
           <div className="font-medium text-sm">{data.email}</div>
-          <div className="text-xs text-gray-500">{data.tier} tier</div>
         </div>
       </div>
     </div>
   )
 }
 
-function PrivateWorkspaceNode({ data }: { data: { name: string; projects: { id: string; name: string; collabs: number }[] } }) {
-  return (
-    <div className="p-3 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50/50 min-w-[200px]">
-      <Handle type="target" position={Position.Top} className="!bg-gray-400" />
-      <div className="text-xs text-gray-400 mb-2">Private Workspace</div>
-      <div className="font-medium text-sm mb-2 truncate">{data.name}</div>
-      {data.projects.length > 0 ? (
-        <div className="space-y-1">
-          {data.projects.map(proj => (
-            <div key={proj.id} className="px-2 py-1 bg-orange-100 border border-orange-300 rounded text-xs">
-              <div className="font-medium truncate">{proj.name}</div>
-              <div className="text-gray-500">{proj.collabs} collaborator{proj.collabs !== 1 ? 's' : ''}</div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-xs text-gray-400 italic">No projects</div>
-      )}
-    </div>
-  )
-}
-
-function GroupWorkspaceNode({ data }: { data: { name: string; plan: string; projects: { id: string; name: string; collabs: number }[] } }) {
-  const planColors = {
-    team: 'border-green-400 bg-green-50',
-    business: 'border-orange-400 bg-orange-50',
+function WorkspaceNode({ data }: { data: { name: string; tier: string; projects: { id: string; name: string; collabs: number; isPublic: boolean }[] } }) {
+  const tierColors = {
+    free: 'border-gray-400 bg-gray-50',
+    pro: 'border-blue-400 bg-blue-50',
     enterprise: 'border-purple-400 bg-purple-50',
   }
   return (
-    <div className={`p-3 rounded-lg border-2 min-w-[220px] ${planColors[data.plan as keyof typeof planColors] ?? planColors.team}`}>
-      <Handle type="target" position={Position.Top} className="!bg-green-500" />
-      <Handle type="target" position={Position.Left} id="left" className="!bg-green-500" />
+    <div className={`p-3 rounded-lg border-2 min-w-[220px] ${tierColors[data.tier as keyof typeof tierColors] ?? tierColors.free}`}>
+      <Handle type="target" position={Position.Top} className="!bg-gray-500" />
+      <Handle type="target" position={Position.Left} id="left" className="!bg-gray-500" />
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs text-gray-500">Group Workspace</div>
-        <div className="text-xs px-1.5 py-0.5 bg-white rounded border">{data.plan}</div>
+        <div className="text-xs text-gray-500">Workspace</div>
+        <div className="text-xs px-1.5 py-0.5 bg-white rounded border">{data.tier}</div>
       </div>
       <div className="font-medium text-sm mb-2">{data.name}</div>
       {data.projects.length > 0 ? (
         <div className="space-y-1">
           {data.projects.map(proj => (
-            <div key={proj.id} className="px-2 py-1 bg-white border border-gray-200 rounded text-xs">
-              <div className="font-medium truncate">{proj.name}</div>
+            <div key={proj.id} className={`px-2 py-1 border rounded text-xs ${proj.isPublic ? 'bg-green-100 border-green-300' : 'bg-white border-gray-200'}`}>
+              <div className="flex items-center gap-1">
+                <div className="font-medium truncate flex-1">{proj.name}</div>
+                {proj.isPublic && <span className="text-[9px] text-green-600">public</span>}
+              </div>
               <div className="text-gray-500">{proj.collabs} collaborator{proj.collabs !== 1 ? 's' : ''}</div>
             </div>
           ))}
@@ -92,8 +67,7 @@ function GroupWorkspaceNode({ data }: { data: { name: string; plan: string; proj
 
 const nodeTypes = {
   user: UserNode,
-  privateWorkspace: PrivateWorkspaceNode,
-  groupWorkspace: GroupWorkspaceNode,
+  workspace: WorkspaceNode,
 }
 
 export function GraphView() {
@@ -108,12 +82,11 @@ export function GraphView() {
     const edges: Edge[] = []
 
     // Layout constants
-    const USER_SPACING_X = 280
-    const PRIVATE_WS_OFFSET_Y = 100
-    const GROUP_WS_START_Y = 380
-    const GROUP_WS_SPACING_X = 300
+    const USER_SPACING_X = 200
+    const WS_START_Y = 200
+    const WS_SPACING_X = 280
 
-    // Create user nodes with their private workspaces
+    // Create user nodes
     users.forEach((user, userIndex) => {
       const userX = userIndex * USER_SPACING_X
       const userY = 0
@@ -122,62 +95,28 @@ export function GraphView() {
         id: `user-${user.id}`,
         type: 'user',
         position: { x: userX, y: userY },
-        data: { email: user.email, tier: user.tier },
+        data: { email: user.email },
       })
-
-      // Private workspace below user
-      const privateWs = workspaces.find(w => w.id === user.privateWorkspaceId)
-      if (privateWs) {
-        const wsProjects = projects.filter(p => p.workspaceId === privateWs.id)
-
-        nodes.push({
-          id: `ws-${privateWs.id}`,
-          type: 'privateWorkspace',
-          position: { x: userX - 20, y: userY + PRIVATE_WS_OFFSET_Y },
-          data: {
-            name: privateWs.name,
-            projects: wsProjects.map(p => ({
-              id: p.id,
-              name: p.name,
-              collabs: projectMembers.filter(pm => pm.projectId === p.id).length,
-            })),
-          },
-        })
-
-        // Edge: User owns private workspace
-        edges.push({
-          id: `edge-owns-${user.id}`,
-          source: `user-${user.id}`,
-          target: `ws-${privateWs.id}`,
-          type: 'smoothstep',
-          animated: false,
-          style: { stroke: '#9ca3af', strokeWidth: 2 },
-          label: 'owns',
-          labelStyle: { fontSize: 10, fill: '#6b7280' },
-          labelBgStyle: { fill: '#f9fafb' },
-        })
-      }
     })
 
-    // Group workspaces
-    const groupWorkspaces = workspaces.filter(w => w.type === 'group')
-
-    groupWorkspaces.forEach((ws, wsIndex) => {
+    // Create workspace nodes
+    workspaces.forEach((ws, wsIndex) => {
       const wsProjects = projects.filter(p => p.workspaceId === ws.id)
-      const wsX = wsIndex * GROUP_WS_SPACING_X
-      const wsY = GROUP_WS_START_Y
+      const wsX = wsIndex * WS_SPACING_X
+      const wsY = WS_START_Y
 
       nodes.push({
         id: `ws-${ws.id}`,
-        type: 'groupWorkspace',
+        type: 'workspace',
         position: { x: wsX, y: wsY },
         data: {
           name: ws.name,
-          plan: ws.plan ?? 'team',
+          tier: ws.tier,
           projects: wsProjects.map(p => ({
             id: p.id,
             name: p.name,
             collabs: projectMembers.filter(pm => pm.projectId === p.id).length,
+            isPublic: p.isPublic,
           })),
         },
       })
@@ -189,9 +128,7 @@ export function GraphView() {
         edges.push({
           id: `edge-member-${member.id}`,
           source: `user-${member.userId}`,
-          sourceHandle: 'right',
           target: `ws-${ws.id}`,
-          targetHandle: 'left',
           type: 'smoothstep',
           animated: isOwner,
           style: {
@@ -211,7 +148,7 @@ export function GraphView() {
       })
     })
 
-    // External project collaborator edges (users not in workspace but on project)
+    // Show project collaborators who are NOT workspace members (orthogonal membership)
     projectMembers.forEach(pm => {
       const project = projects.find(p => p.id === pm.projectId)
       if (!project) return
@@ -219,18 +156,14 @@ export function GraphView() {
       const workspace = workspaces.find(w => w.id === project.workspaceId)
       if (!workspace) return
 
-      // Skip if this is the private workspace owner (implicit)
-      if (workspace.type === 'private' && workspace.ownerUserId === pm.userId) return
+      // Check if user is a workspace member
+      const isWsMember = workspaceMembers.some(
+        wm => wm.workspaceId === workspace.id && wm.userId === pm.userId
+      )
 
-      // Skip if user is a workspace member (already connected)
-      if (workspace.type === 'group') {
-        const isWsMember = workspaceMembers.some(
-          wm => wm.workspaceId === workspace.id && wm.userId === pm.userId
-        )
-        if (isWsMember) return
-      }
+      // Only show edge if user is NOT a workspace member (demonstrates orthogonal membership)
+      if (isWsMember) return
 
-      // This is an external collaborator - show direct link to workspace
       const roleColors = {
         owner: '#eab308',
         internal: '#3b82f6',
@@ -241,7 +174,9 @@ export function GraphView() {
       edges.push({
         id: `edge-external-${pm.id}`,
         source: `user-${pm.userId}`,
+        sourceHandle: 'right',
         target: `ws-${workspace.id}`,
+        targetHandle: 'left',
         type: 'smoothstep',
         style: {
           stroke: color,
