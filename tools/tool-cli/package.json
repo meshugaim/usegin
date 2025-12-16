@@ -1,0 +1,21 @@
+{
+  "name": "tool-cli",
+  "version": "0.1.0",
+  "description": "Central registry for discovering tools in this repo",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "tool": "src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  }
+}
