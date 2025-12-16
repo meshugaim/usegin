@@ -30,7 +30,7 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 **Labels** — Use labels for the type of work: `bug`, `feature`, `chore`, `docs`. This keeps titles focused on *what*, while labels signal *what kind*.
 
-**Connect before creating** — Before adding a new issue, consider how it fits into what already exists. Is it a sub-issue? Does it block something? Is it related to existing work? The graph of connections is as valuable as the issues themselves.
+**Connect before creating** — Before adding a new issue, consider how it relates to what already exists. Use `--parent` for sub-issues, `--blocked-by`/`--blocking` for dependencies, or `--related-to` for loose connections. Connected issues are easier to find — sub-issues appear under their parents in `plan list`, and relationships show in `plan show`. A well-connected graph makes it easier to orient yourself in the work.
 
 **One source of truth** — Linear is where work lives. Don't track tasks in markdown files, todo lists, or other tools. If it's worth tracking, it goes in Linear via `plan`.
 
