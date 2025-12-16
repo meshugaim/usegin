@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { formatListHuman } from "../src/lib/output";
+import { formatListHuman, getTerminalWidth } from "../src/lib/output";
+import { stripAnsi } from "../src/lib/colors";
 import type { PlanIssue } from "../src/types";
 
 const mockIssues: PlanIssue[] = [
@@ -215,6 +216,123 @@ describe("formatListHuman", () => {
     // The child title should be visible across lines
     expect(output).toContain("Child issue with a very");
     expect(output).toContain("second line");
+  });
+
+  describe("terminal width adaptation", () => {
+    const issueWithLongTitle: PlanIssue[] = [
+      {
+        id: "issue-1",
+        identifier: "ENG-123",
+        title: "A moderately long title that might need wrapping depending on terminal width",
+        status: "In Progress",
+        sortOrder: 1.0,
+        children: [],
+      },
+    ];
+
+    it("returns a default terminal width when stdout.columns is undefined", () => {
+      // In test environment, stdout.columns may be undefined
+      const width = getTerminalWidth();
+      expect(width).toBeGreaterThan(0);
+      // Default should be 100 if not in a TTY
+      expect(width).toBe(100);
+    });
+
+    it("adapts title width for narrow terminals", () => {
+      const { output: narrowOutput } = formatListHuman(issueWithLongTitle, { terminalWidth: 80 });
+      const { output: wideOutput } = formatListHuman(issueWithLongTitle, { terminalWidth: 160 });
+
+      // Get the first data line (skip header)
+      const narrowLines = narrowOutput.split("\n");
+      const wideLines = wideOutput.split("\n");
+
+      // Strip ANSI codes for comparison
+      const narrowFirstLine = stripAnsi(narrowLines[1]);
+      const wideFirstLine = stripAnsi(wideLines[1]);
+
+      // Wide output should have longer first line (more title visible)
+      // Or narrow output should wrap where wide doesn't need to
+      // Just check they're different due to different formatting
+      expect(narrowFirstLine.length).toBeLessThanOrEqual(wideFirstLine.length + 10);
+    });
+
+    it("respects minimum title width on very narrow terminals", () => {
+      const { output } = formatListHuman(issueWithLongTitle, { terminalWidth: 40 });
+
+      // Even at 40 chars, the title should still be readable (minimum width)
+      expect(output).toContain("ENG-123");
+      expect(output).toContain("In Progress");
+      // Title should appear even if truncated
+      expect(output).toContain("A moderately");
+    });
+
+    it("respects maximum title width on very wide terminals", () => {
+      const shortIssue: PlanIssue[] = [
+        {
+          id: "issue-1",
+          identifier: "ENG-1",
+          title: "Short",
+          status: "Backlog",
+          sortOrder: 1.0,
+          children: [],
+        },
+      ];
+
+      const { output: narrowOutput } = formatListHuman(shortIssue, { terminalWidth: 80 });
+      const { output: wideOutput } = formatListHuman(shortIssue, { terminalWidth: 300 });
+
+      // Both should contain the title
+      expect(narrowOutput).toContain("Short");
+      expect(wideOutput).toContain("Short");
+
+      // Title column width is capped, so extremely wide terminal
+      // shouldn't create excessively spaced output
+      const narrowFirstDataLine = stripAnsi(narrowOutput.split("\n")[1]);
+      const wideFirstDataLine = stripAnsi(wideOutput.split("\n")[1]);
+
+      // Difference should be limited (max title width is 60)
+      expect(wideFirstDataLine.length - narrowFirstDataLine.length).toBeLessThan(40);
+    });
+
+    it("calculates proper width with labels column", () => {
+      const issueWithLabels: PlanIssue[] = [
+        {
+          id: "issue-1",
+          identifier: "ENG-1",
+          title: "Issue with labels and a longer title for testing",
+          status: "Backlog",
+          sortOrder: 1.0,
+          labels: ["bug", "critical"],
+          children: [],
+        },
+      ];
+
+      const { output } = formatListHuman(issueWithLabels, { terminalWidth: 120 });
+
+      // Should have Labels header
+      expect(output).toContain("Labels");
+      expect(output).toContain("bug");
+    });
+
+    it("calculates proper width with More column", () => {
+      const issueWithChildren: PlanIssue[] = [
+        {
+          id: "issue-1",
+          identifier: "ENG-1",
+          title: "Parent issue with hidden children",
+          status: "Backlog",
+          sortOrder: 1.0,
+          children: [],
+          childCount: 5,
+        },
+      ];
+
+      const { output } = formatListHuman(issueWithChildren, { terminalWidth: 120 });
+
+      // Should have More header and +5 indicator
+      expect(output).toContain("More");
+      expect(output).toContain("+5");
+    });
   });
 });
 

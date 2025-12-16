@@ -9,11 +9,26 @@ import {
   bold,
 } from "./colors";
 
+// Column widths and constraints
+const MIN_TITLE_WIDTH = 20;
+const MAX_TITLE_WIDTH = 60;
+const DEFAULT_TERMINAL_WIDTH = 100;
+const COLUMN_SEPARATOR = "   "; // 3 spaces between columns
+
+/**
+ * Get the terminal width, with fallback for non-TTY environments
+ */
+export function getTerminalWidth(): number {
+  return process.stdout.columns || DEFAULT_TERMINAL_WIDTH;
+}
+
 export interface FormatOptions {
   depth?: number;
   showDone?: boolean;
   /** Whether depth was explicitly set by user (vs default) */
   depthExplicit?: boolean;
+  /** Override terminal width (useful for testing) */
+  terminalWidth?: number;
 }
 
 export interface FormatResult {
@@ -31,17 +46,54 @@ function filterChildren(children: PlanIssue[], showDone: boolean): PlanIssue[] {
 }
 
 /**
+ * Calculate the dynamic title width based on terminal width and other column widths
+ */
+function calculateTitleWidth(
+  terminalWidth: number,
+  numWidth: number,
+  idWidth: number,
+  statusWidth: number,
+  labelWidth: number,
+  hasLabels: boolean,
+  hasHiddenChildren: boolean,
+  moreWidth: number
+): number {
+  // Calculate total fixed width used by other columns
+  // Format: #   ID   Title   Status   [Labels]   [More]
+  // Each column is separated by COLUMN_SEPARATOR (3 spaces)
+  let columnCount = 4; // #, ID, Title, Status
+  if (hasLabels) columnCount++;
+  if (hasHiddenChildren) columnCount++;
+
+  const separatorWidth = COLUMN_SEPARATOR.length * (columnCount - 1);
+  let fixedWidth = numWidth + idWidth + statusWidth + separatorWidth;
+
+  if (hasLabels) {
+    fixedWidth += labelWidth;
+  }
+  if (hasHiddenChildren) {
+    fixedWidth += moreWidth;
+  }
+
+  // Calculate available width for title
+  const availableWidth = terminalWidth - fixedWidth;
+
+  // Clamp to reasonable bounds
+  return Math.max(MIN_TITLE_WIDTH, Math.min(availableWidth, MAX_TITLE_WIDTH));
+}
+
+/**
  * Format issues as a human-readable table
  */
 export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}): FormatResult {
   const depth = options.depth ?? 0;
   const showDone = options.showDone ?? false;
+  const terminalWidth = options.terminalWidth ?? getTerminalWidth();
   const lines: string[] = [];
 
   // Calculate column widths (need to apply filter for accurate column sizing)
   const allIssues = flattenIssues(issues, depth, showDone);
   const maxIdLen = Math.max(4, ...allIssues.map((i) => i.identifier.length));
-  const maxTitleLen = Math.max(5, ...allIssues.map((i) => i.title.length));
   const maxStatusLen = Math.max(6, ...allIssues.map((i) => i.status.length));
 
   // Check if any issues have labels
@@ -54,8 +106,19 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
   // Check if any issues have hidden children (childCount > 0)
   const hasHiddenChildren = allIssues.some((i) => i.childCount && i.childCount > 0);
 
-  // Clamp title length for readability
-  const titleLen = Math.min(maxTitleLen, hasLabels ? 35 : (hasHiddenChildren ? 38 : 40));
+  // Calculate dynamic title width based on terminal width
+  const numWidth = 3;
+  const moreWidth = 5;
+  const titleLen = calculateTitleWidth(
+    terminalWidth,
+    numWidth,
+    maxIdLen,
+    maxStatusLen,
+    labelLen,
+    hasLabels,
+    hasHiddenChildren,
+    moreWidth
+  );
 
   // Header
   const header = formatRow(
@@ -63,12 +126,12 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     hasLabels ? "Labels" : undefined,
     hasHiddenChildren ? "More" : undefined,
     {
-      numWidth: 3,
+      numWidth,
       idWidth: maxIdLen,
       titleWidth: titleLen,
       statusWidth: maxStatusLen,
       labelWidth: labelLen,
-      moreWidth: 5,
+      moreWidth,
       isHeader: true,
     }
   );
@@ -88,12 +151,12 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
 
     lines.push(
       formatRow(posStr, issue.identifier, titleLine1, issue.status, labels, more, {
-        numWidth: 3,
+        numWidth,
         idWidth: maxIdLen,
         titleWidth: titleLen,
         statusWidth: maxStatusLen,
         labelWidth: labelLen,
-        moreWidth: 5,
+        moreWidth,
       })
     );
 
@@ -101,12 +164,12 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     if (titleLine2) {
       lines.push(
         formatContinuationRow(titleLine2, {
-          numWidth: 3,
+          numWidth,
           idWidth: maxIdLen,
           titleWidth: titleLen,
           statusWidth: maxStatusLen,
           labelWidth: labelLen,
-          moreWidth: 5,
+          moreWidth,
           hasLabels,
           hasHiddenChildren,
         })
@@ -116,6 +179,7 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     // Children (if depth > 0)
     if (depth > 0 && issue.children.length > 0) {
       renderChildren(filterChildren(issue.children, showDone), 1, depth, lines, {
+        numWidth,
         maxIdLen,
         titleLen,
         maxStatusLen,
@@ -123,6 +187,7 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
         hasLabels,
         showDone,
         hasHiddenChildren,
+        moreWidth,
       });
     }
   }
@@ -142,6 +207,7 @@ function renderChildren(
   maxDepth: number,
   lines: string[],
   opts: {
+    numWidth: number;
     maxIdLen: number;
     titleLen: number;
     maxStatusLen: number;
@@ -149,6 +215,7 @@ function renderChildren(
     hasLabels: boolean;
     showDone: boolean;
     hasHiddenChildren: boolean;
+    moreWidth: number;
   }
 ): void {
   const indent = "  ".repeat(currentDepth);
@@ -171,12 +238,12 @@ function renderChildren(
 
     lines.push(
       formatRow("", child.identifier, coloredTitle, child.status, childLabels, more, {
-        numWidth: 3,
+        numWidth: opts.numWidth,
         idWidth: opts.maxIdLen,
         titleWidth: opts.titleLen,
         statusWidth: opts.maxStatusLen,
         labelWidth: opts.labelLen,
-        moreWidth: 5,
+        moreWidth: opts.moreWidth,
       })
     );
 
@@ -185,12 +252,12 @@ function renderChildren(
       const coloredContinuation = `${colors.tree(continuationIndent)}${titleLine2}`;
       lines.push(
         formatContinuationRow(coloredContinuation, {
-          numWidth: 3,
+          numWidth: opts.numWidth,
           idWidth: opts.maxIdLen,
           titleWidth: opts.titleLen,
           statusWidth: opts.maxStatusLen,
           labelWidth: opts.labelLen,
-          moreWidth: 5,
+          moreWidth: opts.moreWidth,
           hasLabels: opts.hasLabels,
           hasHiddenChildren: opts.hasHiddenChildren,
         })
