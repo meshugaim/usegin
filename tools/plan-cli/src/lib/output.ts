@@ -80,14 +80,14 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
     position++;
     const posStr = String(position);
 
-    const title = truncate(issue.title, titleLen);
+    const [titleLine1, titleLine2] = wrapTitle(issue.title, titleLen);
     const labels = hasLabels ? truncate(formatLabels(issue.labels), labelLen) : undefined;
     const more = hasHiddenChildren
       ? (issue.childCount && issue.childCount > 0 ? `+${issue.childCount}` : "")
       : undefined;
 
     lines.push(
-      formatRow(posStr, issue.identifier, title, issue.status, labels, more, {
+      formatRow(posStr, issue.identifier, titleLine1, issue.status, labels, more, {
         numWidth: 3,
         idWidth: maxIdLen,
         titleWidth: titleLen,
@@ -96,6 +96,22 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
         moreWidth: 5,
       })
     );
+
+    // Add continuation line for second part of title
+    if (titleLine2) {
+      lines.push(
+        formatContinuationRow(titleLine2, {
+          numWidth: 3,
+          idWidth: maxIdLen,
+          titleWidth: titleLen,
+          statusWidth: maxStatusLen,
+          labelWidth: labelLen,
+          moreWidth: 5,
+          hasLabels,
+          hasHiddenChildren,
+        })
+      );
+    }
 
     // Children (if depth > 0)
     if (depth > 0 && issue.children.length > 0) {
@@ -138,9 +154,12 @@ function renderChildren(
   const indent = "  ".repeat(currentDepth);
   const prefix = `${indent}└ `;
   const prefixLen = prefix.length;
+  // For continuation lines, use spaces to align under the title (after the tree prefix)
+  const continuationIndent = " ".repeat(prefixLen);
 
   for (const child of children) {
-    const childTitle = truncate(child.title, opts.titleLen - prefixLen);
+    const availableTitleLen = opts.titleLen - prefixLen;
+    const [titleLine1, titleLine2] = wrapTitle(child.title, availableTitleLen);
     const childLabels = opts.hasLabels ? truncate(formatLabels(child.labels), opts.labelLen) : undefined;
     const more = opts.hasHiddenChildren
       ? (child.childCount && child.childCount > 0 ? `+${child.childCount}` : "")
@@ -148,7 +167,7 @@ function renderChildren(
 
     // Colorize the tree prefix and title
     const coloredPrefix = colors.tree(prefix);
-    const coloredTitle = `${coloredPrefix}${childTitle}`;
+    const coloredTitle = `${coloredPrefix}${titleLine1}`;
 
     lines.push(
       formatRow("", child.identifier, coloredTitle, child.status, childLabels, more, {
@@ -160,6 +179,23 @@ function renderChildren(
         moreWidth: 5,
       })
     );
+
+    // Add continuation line for second part of title
+    if (titleLine2) {
+      const coloredContinuation = `${colors.tree(continuationIndent)}${titleLine2}`;
+      lines.push(
+        formatContinuationRow(coloredContinuation, {
+          numWidth: 3,
+          idWidth: opts.maxIdLen,
+          titleWidth: opts.titleLen,
+          statusWidth: opts.maxStatusLen,
+          labelWidth: opts.labelLen,
+          moreWidth: 5,
+          hasLabels: opts.hasLabels,
+          hasHiddenChildren: opts.hasHiddenChildren,
+        })
+      );
+    }
 
     // Recurse if we have children and haven't reached max depth
     if (currentDepth < maxDepth && child.children.length > 0) {
@@ -247,6 +283,45 @@ function truncate(str: string, maxLen: number): string {
   return str.slice(0, maxLen - 1) + "…";
 }
 
+/**
+ * Wrap a title to at most two lines, truncating only if needed.
+ * Returns [firstLine, secondLine | null]
+ */
+function wrapTitle(str: string, maxLen: number): [string, string | null] {
+  if (str.length <= maxLen) return [str, null];
+
+  // Try to break at a word boundary near maxLen
+  const breakPoint = findWordBreak(str, maxLen);
+  const firstLine = str.slice(0, breakPoint).trimEnd();
+  const remaining = str.slice(breakPoint).trimStart();
+
+  if (remaining.length === 0) {
+    return [firstLine, null];
+  }
+
+  // Second line: truncate if too long
+  const secondLine = remaining.length <= maxLen
+    ? remaining
+    : remaining.slice(0, maxLen - 1) + "…";
+
+  return [firstLine, secondLine];
+}
+
+/**
+ * Find a good word break point, preferring to break at spaces.
+ * Falls back to maxLen if no good break point found.
+ */
+function findWordBreak(str: string, maxLen: number): number {
+  // If there's a space in the first maxLen chars, break there
+  const lastSpace = str.lastIndexOf(" ", maxLen);
+  if (lastSpace > maxLen * 0.4) {
+    // Only use the space if it's not too far back
+    return lastSpace;
+  }
+  // Otherwise break at maxLen
+  return maxLen;
+}
+
 interface RowOptions {
   numWidth: number;
   idWidth: number;
@@ -300,6 +375,43 @@ function formatRow(
 
   if (more !== undefined) {
     parts.push(more ? dim(more) : "");
+  }
+
+  return parts.join("   ");
+}
+
+interface ContinuationRowOptions {
+  numWidth: number;
+  idWidth: number;
+  titleWidth: number;
+  statusWidth: number;
+  labelWidth: number;
+  moreWidth: number;
+  hasLabels: boolean;
+  hasHiddenChildren: boolean;
+}
+
+/**
+ * Format a continuation row for wrapped titles (second line)
+ */
+function formatContinuationRow(
+  titleContinuation: string,
+  widths: ContinuationRowOptions
+): string {
+  // Empty columns for #, ID, then the title continuation, then empty status/labels/more
+  const parts = [
+    " ".repeat(widths.numWidth),
+    " ".repeat(widths.idWidth),
+    padEnd(titleContinuation, widths.titleWidth),
+    " ".repeat(widths.statusWidth),
+  ];
+
+  if (widths.hasLabels) {
+    parts.push(" ".repeat(widths.labelWidth));
+  }
+
+  if (widths.hasHiddenChildren) {
+    parts.push(" ".repeat(widths.moreWidth));
   }
 
   return parts.join("   ");

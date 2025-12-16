@@ -164,5 +164,57 @@ describe("formatListHuman", () => {
     expect(output).toContain("More");
     expect(output).toContain("+3");
   });
+
+  it("wraps long titles to two lines", () => {
+    const issuesWithLongTitle: PlanIssue[] = [
+      {
+        id: "issue-1",
+        identifier: "ENG-1",
+        title: "This is a very long title that should wrap to two lines for better readability",
+        status: "Backlog",
+        sortOrder: 1.0,
+        children: [],
+      },
+    ];
+    const { output } = formatListHuman(issuesWithLongTitle);
+    const lines = output.split("\n");
+
+    // Should have at least 3 lines: header, first line of title, second line of title
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+
+    // The full title should be visible across the lines (not truncated in the middle)
+    // First part should be visible
+    expect(output).toContain("This is a very long title");
+    // Second part should be visible (wrapped)
+    expect(output).toContain("readability");
+  });
+
+  it("wraps long child titles to two lines", () => {
+    const issuesWithLongChildTitle: PlanIssue[] = [
+      {
+        id: "issue-1",
+        identifier: "ENG-1",
+        title: "Parent",
+        status: "Backlog",
+        sortOrder: 1.0,
+        children: [
+          {
+            id: "issue-2",
+            identifier: "ENG-2",
+            title: "Child issue with a very long title that needs to wrap to a second line",
+            status: "Backlog",
+            sortOrder: 1.1,
+            parent: { id: "issue-1", identifier: "ENG-1" },
+            children: [],
+          },
+        ],
+      },
+    ];
+    const { output } = formatListHuman(issuesWithLongChildTitle, { depth: 1 });
+
+    // The child title should be visible across lines
+    expect(output).toContain("Child issue with a very");
+    expect(output).toContain("second line");
+  });
 });
 
