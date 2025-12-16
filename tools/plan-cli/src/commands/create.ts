@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
+import { normalizeIssueId } from "../lib/identifier";
 
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
@@ -22,7 +23,15 @@ export function createCreateCommand(): Command {
     .option("--stats", "Show API call statistics")
     .option("--create-missing-labels", "Create labels that don't exist")
     .action(async (title: string, opts) => {
-      await runCreate(title, opts);
+      // Normalize any issue ID options
+      const normalizedOpts = {
+        ...opts,
+        parent: opts.parent ? normalizeIssueId(opts.parent) : opts.parent,
+        blockedBy: opts.blockedBy ? normalizeIssueId(opts.blockedBy) : opts.blockedBy,
+        blocking: opts.blocking ? normalizeIssueId(opts.blocking) : opts.blocking,
+        relatedTo: opts.relatedTo ? normalizeIssueId(opts.relatedTo) : opts.relatedTo,
+      };
+      await runCreate(title, normalizedOpts);
     });
 
   return cmd;

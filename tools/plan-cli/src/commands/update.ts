@@ -3,11 +3,12 @@ import { readFileSync } from "fs";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
+import { normalizeIssueId } from "../lib/identifier";
 
 export function createUpdateCommand(): Command {
   const cmd = new Command("update")
     .description("Update an existing issue")
-    .argument("<id>", "Issue identifier (e.g., ENG-20)")
+    .argument("<id>", "Issue identifier (e.g., ENG-20 or just 20)")
     .option("--title <text>", "Update title")
     .option("--description <text>", "Update description")
     .option("--description-file <path>", "Read description from file")
@@ -28,7 +29,16 @@ export function createUpdateCommand(): Command {
     .option("--stats", "Show API call statistics")
     .option("--create-missing-labels", "Create labels that don't exist")
     .action(async (id: string, opts) => {
-      await runUpdate(id, opts);
+      // Normalize the main issue ID and any relationship IDs
+      const normalizedOpts = {
+        ...opts,
+        parent: opts.parent ? normalizeIssueId(opts.parent) : opts.parent,
+        blockedBy: opts.blockedBy ? normalizeIssueId(opts.blockedBy) : opts.blockedBy,
+        blocking: opts.blocking ? normalizeIssueId(opts.blocking) : opts.blocking,
+        relatedTo: opts.relatedTo ? normalizeIssueId(opts.relatedTo) : opts.relatedTo,
+        duplicateOf: opts.duplicateOf ? normalizeIssueId(opts.duplicateOf) : opts.duplicateOf,
+      };
+      await runUpdate(normalizeIssueId(id), normalizedOpts);
     });
 
   return cmd;

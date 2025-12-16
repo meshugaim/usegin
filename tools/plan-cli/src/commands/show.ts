@@ -3,17 +3,18 @@ import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
 import { formatShowHuman, formatShowJson } from "../lib/output";
 import { printApiStats } from "../lib/stats";
+import { normalizeIssueId } from "../lib/identifier";
 
 export function createShowCommand(): Command {
   const cmd = new Command("show")
     .description("Show details of a single issue")
-    .argument("<identifier>", "Issue identifier (e.g., ENG-123)")
+    .argument("<identifier>", "Issue identifier (e.g., ENG-123 or just 123)")
     .option("--json", "Output as JSON")
     .option("--web", "Open issue in web browser")
     .option("--comments", "Include comments in the output")
     .option("--stats", "Show API call statistics")
     .action(async (identifier: string, opts) => {
-      await runShow(identifier, opts);
+      await runShow(normalizeIssueId(identifier), opts);
     });
 
   return cmd;

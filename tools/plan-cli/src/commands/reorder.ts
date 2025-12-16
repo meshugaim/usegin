@@ -10,18 +10,23 @@ import {
   calculatePush,
 } from "../lib/ordering";
 import { colors } from "../lib/colors";
+import { normalizeIssueId } from "../lib/identifier";
 
 export function createReorderCommand(): Command {
   const cmd = new Command("reorder")
     .description("Change the position of an issue in the list")
-    .argument("<id>", "Issue identifier (e.g., ENG-20)")
+    .argument("<id>", "Issue identifier (e.g., ENG-20 or just 20)")
     .argument("<action>", "Action: before, after, top, bottom, pull, push")
     .argument("[target]", "Target identifier or count (depends on action)")
     .option("--team <key>", "Team key (e.g., ENG)")
     .option("--quiet", "No output on success")
     .option("--stats", "Show API call statistics")
     .action(async (id: string, action: string, target: string | undefined, opts) => {
-      await runReorder(id, action, target, opts);
+      // Normalize the ID, and also normalize target if it's an identifier (for before/after actions)
+      const normalizedTarget = target && (action === "before" || action === "after")
+        ? normalizeIssueId(target)
+        : target;
+      await runReorder(normalizeIssueId(id), action, normalizedTarget, opts);
     });
 
   return cmd;

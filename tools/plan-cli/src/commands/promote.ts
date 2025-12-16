@@ -3,19 +3,20 @@ import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { calculateTop } from "../lib/ordering";
 import { colors } from "../lib/colors";
+import { normalizeIssueId } from "../lib/identifier";
 
 const INBOX_LABEL = "inbox";
 
 export function createPromoteCommand(): Command {
   const cmd = new Command("promote")
     .description("Move an issue from inbox to list (removes inbox label)")
-    .argument("<id>", "Issue identifier (e.g., ENG-30)")
+    .argument("<id>", "Issue identifier (e.g., ENG-30 or just 30)")
     .argument("[position]", "Position: 'top' to move to top of list")
     .option("--json", "Output as JSON")
     .option("--quiet", "No output on success")
     .option("--stats", "Show API call statistics")
     .action(async (id: string, position: string | undefined, opts) => {
-      await runPromote(id, position, opts);
+      await runPromote(normalizeIssueId(id), position, opts);
     });
 
   return cmd;

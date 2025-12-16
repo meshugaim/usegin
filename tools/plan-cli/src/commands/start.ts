@@ -2,16 +2,17 @@ import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors } from "../lib/colors";
+import { normalizeIssueId } from "../lib/identifier";
 
 export function createStartCommand(): Command {
   const cmd = new Command("start")
     .description("Start working on an issue (set In Progress + assign to me)")
-    .argument("<id>", "Issue identifier (e.g., ENG-20)")
+    .argument("<id>", "Issue identifier (e.g., ENG-20 or just 20)")
     .option("--json", "Output as JSON")
     .option("--quiet", "No output on success")
     .option("--stats", "Show API call statistics")
     .action(async (id: string, opts) => {
-      await runStart(id, opts);
+      await runStart(normalizeIssueId(id), opts);
     });
 
   return cmd;

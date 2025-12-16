@@ -2,17 +2,18 @@ import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
+import { normalizeIssueId } from "../lib/identifier";
 
 export function createCloseCommand(): Command {
   const cmd = new Command("close")
     .description("Close an issue (set status to Done)")
-    .argument("<id>", "Issue identifier (e.g., ENG-20)")
+    .argument("<id>", "Issue identifier (e.g., ENG-20 or just 20)")
     .option("--reason <text>", "Add a comment explaining why (e.g., 'duplicate of ENG-15')")
     .option("--json", "Output as JSON")
     .option("--quiet", "No output on success")
     .option("--stats", "Show API call statistics")
     .action(async (id: string, opts) => {
-      await runClose(id, opts);
+      await runClose(normalizeIssueId(id), opts);
     });
 
   return cmd;
