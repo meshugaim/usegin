@@ -44,6 +44,13 @@ When enabled, a post-commit hook runs after each commit:
 | Silent success | Single line output on push |
 | Safe conflicts | Aborts rebase, preserves local commit |
 
+## Companion: Autopull
+
+See also `autopull` - the companion feature that polls and pulls from main periodically. Together they provide complete bi-directional sync:
+
+- **autosync**: post-commit hook → push to origin
+- **autopull**: polling → pull from main
+
 ## Spec
 
 See `docs/autosync.spec.md` for full details.
