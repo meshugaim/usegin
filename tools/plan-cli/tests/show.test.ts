@@ -1,6 +1,21 @@
 import { describe, expect, it } from "bun:test";
 import { formatShowHuman, formatShowJson } from "../src/lib/output";
-import type { PlanIssueDetail } from "../src/types";
+import type { PlanIssueDetail, PlanComment } from "../src/types";
+
+const mockComments: PlanComment[] = [
+  {
+    id: "comment-1",
+    body: "This is the first comment.\nIt has multiple lines.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+    user: { id: "user-1", name: "nitsan", displayName: "Nitsan" },
+  },
+  {
+    id: "comment-2",
+    body: "A quick follow-up",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+    user: { id: "user-2", name: "alice", displayName: "Alice" },
+  },
+];
 
 const mockIssue: PlanIssueDetail = {
   id: "issue-2",
@@ -151,5 +166,69 @@ describe("formatShowJson", () => {
 
     expect(parsed.assignee.name).toBe("nitsan");
     expect(parsed.assignee.displayName).toBe("Nitsan");
+  });
+
+  it("excludes comments when not present", () => {
+    const output = formatShowJson(mockIssue);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.comments).toBeUndefined();
+  });
+
+  it("includes comments when present", () => {
+    const issueWithComments = { ...mockIssue, comments: mockComments };
+    const output = formatShowJson(issueWithComments);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.comments).toHaveLength(2);
+    expect(parsed.comments[0].id).toBe("comment-1");
+    expect(parsed.comments[0].body).toContain("first comment");
+    expect(parsed.comments[0].user.name).toBe("nitsan");
+  });
+});
+
+describe("formatShowHuman with comments", () => {
+  it("does not show comments section when comments not present", () => {
+    const output = formatShowHuman(mockIssue);
+    expect(output).not.toContain("Comments");
+  });
+
+  it("shows comments section header with count when comments present", () => {
+    const issueWithComments = { ...mockIssue, comments: mockComments };
+    const output = formatShowHuman(issueWithComments);
+    expect(output).toContain("Comments (2):");
+  });
+
+  it("shows comment author with @ prefix", () => {
+    const issueWithComments = { ...mockIssue, comments: mockComments };
+    const output = formatShowHuman(issueWithComments);
+    expect(output).toContain("@nitsan");
+    expect(output).toContain("@alice");
+  });
+
+  it("shows comment body", () => {
+    const issueWithComments = { ...mockIssue, comments: mockComments };
+    const output = formatShowHuman(issueWithComments);
+    expect(output).toContain("This is the first comment");
+    expect(output).toContain("A quick follow-up");
+  });
+
+  it("shows relative time for comments", () => {
+    const issueWithComments = { ...mockIssue, comments: mockComments };
+    const output = formatShowHuman(issueWithComments);
+    // Should contain relative timestamps like "30m ago" or "2h ago"
+    expect(output).toMatch(/\d+[mh] ago/);
+  });
+
+  it("handles comments without user gracefully", () => {
+    const commentWithoutUser: PlanComment = {
+      id: "comment-3",
+      body: "Anonymous comment",
+      createdAt: new Date().toISOString(),
+    };
+    const issueWithComment = { ...mockIssue, comments: [commentWithoutUser] };
+    const output = formatShowHuman(issueWithComment);
+    expect(output).toContain("(unknown)");
+    expect(output).toContain("Anonymous comment");
   });
 });

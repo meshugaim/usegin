@@ -10,6 +10,7 @@ export function createShowCommand(): Command {
     .argument("<identifier>", "Issue identifier (e.g., ENG-123)")
     .option("--json", "Output as JSON")
     .option("--web", "Open issue in web browser")
+    .option("--comments", "Include comments in the output")
     .option("--stats", "Show API call statistics")
     .action(async (identifier: string, opts) => {
       await runShow(identifier, opts);
@@ -20,7 +21,7 @@ export function createShowCommand(): Command {
 
 async function runShow(
   identifier: string,
-  opts: { json?: boolean; web?: boolean; stats?: boolean }
+  opts: { json?: boolean; web?: boolean; comments?: boolean; stats?: boolean }
 ): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
 
@@ -37,6 +38,11 @@ async function runShow(
     if (!issue) {
       console.error(`Error: Issue "${identifier}" not found`);
       process.exit(3);
+    }
+
+    // Fetch comments if requested
+    if (opts.comments) {
+      issue.comments = await client.getIssueComments(identifier);
     }
 
     if (opts.web) {

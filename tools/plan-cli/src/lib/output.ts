@@ -1,4 +1,4 @@
-import type { PlanIssue, PlanIssueDetail } from "../types";
+import type { PlanIssue, PlanIssueDetail, PlanComment } from "../types";
 import {
   colors,
   colorizeStatus,
@@ -552,36 +552,100 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
     lines.push(`${colors.fieldName("Blocks:")} ${dim("(none)")}`);
   }
 
+  // Comments (if present)
+  if (issue.comments && issue.comments.length > 0) {
+    lines.push("");
+    lines.push(colors.fieldName(`Comments (${issue.comments.length}):`));
+    for (const comment of issue.comments) {
+      lines.push("");
+      lines.push(formatComment(comment));
+    }
+  }
+
   return lines.join("\n");
+}
+
+/**
+ * Format a single comment for display
+ */
+function formatComment(comment: PlanComment): string {
+  const lines: string[] = [];
+  const author = comment.user
+    ? colors.assignee(`@${comment.user.name}`)
+    : dim("(unknown)");
+  const date = formatRelativeDate(comment.createdAt);
+
+  lines.push(`  ${author} ${dim(`· ${date}`)}`);
+
+  // Indent comment body lines
+  const bodyLines = comment.body.split("\n");
+  for (const line of bodyLines) {
+    lines.push(`  ${line}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Format a date as a relative time string
+ */
+function formatRelativeDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours === 0) {
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      if (diffMinutes < 1) return "just now";
+      return `${diffMinutes}m ago`;
+    }
+    return `${diffHours}h ago`;
+  }
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  return `${Math.floor(diffDays / 365)}y ago`;
 }
 
 /**
  * Format a single issue for `plan show` - JSON output
  */
 export function formatShowJson(issue: PlanIssueDetail): string {
-  return JSON.stringify(
-    {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      url: issue.url,
-      description: issue.description,
-      status: issue.status,
-      sortOrder: issue.sortOrder,
-      position: issue.position,
-      assignee: issue.assignee,
-      labels: issue.labels,
-      project: issue.project,
-      children: issue.children.map((child) => ({
-        id: child.id,
-        identifier: child.identifier,
-        title: child.title,
-        status: child.status,
-      })),
-      blockedBy: issue.blockedBy,
-      blocks: issue.blocks,
-    },
-    null,
-    2
-  );
+  const output: Record<string, unknown> = {
+    id: issue.id,
+    identifier: issue.identifier,
+    title: issue.title,
+    url: issue.url,
+    description: issue.description,
+    status: issue.status,
+    sortOrder: issue.sortOrder,
+    position: issue.position,
+    assignee: issue.assignee,
+    labels: issue.labels,
+    project: issue.project,
+    children: issue.children.map((child) => ({
+      id: child.id,
+      identifier: child.identifier,
+      title: child.title,
+      status: child.status,
+    })),
+    blockedBy: issue.blockedBy,
+    blocks: issue.blocks,
+  };
+
+  // Include comments if present
+  if (issue.comments) {
+    output.comments = issue.comments.map((c) => ({
+      id: c.id,
+      body: c.body,
+      createdAt: c.createdAt,
+      user: c.user,
+    }));
+  }
+
+  return JSON.stringify(output, null, 2);
 }

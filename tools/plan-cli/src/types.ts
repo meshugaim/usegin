@@ -43,6 +43,20 @@ export interface ListResult {
 }
 
 /**
+ * Comment on an issue
+ */
+export interface PlanComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    displayName: string;
+  };
+}
+
+/**
  * Extended issue type for show command with relationships
  */
 export interface PlanIssueDetail extends PlanIssue {
@@ -50,4 +64,5 @@ export interface PlanIssueDetail extends PlanIssue {
   position: number;
   blockedBy: Array<{ id: string; identifier: string; title: string }>;
   blocks: Array<{ id: string; identifier: string; title: string }>;
+  comments?: PlanComment[];
 }

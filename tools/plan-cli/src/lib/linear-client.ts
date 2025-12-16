@@ -1,5 +1,5 @@
 import { LinearClient as LinearSDK } from "@linear/sdk";
-import type { PlanIssue, PlanIssueDetail, ListOptions } from "../types";
+import type { PlanIssue, PlanIssueDetail, PlanComment, ListOptions } from "../types";
 import {
   getCachedTeam,
   setCachedTeam,
@@ -1092,5 +1092,60 @@ export class LinearClient {
 
     this.trackCall();
     await this.sdk.updateIssue(issue.id, { sortOrder });
+  }
+
+  /**
+   * Get comments for an issue by identifier
+   */
+  async getIssueComments(identifier: string): Promise<PlanComment[]> {
+    const query = `
+      query GetIssueComments($id: String!) {
+        issue(id: $id) {
+          comments {
+            nodes {
+              id
+              body
+              createdAt
+              user {
+                id
+                name
+                displayName
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    interface GqlComment {
+      id: string;
+      body: string;
+      createdAt: string;
+      user: { id: string; name: string; displayName: string } | null;
+    }
+
+    interface GqlResponse {
+      issue: {
+        comments: {
+          nodes: GqlComment[];
+        };
+      } | null;
+    }
+
+    const data = await this.graphql<GqlResponse>(query, { id: identifier });
+    if (!data.issue) return [];
+
+    return data.issue.comments.nodes.map((c) => ({
+      id: c.id,
+      body: c.body,
+      createdAt: c.createdAt,
+      user: c.user
+        ? {
+            id: c.user.id,
+            name: c.user.name,
+            displayName: c.user.displayName,
+          }
+        : undefined,
+    }));
   }
 }
