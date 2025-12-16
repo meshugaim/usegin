@@ -1,13 +1,37 @@
 import { Command } from "commander";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
-import { parseFrontmatter } from "./docs";
+import { parseFrontmatter, loadDocsFromDir, formatDocsList } from "./docs";
+import { dim } from "../lib/colors";
+
+function getDocsDir(internal = false): string {
+  const base = join(dirname(import.meta.dir), "..", "docs");
+  return internal ? join(base, "internal") : base;
+}
 
 function getPhilosophyContent(): string {
-  const docsDir = join(dirname(import.meta.dir), "..", "docs");
+  const docsDir = getDocsDir();
   const content = readFileSync(join(docsDir, "philosophy.md"), "utf-8");
   const { body } = parseFrontmatter(content);
   return body;
+}
+
+function getDocsOverview(): string {
+  const userDocs = loadDocsFromDir(getDocsDir(false));
+  const internalDocs = loadDocsFromDir(getDocsDir(true));
+  const allDocs = [...userDocs, ...internalDocs];
+
+  if (allDocs.length === 0) {
+    return "";
+  }
+
+  const lines: string[] = [];
+  lines.push("## Available Docs\n");
+  lines.push(formatDocsList(allDocs));
+  lines.push("");
+  lines.push(dim("Use: plan docs show <handle|number>"));
+
+  return lines.join("\n");
 }
 
 export function createAlignCommand(): Command {
@@ -17,6 +41,12 @@ export function createAlignCommand(): Command {
       console.log(getPhilosophyContent());
       console.log("\n---\n");
       command.parent?.outputHelp();
+
+      const docsOverview = getDocsOverview();
+      if (docsOverview) {
+        console.log("\n---\n");
+        console.log(docsOverview);
+      }
     });
 
   return cmd;
