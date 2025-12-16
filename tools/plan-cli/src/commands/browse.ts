@@ -8,7 +8,7 @@ export function createBrowseCommand(): Command {
     .description("Interactive issue browser using fzf")
     .option("--team <key>", "Team key (e.g., ENG)")
     .option("--inbox", "Browse inbox items only")
-    .option("--action <action>", "Action after selection: start, close, delegate")
+    .option("--action <action>", "Action after selection: start, close, open, delegate")
     .option("--multi", "Allow multiple selection")
     .action(async (opts) => {
       await runBrowse(opts);
@@ -82,9 +82,9 @@ async function runBrowse(opts: {
       "--preview-window",
       "right:50%:wrap",
       "--header",
-      "Select issue (enter to select, ctrl-w to delegate, esc to cancel)",
+      "enter=select  ctrl-x=close  ctrl-o=open  ctrl-w=delegate  esc=cancel",
       "--expect",
-      "ctrl-w",
+      "ctrl-w,ctrl-x,ctrl-o",
     ];
 
     if (opts.multi) {
@@ -118,7 +118,20 @@ async function runBrowse(opts: {
     }
 
     // Determine action: keybind takes precedence, then --action flag
-    const action = pressedKey === "ctrl-w" ? "delegate" : opts.action;
+    let action: string | undefined;
+    switch (pressedKey) {
+      case "ctrl-w":
+        action = "delegate";
+        break;
+      case "ctrl-x":
+        action = "close";
+        break;
+      case "ctrl-o":
+        action = "open";
+        break;
+      default:
+        action = opts.action;
+    }
 
     // Perform action if specified
     if (action) {
@@ -161,6 +174,19 @@ async function performAction(
       });
       console.log(`Closed: ${identifier}`);
       break;
+
+    case "open": {
+      // Open in web browser
+      const issue = await client.getIssueDetail(identifier);
+      if (issue?.url) {
+        const openCmd = process.platform === "darwin" ? "open" : "xdg-open";
+        await $`${openCmd} ${issue.url}`.quiet();
+        console.log(`Opened: ${identifier}`);
+      } else {
+        console.error(`Could not get URL for: ${identifier}`);
+      }
+      break;
+    }
 
     case "delegate":
       // Delegate to worktree agent
