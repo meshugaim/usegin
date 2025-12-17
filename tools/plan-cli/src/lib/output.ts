@@ -8,6 +8,7 @@ import {
   dim,
   bold,
 } from "./colors";
+import { renderMarkdown } from "./markdown";
 
 // Column widths and constraints
 const MIN_TITLE_WIDTH = 20;
@@ -519,11 +520,8 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
   if (issue.description) {
     lines.push("");
     lines.push(colors.fieldName("Description:"));
-    // Indent description lines
-    const descLines = issue.description.split("\n");
-    for (const line of descLines) {
-      lines.push(`  ${line}`);
-    }
+    // Render markdown with terminal formatting and indent
+    lines.push(renderMarkdown(issue.description, "  "));
   }
 
   // Sub-issues
@@ -583,11 +581,8 @@ function formatComment(comment: PlanComment): string {
 
   lines.push(`  ${author} ${dim(`· ${date}`)}`);
 
-  // Indent comment body lines
-  const bodyLines = comment.body.split("\n");
-  for (const line of bodyLines) {
-    lines.push(`  ${line}`);
-  }
+  // Render markdown with terminal formatting and indent
+  lines.push(renderMarkdown(comment.body, "  "));
 
   return lines.join("\n");
 }

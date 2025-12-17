@@ -125,6 +125,21 @@ describe("formatShowHuman", () => {
     const output = formatShowHuman(mockIssue);
     expect(output).toContain("Project: MVP");
   });
+
+  it("renders markdown in description (removes markdown markers)", () => {
+    const issueWithMarkdown: PlanIssueDetail = {
+      ...mockIssue,
+      description: "## Header\n\nThis has `inline code` and **bold** text.",
+    };
+    const output = formatShowHuman(issueWithMarkdown);
+    // Should contain the text
+    expect(output).toContain("Header");
+    expect(output).toContain("inline code");
+    expect(output).toContain("bold");
+    // Markdown markers should be removed by the renderer
+    expect(output).not.toContain("##");
+    expect(output).not.toContain("**");
+  });
 });
 
 describe("formatShowJson", () => {
@@ -256,6 +271,22 @@ describe("formatShowHuman with comments", () => {
     const output = formatShowHuman(issueWithComment);
     expect(output).toContain("(unknown)");
     expect(output).toContain("Anonymous comment");
+  });
+
+  it("renders markdown in comment body (removes markdown markers)", () => {
+    const commentWithMarkdown: PlanComment = {
+      id: "comment-md",
+      body: "Check `this code` and **important** note.",
+      createdAt: new Date().toISOString(),
+      user: { id: "user-1", name: "test", displayName: "Test" },
+    };
+    const issueWithComment = { ...mockIssue, comments: [commentWithMarkdown] };
+    const output = formatShowHuman(issueWithComment);
+    // Should contain the text
+    expect(output).toContain("this code");
+    expect(output).toContain("important");
+    // Markdown markers should be removed by the renderer
+    expect(output).not.toContain("**");
   });
 });
 

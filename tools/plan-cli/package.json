@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@linear/sdk": "^29.0.0",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "marked": "15",
+    "marked-terminal": "^7.3.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
