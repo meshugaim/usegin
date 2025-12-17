@@ -552,14 +552,20 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
     lines.push(`${colors.fieldName("Blocks:")} ${dim("(none)")}`);
   }
 
-  // Comments (if present)
+  // Comments section
   if (issue.comments && issue.comments.length > 0) {
+    // Full comments were loaded with --comments flag
     lines.push("");
     lines.push(colors.fieldName(`Comments (${issue.comments.length}):`));
     for (const comment of issue.comments) {
       lines.push("");
       lines.push(formatComment(comment));
     }
+  } else if (issue.commentCount && issue.commentCount > 0) {
+    // Show hint about comments when count > 0 but comments not loaded
+    lines.push("");
+    const countText = issue.commentCount === 1 ? "1 comment" : `${issue.commentCount} comments`;
+    lines.push(`${colors.fieldName("Comments:")} ${countText} ${dim("(use --comments to view)")}`);
   }
 
   return lines.join("\n");
@@ -635,6 +641,7 @@ export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEnt
     })),
     blockedBy: issue.blockedBy,
     blocks: issue.blocks,
+    commentCount: issue.commentCount,
   };
 
   // Include comments if present

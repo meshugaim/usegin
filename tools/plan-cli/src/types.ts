@@ -65,6 +65,8 @@ export interface PlanIssueDetail extends PlanIssue {
   blockedBy: Array<{ id: string; identifier: string; title: string }>;
   blocks: Array<{ id: string; identifier: string; title: string }>;
   comments?: PlanComment[];
+  /** Number of comments on this issue (always fetched, unlike full comments) */
+  commentCount?: number;
 }
 
 /**

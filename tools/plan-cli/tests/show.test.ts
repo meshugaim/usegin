@@ -24,6 +24,7 @@ const mockIssue: PlanIssueDetail = {
   description: "Break up the monolithic API client into smaller modules.",
   status: "Backlog",
   sortOrder: 2.0,
+  url: "https://linear.app/team/issue/ENG-20",
   position: 2,
   assignee: { id: "user-1", name: "nitsan", displayName: "Nitsan" },
   labels: ["refactor", "tech-debt"],
@@ -255,6 +256,73 @@ describe("formatShowHuman with comments", () => {
     const output = formatShowHuman(issueWithComment);
     expect(output).toContain("(unknown)");
     expect(output).toContain("Anonymous comment");
+  });
+});
+
+describe("formatShowHuman with comment count hint", () => {
+  it("shows comment count with hint when commentCount > 0 and comments not loaded", () => {
+    const issueWithCommentCount = { ...mockIssue, commentCount: 3 };
+    const output = formatShowHuman(issueWithCommentCount);
+    expect(output).toContain("Comments:");
+    expect(output).toContain("3 comments");
+    expect(output).toContain("(use --comments to view)");
+  });
+
+  it("shows singular form for 1 comment", () => {
+    const issueWithOneComment = { ...mockIssue, commentCount: 1 };
+    const output = formatShowHuman(issueWithOneComment);
+    expect(output).toContain("1 comment");
+    expect(output).not.toContain("1 comments");
+  });
+
+  it("does not show comment hint when commentCount is 0", () => {
+    const issueWithNoComments = { ...mockIssue, commentCount: 0 };
+    const output = formatShowHuman(issueWithNoComments);
+    expect(output).not.toContain("Comments:");
+    expect(output).not.toContain("use --comments to view");
+  });
+
+  it("does not show comment hint when commentCount is undefined", () => {
+    const issueWithoutCommentCount = { ...mockIssue };
+    delete (issueWithoutCommentCount as Partial<typeof mockIssue>).commentCount;
+    const output = formatShowHuman(issueWithoutCommentCount);
+    expect(output).not.toContain("use --comments to view");
+  });
+
+  it("shows full comments instead of hint when comments are loaded", () => {
+    const issueWithBothCommentsAndCount = {
+      ...mockIssue,
+      comments: mockComments,
+      commentCount: 2,
+    };
+    const output = formatShowHuman(issueWithBothCommentsAndCount);
+    // Should show full comments, not the hint
+    expect(output).toContain("Comments (2):");
+    expect(output).toContain("@nitsan");
+    expect(output).not.toContain("use --comments to view");
+  });
+});
+
+describe("formatShowJson with commentCount", () => {
+  it("includes commentCount in JSON output", () => {
+    const issueWithCommentCount = { ...mockIssue, commentCount: 5 };
+    const output = formatShowJson(issueWithCommentCount);
+    const parsed = JSON.parse(output);
+    expect(parsed.commentCount).toBe(5);
+  });
+
+  it("includes commentCount as 0 when no comments", () => {
+    const issueWithZeroComments = { ...mockIssue, commentCount: 0 };
+    const output = formatShowJson(issueWithZeroComments);
+    const parsed = JSON.parse(output);
+    expect(parsed.commentCount).toBe(0);
+  });
+
+  it("includes commentCount as undefined when not set", () => {
+    const issueWithoutCommentCount = { ...mockIssue };
+    const output = formatShowJson(issueWithoutCommentCount);
+    const parsed = JSON.parse(output);
+    expect(parsed.commentCount).toBeUndefined();
   });
 });
 

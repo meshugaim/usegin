@@ -345,6 +345,7 @@ export class LinearClient {
           labels { nodes { name } }
           project { name }
           team { id }
+          comments { nodes { id } }
           children {
             nodes {
               id
@@ -405,6 +406,7 @@ export class LinearClient {
       labels: { nodes: Array<{ name: string }> };
       project: { name: string } | null;
       team: { id: string };
+      comments: { nodes: Array<{ id: string }> };
       children: { nodes: GqlChild[] };
       relations: { nodes: GqlRelation[] };
       inverseRelations: { nodes: GqlRelation[] };
@@ -496,6 +498,7 @@ export class LinearClient {
         children: children.sort((a, b) => a.sortOrder - b.sortOrder),
         blockedBy,
         blocks,
+        commentCount: issue.comments.nodes.length,
       };
     } catch (error) {
       // Log error for debugging
