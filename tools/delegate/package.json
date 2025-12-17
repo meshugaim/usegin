@@ -1,5 +1,6 @@
 {
   "name": "delegate",
+  "description": "Agent delegation patterns CLI",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

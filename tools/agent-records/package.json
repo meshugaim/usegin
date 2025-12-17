@@ -1,5 +1,6 @@
 {
   "name": "agent-records-cli",
+  "description": "Query and browse Claude agent conversation records",
   "version": "1.0.0",
   "module": "src/cli.ts",
   "type": "module",

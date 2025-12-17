@@ -1,5 +1,6 @@
 {
   "name": "workspace-sim",
+  "description": "Interactive workspace model simulator",
   "private": true,
   "version": "0.0.1",
   "type": "module",

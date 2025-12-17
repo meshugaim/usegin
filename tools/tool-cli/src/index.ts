@@ -158,10 +158,14 @@ function getScriptDescription(filePath: string, name: string): string {
     "api-dev": "Run FastAPI dev server",
     "autopull": "Auto-pull daemon for syncing from main",
     "claude-sync": "Sync Claude sessions between environments",
+    "fathom": "CLI for Fathom API - list, view, export meetings",
+    "gmail": "Sync and search Gmail via CLI",
+    "google-file-search": "Test Google Gemini File Search Tool API",
     "hebrew-to-english": "Convert Hebrew keyboard input to English",
     "nextjs-dev": "Run Next.js dev server",
     "pick-and-push-session.ts": "Pick a session and push for retro",
     "pick-issue": "Interactive issue picker with fzf",
+    "push-session": "Push Claude sessions to git for retro analysis",
     "qr-port": "Generate QR code for port forwarding",
   };
 

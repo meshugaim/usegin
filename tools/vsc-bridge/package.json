@@ -1,5 +1,6 @@
 {
   "name": "vsc-bridge",
+  "description": "VS Code extension bridge for Claude integration",
   "private": true,
   "scripts": {
     "release": "bun scripts/release.ts"
