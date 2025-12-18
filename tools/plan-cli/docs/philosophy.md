@@ -12,13 +12,17 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 ## Our Approach
 
-**Two places**: Inbox (ideas, unclear stuff) → List (ready to work on)
-**Ordering**: Position = priority. What's at the top is what's next.
-**Flow**: capture → promote → start → close
+**The graph**: Work lives in a web of connected issues. When creating or capturing, connect it to what it relates to—`--parent` for sub-issues, `--related-to` for loose connections. Standalone issues are rare.
+
+**Ordering**: The order of issues is a rough understanding of how we think execution should be sequenced. Focus on what's at the top. The rest will shift as things become clearer.
+
+**Inbox**: A label for things that need processing and clarification. They're waiting to be understood—what exactly is this, and what should we do about it? Clarify and process before starting, or do it all in one go: start, clarify, work.
+
+**Flow**: capture/create → start → close
 
 ## What We Value
 
-**Connectedness** — Work isn't isolated. We build a web of related issues, linked commits, parent-child relationships. Context travels with the work.
+**Connectedness** — We build a web of related issues, linked commits, parent-child relationships. Context travels with the work.
 
 **Clarity** — Simple names: `scope: what it does`. Labels carry the type. Titles stay scannable.
 
@@ -29,8 +33,6 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 ## Practices
 
 **Labels** — Use labels for the type of work: `bug`, `feature`, `chore`, `docs`. This keeps titles focused on *what*, while labels signal *what kind*.
-
-**Connect before creating** — Before adding a new issue, consider how it relates to what already exists. Use `--parent` for sub-issues, `--blocked-by`/`--blocking` for dependencies, or `--related-to` for loose connections. Connected issues are easier to find — sub-issues appear under their parents in `plan list`, and relationships show in `plan show`. A well-connected graph makes it easier to orient yourself in the work.
 
 **One source of truth** — Linear is where work lives. Don't track tasks in markdown files, todo lists, or other tools. If it's worth tracking, it goes in Linear via `plan`.
 
