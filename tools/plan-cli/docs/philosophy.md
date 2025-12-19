@@ -12,7 +12,7 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 ## Our Approach
 
-**The graph**: Work lives in a web of connected issues. When creating or capturing, connect it to what it relates to—`--parent` for sub-issues, `--related-to` for loose connections. This means start by familiarizing with the `plan list`. Standalone issues are rare.
+**The graph**: Work lives in a web of connected issues. When creating or capturing, connect it to existing items - `--parent` for sub-issues, `--related-to` for loose connections. This means, first start by familiarizing with the existing `plan list`. Standalone issues are rare.
 
 **Ordering**: The order of issues is a rough understanding of how we think execution should be sequenced. Focus on what's at the top. The rest will shift as things become clearer.
 
