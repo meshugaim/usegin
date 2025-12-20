@@ -7,6 +7,7 @@ import { normalizeIssueId } from "../lib/identifier";
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
     .alias("as")
+    .alias("capture")
     .description("Create a new issue in the list")
     .argument("<title>", "Issue title")
     .option("--team <key>", "Team key (e.g., ENG)")

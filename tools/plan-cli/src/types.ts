@@ -26,8 +26,6 @@ export interface PlanIssue {
 }
 
 export interface ListOptions {
-  inbox?: boolean;
-  all?: boolean;
   depth?: number;
   status?: string;
   assignee?: string;

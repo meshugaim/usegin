@@ -12,13 +12,11 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 ## Our Approach
 
-**The graph**: Work lives in a web of connected issues. When creating or capturing, connect it to existing items - `--parent` for sub-issues, `--related-to` for loose connections. This means, first start by familiarizing with the existing `plan list`. Standalone issues are rare.
+**The graph**: Work lives in a web of connected issues. When creating, connect it to existing items - `--parent` for sub-issues, `--related-to` for loose connections. This means, first start by familiarizing with the existing `plan list`. Standalone issues are rare.
 
 **Ordering**: The order of issues is a rough understanding of how we think execution should be sequenced. Focus on what's at the top. The rest will shift as things become clearer.
 
-**Inbox**: A label for things that need processing and clarification. They're waiting to be understood—what exactly is this, and what should we do about it? Clarify and process before starting, or do it all in one go: start, clarify, work.
-
-**Flow**: capture/create → start → close
+**Flow**: create → start → close
 
 ## What We Value
 

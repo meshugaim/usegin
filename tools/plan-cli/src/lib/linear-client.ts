@@ -246,11 +246,6 @@ export class LinearClient {
       filterParts.push(`labels: { name: { in: [${labelList}] } }`);
     }
 
-    // Filter for inbox
-    if (options.inbox) {
-      filterParts.push(`labels: { name: { eq: "inbox" } }`);
-    }
-
     const filterStr = `filter: { ${filterParts.join(", ")} }`;
 
     // Build GraphQL query with dynamic depth for nested children

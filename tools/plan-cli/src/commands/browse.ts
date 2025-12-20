@@ -7,7 +7,6 @@ export function createBrowseCommand(): Command {
   const cmd = new Command("browse")
     .description("Interactive issue browser using fzf")
     .option("--team <key>", "Team key (e.g., ENG)")
-    .option("--inbox", "Browse inbox items only")
     .option("--action <action>", "Action after selection: start, close, open, delegate")
     .option("--multi", "Allow multiple selection")
     .action(async (opts) => {
@@ -41,7 +40,6 @@ export function extractIdentifier(line: string): string | null {
 
 async function runBrowse(opts: {
   team?: string;
-  inbox?: boolean;
   action?: string;
   multi?: boolean;
 }): Promise<void> {
@@ -60,7 +58,6 @@ async function runBrowse(opts: {
 
     const issues = await client.listIssues({
       team,
-      inbox: opts.inbox,
     });
 
     if (issues.length === 0) {

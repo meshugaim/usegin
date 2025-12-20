@@ -17,8 +17,6 @@ export function createListCommand(): Command {
     .option("--search <text>", "Search in title and description")
     .option("--group-by <field>", "Group by: label, project, or status")
     .option("--depth <n>", "Include sub-issues (0=none, 1, 2, ...)", "2")
-    .option("--inbox", "Show inbox items only")
-    .option("--all", "Show both inbox and list items")
     .option("--status <status>", "Filter by status")
     .option("--assignee <user>", "Filter by assignee (@me for self)")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
@@ -44,8 +42,6 @@ async function runList(opts: {
   search?: string;
   groupBy?: string;
   depth?: string;
-  inbox?: boolean;
-  all?: boolean;
   status?: string;
   assignee?: string;
   fzf?: boolean;
@@ -94,8 +90,6 @@ async function runList(opts: {
       search: opts.search,
       groupBy: opts.groupBy as ListOptions["groupBy"],
       depth: parseInt(opts.depth ?? "0", 10),
-      inbox: opts.inbox,
-      all: opts.all,
       status: opts.status,
       assignee: opts.assignee,
     };
