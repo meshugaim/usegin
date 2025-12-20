@@ -207,11 +207,13 @@ export class LinearClient {
   }
 
   /**
-   * List issues from Linear (single GraphQL query)
+   * List issues from Linear with pagination support
    */
   async listIssues(options: ListOptions = {}): Promise<PlanIssue[]> {
-    // Build filter
-    const filterParts: string[] = [];
+    // Build filter - always filter for top-level issues (no parent)
+    const filterParts: string[] = [
+      `parent: { null: true }`,
+    ];
 
     if (options.team) {
       const team = await this.getTeamByKey(options.team);
@@ -249,30 +251,48 @@ export class LinearClient {
       filterParts.push(`labels: { name: { eq: "inbox" } }`);
     }
 
-    const filterStr = filterParts.length > 0 ? `filter: { ${filterParts.join(", ")} }` : "";
+    const filterStr = `filter: { ${filterParts.join(", ")} }`;
 
     // Build GraphQL query with dynamic depth for nested children
     const depth = options.depth ?? 0;
     const issueFields = this.buildIssueFields(depth);
 
-    const query = `
-      query ListIssues {
-        issues(${filterStr}, first: 100) {
-          nodes {${issueFields}
+    // Paginate through all results
+    const allIssues: GqlIssue[] = [];
+    let hasNextPage = true;
+    let cursor: string | null = null;
+
+    while (hasNextPage) {
+      const afterClause = cursor ? `, after: "${cursor}"` : "";
+      const query = `
+        query ListIssues {
+          issues(${filterStr}, first: 100${afterClause}) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {${issueFields}
+            }
           }
         }
-      }
-    `;
+      `;
 
-    const data = await this.graphql<{ issues: { nodes: GqlIssue[] } }>(query);
+      const data = await this.graphql<{
+        issues: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: GqlIssue[];
+        };
+      }>(query);
 
-    // Transform to PlanIssue format
+      allIssues.push(...data.issues.nodes);
+      hasNextPage = data.issues.pageInfo.hasNextPage;
+      cursor = data.issues.pageInfo.endCursor;
+    }
+
+    // Transform to PlanIssue format (no need to filter by parent - done at GraphQL level)
     const planIssues: PlanIssue[] = [];
 
-    for (const issue of data.issues.nodes) {
-      // Skip if has parent (we only want top-level)
-      if (issue.parent) continue;
-
+    for (const issue of allIssues) {
       // Apply search filter (client-side since GraphQL filter is limited)
       if (options.search) {
         const searchLower = options.search.toLowerCase();
@@ -455,23 +475,41 @@ export class LinearClient {
         children: [],
       }));
 
-      // Get position from siblings (second query - unavoidable for position)
-      const siblingsQuery = `
-        query GetSiblings($teamId: ID!) {
-          issues(filter: {
-            team: { id: { eq: $teamId } },
-            parent: { null: true },
-            state: { type: { nin: ["completed", "canceled"] } }
-          }, first: 100) {
-            nodes { id sortOrder }
+      // Get position from siblings with pagination
+      const allSiblings: Array<{ id: string; sortOrder: number }> = [];
+      let siblingsHasNextPage = true;
+      let siblingsCursor: string | null = null;
+
+      while (siblingsHasNextPage) {
+        const afterClause = siblingsCursor ? `, after: "${siblingsCursor}"` : "";
+        const siblingsQuery = `
+          query GetSiblings($teamId: ID!) {
+            issues(filter: {
+              team: { id: { eq: $teamId } },
+              parent: { null: true },
+              state: { type: { nin: ["completed", "canceled"] } }
+            }, first: 100${afterClause}) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes { id sortOrder }
+            }
           }
-        }
-      `;
-      const siblingsData = await this.graphql<{ issues: { nodes: Array<{ id: string; sortOrder: number }> } }>(
-        siblingsQuery,
-        { teamId: issue.team.id }
-      );
-      const sortedSiblings = siblingsData.issues.nodes.sort((a, b) => a.sortOrder - b.sortOrder);
+        `;
+        const siblingsData = await this.graphql<{
+          issues: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            nodes: Array<{ id: string; sortOrder: number }>;
+          };
+        }>(siblingsQuery, { teamId: issue.team.id });
+
+        allSiblings.push(...siblingsData.issues.nodes);
+        siblingsHasNextPage = siblingsData.issues.pageInfo.hasNextPage;
+        siblingsCursor = siblingsData.issues.pageInfo.endCursor;
+      }
+
+      const sortedSiblings = allSiblings.sort((a, b) => a.sortOrder - b.sortOrder);
       const position = sortedSiblings.findIndex((i) => i.id === issue.id) + 1;
 
       return {
@@ -1047,7 +1085,7 @@ export class LinearClient {
   }
 
   /**
-   * Get all top-level issues with sortOrder for reordering
+   * Get all top-level issues with sortOrder for reordering (with pagination)
    */
   async getIssuesForReordering(teamKey?: string): Promise<Array<{
     id: string;
@@ -1064,26 +1102,47 @@ export class LinearClient {
       filterParts.push(`team: { key: { eq: "${teamKey}" } }`);
     }
 
-    const query = `
-      query GetIssuesForReordering {
-        issues(filter: { ${filterParts.join(", ")} }, first: 100) {
-          nodes {
-            id
-            identifier
-            sortOrder
-          }
-        }
-      }
-    `;
-
     interface GqlIssue {
       id: string;
       identifier: string;
       sortOrder: number;
     }
 
-    const data = await this.graphql<{ issues: { nodes: GqlIssue[] } }>(query);
-    return data.issues.nodes;
+    const allIssues: GqlIssue[] = [];
+    let hasNextPage = true;
+    let cursor: string | null = null;
+
+    while (hasNextPage) {
+      const afterClause = cursor ? `, after: "${cursor}"` : "";
+      const query = `
+        query GetIssuesForReordering {
+          issues(filter: { ${filterParts.join(", ")} }, first: 100${afterClause}) {
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            nodes {
+              id
+              identifier
+              sortOrder
+            }
+          }
+        }
+      `;
+
+      const data = await this.graphql<{
+        issues: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: GqlIssue[];
+        };
+      }>(query);
+
+      allIssues.push(...data.issues.nodes);
+      hasNextPage = data.issues.pageInfo.hasNextPage;
+      cursor = data.issues.pageInfo.endCursor;
+    }
+
+    return allIssues;
   }
 
   /**
