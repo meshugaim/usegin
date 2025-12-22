@@ -20,6 +20,7 @@ export function createListCommand(): Command {
     .option("--status <status>", "Filter by status")
     .option("--assignee <user>", "Filter by assignee (@me for self)")
     .option("--latest", "Sort by creation date (newest first)")
+    .option("--active", "Sort by recent activity (most recently updated first)")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
     .option("--show-done", "Show Done sub-issues (hidden by default)")
@@ -46,6 +47,7 @@ async function runList(opts: {
   status?: string;
   assignee?: string;
   latest?: boolean;
+  active?: boolean;
   fzf?: boolean;
   multi?: boolean;
   showDone?: boolean;
@@ -109,6 +111,15 @@ async function runList(opts: {
         const dateA = new Date(a.createdAt).getTime();
         const dateB = new Date(b.createdAt).getTime();
         return dateB - dateA; // Newest first
+      });
+    }
+
+    // Sort by update date if --active is specified
+    if (opts.active) {
+      issues = issues.sort((a, b) => {
+        const dateA = new Date(a.updatedAt).getTime();
+        const dateB = new Date(b.updatedAt).getTime();
+        return dateB - dateA; // Most recently updated first
       });
     }
 

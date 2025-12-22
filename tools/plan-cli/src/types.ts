@@ -10,6 +10,7 @@ export interface PlanIssue {
   status: string;
   sortOrder: number;
   createdAt: string;
+  updatedAt: string;
   assignee?: {
     id: string;
     name: string;

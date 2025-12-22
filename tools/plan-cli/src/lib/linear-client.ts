@@ -27,6 +27,7 @@ interface GqlIssue {
   description: string | null;
   sortOrder: number;
   createdAt: string;
+  updatedAt: string;
   state: { name: string } | null;
   assignee: { id: string; name: string; displayName: string } | null;
   parent?: { id: string; identifier: string } | null;
@@ -133,6 +134,7 @@ export class LinearClient {
       description
       sortOrder
       createdAt
+      updatedAt
       state { name }
       assignee { id name displayName }
       labels { nodes { name } }
@@ -194,6 +196,7 @@ export class LinearClient {
       status: gqlIssue.state?.name ?? "Unknown",
       sortOrder: gqlIssue.sortOrder,
       createdAt: gqlIssue.createdAt,
+      updatedAt: gqlIssue.updatedAt,
       assignee: gqlIssue.assignee
         ? {
             id: gqlIssue.assignee.id,
@@ -327,6 +330,7 @@ export class LinearClient {
         status: state?.name ?? "Unknown",
         sortOrder: issue.sortOrder,
         createdAt: issue.createdAt.toISOString(),
+        updatedAt: issue.updatedAt.toISOString(),
         assignee: assignee
           ? {
               id: assignee.id,
@@ -357,6 +361,8 @@ export class LinearClient {
           title
           description
           sortOrder
+          createdAt
+          updatedAt
           url
           state { name }
           assignee { id name displayName }
@@ -373,6 +379,7 @@ export class LinearClient {
               description
               sortOrder
               createdAt
+              updatedAt
               state { name }
               assignee { id name displayName }
               labels { nodes { name } }
@@ -408,6 +415,7 @@ export class LinearClient {
       description: string | null;
       sortOrder: number;
       createdAt: string;
+      updatedAt: string;
       state: { name: string } | null;
       assignee: { id: string; name: string; displayName: string } | null;
       labels: { nodes: Array<{ name: string }> };
@@ -420,6 +428,8 @@ export class LinearClient {
       title: string;
       description: string | null;
       sortOrder: number;
+      createdAt: string;
+      updatedAt: string;
       url: string;
       state: { name: string } | null;
       assignee: { id: string; name: string; displayName: string } | null;
@@ -464,6 +474,7 @@ export class LinearClient {
         status: child.state?.name ?? "Unknown",
         sortOrder: child.sortOrder,
         createdAt: child.createdAt,
+        updatedAt: child.updatedAt,
         assignee: child.assignee
           ? {
               id: child.assignee.id,
@@ -521,6 +532,8 @@ export class LinearClient {
         description: issue.description ?? undefined,
         status: issue.state?.name ?? "Unknown",
         sortOrder: issue.sortOrder,
+        createdAt: issue.createdAt,
+        updatedAt: issue.updatedAt,
         url: issue.url,
         position: position > 0 ? position : 1,
         assignee: issue.assignee
@@ -845,6 +858,7 @@ export class LinearClient {
         status: state?.name ?? "Unknown",
         sortOrder: issue.sortOrder,
         createdAt: issue.createdAt.toISOString(),
+        updatedAt: issue.updatedAt.toISOString(),
         children: [],
       },
       missingLabels,
@@ -1212,6 +1226,85 @@ export class LinearClient {
           }
         : undefined,
     }));
+  }
+
+  /**
+   * Get siblings of an issue (issues with same parent)
+   */
+  async getIssueSiblings(parentIdentifier: string): Promise<Array<{ id: string; identifier: string; title: string; sortOrder: number }>> {
+    const query = `
+      query GetIssueSiblings($id: String!) {
+        issue(id: $id) {
+          id
+          children {
+            nodes {
+              id
+              identifier
+              title
+              sortOrder
+            }
+          }
+        }
+      }
+    `;
+
+    interface GqlSibling {
+      id: string;
+      identifier: string;
+      title: string;
+      sortOrder: number;
+    }
+
+    try {
+      const data = await this.graphql<{
+        issue: {
+          children: {
+            nodes: GqlSibling[];
+          };
+        } | null;
+      }>(query, { id: parentIdentifier });
+
+      if (!data.issue) return [];
+
+      return data.issue.children.nodes.sort((a, b) => a.sortOrder - b.sortOrder);
+    } catch (error) {
+      if (process.env.DEBUG) {
+        console.error("getIssueSiblings error:", error);
+      }
+      return [];
+    }
+  }
+
+  /**
+   * Get parent issue details
+   */
+  async getParentIssue(parentIdentifier: string): Promise<{ id: string; identifier: string; title: string } | null> {
+    const query = `
+      query GetParentIssue($id: String!) {
+        issue(id: $id) {
+          id
+          identifier
+          title
+        }
+      }
+    `;
+
+    try {
+      const data = await this.graphql<{
+        issue: {
+          id: string;
+          identifier: string;
+          title: string;
+        } | null;
+      }>(query, { id: parentIdentifier });
+
+      return data.issue;
+    } catch (error) {
+      if (process.env.DEBUG) {
+        console.error("getParentIssue error:", error);
+      }
+      return null;
+    }
   }
 
   /**
