@@ -26,6 +26,7 @@ interface GqlIssue {
   title: string;
   description: string | null;
   sortOrder: number;
+  createdAt: string;
   state: { name: string } | null;
   assignee: { id: string; name: string; displayName: string } | null;
   parent?: { id: string; identifier: string } | null;
@@ -131,6 +132,7 @@ export class LinearClient {
       title
       description
       sortOrder
+      createdAt
       state { name }
       assignee { id name displayName }
       labels { nodes { name } }
@@ -191,6 +193,7 @@ export class LinearClient {
       description: gqlIssue.description ?? undefined,
       status: gqlIssue.state?.name ?? "Unknown",
       sortOrder: gqlIssue.sortOrder,
+      createdAt: gqlIssue.createdAt,
       assignee: gqlIssue.assignee
         ? {
             id: gqlIssue.assignee.id,
@@ -323,6 +326,7 @@ export class LinearClient {
         description: issue.description ?? undefined,
         status: state?.name ?? "Unknown",
         sortOrder: issue.sortOrder,
+        createdAt: issue.createdAt.toISOString(),
         assignee: assignee
           ? {
               id: assignee.id,
@@ -368,6 +372,7 @@ export class LinearClient {
               title
               description
               sortOrder
+              createdAt
               state { name }
               assignee { id name displayName }
               labels { nodes { name } }
@@ -402,6 +407,7 @@ export class LinearClient {
       title: string;
       description: string | null;
       sortOrder: number;
+      createdAt: string;
       state: { name: string } | null;
       assignee: { id: string; name: string; displayName: string } | null;
       labels: { nodes: Array<{ name: string }> };
@@ -457,6 +463,7 @@ export class LinearClient {
         description: child.description ?? undefined,
         status: child.state?.name ?? "Unknown",
         sortOrder: child.sortOrder,
+        createdAt: child.createdAt,
         assignee: child.assignee
           ? {
               id: child.assignee.id,
@@ -837,6 +844,7 @@ export class LinearClient {
         description: issue.description ?? undefined,
         status: state?.name ?? "Unknown",
         sortOrder: issue.sortOrder,
+        createdAt: issue.createdAt.toISOString(),
         children: [],
       },
       missingLabels,

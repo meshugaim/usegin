@@ -19,6 +19,7 @@ export function createListCommand(): Command {
     .option("--depth <n>", "Include sub-issues (0=none, 1, 2, ...)", "2")
     .option("--status <status>", "Filter by status")
     .option("--assignee <user>", "Filter by assignee (@me for self)")
+    .option("--latest", "Sort by creation date (newest first)")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
     .option("--show-done", "Show Done sub-issues (hidden by default)")
@@ -44,6 +45,7 @@ async function runList(opts: {
   depth?: string;
   status?: string;
   assignee?: string;
+  latest?: boolean;
   fzf?: boolean;
   multi?: boolean;
   showDone?: boolean;
@@ -94,11 +96,20 @@ async function runList(opts: {
       assignee: opts.assignee,
     };
 
-    const issues = await client.listIssues(options);
+    let issues = await client.listIssues(options);
 
     if (issues.length === 0) {
       console.log("No issues found");
       return;
+    }
+
+    // Sort by creation date if --latest is specified
+    if (opts.latest) {
+      issues = issues.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA; // Newest first
+      });
     }
 
     // FZF mode
