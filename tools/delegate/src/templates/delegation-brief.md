@@ -26,10 +26,10 @@ You have full access to `plan` — use it freely:
 - `plan close {{ id }}` — when you're done
 
 ## How we work
-- **Commit continuously** — small, complete, working commits
-- **Push often** — `git push origin wt/{{ id }}:main`
+- **Commit after each logical step** — don't batch changes; commit as soon as something works. Worktrees may be cleaned up without warning, and uncommitted work is lost forever.
+- **Push constantly** — autosync handles this on commit, but verify it succeeds. Unpushed commits don't exist.
+- **Update Linear as you go** — use `plan update {{ id }} --comment "..."` to share progress regularly. This creates a trail of what was done and provides visibility to others.
 - **Stay current** — `git pull origin main --rebase` frequently
-- **Share progress** — comment on the issue as you go
 - **Discover work** — if you find new issues, create them
 
 ## Autosync
