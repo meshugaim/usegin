@@ -24,9 +24,10 @@ Use `bun set-env` to configure environment variables for different contexts.
 
 ```bash
 bun set-env --help           # See all options
-bun set-env --supabase local --urls localhost   # Local development
-bun set-env --supabase local --urls gitpod      # Gitpod with local Supabase
-bun set-env --supabase prod --urls gitpod       # Gitpod with production Supabase
+bun set-env --supabase local --urls localhost    # Local development
+bun set-env --supabase local --urls gitpod       # Gitpod with local Supabase
+bun set-env --supabase local --urls codespaces   # GitHub Codespaces with local Supabase
+bun set-env --supabase prod --urls gitpod        # Gitpod with production Supabase
 ```
 
 ## Local URLs
@@ -48,6 +49,39 @@ gitpod env ports list
 ```
 
 **Important:** Playwright MCP must navigate to Gitpod public URLs (e.g., `https://3000--...gitpod.dev`), not localhost.
+
+## GitHub Codespaces URLs
+
+In GitHub Codespaces, configure with:
+
+```bash
+bun set-env --supabase local --urls codespaces
+```
+
+Get port URLs with:
+
+```bash
+gh codespace ports -c $CODESPACE_NAME
+```
+
+### Required Setup
+
+1. **Make ports public** (required for browser CORS):
+   ```bash
+   gh codespace ports visibility 3000:public 54321:public -c $CODESPACE_NAME
+   ```
+
+2. **Restart Supabase** (to pick up redirect URL config):
+   ```bash
+   supabase stop && supabase start
+   ```
+
+3. **Restart dev servers**:
+   ```bash
+   just dev
+   ```
+
+**Important:** Playwright MCP must navigate to Codespaces public URLs (e.g., `https://<name>-3000.app.github.dev`), not localhost.
 
 ## Test Users (Local)
 
