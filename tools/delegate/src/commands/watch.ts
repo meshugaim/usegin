@@ -67,12 +67,12 @@ export function createWatchCommand(): Command {
       console.log("Press Ctrl+C to stop\n");
       console.log("---\n");
 
-      // Use tail -f piped to session-parser --stream
+      // Use tail -f piped to session --stream
       const tail = spawn("tail", ["-f", session.path], {
         stdio: ["ignore", "pipe", "inherit"],
       });
 
-      const parser = spawn("session-parser", ["--stream"], {
+      const parser = spawn("session", ["--stream"], {
         stdio: ["pipe", "inherit", "inherit"],
       });
 

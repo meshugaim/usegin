@@ -94,7 +94,7 @@ export function createPeekCommand(): Command {
       console.log(`Last activity: ${lastActivity}`);
       console.log("---\n");
 
-      // Build session-parser command
+      // Build session command
       const args = [session.path];
       if (options.toolInput) {
         args.push("--tool-input");
@@ -105,7 +105,7 @@ export function createPeekCommand(): Command {
 
       try {
         // Parse the session and show last N lines
-        const result = await $`session-parser ${args}`.quiet().text();
+        const result = await $`session ${args}`.quiet().text();
         const lines = result.trim().split("\n");
         const numLines = parseInt(options.lines, 10) || 50;
         const lastLines = lines.slice(-numLines);

@@ -1,0 +1,16 @@
+{
+  "name": "session",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "CLI for parsing Claude session JSONL files with configurable verbosity",
+  "bin": {
+    "session": "./src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun src/cli.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.4"
+  }
+}

@@ -14,7 +14,7 @@ Analyze a Claude Code session to identify friction points and create GitHub issu
 ### Step 1: Parse the Session
 
 ```bash
-bun tools/session-parser/src/cli.ts <session.jsonl> --tool-input --subagents
+bun tools/session/src/cli.ts <session.jsonl> --tool-input --subagents
 ```
 
 ### Step 2: Identify Issues
@@ -119,7 +119,7 @@ Sessions live in `~/.claude/projects/<project-hash>/`:
 
 Use `--list-files` to find related files:
 ```bash
-bun tools/session-parser/src/cli.ts <session.jsonl> --list-files
+bun tools/session/src/cli.ts <session.jsonl> --list-files
 ```
 
 ## When to Create Issues

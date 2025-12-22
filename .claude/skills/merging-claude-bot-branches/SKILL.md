@@ -78,7 +78,7 @@ git diff --name-only HEAD~1
 Only run builds if relevant code changed:
 - **nextjs-app/**: `cd nextjs-app && bun run build`
 - **python-services/**: `cd python-services && uv run pytest`
-- **tools/session-parser/**: `cd tools/session-parser && bun test`
+- **tools/session/**: `cd tools/session && bun test`
 - **tools/retro/**: `cd tools/retro && bun test`
 - **Docs/config only** (CLAUDE.md, .github/, etc.): Skip build
 
