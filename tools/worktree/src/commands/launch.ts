@@ -18,7 +18,9 @@ export function getDefaultDeps(): LaunchDeps {
   return {
     getWorktreeList: async () => $`git worktree list --porcelain`.text(),
     spawn: async (command, args, cwd) => {
-      const proc = Bun.spawn([command, ...args], {
+      // Use 'bun run --bun' to resolve the claude executable via node_modules/.bin
+      // This matches how delegate worktree launches claude and ensures PATH resolution works
+      const proc = Bun.spawn(["bun", "run", "--bun", command, ...args], {
         cwd,
         stdio: ["inherit", "inherit", "inherit"],
       });
