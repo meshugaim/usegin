@@ -16,7 +16,9 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 **Ordering**: The order of issues is a rough understanding of how we think execution should be sequenced. Focus on what's at the top. The rest will shift as things become clearer.
 
-**Flow**: create → start → close
+**Flow**: create → orient → start → close
+
+Before `plan start`, run `plan show <id>` to locate yourself in the graph—see the parent issue (larger goal), siblings (related work), and children (scope). Context shapes better decisions.
 
 ## What We Value
 
@@ -35,5 +37,7 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 **One source of truth** — Linear is where work lives. Don't track tasks in markdown files, todo lists, or other tools. If it's worth tracking, it goes in Linear via `plan`.
 
 **Commit often** — Small, frequent commits. Mention the Linear issue in the commit body (e.g., `Closes: ENG-123` or `Part of: ENG-123`). The commit history tells the story.
+
+**Orient first** — Before starting an issue, run `plan show <id>` to see its parent, siblings, and children. Understanding where work fits in the graph leads to better decisions and avoids duplicate effort.
 
 **Iterative descriptions** — For complex issue descriptions, see `plan docs show iterative-descriptions`.
