@@ -7,6 +7,24 @@ import { printApiStats } from "../lib/stats";
 import { dim } from "../lib/colors";
 import type { ListOptions, PlanIssue } from "../types";
 
+/**
+ * Get the maximum updatedAt timestamp across an issue and all its descendants.
+ * Used for --active sorting so that parent issues bubble up when their
+ * children are being actively worked on.
+ */
+export function getMaxUpdatedAt(issue: PlanIssue): number {
+  let maxTime = new Date(issue.updatedAt).getTime();
+
+  for (const child of issue.children) {
+    const childMax = getMaxUpdatedAt(child);
+    if (childMax > maxTime) {
+      maxTime = childMax;
+    }
+  }
+
+  return maxTime;
+}
+
 export function createListCommand(): Command {
   const cmd = new Command("list")
     .alias("ls")
@@ -115,10 +133,12 @@ async function runList(opts: {
     }
 
     // Sort by update date if --active is specified
+    // Uses max(updatedAt) across entire subtree so parent issues bubble up
+    // when their children are actively being worked on
     if (opts.active) {
       issues = issues.sort((a, b) => {
-        const dateA = new Date(a.updatedAt).getTime();
-        const dateB = new Date(b.updatedAt).getTime();
+        const dateA = getMaxUpdatedAt(a);
+        const dateB = getMaxUpdatedAt(b);
         return dateB - dateA; // Most recently updated first
       });
     }
