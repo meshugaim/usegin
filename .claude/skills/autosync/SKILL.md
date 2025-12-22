@@ -40,9 +40,22 @@ When enabled, a post-commit hook runs after each commit:
 | Behavior | Description |
 |----------|-------------|
 | Opt-in | Must explicitly enable per environment |
-| Main only | Only syncs on `main` branch |
+| Main only | Only syncs on `main` branch or worktrees |
 | Silent success | Single line output on push |
 | Safe conflicts | Aborts rebase, preserves local commit |
+
+## Branch Behavior
+
+Autosync only triggers when:
+- On the `main` branch directly, OR
+- In a worktree (which pushes to `main` regardless of local branch name)
+
+Autosync is **inactive** (silently skipped) on:
+- `staging` branch
+- `production` branch
+- Any other feature/topic branches
+
+This prevents accidental pushes to deployment branches while keeping the convenience for trunk-based development.
 
 ## Companion: Autopull
 
