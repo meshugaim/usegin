@@ -22,21 +22,13 @@ Turn specs into working software through vertical slices, TDD, and continuous al
 | **Self-verification**      | Get into feedback loops to verify your own work (run tests, check UI, hit endpoints).      |
 | **Feature toggles**        | Use them to get incomplete work to prod safely.                                            |
 
-## Progress Doc
+## Progress Tracking
 
-Keep an `<feature>.impl-status.md` next to the spec (e.g., `docs/specs/auth.impl-status.md` alongside `auth.spec.md`).
+Track progress in Linear via sub-issues and issue updates. See `plan align` for workflow context.
 
-**What to include:**
-- Meta section at top: purpose of doc, link to spec
-- Next step (keep at top, write in reverse chronological order)
-- Decisions made along the way
-- Open questions
-
-The doc itself should state its purpose: "This is not a full plan upfront. It tracks ongoing decisions and progress."
-
-Update it as you go. It's a living record, not a contract.
-
-**Style:** Keep it concise. Don't list files created or flags added - just show usage examples. Focus on what matters for the next person reading it.
+- Break slices into sub-issues with `plan create --parent <spec-issue>`
+- Use `plan start` / `plan close` to track progress
+- Update issue descriptions with decisions and open questions via `plan update`
 
 ## Workflow Guidelines
 
@@ -51,7 +43,7 @@ Guidelines, not a strict process. Adapt to the situation.
 | **Self-verify**         | Run tests, check UI, hit endpoints.                         | Use `closed-loop-web-development` skill for UI verification.                            |
 | **Checkpoint**          | Summarize progress. Ask user if still aligned.              | Do this often.                                                                          |
 | **Commit & push**       | Commit after each slice. Don't accumulate uncommitted work. | Small commits, pushed frequently. Avoids lost work and enables easier rollback.         |
-| **Update progress doc** | Record decisions, next step.                                | Keep it current.                                                                        |
+| **Update Linear**       | Record decisions, close slice issue.                        | Keep issues current.                                                                    |
 | **Check context**       | Run `/context` to assess context window usage.              | If getting full, prepare/create handoff. See "Context Management" section.              |
 | **Repeat**              | Propose next slice. Ask: "Right size? Go smaller?"          | Continuous alignment.                                                                   |
 
@@ -172,7 +164,7 @@ Run `/context` to check context usage. This shows a visual grid of how much cont
 | Context State | Action |
 | ------------- | ------ |
 | Plenty of room | Continue to next slice |
-| Getting full (~70%+) | Prepare for handoff, update impl-status.md proactively |
+| Getting full (~70%+) | Prepare for handoff, update Linear issues proactively |
 | Nearly full (~85%+) | Create handoff, suggest new session |
 
 **Note:** `/compact` can reduce context by summarizing, but it may be disabled in settings. Don't rely on it - treat handoffs as the primary strategy for managing long implementations.
@@ -187,12 +179,12 @@ Run `/context` to check context usage. This shows a visual grid of how much cont
 ### Handoff Process
 
 1. **Commit all current work** - Nothing uncommitted
-2. **Update impl-status.md** - Mark completed slices, document current state
-3. **Create handoff prompt** - Either in impl-status.md or share directly with user
+2. **Update Linear** - Close completed slice issues, update parent issue with current state
+3. **Create handoff prompt** - Update the spec issue description with handoff context
 
 ### Handoff Prompt Structure
 
-Include in impl-status.md or provide to user:
+Include in the spec issue description (use `plan update --description-file`):
 
 ```markdown
 ## Handoff: [Feature Name]
@@ -222,10 +214,11 @@ Include in impl-status.md or provide to user:
 
 When starting a new session to continue:
 
-1. Read the spec and impl-status.md
-2. Check git log for recent commits
-3. Run tests to verify current state
-4. Pick up from documented next steps
+1. Read the spec issue (`plan show <id> --tree` for graph context)
+2. Check sub-issues for completed/pending slices (`plan list`)
+3. Check git log for recent commits
+4. Run tests to verify current state
+5. Pick up from documented next steps
 
 The goal: A fresh session can continue seamlessly without re-discovering context.
 
