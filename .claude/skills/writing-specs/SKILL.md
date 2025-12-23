@@ -49,14 +49,16 @@ Present section outline. Get approval or adjust.
 
 ### 4. Write Section by Section
 
-Create `docs/thing.spec.md`. For each section:
+Write to a Linear issue description. Create an issue if needed (see `plan align` for workflow context, `plan docs show iterative-descriptions` for mechanics).
+
+For each section:
 
 | Step | Action |
 |------|--------|
-| 1 | Write section to file |
-| 2 | Commit and push to `main` |
+| 1 | Write/edit section in temp file |
+| 2 | Push to Linear with `plan update` |
 | 3 | PAUSE - get feedback (see below) |
-| 4 | Apply changes if needed, commit and push again |
+| 4 | Apply changes if needed, `plan update` again |
 | 5 | Move to next section when approved |
 
 **Feedback via `AskUserQuestion` - three questions:**
@@ -67,9 +69,7 @@ Create `docs/thing.spec.md`. For each section:
 | Other thoughts? (updates to previous sections, new ideas...) | "No", "Yes - I'll describe" |
 | Next section? | List from outline + "Done" |
 
-If other thoughts require changes to previous sections: edit them, commit and push, then continue.
-
-Git commits after every change = easy rollback, clear history, checkpoints.
+If other thoughts require changes to previous sections: edit them, `plan update`, then continue.
 
 ## Spec Style
 
