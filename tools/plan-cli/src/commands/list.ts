@@ -179,7 +179,8 @@ async function runList(opts: {
     }
 
     // Standard output modes
-    const showDone = opts.showDone ?? false;
+    // Show Done children if explicitly requested OR if filtering by done status
+    const showDone = opts.showDone ?? (opts.status?.toLowerCase() === "done");
     const depthExplicit = process.argv.some(arg => arg.startsWith("--depth"));
 
     if (opts.groupBy) {

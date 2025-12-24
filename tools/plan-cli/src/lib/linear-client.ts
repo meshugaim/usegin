@@ -163,10 +163,15 @@ export class LinearClient {
   /**
    * Transform a GraphQL issue response to PlanIssue format recursively.
    * At the deepest level, children only have `id` - we count these but don't transform them.
+   *
+   * @param statusFilter - Optional status filter to apply recursively to children.
+   *   When undefined/null, defaults to excluding completed/canceled states.
+   *   When explicitly set, only children matching that status are included.
    */
   private transformGqlIssue(
     gqlIssue: GqlIssue,
-    parentInfo?: { id: string; identifier: string }
+    parentInfo?: { id: string; identifier: string },
+    statusFilter?: string | null
   ): PlanIssue {
     let children: PlanIssue[] = [];
     let childCount: number | undefined;
@@ -175,15 +180,30 @@ export class LinearClient {
       // Check if children have full data (identifier exists) or just IDs
       const firstChild = gqlIssue.children.nodes[0];
       if (firstChild.identifier) {
-        // Full children - transform recursively
-        children = gqlIssue.children.nodes.map((child) =>
+        // Full children - filter by status and transform recursively
+        // Completed/canceled status types to exclude by default
+        const completedStatuses = ["done", "canceled", "cancelled"];
+
+        const filteredChildren = gqlIssue.children.nodes.filter((child) => {
+          const childStatus = child.state?.name?.toLowerCase() ?? "";
+          if (statusFilter) {
+            // Explicit status filter: only include matching children
+            return childStatus === statusFilter.toLowerCase();
+          } else {
+            // Default: exclude completed/canceled (match top-level behavior)
+            return !completedStatuses.includes(childStatus);
+          }
+        });
+
+        children = filteredChildren.map((child) =>
           this.transformGqlIssue(child, {
             id: gqlIssue.id,
             identifier: gqlIssue.identifier,
-          })
+          }, statusFilter)
         ).sort((a, b) => a.sortOrder - b.sortOrder);
       } else {
         // Only IDs - this is the deepest level, just count them
+        // Note: We can't filter these as they don't have status info
         childCount = gqlIssue.children.nodes.length;
       }
     }
@@ -302,7 +322,7 @@ export class LinearClient {
         if (!inTitle && !inDesc) continue;
       }
 
-      planIssues.push(this.transformGqlIssue(issue));
+      planIssues.push(this.transformGqlIssue(issue, undefined, options.status));
     }
 
     // Sort by sortOrder
