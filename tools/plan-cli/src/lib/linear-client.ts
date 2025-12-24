@@ -1308,6 +1308,115 @@ export class LinearClient {
   }
 
   /**
+   * Search issues using Linear's API filters (server-side search)
+   * Searches in title and description using 'contains' filter with 'or' logic
+   */
+  async searchIssues(options: {
+    query: string;
+    team?: string;
+    includeCompleted?: boolean;
+    limit?: number;
+  }): Promise<PlanIssue[]> {
+    const { query, team, includeCompleted = false, limit = 50 } = options;
+
+    // Build filter parts
+    const filterParts: string[] = [];
+
+    // Team filter
+    if (team) {
+      const teamData = await this.getTeamByKey(team);
+      if (!teamData) {
+        const teams = await this.getAllTeams();
+        const available = teams.map((t) => t.key).join(", ");
+        throw new Error(`Team "${team}" not found. Available teams: ${available}`);
+      }
+      filterParts.push(`team: { key: { eq: "${team}" } }`);
+    }
+
+    // Exclude completed/canceled unless includeCompleted is true
+    if (!includeCompleted) {
+      filterParts.push(`state: { type: { nin: ["completed", "canceled"] } }`);
+    }
+
+    // Search filter using 'or' to match in title OR description
+    const escapedQuery = query.replace(/"/g, '\\"');
+    const searchFilter = `or: [
+      { title: { containsIgnoreCase: "${escapedQuery}" } },
+      { description: { containsIgnoreCase: "${escapedQuery}" } }
+    ]`;
+    filterParts.push(searchFilter);
+
+    const filterStr = `filter: { ${filterParts.join(", ")} }`;
+
+    // GraphQL query
+    const gqlQuery = `
+      query SearchIssues {
+        issues(${filterStr}, first: ${limit}) {
+          nodes {
+            id
+            identifier
+            title
+            description
+            sortOrder
+            createdAt
+            updatedAt
+            state { name }
+            assignee { id name displayName }
+            parent { id identifier }
+            labels { nodes { name } }
+            project { name }
+          }
+        }
+      }
+    `;
+
+    interface GqlSearchResult {
+      issues: {
+        nodes: Array<{
+          id: string;
+          identifier: string;
+          title: string;
+          description: string | null;
+          sortOrder: number;
+          createdAt: string;
+          updatedAt: string;
+          state: { name: string } | null;
+          assignee: { id: string; name: string; displayName: string } | null;
+          parent: { id: string; identifier: string } | null;
+          labels: { nodes: Array<{ name: string }> };
+          project: { name: string } | null;
+        }>;
+      };
+    }
+
+    const data = await this.graphql<GqlSearchResult>(gqlQuery);
+
+    return data.issues.nodes.map((issue) => ({
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      description: issue.description ?? undefined,
+      status: issue.state?.name ?? "Unknown",
+      sortOrder: issue.sortOrder,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      assignee: issue.assignee
+        ? {
+            id: issue.assignee.id,
+            name: issue.assignee.name,
+            displayName: issue.assignee.displayName,
+          }
+        : undefined,
+      parent: issue.parent
+        ? { id: issue.parent.id, identifier: issue.parent.identifier }
+        : undefined,
+      labels: issue.labels.nodes.map((l) => l.name),
+      project: issue.project?.name,
+      children: [],
+    }));
+  }
+
+  /**
    * Get history entries for an issue
    */
   async getIssueHistory(identifier: string, limit: number = 20): Promise<IssueHistoryEntry[]> {

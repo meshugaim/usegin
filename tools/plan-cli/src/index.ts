@@ -13,6 +13,7 @@ import { createCloseCommand } from "./commands/close";
 import { createAlignCommand } from "./commands/align";
 import { createDocsCommand, getDocsHelpText } from "./commands/docs";
 import { createHistoryCommand } from "./commands/history";
+import { createSearchCommand } from "./commands/search";
 
 // Help text explaining short ID support
 function getShortIdHelpText(): string {
@@ -46,6 +47,7 @@ program.addCommand(createCloseCommand());
 program.addCommand(createAlignCommand());
 program.addCommand(createDocsCommand());
 program.addCommand(createHistoryCommand());
+program.addCommand(createSearchCommand());
 
 // Parse arguments
 program.parse();
