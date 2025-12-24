@@ -11,6 +11,7 @@ describe("plan create command", () => {
       expect(result).toContain("create");
       expect(result).toContain("--parent");
       expect(result).toContain("--quiet");
+      expect(result).toContain("--start");
     });
 
     it("requires a title argument", async () => {

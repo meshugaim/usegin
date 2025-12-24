@@ -19,6 +19,7 @@ export function createCreateCommand(): Command {
     .option("--blocked-by <id>", "Set blocked-by relationship after creation")
     .option("--blocking <id>", "Set blocking relationship after creation")
     .option("--related-to <id>", "Set related-to relationship after creation")
+    .option("--start", "Start working immediately (set In Progress + assign to me)")
     .option("--json", "Output as JSON")
     .option("--quiet", "Only output the issue identifier")
     .option("--stats", "Show API call statistics")
@@ -55,6 +56,7 @@ async function runCreate(
     blockedBy?: string;
     blocking?: string;
     relatedTo?: string;
+    start?: boolean;
     json?: boolean;
     quiet?: boolean;
     stats?: boolean;
@@ -102,22 +104,32 @@ async function runCreate(
       await client.addRelatedTo(issue.identifier, opts.relatedTo);
     }
 
+    // Start working if --start flag is set
+    let startedIssue = issue;
+    if (opts.start) {
+      const result = await client.updateIssue(issue.identifier, {
+        status: "In Progress",
+        assignee: "@me",
+      });
+      startedIssue = result.issue;
+    }
+
     // Check if any connections were made
     const hasConnections = opts.parent || opts.blockedBy || opts.blocking || opts.relatedTo;
 
     if (opts.quiet) {
       // Just output the identifier
-      console.log(issue.identifier);
+      console.log(startedIssue.identifier);
     } else if (opts.json) {
       // JSON output
       console.log(
         JSON.stringify(
           {
-            id: issue.id,
-            identifier: issue.identifier,
-            title: issue.title,
-            description: issue.description,
-            status: issue.status,
+            id: startedIssue.id,
+            identifier: startedIssue.identifier,
+            title: startedIssue.title,
+            description: startedIssue.description,
+            status: startedIssue.status,
           },
           null,
           2
@@ -125,7 +137,11 @@ async function runCreate(
       );
     } else {
       // Human-readable output
-      console.log(`${colors.success("Created")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
+      if (opts.start) {
+        console.log(`${colors.success("Created and started")}: ${colors.identifier(startedIssue.identifier)} - ${startedIssue.title}`);
+      } else {
+        console.log(`${colors.success("Created")}: ${colors.identifier(startedIssue.identifier)} - ${startedIssue.title}`);
+      }
       if (!hasConnections) {
         console.log(dim(`  Tip: Consider connecting with --parent, --blocked-by, or --related-to`));
       }
