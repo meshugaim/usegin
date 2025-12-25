@@ -7,6 +7,12 @@ description: Write Playwright e2e tests using driver pattern. Triggered by "writ
 
 Write maintainable Playwright e2e tests using the driver pattern.
 
+**Reference implementation:** Project Settings page demonstrates all patterns:
+- Driver: `tests/e2e/drivers/project-settings.driver.ts`
+- E2E tests: `tests/e2e/tests/project-settings.spec.ts`
+- Unit tests: `nextjs-app/tests/unit/components/project-file-manager.test.tsx`
+- Component: `nextjs-app/components/project-file-manager.tsx` (data-testid usage)
+
 ## Workflow
 
 ### 1. Explore with Playwright MCP First
@@ -230,6 +236,5 @@ just e2e-cleanup              # Clean up containers
 
 ## Reference
 
-- Full docs: `tests/e2e/README.md`
-- Example driver: `tests/e2e/drivers/project-settings.driver.ts`
-- Example tests: `tests/e2e/tests/project-settings.spec.ts`
+- Full e2e docs: `tests/e2e/README.md`
+- Running tests skill: `running-e2e-tests`
