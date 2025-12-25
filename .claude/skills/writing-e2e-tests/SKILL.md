@@ -7,6 +7,41 @@ description: Write Playwright e2e tests using driver pattern. Triggered by "writ
 
 Write maintainable Playwright e2e tests using the driver pattern.
 
+## Workflow
+
+### 1. Explore with Playwright MCP First
+
+Before writing test scripts, manually test the flow using Playwright MCP:
+
+```
+1. Navigate to the page with mcp__playwright__browser_navigate
+2. Take snapshots with mcp__playwright__browser_snapshot
+3. Interact with elements using mcp__playwright__browser_click, etc.
+4. Verify the flow works as expected
+```
+
+This helps you:
+- Understand the actual DOM structure
+- Find the right selectors
+- Discover edge cases
+- Validate the test scenario before coding
+
+### 2. Write Tests with e2e-dev Mode
+
+When iterating on new tests, use `e2e-dev` to keep services running:
+
+```bash
+just e2e-dev my-test.spec.ts   # First run starts services (~50s)
+just e2e-dev my-test.spec.ts   # Subsequent runs reuse them (~4s)
+just e2e-cleanup               # Clean up when done
+```
+
+This dramatically speeds up the write-run-fix cycle.
+
+### 3. Convert to Driver Pattern
+
+Once the test works, refactor into the driver pattern for maintainability.
+
 ## When to Use E2E vs Unit Tests
 
 | Use E2E for | Use Unit for |
@@ -165,13 +200,24 @@ await expect(page).toHaveURL(/\/success/);
 
 ## Checklist
 
-Before writing e2e tests:
+### Before Writing
 
+- [ ] Explore the flow manually with Playwright MCP
 - [ ] Add `data-testid` to interactive elements in component
+- [ ] Start services with `just e2e-dev`
+
+### While Writing
+
 - [ ] Create driver file in `tests/e2e/drivers/`
 - [ ] Use fixtures for auth (`authAsOwner`, `authAsInternal`, etc.)
 - [ ] Handle dialogs with `page.once("dialog", ...)`
 - [ ] Clean up test data (delete uploaded files, remove added members)
+- [ ] Run with `just e2e-dev <file>` for fast iteration
+
+### After Writing
+
+- [ ] Run full suite with `just e2e` to verify
+- [ ] Clean up with `just e2e-cleanup`
 
 ## Running Tests
 
