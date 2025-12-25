@@ -17,14 +17,9 @@ Write maintainable Playwright e2e tests using the driver pattern.
 
 ### 1. Explore with Playwright MCP First
 
-Before writing test scripts, manually test the flow using Playwright MCP:
+Before writing test scripts, manually test the flow using Playwright MCP.
 
-```
-1. Navigate to the page with mcp__playwright__browser_navigate
-2. Take snapshots with mcp__playwright__browser_snapshot
-3. Interact with elements using mcp__playwright__browser_click, etc.
-4. Verify the flow works as expected
-```
+**See:** `browser-testing-setup` skill for environment setup, `closed-loop-web-development` skill for the MCP workflow.
 
 This helps you:
 - Understand the actual DOM structure
