@@ -32,21 +32,23 @@ This helps you:
 - Discover edge cases
 - Validate the test scenario before coding
 
-### 2. Write Tests with e2e-dev Mode
+### 2. Write Driver and Tests
 
-When iterating on new tests, use `e2e-dev` to keep services running:
+Use the driver pattern from the start:
+
+1. Create driver file with selectors and actions
+2. Write tests using driver methods
+3. Add `data-testid` to components as needed
+
+### 3. Iterate with e2e-dev Mode
+
+Keep services running for fast iteration:
 
 ```bash
 just e2e-dev my-test.spec.ts   # First run starts services (~50s)
 just e2e-dev my-test.spec.ts   # Subsequent runs reuse them (~4s)
 just e2e-cleanup               # Clean up when done
 ```
-
-This dramatically speeds up the write-run-fix cycle.
-
-### 3. Convert to Driver Pattern
-
-Once the test works, refactor into the driver pattern for maintainability.
 
 ## When to Use E2E vs Unit Tests
 
