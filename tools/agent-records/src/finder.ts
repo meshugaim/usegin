@@ -155,6 +155,176 @@ export interface OverviewStats {
 /**
  * Get overview statistics grouped by username and date
  */
+export interface SearchResult {
+	summaryPath: string;
+	conversationPath: string;
+	summaryContent: string;
+	matchingLines: string[];
+	username: string;
+	date: string;
+}
+
+export interface SearchOptions {
+	username?: string;
+	from?: string;
+	to?: string;
+}
+
+/**
+ * Search through summary files for a query string
+ */
+export async function searchSummaries(
+	config: Config,
+	query: string,
+	options: SearchOptions = {},
+): Promise<SearchResult[]> {
+	const { username, from, to } = options;
+
+	// Build glob pattern for summary files
+	const usernamePattern = username || "*";
+	const pattern = `${usernamePattern}/*/*/*.summary.md`;
+
+	const glob = new Glob(pattern);
+	const results: SearchResult[] = [];
+
+	// Case-insensitive search
+	const queryLower = query.toLowerCase();
+	const queryWords = queryLower.split(/\s+/).filter(Boolean);
+
+	for await (const file of glob.scan({
+		cwd: config.recordsDir,
+		absolute: true,
+		onlyFiles: true,
+	})) {
+		// Filter by date range if specified
+		const dateMatch = file.match(/\/(\d{4}-\d{2}-\d{2})\//);
+		if (dateMatch) {
+			const fileDate = dateMatch[1];
+			if (from && fileDate < from) continue;
+			if (to && fileDate > to) continue;
+		}
+
+		try {
+			const content = await Bun.file(file).text();
+			const contentLower = content.toLowerCase();
+
+			// Check if all query words are present
+			const allWordsMatch = queryWords.every((word) =>
+				contentLower.includes(word),
+			);
+
+			if (allWordsMatch) {
+				// Find matching lines for context
+				const lines = content.split("\n");
+				const matchingLines = lines.filter((line) => {
+					const lineLower = line.toLowerCase();
+					return queryWords.some((word) => lineLower.includes(word));
+				});
+
+				// Extract username and date from path
+				const pathMatch = file.match(
+					/\/([^/]+)\/(\d{4}-\d{2})\/(\d{4}-\d{2}-\d{2})\//,
+				);
+				const extractedUsername = pathMatch?.[1] || "unknown";
+				const extractedDate = pathMatch?.[3] || "unknown";
+
+				// Get conversation path
+				const conversationPath = file.replace(/\.summary\.md$/, ".txt");
+
+				results.push({
+					summaryPath: file,
+					conversationPath,
+					summaryContent: content,
+					matchingLines: matchingLines.slice(0, 5), // Limit to 5 lines
+					username: extractedUsername,
+					date: extractedDate,
+				});
+			}
+		} catch {
+			// Skip files that can't be read
+		}
+	}
+
+	// Sort by date (newest first)
+	results.sort((a, b) => b.date.localeCompare(a.date));
+
+	return results;
+}
+
+/**
+ * Get the full conversation content
+ */
+export async function getConversationContent(
+	conversationPath: string,
+): Promise<string | null> {
+	try {
+		const file = Bun.file(conversationPath);
+		if (await file.exists()) {
+			return await file.text();
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Format a search result for fzf display
+ */
+export function formatSearchResult(result: SearchResult): string {
+	const header = `${result.date} [${result.username}]`;
+	const preview = result.matchingLines
+		.map((line) => `  ${line.trim().substring(0, 100)}`)
+		.join("\n");
+
+	// Include the conversation path at the end for extraction
+	return `${header}\n${preview}\n${result.conversationPath}`;
+}
+
+/**
+ * Run fzf with search results
+ */
+export async function runSearchFzf(
+	results: SearchResult[],
+): Promise<string | null> {
+	if (results.length === 0) {
+		return null;
+	}
+
+	// Format entries with null separator
+	const entries = results.map(formatSearchResult);
+	const input = entries.join("\0");
+
+	const fzfArgs = [
+		"--read0",
+		"--ansi",
+		"--reverse",
+		"--height",
+		"80%",
+		"--preview",
+		"cat {-1}", // Preview the full conversation (last line is path)
+		"--preview-window",
+		"right:60%:wrap",
+	];
+
+	const proc = Bun.spawn(["fzf", ...fzfArgs], {
+		stdin: new Response(input).body,
+		stdout: "pipe",
+		stderr: "inherit",
+	});
+
+	const output = await new Response(proc.stdout).text();
+	await proc.exited;
+
+	if (proc.exitCode !== 0) {
+		return null;
+	}
+
+	// Extract the path (last line of the selection)
+	const lines = output.trim().split("\n");
+	return lines[lines.length - 1] || null;
+}
+
 export async function getOverview(
 	config: Config,
 	options: FindOptions = {},

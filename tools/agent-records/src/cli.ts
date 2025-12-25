@@ -2,11 +2,17 @@
 
 import Table from "cli-table3";
 import { configSchema } from "./config.ts";
-import { findConversations, getOverview } from "./finder.ts";
-import type { FindOptions } from "./finder.ts";
+import {
+	findConversations,
+	getOverview,
+	searchSummaries,
+	runSearchFzf,
+	getConversationContent,
+} from "./finder.ts";
+import type { FindOptions, SearchOptions } from "./finder.ts";
 
 interface CliArgs {
-	command: "find" | "overview" | "help";
+	command: "find" | "overview" | "search" | "help";
 	date?: string;
 	from?: string;
 	to?: string;
@@ -14,6 +20,8 @@ interface CliArgs {
 	recordsDir?: string;
 	ignoreContent?: string[];
 	withSubagents?: boolean;
+	query?: string; // For search command
+	noFzf?: boolean; // Output path directly without fzf
 }
 
 /**
@@ -27,13 +35,17 @@ function parseArgs(args: string[]): CliArgs {
 	if (
 		command !== "find" &&
 		command !== "overview" &&
+		command !== "search" &&
 		command !== "help"
 	) {
 		throw new Error(
-			`Invalid command: ${command}. Use 'find', 'overview', or 'help'`,
+			`Invalid command: ${command}. Use 'find', 'overview', 'search', or 'help'`,
 		);
 	}
 	parsed.command = command;
+
+	// For search command, collect non-flag args as query
+	const queryParts: string[] = [];
 
 	// Parse flags
 	for (let i = 1; i < args.length; i++) {
@@ -45,6 +57,10 @@ function parseArgs(args: string[]): CliArgs {
 			// Boolean flags (no value)
 			if (key === "with-subagents") {
 				parsed.withSubagents = true;
+				continue;
+			}
+			if (key === "no-fzf") {
+				parsed.noFzf = true;
 				continue;
 			}
 
@@ -85,7 +101,15 @@ function parseArgs(args: string[]): CliArgs {
 				default:
 					throw new Error(`Unknown flag: --${key}`);
 			}
+		} else if (command === "search" && arg) {
+			// For search command, non-flag args are the query
+			queryParts.push(arg);
 		}
+	}
+
+	// Join query parts for search command
+	if (command === "search" && queryParts.length > 0) {
+		parsed.query = queryParts.join(" ");
 	}
 
 	return parsed as CliArgs;
@@ -103,10 +127,36 @@ USAGE:
 
 COMMANDS:
   find        Find conversations matching criteria
+  search      Search summaries and output full conversation text
   overview    Show statistics grouped by username and date
   help        Show this help message
 
-OPTIONS:
+SEARCH COMMAND:
+  agent-records search <query> [options]
+
+  Searches through .summary.md files for matching keywords, shows results
+  in an interactive fzf picker, and outputs the full conversation text.
+
+  Options:
+    --username <name>     Filter by username
+    --from <YYYY-MM-DD>   Search from this date onwards
+    --to <YYYY-MM-DD>     Search up to this date
+    --no-fzf              Skip fzf, output first match directly
+
+  Examples:
+    # Search for sessions about GFS fixes
+    agent-records search "GFS stuck files"
+
+    # Search within a date range
+    agent-records search "authentication" --from 2025-12-01
+
+    # Search for a specific user's sessions
+    agent-records search "refactor" --username lihub
+
+    # Pipe directly to Claude for context
+    agent-records search "login bug" --no-fzf | claude -p "continue this work"
+
+FIND OPTIONS:
   --date <YYYY-MM-DD>       Find conversations on a specific date
   --from <YYYY-MM-DD>       Find conversations from this date onwards
   --to <YYYY-MM-DD>         Find conversations up to this date
@@ -200,7 +250,50 @@ async function main() {
 		};
 
 		// Execute command
-		if (cliArgs.command === "overview") {
+		if (cliArgs.command === "search") {
+			// Search command
+			if (!cliArgs.query) {
+				console.error("Error: Search query is required");
+				console.error("Usage: agent-records search <query> [options]");
+				process.exit(1);
+			}
+
+			const searchOptions: SearchOptions = {
+				username: cliArgs.username,
+				from: cliArgs.from,
+				to: cliArgs.to,
+			};
+
+			const results = await searchSummaries(config, cliArgs.query, searchOptions);
+
+			if (results.length === 0) {
+				console.error(`No sessions found matching: "${cliArgs.query}"`);
+				process.exit(1);
+			}
+
+			let selectedPath: string | null;
+
+			if (cliArgs.noFzf) {
+				// No fzf mode - just use first result
+				selectedPath = results[0].conversationPath;
+			} else {
+				// Interactive fzf selection
+				selectedPath = await runSearchFzf(results);
+			}
+
+			if (!selectedPath) {
+				process.exit(1);
+			}
+
+			// Output the full conversation content
+			const content = await getConversationContent(selectedPath);
+			if (content) {
+				console.log(content);
+			} else {
+				console.error(`Error: Could not read conversation at ${selectedPath}`);
+				process.exit(1);
+			}
+		} else if (cliArgs.command === "overview") {
 			const stats = await getOverview(config, findOptions);
 
 			// Create table
@@ -255,7 +348,7 @@ async function main() {
 			]);
 
 			console.log(table.toString());
-		} else {
+		} else if (cliArgs.command === "find") {
 			// find command
 			const results = await findConversations(config, findOptions);
 
