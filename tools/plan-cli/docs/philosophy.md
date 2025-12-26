@@ -12,13 +12,19 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 ## Our Approach
 
+**The plan is for you, Claude**: Use as many sub issues and issues as you'd like to track your work and keep the pace.
+
+**The plan is for us too**: Let's keep it legible, well connected, up to date.
+
 **The graph**: Work lives in a web of connected issues. When creating, connect it to existing items - `--parent` for sub-issues, `--related-to` for loose connections. This means, first start by familiarizing with the existing `plan list`. Standalone issues are rare.
 
 **Ordering**: The order of issues is a rough understanding of how we think execution should be sequenced. Focus on what's at the top. The rest will shift as things become clearer.
 
-**Flow**: create → orient → start → close
+**Flow**: orient → create → start → close
 
 Before `plan start`, run `plan show <id>` to locate yourself in the graph—see the parent issue (larger goal), siblings (related work), and children (scope). Context shapes better decisions.
+
+Before `plan create` use `plan list` at least once.
 
 ## What We Value
 
