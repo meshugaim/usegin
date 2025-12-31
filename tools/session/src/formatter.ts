@@ -211,6 +211,15 @@ function truncateLines(str: string, maxLines: number): string {
 }
 
 /**
+ * Strip ANSI escape codes from a string
+ */
+function stripAnsi(str: string): string {
+  // Match ANSI escape sequences: ESC[ followed by params and a letter
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+}
+
+/**
  * Format a session in terminal style (replicates /export format)
  *
  * Format:
@@ -349,8 +358,9 @@ function formatTerminalToolResult(
 ): string {
   const indent = "  ⎿ ";
 
-  // Ensure content is a string
-  const content = typeof result.content === "string" ? result.content : String(result.content || "");
+  // Ensure content is a string and strip ANSI codes
+  const rawContent = typeof result.content === "string" ? result.content : String(result.content || "");
+  const content = stripAnsi(rawContent);
 
   if (result.isError) {
     const errorContent = truncateLines(content, 3);
