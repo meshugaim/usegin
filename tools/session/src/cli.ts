@@ -17,7 +17,7 @@
  */
 
 import { parseSession, listRelatedFiles, StreamingParser } from "./parser";
-import { formatNarrative, formatMarkdown, type FormatOptions } from "./formatter";
+import { formatNarrative, formatMarkdown, formatTerminal, type FormatOptions } from "./formatter";
 import {
   discoverSessions,
   extractSessionMeta,
@@ -30,6 +30,8 @@ import {
 } from "./finder";
 import { parseFindArgs, parsePickArgs, parseListArgs } from "./cli-args";
 
+type OutputFormat = "narrative" | "terminal" | "markdown";
+
 interface CliArgs {
   file: string;
   toolInput: boolean;
@@ -39,6 +41,7 @@ interface CliArgs {
   includeWarmups: boolean;
   listFiles: boolean;
   stream: boolean;
+  format: OutputFormat;
   help: boolean;
 }
 
@@ -52,6 +55,7 @@ function parseArgs(args: string[]): CliArgs {
     includeWarmups: false,
     listFiles: false,
     stream: false,
+    format: "narrative",
     help: false,
   };
 
@@ -75,6 +79,11 @@ function parseArgs(args: string[]): CliArgs {
       result.listFiles = true;
     } else if (arg === "--stream") {
       result.stream = true;
+    } else if (arg === "--format") {
+      const val = args[++i] as OutputFormat;
+      if (val === "narrative" || val === "terminal" || val === "markdown") {
+        result.format = val;
+      }
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";
     }
@@ -115,6 +124,8 @@ FIND OPTIONS:
   --output-file <path>  Write selection to JSON file (for tmux integration)
 
 OPTIONS:
+  --format <fmt>     Output format: narrative (default), terminal, markdown
+                     terminal format replicates /export output
   --stream           Stream mode: read from stdin, output in real-time
   --tool-input       Include tool call inputs
   --tool-output      Include tool results
@@ -138,6 +149,9 @@ NOT YET IMPLEMENTED:
 EXAMPLES:
   # Basic narrative output
   session session.jsonl
+
+  # Terminal format (replicates /export)
+  session session.jsonl --format terminal
 
   # Include tool inputs
   session session.jsonl --tool-input
@@ -393,7 +407,19 @@ async function main() {
       includeSubagents: args.subagents,
     };
 
-    const output = formatNarrative(session, options);
+    let output: string;
+    switch (args.format) {
+      case "terminal":
+        output = formatTerminal(session, options);
+        break;
+      case "markdown":
+        output = formatMarkdown(session);
+        break;
+      case "narrative":
+      default:
+        output = formatNarrative(session, options);
+        break;
+    }
     console.log(output);
   } catch (error) {
     if (error instanceof Error) {
