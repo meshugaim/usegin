@@ -1,11 +1,13 @@
 ---
 name: pushing-db-migrations-to-staging
-description: This skill should be used when pushing database migrations to staging Supabase. Triggered by phrases like "push migrations to staging", "db push to staging", "deploy migrations to staging", or "staging db push".
+description: Manual skill for pushing database migrations to staging Supabase. Only use when explicitly requested via slash command. Migrations are normally auto-applied when pushing to the staging branch.
 ---
 
-# Pushing DB Migrations to Staging
+# Pushing DB Migrations to Staging (Manual)
 
-Push local Supabase migrations to the staging database.
+Manually push local Supabase migrations to the staging database.
+
+**Note:** Migrations are automatically applied when pushing to the `staging` branch. This skill is only needed for manual/out-of-band migration pushes (e.g., troubleshooting, emergency fixes).
 
 ## Prerequisites
 

@@ -1,11 +1,13 @@
 ---
 name: pushing-db-migrations-to-production
-description: This skill should be used when pushing database migrations to production Supabase. Triggered by phrases like "push migrations to production", "db push to prod", "push db changes", or "deploy migrations".
+description: Manual skill for pushing database migrations to production Supabase. Only use when explicitly requested via slash command. Migrations are normally auto-applied when pushing to the production branch.
 ---
 
-# Pushing DB Migrations to Production
+# Pushing DB Migrations to Production (Manual)
 
-Push local Supabase migrations to the production database.
+Manually push local Supabase migrations to the production database.
+
+**Note:** Migrations are automatically applied when pushing to the `production` branch. This skill is only needed for manual/out-of-band migration pushes (e.g., troubleshooting, emergency fixes).
 
 ## Prerequisites
 
