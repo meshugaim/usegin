@@ -54,16 +54,16 @@ JSON output includes `session_id` for later resume:
 
 ## Using crun (Recommended)
 
-For managed background processes:
+For managed processes with pm2:
 
 ```bash
-# Spawn and return immediately
+# Spawn and stream output (default)
 crun spawn "implement the feature"
-# → Started: abc123
-
-# Spawn and follow output
-crun spawn --follow "fix the bug"
 # → (streams output, exits when done)
+
+# Spawn in background (detached)
+crun spawn --detach "fix the bug"
+# → Started: abc123
 
 # List running workers
 crun list
@@ -73,6 +73,17 @@ crun send abc123 "also add tests"
 
 # View output
 session abc123
+```
+
+### Non-blocking from Claude Code
+
+When spawning workers from within Claude Code, use the Task tool with `run_in_background: true` to avoid blocking the parent agent:
+
+```
+Task tool with run_in_background: true
+→ spawns worker
+→ parent continues immediately
+→ use TaskOutput to check results later
 ```
 
 ## Using session CLI

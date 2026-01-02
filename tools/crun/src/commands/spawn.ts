@@ -3,11 +3,11 @@ import { spawnProcess, followProcess } from "../pm2";
 
 export function createSpawnCommand(): Command {
   const cmd = new Command("spawn")
-    .description("Spawn a new background Claude process")
+    .description("Spawn a Claude process (streams output by default)")
     .argument("<prompt>", "The prompt to send to Claude")
-    .option("-f, --follow", "Stream output, exit when process completes")
+    .option("-d, --detach", "Run in background without streaming output")
     .option("--issue <id>", "Link to Linear issue (updates on completion)")
-    .option("--resume <session-id>", "Continue existing session in background")
+    .option("--resume <session-id>", "Continue existing session")
     .option("--model <model>", "Override default model")
     .action(async (prompt: string, opts) => {
       await runSpawn(prompt, opts);
@@ -19,16 +19,18 @@ export function createSpawnCommand(): Command {
 async function runSpawn(
   prompt: string,
   opts: {
-    follow?: boolean;
+    detach?: boolean;
     issue?: string;
     resume?: string;
     model?: string;
   }
 ): Promise<void> {
+  const follow = !opts.detach;
+
   try {
     const result = await spawnProcess({
       prompt,
-      follow: opts.follow,
+      follow,
       issueId: opts.issue,
       resumeSessionId: opts.resume,
       model: opts.model,
@@ -40,7 +42,7 @@ async function runSpawn(
       console.log(`Started: ${result.sessionId}`);
     }
 
-    if (opts.follow) {
+    if (follow) {
       // Stream logs until process exits, then terminate
       await followProcess(result.sessionId);
       console.log(`Done: ${result.sessionId}`);
