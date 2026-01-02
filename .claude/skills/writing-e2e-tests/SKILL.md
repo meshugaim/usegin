@@ -244,7 +244,21 @@ Tests can pollute each other's state. Clean up BEFORE and AFTER:
 // In driver
 cleanupBefore: async (projectId: string) => {
   await deleteTestData(projectId);
-  await new Promise(r => setTimeout(r, 200)); // Let deletion propagate
+
+  // Poll to VERIFY deletion completed (don't trust timing)
+  const maxWait = 5000;
+  const pollInterval = 200;
+  const start = Date.now();
+
+  while (Date.now() - start < maxWait) {
+    const remaining = await queryTestData(projectId);
+    if (remaining.length === 0) {
+      await new Promise(r => setTimeout(r, 100)); // Small buffer
+      return;
+    }
+    await new Promise(r => setTimeout(r, pollInterval));
+  }
+  console.warn("Cleanup verification timed out");
 },
 
 cleanup: async () => {
