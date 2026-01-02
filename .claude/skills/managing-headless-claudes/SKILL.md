@@ -1,11 +1,13 @@
 ---
-name: agent-orchestration-workflow
+name: managing-headless-claudes
 description: Workflow patterns for managing spawned Claude workers. Triggered by "spawn a worker", "orchestrate agents", or "manage claude workers".
 ---
 
-# Agent Orchestration Workflow
+# Managing Headless Claudes
 
 Patterns for managing spawned Claude workers effectively.
+
+> **See also:** [multi-turn-headless-claude](../multi-turn-headless-claude/SKILL.md) for technical patterns on running Claude non-interactively with session persistence.
 
 ## Principles
 
