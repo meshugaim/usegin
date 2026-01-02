@@ -335,6 +335,14 @@ export async function followProcess(sessionId: string): Promise<void> {
 
   // Use pm2's launchBus to listen for process exit events
   await new Promise<void>((resolve, reject) => {
+    let resolved = false;
+    const cleanup = () => {
+      if (resolved) return;
+      resolved = true;
+      logProc.kill();
+      pm2.disconnect();
+    };
+
     pm2.connect((err) => {
       if (err) {
         logProc.kill();
@@ -353,17 +361,23 @@ export async function followProcess(sessionId: string): Promise<void> {
         bus.on("process:event", (event: { event: string; process: { name: string } }) => {
           if (event.event === "exit" && event.process.name === pm2Name) {
             // Process exited - clean up
-            logProc.kill();
-            pm2.disconnect();
+            cleanup();
             resolve();
           }
         });
 
-        // Also check if process already finished before we connected
-        getProcess(sessionId).then((proc) => {
-          if (!proc || proc.status !== "running") {
-            logProc.kill();
-            pm2.disconnect();
+        // Check if process already finished before we connected
+        // IMPORTANT: Use pm2.list directly to avoid nested connect/disconnect
+        // which would break the bus connection
+        pm2.list((err, processes) => {
+          if (err) {
+            // Ignore list errors, rely on bus events
+            return;
+          }
+          const proc = processes.find((p) => p.name === pm2Name);
+          const status = proc?.pm2_env?.status;
+          if (!proc || status === "stopped" || status === "errored") {
+            cleanup();
             resolve();
           }
         });

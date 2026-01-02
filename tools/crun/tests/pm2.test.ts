@@ -238,4 +238,112 @@ describe("pm2 SDK operations", () => {
       expect(process).toBeNull();
     });
   });
+
+  describe("followProcess", () => {
+    it("exits when an already-finished process is checked", async () => {
+      const { followProcess, deleteProcess, generateSessionId, buildPm2Name, withPm2Connection } = await import("../src/pm2");
+      const pm2 = await import("pm2");
+
+      // Generate a unique session ID
+      const sessionId = await generateSessionId();
+      const pm2Name = buildPm2Name(sessionId);
+
+      // Create a quick script that exits immediately
+      const scriptFile = `/tmp/crun-test-${sessionId}.sh`;
+      await Bun.write(scriptFile, `#!/bin/bash\necho "test output"\nexit 0\n`);
+      await Bun.spawn(["chmod", "+x", scriptFile]).exited;
+
+      // Start the process via pm2
+      await withPm2Connection(async () => {
+        return new Promise<void>((resolve, reject) => {
+          pm2.default.start(
+            {
+              script: scriptFile,
+              name: pm2Name,
+              autorestart: false,
+            },
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+      });
+
+      // followProcess should return within 5 seconds
+      // If it hangs forever, this test will timeout
+      const timeout = 5000;
+      const start = Date.now();
+
+      try {
+        await Promise.race([
+          followProcess(sessionId),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("followProcess did not exit within timeout")), timeout)
+          ),
+        ]);
+      } finally {
+        // Cleanup
+        await deleteProcess(sessionId);
+        await Bun.spawn(["rm", "-f", scriptFile]).exited;
+      }
+
+      const elapsed = Date.now() - start;
+      expect(elapsed).toBeLessThan(timeout);
+    }, 10000);
+
+    it("exits when process finishes while following", async () => {
+      const { followProcess, deleteProcess, generateSessionId, buildPm2Name, withPm2Connection } = await import("../src/pm2");
+      const pm2 = await import("pm2");
+
+      // Generate a unique session ID
+      const sessionId = await generateSessionId();
+      const pm2Name = buildPm2Name(sessionId);
+
+      // Create a script that runs for 2 seconds then exits
+      const scriptFile = `/tmp/crun-test-${sessionId}.sh`;
+      await Bun.write(scriptFile, `#!/bin/bash\necho "starting"\nsleep 2\necho "done"\nexit 0\n`);
+      await Bun.spawn(["chmod", "+x", scriptFile]).exited;
+
+      // Start the process via pm2
+      await withPm2Connection(async () => {
+        return new Promise<void>((resolve, reject) => {
+          pm2.default.start(
+            {
+              script: scriptFile,
+              name: pm2Name,
+              autorestart: false,
+            },
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+      });
+
+      // followProcess should return within 5 seconds (2 seconds for process + 3 second buffer)
+      // If it hangs forever, this test will timeout
+      const timeout = 5000;
+      const start = Date.now();
+
+      try {
+        await Promise.race([
+          followProcess(sessionId),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("followProcess did not exit within timeout")), timeout)
+          ),
+        ]);
+      } finally {
+        // Cleanup
+        await deleteProcess(sessionId);
+        await Bun.spawn(["rm", "-f", scriptFile]).exited;
+      }
+
+      const elapsed = Date.now() - start;
+      // Should take roughly 2 seconds (process runtime), not hang forever
+      expect(elapsed).toBeGreaterThan(1500); // At least 1.5 seconds
+      expect(elapsed).toBeLessThan(timeout);
+    }, 10000);
+  });
 });
