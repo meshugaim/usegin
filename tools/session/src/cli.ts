@@ -98,11 +98,17 @@ function printHelp() {
 Session - Parse Claude session JSONL files
 
 USAGE:
-  session <file.jsonl> [options]
+  session <file.jsonl|session-id|prefix> [options]
   session list [options]    List sessions (non-interactive)
   session ls [options]      Alias for 'list'
   session find [options]    Browse sessions interactively with fzf
   session pick [options]    Pick session via popup (for Claude)
+
+SESSION IDENTIFIERS:
+  You can specify sessions by:
+  - Full path: /home/user/.claude/projects/foo/abc123.jsonl
+  - Full UUID: 502de9c7-684a-4724-b592-34aa88aac626
+  - Short prefix: 502de9c7 (minimum 4 hex characters)
 
 PICK OPTIONS:
   --method <method>  Picker method: auto, tmux, vsc (default: auto)
@@ -150,6 +156,9 @@ NOT YET IMPLEMENTED:
 EXAMPLES:
   # Basic narrative output
   session session.jsonl
+
+  # Use short session ID prefix
+  session 502de9c7
 
   # Terminal format (replicates /export)
   session session.jsonl --format terminal
