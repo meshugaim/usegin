@@ -2,9 +2,35 @@
  * pm2 wrapper for crun
  */
 
-import type { CrunProcess, Pm2ProcessInfo, ProcessStatus, SpawnOptions, SpawnResult } from "./types";
+import pm2 from "pm2";
+import type { ProcessDescription } from "pm2";
+import type { CrunProcess, ProcessStatus, SpawnOptions, SpawnResult } from "./types";
 
 const CRUN_PREFIX = "crun-";
+
+/**
+ * Execute an operation with a pm2 connection, ensuring proper connect/disconnect
+ */
+export async function withPm2Connection<T>(operation: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    pm2.connect((err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      operation()
+        .then((result) => {
+          pm2.disconnect();
+          resolve(result);
+        })
+        .catch((error) => {
+          pm2.disconnect();
+          reject(error);
+        });
+    });
+  });
+}
 
 /**
  * Generate a new UUID session ID
@@ -124,26 +150,31 @@ cat "${promptFile}" | bun run c ${claudeArgs.join(" ")}
   const chmodProc = Bun.spawn(["chmod", "+x", scriptFile]);
   await chmodProc.exited;
 
-  // Start via pm2
-  const proc = Bun.spawn(
-    ["pm2", "start", scriptFile, "--name", pm2Name, "--no-autorestart"],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        CRUN_ISSUE_ID: options.issueId || "",
-        CRUN_SESSION_ID: sessionId,
-      },
-      stdout: "pipe",
-      stderr: "pipe",
-    }
-  );
-
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text();
-    throw new Error(`pm2 start failed: ${stderr}`);
-  }
+  // Start via pm2 using SDK
+  await withPm2Connection(async () => {
+    return new Promise<void>((resolve, reject) => {
+      pm2.start(
+        {
+          script: scriptFile,
+          name: pm2Name,
+          autorestart: false,
+          cwd: process.cwd(),
+          env: {
+            ...process.env,
+            CRUN_ISSUE_ID: options.issueId || "",
+            CRUN_SESSION_ID: sessionId,
+          },
+        },
+        (err) => {
+          if (err) {
+            reject(new Error(`pm2 start failed: ${err.message}`));
+            return;
+          }
+          resolve();
+        }
+      );
+    });
+  });
 
   return { sessionId, pm2Name };
 }
@@ -152,42 +183,46 @@ cat "${promptFile}" | bun run c ${claudeArgs.join(" ")}
  * List all crun processes from pm2
  */
 export async function listProcesses(): Promise<CrunProcess[]> {
-  const proc = Bun.spawn(["pm2", "jlist"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const stdout = await new Response(proc.stdout).text();
-  const exitCode = await proc.exited;
-
-  if (exitCode !== 0) {
-    // pm2 might not be running
-    return [];
-  }
-
   try {
-    const processes: Pm2ProcessInfo[] = JSON.parse(stdout);
-    const results: CrunProcess[] = [];
+    return await withPm2Connection(async () => {
+      return new Promise<CrunProcess[]>((resolve, reject) => {
+        pm2.list((err, processes) => {
+          if (err) {
+            reject(err);
+            return;
+          }
 
-    for (const p of processes) {
-      if (!p.name.startsWith(CRUN_PREFIX)) continue;
+          const results: CrunProcess[] = [];
 
-      const parsed = parsePm2Name(p.name);
-      if (!parsed) continue;
+          for (const p of processes) {
+            if (!p.name?.startsWith(CRUN_PREFIX)) continue;
 
-      results.push({
-        sessionId: parsed.sessionId,
-        pm2Name: p.name,
-        status: mapPm2Status(p.pm2_env.status, p.pm2_env.exit_code),
-        pid: p.pid,
-        issueId: parsed.issueId || p.pm2_env.env?.CRUN_ISSUE_ID,
-        startedAt: p.pm2_env.pm_uptime ? new Date(p.pm2_env.pm_uptime) : undefined,
-        exitCode: p.pm2_env.exit_code,
+            const parsed = parsePm2Name(p.name);
+            if (!parsed) continue;
+
+            // pm2 SDK types are incomplete - cast to access runtime properties
+            const pm2Env = p.pm2_env as ProcessDescription["pm2_env"] & {
+              exit_code?: number;
+              env?: Record<string, string>;
+            };
+
+            results.push({
+              sessionId: parsed.sessionId,
+              pm2Name: p.name,
+              status: mapPm2Status(pm2Env?.status || "", pm2Env?.exit_code),
+              pid: p.pid,
+              issueId: parsed.issueId || pm2Env?.env?.CRUN_ISSUE_ID,
+              startedAt: pm2Env?.pm_uptime ? new Date(pm2Env.pm_uptime) : undefined,
+              exitCode: pm2Env?.exit_code,
+            });
+          }
+
+          resolve(results);
+        });
       });
-    }
-
-    return results;
+    });
   } catch {
+    // pm2 might not be running
     return [];
   }
 }
@@ -204,17 +239,27 @@ export async function getProcess(sessionId: string): Promise<CrunProcess | null>
  * Delete a process from pm2
  */
 export async function deleteProcess(sessionId: string): Promise<boolean> {
-  const process = await getProcess(sessionId);
-  if (!process) {
+  const crunProcess = await getProcess(sessionId);
+  if (!crunProcess) {
     return false;
   }
 
-  const proc = Bun.spawn(["pm2", "delete", process.pm2Name], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  return (await proc.exited) === 0;
+  try {
+    await withPm2Connection(async () => {
+      return new Promise<void>((resolve, reject) => {
+        pm2.delete(crunProcess.pm2Name, (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        });
+      });
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -222,17 +267,33 @@ export async function deleteProcess(sessionId: string): Promise<boolean> {
  */
 export async function deleteAllProcesses(): Promise<number> {
   const processes = await listProcesses();
+  if (processes.length === 0) {
+    return 0;
+  }
+
   let deleted = 0;
 
-  for (const process of processes) {
-    const proc = Bun.spawn(["pm2", "delete", process.pm2Name], {
-      stdout: "pipe",
-      stderr: "pipe",
+  try {
+    await withPm2Connection(async () => {
+      for (const crunProcess of processes) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            pm2.delete(crunProcess.pm2Name, (err) => {
+              if (err) {
+                reject(err);
+                return;
+              }
+              resolve();
+            });
+          });
+          deleted++;
+        } catch {
+          // Continue deleting other processes even if one fails
+        }
+      }
     });
-
-    if ((await proc.exited) === 0) {
-      deleted++;
-    }
+  } catch {
+    // Connection failed
   }
 
   return deleted;
@@ -258,6 +319,10 @@ export function streamLogs(sessionId: string, raw: boolean = false): Bun.Subproc
 
 /**
  * Stream logs and wait for process to complete using pm2's event bus
+ *
+ * Note: This function maintains a long-running pm2 connection to listen for
+ * process exit events, so it cannot use withPm2Connection which disconnects
+ * after each operation.
  */
 export async function followProcess(sessionId: string): Promise<void> {
   const pm2Name = `${CRUN_PREFIX}${sessionId}`;
@@ -269,19 +334,17 @@ export async function followProcess(sessionId: string): Promise<void> {
   });
 
   // Use pm2's launchBus to listen for process exit events
-  const pm2 = await import("pm2");
-
   await new Promise<void>((resolve, reject) => {
-    pm2.default.connect((err) => {
+    pm2.connect((err) => {
       if (err) {
         logProc.kill();
         reject(err);
         return;
       }
 
-      pm2.default.launchBus((err, bus) => {
+      pm2.launchBus((err, bus) => {
         if (err) {
-          pm2.default.disconnect();
+          pm2.disconnect();
           logProc.kill();
           reject(err);
           return;
@@ -291,7 +354,7 @@ export async function followProcess(sessionId: string): Promise<void> {
           if (event.event === "exit" && event.process.name === pm2Name) {
             // Process exited - clean up
             logProc.kill();
-            pm2.default.disconnect();
+            pm2.disconnect();
             resolve();
           }
         });
@@ -300,7 +363,7 @@ export async function followProcess(sessionId: string): Promise<void> {
         getProcess(sessionId).then((proc) => {
           if (!proc || proc.status !== "running") {
             logProc.kill();
-            pm2.default.disconnect();
+            pm2.disconnect();
             resolve();
           }
         });

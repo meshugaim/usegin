@@ -28,7 +28,7 @@ describe("crun CLI", () => {
       const result = await $`bun ${CLI_PATH} spawn --help`.text();
 
       expect(result).toContain("spawn");
-      expect(result).toContain("--follow");
+      expect(result).toContain("--detach");
       expect(result).toContain("--issue");
       expect(result).toContain("--resume");
       expect(result).toContain("--model");
