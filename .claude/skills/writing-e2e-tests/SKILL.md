@@ -201,6 +201,95 @@ await page.getByTestId("file-input").setInputFiles({
 await expect(page).toHaveURL(/\/success/);
 ```
 
+## Avoiding Flakiness
+
+E2E tests can be flaky due to timing issues. Here are common causes and solutions:
+
+### 1. Database State Verification
+
+When verifying async operations (API calls, background jobs), use polling instead of fixed waits:
+
+```typescript
+// BAD: Fixed wait - arbitrary and slow
+await page.waitForTimeout(2000);
+const row = await db.query("SELECT * FROM items WHERE ...");
+
+// GOOD: Poll until condition is met or timeout
+async function pollUntil<T>(
+  fn: () => Promise<T>,
+  condition: (result: T) => boolean,
+  timeout: number = 15000
+): Promise<T> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeout) {
+    const result = await fn();
+    if (condition(result)) return result;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return fn(); // Return last result for error message
+}
+
+const row = await pollUntil(
+  () => db.query("SELECT * FROM items WHERE ..."),
+  (result) => result !== null,
+  15000
+);
+```
+
+### 2. Test Data Isolation
+
+Tests can pollute each other's state. Clean up BEFORE and AFTER:
+
+```typescript
+// In driver
+cleanupBefore: async (projectId: string) => {
+  await deleteTestData(projectId);
+  await new Promise(r => setTimeout(r, 200)); // Let deletion propagate
+},
+
+cleanup: async () => {
+  await deleteTestData(projectId);
+  await new Promise(r => setTimeout(r, 200));
+},
+
+// In test
+try {
+  await driver.cleanupBefore(projectId); // Ensure clean slate
+  // ... test logic ...
+} finally {
+  await driver.cleanup(); // Clean up after
+}
+```
+
+### 3. UI State Waits
+
+Wait for specific UI elements, not arbitrary timeouts:
+
+```typescript
+// BAD: Arbitrary wait
+await page.waitForTimeout(1000);
+
+// GOOD: Wait for specific element that indicates completion
+await expect(page.getByTestId("success-message")).toBeVisible();
+await expect(page.getByTestId("loading-spinner")).not.toBeVisible();
+```
+
+### 4. CI-Specific Timeouts
+
+CI environments are slower. Use longer timeouts:
+
+```typescript
+// Local might work with 10s, CI needs 15-20s
+const DEFAULT_TIMEOUT = 15000;
+```
+
+### 5. Reference Implementation
+
+See `tests/e2e/drivers/conversation.driver.ts` for a complete example of:
+- Polling with `pollUntil()`
+- `cleanupBefore()` and `cleanup()` methods
+- Timeout handling for async database operations
+
 ## Checklist
 
 ### Before Writing
@@ -214,7 +303,9 @@ await expect(page).toHaveURL(/\/success/);
 - [ ] Create driver file in `tests/e2e/drivers/`
 - [ ] Use fixtures for auth (`authAsOwner`, `authAsInternal`, etc.)
 - [ ] Handle dialogs with `page.once("dialog", ...)`
-- [ ] Clean up test data (delete uploaded files, remove added members)
+- [ ] Clean up test data BEFORE and AFTER tests (see Avoiding Flakiness)
+- [ ] Use polling for async state verification, not fixed waits
+- [ ] Use 15s+ timeouts for database operations in CI
 - [ ] Run with `just e2e-dev <file>` for fast iteration
 
 ### After Writing
