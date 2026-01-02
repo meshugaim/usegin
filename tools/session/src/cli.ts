@@ -25,6 +25,7 @@ import {
   formatOutput,
   getCurrentProjectHash,
   openSessionPicker,
+  resolveSessionPath,
   runFzfMultiLine,
   writeOutputFile,
 } from "./finder";
@@ -386,16 +387,19 @@ async function main() {
       return;
     }
 
+    // Resolve session ID to path if needed
+    const filePath = await resolveSessionPath(args.file);
+
     // List related files mode - just print file paths
     if (args.listFiles) {
-      const files = await listRelatedFiles(args.file);
+      const files = await listRelatedFiles(filePath);
       for (const file of files) {
         console.log(file);
       }
       return;
     }
 
-    const session = await parseSession(args.file, {
+    const session = await parseSession(filePath, {
       includeSubagents: args.subagents,
       includeWarmups: args.includeWarmups,
     });

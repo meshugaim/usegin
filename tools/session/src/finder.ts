@@ -374,6 +374,76 @@ export function extractSessionIdFromPath(path: string): string {
 }
 
 /**
+ * Check if a string looks like a session ID (UUID format)
+ * Returns false for file paths or other strings
+ */
+export function isSessionId(input: string): boolean {
+  if (!input) return false;
+
+  // If it contains a slash, it's a path
+  if (input.includes("/")) return false;
+
+  // If it has a file extension, it's a filename
+  if (input.includes(".")) return false;
+
+  // UUID v4 with hyphens: 8-4-4-4-12 hex chars (36 total)
+  const uuidWithHyphens = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // UUID v4 without hyphens: 32 hex chars
+  const uuidWithoutHyphens = /^[0-9a-f]{32}$/i;
+
+  return uuidWithHyphens.test(input) || uuidWithoutHyphens.test(input);
+}
+
+/**
+ * Find a session by its ID
+ * Searches current project first, then all projects
+ * Returns null if not found
+ */
+export async function findSessionById(sessionId: string): Promise<SessionInfo | null> {
+  const currentProject = getCurrentProjectHash();
+
+  // First, search in current project (if we have one)
+  if (currentProject) {
+    const currentProjectSessions = await discoverSessions({
+      project: currentProject,
+    });
+
+    const match = currentProjectSessions.find((s) => s.id === sessionId);
+    if (match) {
+      return match;
+    }
+  }
+
+  // Fall back to searching all projects
+  const allSessions = await discoverSessions({ allProjects: true });
+  const match = allSessions.find((s) => s.id === sessionId);
+
+  return match ?? null;
+}
+
+/**
+ * Resolve a session path or ID to a full file path
+ * - If input looks like a path (contains /), returns it unchanged
+ * - If input is a session ID (UUID), resolves it to full path
+ * - Throws if session ID is not found
+ */
+export async function resolveSessionPath(input: string): Promise<string> {
+  // If it looks like a path, return unchanged
+  if (!isSessionId(input)) {
+    return input;
+  }
+
+  // It's a session ID - resolve it
+  const session = await findSessionById(input);
+  if (!session) {
+    throw new Error(`Session not found: ${input}`);
+  }
+
+  return session.path;
+}
+
+/**
  * Build fzf arguments array
  * Separated for testability
  */

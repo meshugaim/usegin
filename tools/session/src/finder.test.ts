@@ -14,6 +14,9 @@ import {
   parseSinceFilter,
   buildFzfArgs,
   extractSessionIdFromPath,
+  isSessionId,
+  findSessionById,
+  resolveSessionPath,
   type SessionInfo,
 } from "./finder";
 
@@ -345,6 +348,181 @@ describe("extractSessionIdFromPath", () => {
     const path = "abc123.jsonl";
     const id = extractSessionIdFromPath(path);
     expect(id).toBe("abc123");
+  });
+});
+
+describe("isSessionId", () => {
+  test("returns true for UUID format with hyphens", () => {
+    expect(isSessionId("0b009ce0-eb9f-443c-8255-63bd8753a7e2")).toBe(true);
+  });
+
+  test("returns true for UUID format without hyphens", () => {
+    expect(isSessionId("0b009ce0eb9f443c825563bd8753a7e2")).toBe(true);
+  });
+
+  test("returns false for absolute file paths", () => {
+    expect(isSessionId("/home/user/.claude/projects/foo/session.jsonl")).toBe(false);
+  });
+
+  test("returns false for relative paths with ./", () => {
+    expect(isSessionId("./session.jsonl")).toBe(false);
+  });
+
+  test("returns false for relative paths with ../", () => {
+    expect(isSessionId("../session.jsonl")).toBe(false);
+  });
+
+  test("returns false for paths containing slashes", () => {
+    expect(isSessionId("projects/session.jsonl")).toBe(false);
+  });
+
+  test("returns false for random non-UUID strings", () => {
+    expect(isSessionId("not-a-uuid")).toBe(false);
+    expect(isSessionId("hello")).toBe(false);
+    expect(isSessionId("abc123")).toBe(false);
+  });
+
+  test("returns false for empty string", () => {
+    expect(isSessionId("")).toBe(false);
+  });
+
+  test("returns false for filename with .jsonl extension", () => {
+    expect(isSessionId("session.jsonl")).toBe(false);
+  });
+
+  test("returns false for partial UUID (too short)", () => {
+    expect(isSessionId("0b009ce0-eb9f-443c")).toBe(false);
+  });
+
+  test("returns false for UUID with .jsonl extension", () => {
+    expect(isSessionId("0b009ce0-eb9f-443c-8255-63bd8753a7e2.jsonl")).toBe(false);
+  });
+});
+
+describe("findSessionById", () => {
+  test("finds session by ID in current project", async () => {
+    // First, get a real session from current project to use its ID
+    const currentProject = getCurrentProjectHash();
+    if (!currentProject) return; // Skip if not in a project
+
+    const sessions = await discoverSessions({ project: currentProject });
+    if (sessions.length === 0) return; // Skip if no sessions
+
+    const targetSession = sessions[0];
+    const result = await findSessionById(targetSession.id);
+
+    expect(result).not.toBeNull();
+    expect(result!.path).toBe(targetSession.path);
+    expect(result!.id).toBe(targetSession.id);
+  });
+
+  test("finds session by ID across all projects", async () => {
+    // Get any session from any project
+    const sessions = await discoverSessions({ allProjects: true });
+    if (sessions.length === 0) return; // Skip if no sessions
+
+    const targetSession = sessions[0];
+    const result = await findSessionById(targetSession.id);
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(targetSession.id);
+  });
+
+  test("returns null for non-existent session ID", async () => {
+    const result = await findSessionById("00000000-0000-0000-0000-000000000000");
+
+    expect(result).toBeNull();
+  });
+
+  test("prefers current project when session ID exists in multiple projects", async () => {
+    // This test documents the expected behavior:
+    // If a session ID somehow exists in multiple projects (unlikely but possible),
+    // we should prefer the current project's version
+    const currentProject = getCurrentProjectHash();
+    if (!currentProject) return;
+
+    const sessions = await discoverSessions({ project: currentProject });
+    if (sessions.length === 0) return;
+
+    const targetSession = sessions[0];
+    const result = await findSessionById(targetSession.id);
+
+    // Result should be from current project
+    expect(result).not.toBeNull();
+    expect(result!.project).toBe(currentProject);
+  });
+
+  test("returns SessionInfo with all required fields", async () => {
+    const sessions = await discoverSessions({ allProjects: true });
+    if (sessions.length === 0) return;
+
+    const targetSession = sessions[0];
+    const result = await findSessionById(targetSession.id);
+
+    expect(result).not.toBeNull();
+    expect(result!.path).toMatch(/\.jsonl$/);
+    expect(result!.id).toBeTruthy();
+    expect(result!.mtime).toBeInstanceOf(Date);
+    expect(result!.project).toBeTruthy();
+  });
+});
+
+describe("resolveSessionPath", () => {
+  test("returns path unchanged for absolute file path", async () => {
+    const inputPath = "/home/user/.claude/projects/foo/session.jsonl";
+    const result = await resolveSessionPath(inputPath);
+
+    expect(result).toBe(inputPath);
+  });
+
+  test("returns path unchanged for relative file path with ./", async () => {
+    const inputPath = "./session.jsonl";
+    const result = await resolveSessionPath(inputPath);
+
+    expect(result).toBe(inputPath);
+  });
+
+  test("returns path unchanged for relative file path with ../", async () => {
+    const inputPath = "../session.jsonl";
+    const result = await resolveSessionPath(inputPath);
+
+    expect(result).toBe(inputPath);
+  });
+
+  test("returns path unchanged for path containing slashes", async () => {
+    const inputPath = "some/path/session.jsonl";
+    const result = await resolveSessionPath(inputPath);
+
+    expect(result).toBe(inputPath);
+  });
+
+  test("resolves valid session ID to full path", async () => {
+    const sessions = await discoverSessions({ allProjects: true });
+    if (sessions.length === 0) return;
+
+    const targetSession = sessions[0];
+    const result = await resolveSessionPath(targetSession.id);
+
+    expect(result).toBe(targetSession.path);
+  });
+
+  test("throws error for non-existent session ID", async () => {
+    const fakeId = "00000000-0000-0000-0000-000000000000";
+
+    await expect(resolveSessionPath(fakeId)).rejects.toThrow(
+      `Session not found: ${fakeId}`
+    );
+  });
+
+  test("error message includes the session ID that was not found", async () => {
+    const fakeId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+
+    try {
+      await resolveSessionPath(fakeId);
+      expect(true).toBe(false); // Should not reach here
+    } catch (error) {
+      expect((error as Error).message).toContain(fakeId);
+    }
   });
 });
 
