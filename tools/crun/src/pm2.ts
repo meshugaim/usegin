@@ -257,8 +257,7 @@ export function streamLogs(sessionId: string, raw: boolean = false): Bun.Subproc
 }
 
 /**
- * Stream logs and wait for process to complete
- * Polls every second for process status and kills the log stream when done
+ * Stream logs and wait for process to complete using pm2's event bus
  */
 export async function followProcess(sessionId: string): Promise<void> {
   const pm2Name = `${CRUN_PREFIX}${sessionId}`;
@@ -269,16 +268,43 @@ export async function followProcess(sessionId: string): Promise<void> {
     stderr: "inherit",
   });
 
-  // Poll for process completion
-  const pollInterval = 1000; // 1 second
-  while (true) {
-    await Bun.sleep(pollInterval);
+  // Use pm2's launchBus to listen for process exit events
+  const pm2 = await import("pm2");
 
-    const proc = await getProcess(sessionId);
-    if (!proc || proc.status !== "running") {
-      // Process finished - kill the log stream
-      logProc.kill();
-      break;
-    }
-  }
+  await new Promise<void>((resolve, reject) => {
+    pm2.default.connect((err) => {
+      if (err) {
+        logProc.kill();
+        reject(err);
+        return;
+      }
+
+      pm2.default.launchBus((err, bus) => {
+        if (err) {
+          pm2.default.disconnect();
+          logProc.kill();
+          reject(err);
+          return;
+        }
+
+        bus.on("process:event", (event: { event: string; process: { name: string } }) => {
+          if (event.event === "exit" && event.process.name === pm2Name) {
+            // Process exited - clean up
+            logProc.kill();
+            pm2.default.disconnect();
+            resolve();
+          }
+        });
+
+        // Also check if process already finished before we connected
+        getProcess(sessionId).then((proc) => {
+          if (!proc || proc.status !== "running") {
+            logProc.kill();
+            pm2.default.disconnect();
+            resolve();
+          }
+        });
+      });
+    });
+  });
 }
