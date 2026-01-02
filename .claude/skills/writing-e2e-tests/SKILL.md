@@ -283,12 +283,30 @@ CI environments are slower. Use longer timeouts:
 const DEFAULT_TIMEOUT = 15000;
 ```
 
-### 5. Reference Implementation
+### 5. Multi-User Tests
+
+When testing with multiple users, avoid concurrent API requests:
+
+```typescript
+// BAD: Second user starts while first user's persistence is still running
+await ownerChat.sendMessage("Hello");
+await ownerChat.expectAssistantResponse();
+await internalChat.sendMessage("Hi"); // May cause API contention
+
+// GOOD: Add delay between users to let async operations complete
+await ownerChat.sendMessage("Hello");
+await ownerChat.expectAssistantResponse();
+await new Promise(r => setTimeout(r, 1000)); // Let persistence complete
+await internalChat.sendMessage("Hi");
+```
+
+### 6. Reference Implementation
 
 See `tests/e2e/drivers/conversation.driver.ts` for a complete example of:
 - Polling with `pollUntil()`
 - `cleanupBefore()` and `cleanup()` methods
 - Timeout handling for async database operations
+- Multi-user test patterns with proper delays
 
 ## Checklist
 
