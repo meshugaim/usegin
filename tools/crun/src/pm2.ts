@@ -96,20 +96,37 @@ export async function spawnProcess(options: SpawnOptions): Promise<SpawnResult> 
   await Bun.write(promptFile, options.prompt);
 
   // Build claude command
-  const claudeArgs = ["-p", "--session-id", sessionId];
+  // -p for print mode (non-interactive)
+  const claudeArgs = ["-p"];
+
   if (options.resumeSessionId) {
+    // Resume an existing session
     claudeArgs.push("-r", options.resumeSessionId);
+  } else {
+    // New session with explicit ID
+    claudeArgs.push("--session-id", sessionId);
   }
+
   if (options.model) {
     claudeArgs.push("--model", options.model);
   }
 
-  // Use bun run c which provides --dangerously-skip-permissions
-  const command = `cat ${promptFile} | bun run c ${claudeArgs.join(" ")}`;
+  // Write a shell script to run the command
+  // This avoids shell quoting issues and works better with pm2
+  const scriptFile = `/tmp/crun-script-${sessionId}.sh`;
+  const scriptContent = `#!/usr/bin/env bash
+cd "${process.cwd()}"
+cat "${promptFile}" | bun run c ${claudeArgs.join(" ")}
+`;
+  await Bun.write(scriptFile, scriptContent);
+
+  // Make script executable
+  const chmodProc = Bun.spawn(["chmod", "+x", scriptFile]);
+  await chmodProc.exited;
 
   // Start via pm2
   const proc = Bun.spawn(
-    ["pm2", "start", command, "--name", pm2Name, "--no-autorestart", "--interpreter", "bash"],
+    ["pm2", "start", scriptFile, "--name", pm2Name, "--no-autorestart"],
     {
       cwd: process.cwd(),
       env: {
