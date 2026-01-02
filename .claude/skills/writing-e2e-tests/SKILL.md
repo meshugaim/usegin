@@ -297,7 +297,24 @@ CI environments are slower. Use longer timeouts:
 const DEFAULT_TIMEOUT = 15000;
 ```
 
-### 5. Multi-User Tests
+### 5. Multi-Turn Conversation Tests
+
+React state updates may not be committed immediately. Add delays between messages:
+
+```typescript
+// BAD: Second message may send before React commits session_id
+await chat.sendMessage("First message");
+await chat.expectAssistantResponse();
+await chat.sendMessage("Second message"); // session_id may still be null!
+
+// GOOD: Wait for React to commit the session_id state update
+await chat.sendMessage("First message");
+await chat.expectAssistantResponse();
+await new Promise(r => setTimeout(r, 500)); // Let React commit state
+await chat.sendMessage("Second message"); // session_id is set
+```
+
+### 6. Multi-User Tests
 
 When testing with multiple users, avoid concurrent API requests:
 
@@ -314,7 +331,7 @@ await new Promise(r => setTimeout(r, 1000)); // Let persistence complete
 await internalChat.sendMessage("Hi");
 ```
 
-### 6. Reference Implementation
+### 7. Reference Implementation
 
 See `tests/e2e/drivers/conversation.driver.ts` for a complete example of:
 - Polling with `pollUntil()`
