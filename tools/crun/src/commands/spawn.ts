@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { spawnProcess, streamLogs } from "../pm2";
+import { spawnProcess, followProcess } from "../pm2";
 
 export function createSpawnCommand(): Command {
   const cmd = new Command("spawn")
@@ -41,9 +41,8 @@ async function runSpawn(
     }
 
     if (opts.follow) {
-      // Stream logs until process exits
-      const logProc = streamLogs(result.sessionId, false);
-      await logProc.exited;
+      // Stream logs until process exits, then terminate
+      await followProcess(result.sessionId);
       console.log(`Done: ${result.sessionId}`);
     }
   } catch (error) {

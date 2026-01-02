@@ -242,10 +242,7 @@ export async function deleteAllProcesses(): Promise<number> {
  * Stream logs from a pm2 process
  */
 export function streamLogs(sessionId: string, raw: boolean = false): Bun.Subprocess {
-  const process_ = getProcess(sessionId);
-
-  // Get pm2Name - we need to do this synchronously for the spawn
-  // Since we can't await here, we'll construct the name directly
+  // Get pm2Name - construct directly since we can't await
   const pm2Name = `${CRUN_PREFIX}${sessionId}`;
 
   const args = ["pm2", "logs", pm2Name];
@@ -257,4 +254,31 @@ export function streamLogs(sessionId: string, raw: boolean = false): Bun.Subproc
     stdout: "inherit",
     stderr: "inherit",
   });
+}
+
+/**
+ * Stream logs and wait for process to complete
+ * Polls every second for process status and kills the log stream when done
+ */
+export async function followProcess(sessionId: string): Promise<void> {
+  const pm2Name = `${CRUN_PREFIX}${sessionId}`;
+
+  // Start log streaming
+  const logProc = Bun.spawn(["pm2", "logs", pm2Name], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  // Poll for process completion
+  const pollInterval = 1000; // 1 second
+  while (true) {
+    await Bun.sleep(pollInterval);
+
+    const proc = await getProcess(sessionId);
+    if (!proc || proc.status !== "running") {
+      // Process finished - kill the log stream
+      logProc.kill();
+      break;
+    }
+  }
 }

@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { listProcesses } from "../pm2";
+import { getPromptPreview } from "../session";
 import type { CrunProcess } from "../types";
 
 export function createListCommand(): Command {
@@ -51,13 +52,21 @@ async function runList(opts: { json?: boolean }): Promise<void> {
   try {
     const processes = await listProcesses();
 
-    if (opts.json) {
-      console.log(JSON.stringify(processes, null, 2));
+    if (processes.length === 0) {
+      console.log("No crun processes found");
       return;
     }
 
-    if (processes.length === 0) {
-      console.log("No crun processes found");
+    // Fetch prompt previews for all processes
+    const processesWithPrompts = await Promise.all(
+      processes.map(async (proc) => ({
+        ...proc,
+        prompt: (await getPromptPreview(proc.sessionId)) ?? undefined,
+      }))
+    );
+
+    if (opts.json) {
+      console.log(JSON.stringify(processesWithPrompts, null, 2));
       return;
     }
 
@@ -65,8 +74,8 @@ async function runList(opts: { json?: boolean }): Promise<void> {
     console.log("ID        STATUS    ELAPSED   ISSUE       PROMPT");
 
     // Print rows
-    for (const process of processes) {
-      console.log(formatTableRow(process));
+    for (const proc of processesWithPrompts) {
+      console.log(formatTableRow(proc));
     }
   } catch (error) {
     if (error instanceof Error) {
