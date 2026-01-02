@@ -24,14 +24,19 @@ Patterns for managing spawned Claude workers effectively.
 ## Spawning Workers
 
 ```bash
-# Spawn with clear task
+# Spawn with clear task (follows by default)
 crun spawn "implement ENG-745: crun CLI"
 
 # With issue linking
 crun spawn --issue ENG-745 "implement the crun CLI per spec"
 
-# Follow for short tasks
-crun spawn --follow "add tests for the auth module"
+# Detach for long-running tasks
+crun spawn --detach "implement the full feature"
+
+# Parallel workers
+crun spawn --detach --issue ENG-100 "implement auth"
+crun spawn --detach --issue ENG-101 "implement logging"
+crun list  # see both
 ```
 
 ## Guiding Workers
@@ -50,12 +55,12 @@ You are implementing ENG-XXX.
 Read the spec: `plan show XXX`
 
 Follow TDD:
-1. Write failing tests first
+1. Write failing tests first - make sure they fail for the RIGHT reason
 2. Implement to make tests pass
-3. Commit after each working piece
+3. Commit AND push after each working piece
 
 Use patterns from tools/session/ for CLI structure.
-Commit often, push often.
+Commit often, push often. Don't batch - push after each commit.
 PROMPT
 
 crun spawn "$(cat /tmp/task.txt)"
@@ -63,21 +68,24 @@ crun spawn "$(cat /tmp/task.txt)"
 
 ### Nudging / Checkpoints
 
-Kill and resume to send guidance:
+Check progress and send guidance:
 
 ```bash
-# Check progress
-session <worker-session-id>
+# Check progress (short ID works)
+session <id> | tail -50
 
 # Kill if needed
-pkill -f "<session-id>"
+crun kill <id>
 
-# Send nudge
+# Send follow-up to running worker
+crun send <id> "checkpoint: self-review, commit working code, push"
+
+# Or resume a stopped session with detailed nudge
 cat > /tmp/nudge.txt << 'PROMPT'
 Pause and checkpoint.
 
 1. Self-review what you've built
-2. Commit what's working
+2. Commit AND push what's working
 3. List what's incomplete and why
 
 Be honest in your assessment.
@@ -111,11 +119,36 @@ crun list
 # Check specific worker
 crun status <id>
 
-# View transcript
+# View transcript (short ID works)
 session <id>
+session <id> | tail -50  # just recent activity
 
 # Tail live output
 crun tail <id>
+```
+
+## After Worker Finishes
+
+Workers often don't commit/push at the end. Manager should:
+
+```bash
+# Check what worker left uncommitted
+git status
+
+# Run tests
+bun test  # or appropriate test command
+
+# Commit worker's changes
+git add -A && git commit -m "feat: description
+
+Closes: ENG-XXX
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+
+# Push (may need rebase if other workers pushed)
+git pull --rebase origin main && git push origin main
 ```
 
 ## Workflow Example
@@ -124,20 +157,20 @@ crun tail <id>
 # 1. Create issue with spec
 plan create "implement feature X" --description "$(cat spec.md)"
 
-# 2. Spawn worker
-crun spawn --issue ENG-XXX "implement per spec, TDD, commit often"
+# 2. Spawn worker (detach for long tasks)
+crun spawn --detach --issue ENG-XXX "implement per spec, TDD, commit often"
 
 # 3. Check progress periodically
 crun list
 session <id> | tail -50
 
-# 4. Nudge if needed (kill + resume)
-pkill -f "<id>"
-echo "checkpoint: self-review, commit working code" | claude -p -r "<id>"
+# 4. Nudge if needed
+crun send <id> "checkpoint: self-review, commit and push working code"
 
-# 5. Review final state
-session <id>
-git log --oneline -5
+# 5. When done - verify and commit any uncommitted work
+git status
+bun test
+git add -A && git commit -m "..." && git push origin main
 
 # 6. Close issue
 plan close XXX
@@ -152,6 +185,24 @@ plan close XXX
 | Let worker run forever | Periodic checkpoints |
 | Batch commits at end | Commit after each working piece |
 | Skip pushing | Push after each commit |
+
+## Git Conflicts with Parallel Workers
+
+When multiple workers push, you may hit conflicts:
+
+```bash
+# Push fails
+git push origin main
+# ! [rejected] main -> main (fetch first)
+
+# Solution: stash, pull, unstash
+git stash
+git pull --rebase origin main
+git stash pop
+
+# Resolve any conflicts, then push
+git push origin main
+```
 
 ## Context Window Management
 

@@ -57,7 +57,7 @@ JSON output includes `session_id` for later resume:
 For managed processes with pm2:
 
 ```bash
-# Spawn and stream output (default)
+# Spawn and stream output (default - follows until done)
 crun spawn "implement the feature"
 # → (streams output, exits when done)
 
@@ -68,11 +68,15 @@ crun spawn --detach "fix the bug"
 # List running workers
 crun list
 
-# Send follow-up
+# Send follow-up to existing session
 crun send abc123 "also add tests"
 
-# View output
+# Kill a worker
+crun kill abc123
+
+# View output (short ID works)
 session abc123
+session 502de9c7  # prefix also works
 ```
 
 ### Non-blocking from Claude Code
@@ -89,14 +93,26 @@ Task tool with run_in_background: true
 ## Using session CLI
 
 ```bash
-# View parsed transcript
+# View parsed transcript (short ID works)
 session abc123
+session 502de9c7  # prefix also works
+
+# Check progress on running worker
+session <id> | tail -50
 
 # List recent sessions
-session list --output id
+session list -n 5 --output id
 
 # Stream live output
 claude -p "task" --output-format stream-json | session --stream
+```
+
+## Aliases
+
+In this repo, `bun run c` is an alias for `claude`:
+
+```bash
+cat /tmp/prompt.txt | bun run c --session-id "$session_id"
 ```
 
 ## Patterns
