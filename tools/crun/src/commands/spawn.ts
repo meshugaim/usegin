@@ -9,6 +9,7 @@ export function createSpawnCommand(): Command {
     .option("--issue <id>", "Link to Linear issue (updates on completion)")
     .option("--resume <session-id>", "Continue existing session")
     .option("--model <model>", "Override default model")
+    .option("--max-memory <size>", "Memory limit for auto-restart (default: 500M)")
     .action(async (prompt: string, opts) => {
       await runSpawn(prompt, opts);
     });
@@ -23,6 +24,7 @@ async function runSpawn(
     issue?: string;
     resume?: string;
     model?: string;
+    maxMemory?: string;
   }
 ): Promise<void> {
   const follow = !opts.detach;
@@ -34,6 +36,7 @@ async function runSpawn(
       issueId: opts.issue,
       resumeSessionId: opts.resume,
       model: opts.model,
+      maxMemoryRestart: opts.maxMemory,
     });
 
     if (opts.issue) {
