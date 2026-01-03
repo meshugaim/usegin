@@ -324,8 +324,8 @@ export function streamLogs(sessionId: string, raw: boolean = false): Bun.Subproc
  * process exit events, so it cannot use withPm2Connection which disconnects
  * after each operation.
  */
-export async function followProcess(sessionId: string): Promise<void> {
-  const pm2Name = `${CRUN_PREFIX}${sessionId}`;
+export async function followProcess(sessionId: string, issueId?: string): Promise<void> {
+  const pm2Name = buildPm2Name(sessionId, issueId);
 
   // Start log streaming
   const logProc = Bun.spawn(["pm2", "logs", pm2Name], {
@@ -369,18 +369,47 @@ export async function followProcess(sessionId: string): Promise<void> {
         // Check if process already finished before we connected
         // IMPORTANT: Use pm2.list directly to avoid nested connect/disconnect
         // which would break the bus connection
-        pm2.list((err, processes) => {
-          if (err) {
-            // Ignore list errors, rely on bus events
-            return;
-          }
-          const proc = processes.find((p) => p.name === pm2Name);
-          const status = proc?.pm2_env?.status;
-          if (!proc || status === "stopped" || status === "errored") {
-            cleanup();
-            resolve();
-          }
-        });
+        //
+        // We poll a few times because pm2 may have a short delay between
+        // pm2.start() returning and the process appearing in pm2.list().
+        // Only treat "stopped"/"errored" as already-finished; if process
+        // is not found, wait for it to appear rather than exiting immediately.
+        const MAX_POLL_ATTEMPTS = 10;
+        const POLL_INTERVAL_MS = 100;
+        let pollAttempt = 0;
+
+        const checkProcessStatus = () => {
+          pm2.list((err, processes) => {
+            if (resolved) return; // Already resolved via bus event
+
+            if (err) {
+              // Ignore list errors, rely on bus events
+              return;
+            }
+
+            const proc = processes.find((p) => p.name === pm2Name);
+            const status = proc?.pm2_env?.status;
+
+            if (proc) {
+              // Process found - check if it's already finished
+              if (status === "stopped" || status === "errored") {
+                cleanup();
+                resolve();
+              }
+              // Process is running - rely on bus events for exit notification
+            } else {
+              // Process not found yet - poll again if we haven't exceeded attempts
+              pollAttempt++;
+              if (pollAttempt < MAX_POLL_ATTEMPTS) {
+                setTimeout(checkProcessStatus, POLL_INTERVAL_MS);
+              }
+              // After max attempts, just rely on bus events (process may have
+              // started and exited very quickly, in which case bus should catch it)
+            }
+          });
+        };
+
+        checkProcessStatus();
       });
     });
   });

@@ -44,7 +44,7 @@ async function runSpawn(
 
     if (follow) {
       // Stream logs until process exits, then terminate
-      await followProcess(result.sessionId);
+      await followProcess(result.sessionId, opts.issue);
       console.log(`Done: ${result.sessionId}`);
     }
   } catch (error) {

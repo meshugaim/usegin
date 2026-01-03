@@ -345,5 +345,30 @@ describe("pm2 SDK operations", () => {
       expect(elapsed).toBeGreaterThan(1500); // At least 1.5 seconds
       expect(elapsed).toBeLessThan(timeout);
     }, 10000);
+
+    it("does not exit immediately for non-existent process (race condition fix)", async () => {
+      // Regression test for ENG-766: followProcess was exiting immediately
+      // when pm2.list() didn't find the process, treating "not found" as "finished"
+      const { followProcess } = await import("../src/pm2");
+
+      const fakeSessionId = `non-existent-${Date.now()}`;
+      const start = Date.now();
+
+      // followProcess should poll for the process (10 * 100ms = 1 second minimum)
+      // before giving up and relying on bus events. Set a timeout to abort since
+      // for a non-existent process, the bus will never fire an exit event.
+      const timeout = 2000;
+
+      await Promise.race([
+        followProcess(fakeSessionId),
+        new Promise<void>((resolve) => setTimeout(resolve, timeout)),
+      ]);
+
+      const elapsed = Date.now() - start;
+
+      // Should have waited at least 500ms (polling attempts), not returned immediately
+      // Before the fix, this would return in ~30-50ms
+      expect(elapsed).toBeGreaterThanOrEqual(500);
+    }, 5000);
   });
 });
