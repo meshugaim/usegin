@@ -1,9 +1,11 @@
 import { describe, expect, it, beforeAll, afterAll, mock } from "bun:test";
 import {
   formatOutputSnippet,
+  formatSummaryLine,
   getOutputSnippet,
   truncateLine,
 } from "../src/commands/list";
+import type { ProcessStatus } from "../src/types";
 import { mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
@@ -109,6 +111,67 @@ describe("list command", () => {
 
       const result = await getOutputSnippet(testSessionId);
       expect(result).toBeNull();
+    });
+  });
+
+  describe("formatNoLogsIndicator", () => {
+    it("returns indicator with proper indentation", async () => {
+      const { formatNoLogsIndicator } = await import("../src/commands/list");
+      const result = formatNoLogsIndicator();
+
+      // Should have 44 spaces before the indicator (to align under PROMPT)
+      expect(result).toMatch(/^\s{44}\(no logs\)$/);
+    });
+  });
+
+  describe("formatSummaryLine", () => {
+    it("formats summary with multiple statuses", () => {
+      const statuses: ProcessStatus[] = [
+        "running",
+        "running",
+        "running",
+        "done",
+        "done",
+        "errored",
+      ];
+      const result = formatSummaryLine(statuses);
+      expect(result).toBe("3 running, 2 done, 1 errored (6 total)");
+    });
+
+    it("formats summary with only running processes", () => {
+      const statuses: ProcessStatus[] = ["running", "running"];
+      const result = formatSummaryLine(statuses);
+      expect(result).toBe("2 running (2 total)");
+    });
+
+    it("formats summary with only done processes", () => {
+      const statuses: ProcessStatus[] = ["done", "done", "done"];
+      const result = formatSummaryLine(statuses);
+      expect(result).toBe("3 done (3 total)");
+    });
+
+    it("formats summary with all status types", () => {
+      const statuses: ProcessStatus[] = [
+        "running",
+        "done",
+        "errored",
+        "stopped",
+        "historical",
+      ];
+      const result = formatSummaryLine(statuses);
+      expect(result).toBe(
+        "1 running, 1 done, 1 errored, 1 stopped, 1 historical (5 total)"
+      );
+    });
+
+    it("returns empty string for empty list", () => {
+      const result = formatSummaryLine([]);
+      expect(result).toBe("");
+    });
+
+    it("handles single process", () => {
+      const result = formatSummaryLine(["running"]);
+      expect(result).toBe("1 running (1 total)");
     });
   });
 });
