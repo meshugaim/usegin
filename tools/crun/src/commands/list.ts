@@ -4,7 +4,7 @@ import { getPromptPreview } from "../session";
 import { homedir } from "os";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import type { CrunProcess } from "../types";
+import type { CrunProcess, ProcessStatus } from "../types";
 
 const PM2_LOG_DIR = join(homedir(), ".pm2", "logs");
 
@@ -102,6 +102,48 @@ export function formatOutputSnippet(
     .join("\n");
 }
 
+/**
+ * Format indicator for processes with no logs available.
+ * Exported for testing.
+ */
+export function formatNoLogsIndicator(): string {
+  const indent = " ".repeat(PROMPT_COLUMN_OFFSET);
+  return `${indent}(no logs)`;
+}
+
+/**
+ * Format summary line showing status counts.
+ * Example: "3 running, 2 done, 1 errored (6 total)"
+ * Exported for testing.
+ */
+export function formatSummaryLine(statuses: ProcessStatus[]): string {
+  if (statuses.length === 0) return "";
+
+  // Count each status type in display order
+  const statusOrder: ProcessStatus[] = [
+    "running",
+    "done",
+    "errored",
+    "stopped",
+    "historical",
+  ];
+  const counts = new Map<ProcessStatus, number>();
+  for (const status of statuses) {
+    counts.set(status, (counts.get(status) || 0) + 1);
+  }
+
+  // Build parts for non-zero counts
+  const parts: string[] = [];
+  for (const status of statusOrder) {
+    const count = counts.get(status);
+    if (count && count > 0) {
+      parts.push(`${count} ${status}`);
+    }
+  }
+
+  return `${parts.join(", ")} (${statuses.length} total)`;
+}
+
 function formatTableRow(process: CrunProcess): string {
   const id = process.sessionId.slice(0, 8);
   const status = process.status.padEnd(10);
@@ -164,8 +206,18 @@ async function runList(opts: { json?: boolean; all?: boolean; verbose?: boolean 
           if (formatted) {
             console.log(formatted);
           }
+        } else {
+          console.log(formatNoLogsIndicator());
         }
       }
+    }
+
+    // Print summary line
+    const statuses = processesWithPrompts.map((p) => p.status);
+    const summary = formatSummaryLine(statuses);
+    if (summary) {
+      console.log("");
+      console.log(summary);
     }
   } catch (error) {
     if (error instanceof Error) {

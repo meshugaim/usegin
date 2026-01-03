@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll, mock } from "bun:test";
 import {
   formatOutputSnippet,
+  formatNoLogsIndicator,
   formatSummaryLine,
   getOutputSnippet,
   truncateLine,
@@ -115,8 +116,7 @@ describe("list command", () => {
   });
 
   describe("formatNoLogsIndicator", () => {
-    it("returns indicator with proper indentation", async () => {
-      const { formatNoLogsIndicator } = await import("../src/commands/list");
+    it("returns indicator with proper indentation", () => {
       const result = formatNoLogsIndicator();
 
       // Should have 44 spaces before the indicator (to align under PROMPT)
