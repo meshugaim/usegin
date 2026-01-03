@@ -22,14 +22,13 @@ You orchestrate. You ensure things happen. You don't do them directly.
 - Parallel work identified
 - Specialized task (review, retro)
 
-**Prompt includes:**
+**Prompt must include:**
+- Tell them they're a cell worker: "You are a cell worker. Read the cell skill (.claude/skills/cell/worker.md)."
 - Linear issue reference (`plan show <id>`)
 - What to do
-- Process (TDD, commit often)
-- Relevant patterns/files
 
 ```bash
-crun spawn "implement ENG-123 per spec. TDD. Commit often."
+crun spawn "You are a cell worker. Read the cell skill (.claude/skills/cell/worker.md). Your assignment: implement ENG-123."
 ```
 
 ## Monitoring
