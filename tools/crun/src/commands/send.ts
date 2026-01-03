@@ -1,11 +1,11 @@
 import { Command } from "commander";
 import { getProcess, spawnProcess } from "../pm2";
-import { findSessionPath } from "../session";
+import { resolveUniqueSessionId } from "../session";
 
 export function createSendCommand(): Command {
   const cmd = new Command("send")
     .description("Send a follow-up message to an existing session")
-    .argument("<session-id>", "Session ID to send to")
+    .argument("<session-id>", "Session ID (full or short prefix)")
     .argument("<prompt>", "The follow-up prompt")
     .action(async (sessionId: string, prompt: string) => {
       await runSend(sessionId, prompt);
@@ -16,26 +16,23 @@ export function createSendCommand(): Command {
 
 async function runSend(sessionId: string, prompt: string): Promise<void> {
   try {
-    // Check if session exists - first in pm2 (running), then in session files (historical)
-    const existing = await getProcess(sessionId);
-    const sessionPath = await findSessionPath(sessionId);
+    // Resolve short ID to full session ID
+    const fullSessionId = await resolveUniqueSessionId(sessionId);
 
-    if (!existing && !sessionPath) {
-      console.error(`Session not found: ${sessionId}`);
-      process.exit(1);
-    }
+    // Check if session is currently running in pm2 (to get issue ID)
+    const existing = await getProcess(fullSessionId);
 
     // Spawn new process resuming the session
     await spawnProcess({
       prompt,
-      resumeSessionId: sessionId,
+      resumeSessionId: fullSessionId,
       issueId: existing?.issueId,
     });
 
-    console.log(`Sent follow-up to ${sessionId}`);
+    console.log(`Sent follow-up to ${fullSessionId}`);
   } catch (error) {
     if (error instanceof Error) {
-      console.error(`Error: ${error.message}`);
+      console.error(error.message);
     } else {
       console.error("An unknown error occurred");
     }
