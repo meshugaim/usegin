@@ -56,7 +56,7 @@ Triggered by spawner, executed by workers:
 
 **Retro:** After feature completion. What worked, what didn't, improvements.
 
-**Meta-retro:** Spawner can retro its own session via worker.
+**Self-retro:** Spawner can retro its own session via worker.
 
 **System improvement:**
 - Add missing tools/skills
