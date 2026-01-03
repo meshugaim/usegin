@@ -6,6 +6,7 @@ import { createStatusCommand } from "./commands/status";
 import { createTailCommand } from "./commands/tail";
 import { createSendCommand } from "./commands/send";
 import { createKillCommand } from "./commands/kill";
+import { createOutputCommand } from "./commands/output";
 
 const program = new Command()
   .name("crun")
@@ -18,5 +19,6 @@ program.addCommand(createStatusCommand());
 program.addCommand(createTailCommand());
 program.addCommand(createSendCommand());
 program.addCommand(createKillCommand());
+program.addCommand(createOutputCommand());
 
 program.parse();
