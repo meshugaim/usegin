@@ -5,14 +5,13 @@ description: How to review code as a cell worker. Triggered by "review this code
 
 # Code Review
 
-You've been assigned to review code. Here's how.
+Post-commit review on main. Code is already pushed - you're looking for improvements, not blocking.
 
 ## What to Review
 
-Check the assignment for scope:
-- Specific commits (from git log)
+Check assignment for scope:
+- Specific commits (`git log --oneline -10`)
 - Specific files
-- A PR
 - All changes in a slice
 
 ## How to Review
@@ -20,67 +19,107 @@ Check the assignment for scope:
 ### 1. Understand Context
 
 - `plan show <issue-id>` - what was being built?
-- `git log --oneline -10` - recent commits
-- Read related code if needed
+- `git log` - recent commits
+- Read surrounding code
 
-### 2. Check the Code
+### 2. Correctness
 
-**Correctness:**
 - Does it do what the issue asks?
 - Edge cases handled?
 - Error handling appropriate?
 
-**Tests:**
-- Are there tests?
-- Do tests cover the changes?
-- Are test names descriptive?
+### 3. Simplification
 
-**Quality:**
-- Readable?
-- Follows existing patterns?
-- No unnecessary complexity?
+- Can anything be simplified?
+- Unnecessary complexity?
+- Over-engineering?
 
-**Security:**
+### 4. Duplication
+
+- Code repeated that could be extracted?
+- Patterns that should be shared?
+- Existing utilities that could be reused?
+
+### 5. Standardization
+
+- Follows existing patterns in codebase?
+- Consistent with similar code elsewhere?
+- Opportunities to standardize across files?
+
+### 6. Tests
+
+**Existence:**
+- Are there tests for the changes?
+
+**Readability:**
+- Test names describe the scenario?
+- Test structure clear (arrange/act/assert)?
+- Easy to understand what's being tested?
+
+**Meaningfulness:**
+- Tests cover real scenarios, not just for coverage?
+- Edge cases tested?
+- Failure modes tested?
+- Would catch actual bugs?
+
+**Coverage:**
+- Run coverage if available (`bun test --coverage`, `pytest --cov`)
+- New code covered?
+- Critical paths covered?
+
+### 7. Linting
+
+- Run linter if not auto-run (`bun lint`, `ruff check`)
+- Type errors? (`bun typecheck`, `pyright`)
+- Linting issues in changed files?
+
+### 8. Security
+
 - Input validation at boundaries?
 - No secrets in code?
 - Safe from injection/XSS?
 
-### 3. Leave Feedback
+## Output
 
-**Where:** Linear issue comment or PR comment (check assignment).
+Post to Linear issue:
 
-**Format:**
 ```
 ## Review: ENG-XXX
 
-**Summary:** [1-2 sentences - overall assessment]
+**Summary:** [1-2 sentences]
 
-**Issues:**
-- [file:line] [description of issue]
-- [file:line] [description of issue]
+**Issues:** (if any)
+- [file:line] [issue]
 
-**Suggestions:**
-- [optional improvements, not blockers]
+**Simplification opportunities:**
+- [suggestion]
 
-**Verdict:** Approved / Needs changes
+**Duplication to extract:**
+- [pattern that repeats]
+
+**Test observations:**
+- [readability/meaningfulness notes]
+
+**Verdict:** Approved / Follow-up needed
 ```
+
+If follow-up needed, create sub-issue for fixes.
 
 ## Priorities
 
-Focus on:
-1. Bugs and correctness
-2. Missing tests
+High priority:
+1. Bugs / correctness
+2. Meaningful test gaps
 3. Security issues
-4. Readability blockers
+4. Clear duplication
 
-Don't nitpick:
-- Style preferences (if code works)
-- Minor naming unless confusing
+Lower priority (note but don't block):
+- Style preferences
+- Minor naming
 - "I would have done it differently"
 
 ## Signaling
 
-When done:
-1. Post review feedback
-2. Update Linear with verdict
+1. Post review to Linear
+2. Create follow-up issues if needed
 3. Exit cleanly
