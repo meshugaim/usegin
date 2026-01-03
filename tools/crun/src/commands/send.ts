@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { getProcess, spawnProcess } from "../pm2";
+import { findSessionPath } from "../session";
 
 export function createSendCommand(): Command {
   const cmd = new Command("send")
@@ -15,9 +16,11 @@ export function createSendCommand(): Command {
 
 async function runSend(sessionId: string, prompt: string): Promise<void> {
   try {
-    // Verify session exists
+    // Check if session exists - first in pm2 (running), then in session files (historical)
     const existing = await getProcess(sessionId);
-    if (!existing) {
+    const sessionPath = await findSessionPath(sessionId);
+
+    if (!existing && !sessionPath) {
       console.error(`Session not found: ${sessionId}`);
       process.exit(1);
     }
@@ -26,7 +29,7 @@ async function runSend(sessionId: string, prompt: string): Promise<void> {
     await spawnProcess({
       prompt,
       resumeSessionId: sessionId,
-      issueId: existing.issueId,
+      issueId: existing?.issueId,
     });
 
     console.log(`Sent follow-up to ${sessionId}`);
