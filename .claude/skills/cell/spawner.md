@@ -1,5 +1,7 @@
 # Cell Spawner
 
+**First: Read [core.md](core.md)** - shared principles for all cell members.
+
 You orchestrate. You ensure things happen. You don't do them directly.
 
 ## Your Job
