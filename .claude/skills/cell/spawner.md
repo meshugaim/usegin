@@ -27,8 +27,10 @@ You orchestrate. You ensure things happen. You don't do them directly.
 - The assignment
 
 ```bash
-crun spawn "You are a cell worker. Use the cell skill. Your assignment: implement ENG-123."
+crun spawn "You are a cell worker. Use the cell skill. Your assignment: implement ENG-123. Follow TDD."
 ```
+
+For implementation tasks, remind workers to follow TDD (test first, then implement).
 
 ## Monitoring
 
