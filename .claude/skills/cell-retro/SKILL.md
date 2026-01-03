@@ -35,6 +35,16 @@ Check assignment for what to retro:
 - Wasted context
 - Slow progress areas
 
+**Skill adherence check:**
+- If a skill was invoked during the session, verify the worker followed the skill's guidance
+- Note any deviations from the skill's prescribed process
+- Assess whether deviations were justified or led to issues
+
+**Tool utilization check:**
+- If a tool was used, assess whether it was used to its fullest potential
+- Was the tool's full capability leveraged (flags, options, advanced features)?
+- Identify cases where a tool was underutilized—could have solved problems faster or more completely
+
 **What could improve:**
 - Missing tools or skills
 - Existing tools that could be better
