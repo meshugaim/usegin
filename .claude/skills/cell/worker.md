@@ -23,10 +23,28 @@ You execute assignments. Signal clearly. Self-verify.
 
 ## During Execution
 
-- Small steps, commit often
+- Small steps, **commit after each edit**
 - Self-verify (run tests, check UI/endpoints)
 - Run linter/typecheck before pushing
 - Signal via commits + Linear updates
+
+## Commit Discipline
+
+**Your work only exists if it's committed.** Uncommitted work is lost work.
+
+**Commit immediately after:**
+- Every file edit (even small ones)
+- Tests passing
+- Fixing a bug
+- Adding a test
+
+**Checkpoint commits (commit before):**
+- Risky refactors
+- Deleting code
+- Changing APIs
+- Running commands that might fail
+
+**Push often:** Commits without pushes are invisible to spawner.
 
 ## Signaling
 
@@ -58,6 +76,17 @@ Stay aware of:
 - Parallel work happening
 - What's already done
 - Your own context state
+
+## Running Low on Context
+
+**Never exit with uncommitted work.** If context is running low:
+
+1. **Stop new work immediately**
+2. **Commit and push everything** - even partial progress
+3. **Update Linear** with what's done and what remains
+4. **Exit cleanly** - spawner will continue or reassign
+
+Better to commit incomplete work than lose it entirely. A partial commit with a clear message ("WIP: added tests, impl pending") is infinitely better than no commit.
 
 ## Assignments You Might Get
 
