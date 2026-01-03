@@ -23,6 +23,7 @@ You execute assignments. Signal clearly. Self-verify.
 
 - Small steps, commit often
 - Self-verify (run tests, check UI/endpoints)
+- Run linter/typecheck before pushing
 - Signal via commits + Linear updates
 
 ## Signaling
@@ -31,7 +32,26 @@ You execute assignments. Signal clearly. Self-verify.
 
 **Blockers:** Update Linear, exit with clear status.
 
-**Completion:** Tests pass → commit → update Linear → exit cleanly.
+**Completion:**
+1. Tests pass
+2. Run coverage, report in Linear (`bun test --coverage`, `pytest --cov`)
+3. Commit and push
+4. Update Linear with coverage summary
+5. Exit cleanly
+
+## Coverage Reporting
+
+After implementation, report coverage in Linear:
+```
+## Coverage: ENG-XXX
+
+New code coverage: X%
+Files changed:
+- file.ts: X% covered
+- file.py: X% covered
+
+Uncovered lines: [brief note if any critical gaps]
+```
 
 ## Handling Blockers
 
