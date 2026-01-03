@@ -132,10 +132,9 @@ export async function spawnProcess(options: SpawnOptions): Promise<SpawnResult> 
   if (options.resumeSessionId) {
     // Resume an existing session
     claudeArgs.push("-r", options.resumeSessionId);
-  } else {
-    // New session with explicit ID
-    claudeArgs.push("--session-id", sessionId);
   }
+  // Note: For new sessions, we generate the session ID dynamically in the script
+  // to avoid "Session ID already in use" errors if pm2 restarts the process
 
   if (options.model) {
     claudeArgs.push("--model", options.model);
@@ -144,10 +143,39 @@ export async function spawnProcess(options: SpawnOptions): Promise<SpawnResult> 
   // Write a shell script to run the command
   // This avoids shell quoting issues and works better with pm2
   const scriptFile = `/tmp/crun-script-${sessionId}.sh`;
-  const scriptContent = `#!/usr/bin/env bash
+
+  // For new sessions, we need to handle session ID specially:
+  // - First run: use the pre-generated sessionId with --session-id
+  // - Subsequent runs (if pm2 restarts): use --resume to continue the session
+  // This is done via a marker file that tracks whether the session was started
+  const markerFile = `/tmp/crun-started-${sessionId}`;
+
+  let scriptContent: string;
+  if (options.resumeSessionId) {
+    // Resume mode: always use --resume
+    scriptContent = `#!/usr/bin/env bash
 cd "${process.cwd()}"
 cat "${promptFile}" | bun run c ${claudeArgs.join(" ")}
 `;
+  } else {
+    // New session mode: use marker file to detect restarts
+    // First run creates the session with --session-id
+    // Subsequent runs (pm2 restart) use --resume to continue
+    scriptContent = `#!/usr/bin/env bash
+cd "${process.cwd()}"
+MARKER="${markerFile}"
+SESSION_ID="${sessionId}"
+
+if [ -f "$MARKER" ]; then
+  # Session was already started - use resume to continue
+  cat "${promptFile}" | bun run c ${claudeArgs.join(" ")} --resume "$SESSION_ID"
+else
+  # First run - create new session and mark as started
+  touch "$MARKER"
+  cat "${promptFile}" | bun run c ${claudeArgs.join(" ")} --session-id "$SESSION_ID"
+fi
+`;
+  }
   await Bun.write(scriptFile, scriptContent);
 
   // Make script executable
