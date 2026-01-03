@@ -1,7 +1,12 @@
 import { Command } from "commander";
 import { listProcesses, listHistoricalProcesses } from "../pm2";
 import { getPromptPreview } from "../session";
+import { homedir } from "os";
+import { readdir, readFile } from "fs/promises";
+import { join } from "path";
 import type { CrunProcess } from "../types";
+
+const PM2_LOG_DIR = join(homedir(), ".pm2", "logs");
 
 export function createListCommand(): Command {
   const cmd = new Command("list")
@@ -9,6 +14,7 @@ export function createListCommand(): Command {
     .description("List all crun processes")
     .option("--json", "Output as JSON")
     .option("--all", "Include historical (completed/dead) processes")
+    .option("-v, --verbose", "Show output snippet for each process")
     .action(async (opts) => {
       await runList(opts);
     });
@@ -39,6 +45,26 @@ function truncatePrompt(prompt?: string, maxLength: number = 40): string {
   return prompt.slice(0, maxLength - 3) + "...";
 }
 
+async function getOutputSnippet(sessionId: string, lines: number = 5): Promise<string | null> {
+  try {
+    const files = await readdir(PM2_LOG_DIR);
+    const outLog = files.find(
+      (f) => f.includes(sessionId) && f.endsWith("-out.log")
+    );
+    if (!outLog) return null;
+
+    const content = await readFile(join(PM2_LOG_DIR, outLog), "utf-8");
+    if (!content.trim()) return null;
+
+    // Get last N non-empty lines
+    const allLines = content.split("\n").filter((l) => l.trim());
+    const lastLines = allLines.slice(-lines);
+    return lastLines.join("\n");
+  } catch {
+    return null;
+  }
+}
+
 function formatTableRow(process: CrunProcess): string {
   const id = process.sessionId.slice(0, 8);
   const status = process.status.padEnd(10);
@@ -49,7 +75,7 @@ function formatTableRow(process: CrunProcess): string {
   return `${id}  ${status}  ${elapsed}  ${issue}  ${prompt}`;
 }
 
-async function runList(opts: { json?: boolean; all?: boolean }): Promise<void> {
+async function runList(opts: { json?: boolean; all?: boolean; verbose?: boolean }): Promise<void> {
   try {
     // Get active processes
     const activeProcesses = await listProcesses();
@@ -92,6 +118,19 @@ async function runList(opts: { json?: boolean; all?: boolean }): Promise<void> {
     // Print rows
     for (const proc of processesWithPrompts) {
       console.log(formatTableRow(proc));
+
+      // Show output snippet in verbose mode
+      if (opts.verbose) {
+        const snippet = await getOutputSnippet(proc.sessionId);
+        if (snippet) {
+          const indented = snippet
+            .split("\n")
+            .map((l) => `    ${l}`)
+            .join("\n");
+          console.log(indented);
+          console.log();
+        }
+      }
     }
   } catch (error) {
     if (error instanceof Error) {
