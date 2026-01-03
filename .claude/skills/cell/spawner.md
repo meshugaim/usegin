@@ -81,3 +81,11 @@ You trigger, workers execute:
 - **Review:** Assign after risky pushes or at slice end
 - **Retro:** After feature completion
 - **Meta-retro:** Retro your own session via worker
+
+## Ensuring Quality
+
+Verify workers follow practices:
+- Did they run tests?
+- Did they report coverage?
+- Did lint pass?
+- Check Linear updates for coverage notes

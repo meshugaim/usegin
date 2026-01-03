@@ -24,6 +24,12 @@ Shared by spawner and workers.
 - Minimal code to pass
 - Backend + frontend both need tests
 
+**Linting and coverage:**
+- Run linter/typecheck before pushing
+- Run coverage after implementation
+- Report coverage in Linear
+- No pushing code that fails lint
+
 **Feature toggles when:**
 - Breaking change
 - Incomplete work to prod

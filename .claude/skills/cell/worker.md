@@ -41,17 +41,7 @@ You execute assignments. Signal clearly. Self-verify.
 
 ## Coverage Reporting
 
-After implementation, report coverage in Linear:
-```
-## Coverage: ENG-XXX
-
-New code coverage: X%
-Files changed:
-- file.ts: X% covered
-- file.py: X% covered
-
-Uncovered lines: [brief note if any critical gaps]
-```
+After implementation, run coverage and note results in Linear update.
 
 ## Handling Blockers
 
