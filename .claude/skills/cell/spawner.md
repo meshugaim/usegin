@@ -82,7 +82,10 @@ You trigger, workers execute:
 
 - **Review:** Assign after risky pushes or at slice end
 - **Retro:** After feature completion
-- **Meta-retro:** Retro your own session via worker
+- **Meta-retro:** Retro your own session via worker. Pass your session ID:
+```bash
+crun spawn "Use the cell-retro skill. Retro session $CLAUDE_SESSION_ID"
+```
 
 ## Ensuring Quality
 
