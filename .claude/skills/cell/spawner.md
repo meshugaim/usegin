@@ -16,6 +16,10 @@ You orchestrate. You ensure things happen. You don't do them directly.
 
 ## Spawning Workers
 
+**Before spawning:**
+1. `plan start <id>` - mark the issue in-progress
+2. Check `crun --help` if unsure about available commands
+
 **When:**
 - New slice ready
 - Worker blocked
@@ -25,6 +29,7 @@ You orchestrate. You ensure things happen. You don't do them directly.
 **Prompt must include:**
 - Tell them to use the cell skill as worker
 - The assignment
+- TDD reminder for implementation tasks
 
 ```bash
 crun spawn "You are a cell worker. Use the cell skill. Your assignment: implement ENG-123. Follow TDD."
