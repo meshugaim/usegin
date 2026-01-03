@@ -4,9 +4,13 @@
 
 import pm2 from "pm2";
 import type { ProcessDescription } from "pm2";
+import { homedir } from "os";
+import { readdir } from "fs/promises";
+import { join } from "path";
 import type { CrunProcess, ProcessStatus, SpawnOptions, SpawnResult } from "./types";
 
 const CRUN_PREFIX = "crun-";
+const PM2_LOG_DIR = join(homedir(), ".pm2", "logs");
 
 /**
  * Execute an operation with a pm2 connection, ensuring proper connect/disconnect
@@ -413,4 +417,60 @@ export async function followProcess(sessionId: string, issueId?: string): Promis
       });
     });
   });
+}
+
+/**
+ * Parse a pm2 log filename to extract session ID and issue ID
+ * Log files follow the pattern: crun-<sessionId>[-<issueId>]-(out|error).log
+ */
+export function parseLogFilename(filename: string): { sessionId: string; issueId?: string } | null {
+  // Remove the -(out|error).log suffix
+  const withoutSuffix = filename.replace(/-(out|error)\.log$/, "");
+
+  // Use the existing parsePm2Name function since the remaining format is the same
+  return parsePm2Name(withoutSuffix);
+}
+
+/**
+ * List historical processes by scanning pm2 log files
+ * These are processes that ran in the past but are no longer in pm2's active list
+ */
+export async function listHistoricalProcesses(): Promise<CrunProcess[]> {
+  // Get the list of currently active processes to exclude them
+  const activeProcesses = await listProcesses();
+  const activeSessionIds = new Set(activeProcesses.map(p => p.sessionId));
+
+  try {
+    const files = await readdir(PM2_LOG_DIR);
+
+    // Filter for crun output logs only (not error logs, to avoid duplicates)
+    const crunOutLogs = files.filter(f => f.startsWith(CRUN_PREFIX) && f.endsWith("-out.log"));
+
+    const results: CrunProcess[] = [];
+    const seenSessionIds = new Set<string>();
+
+    for (const filename of crunOutLogs) {
+      const parsed = parseLogFilename(filename);
+      if (!parsed) continue;
+
+      // Skip if this session is currently active in pm2
+      if (activeSessionIds.has(parsed.sessionId)) continue;
+
+      // Skip duplicates (shouldn't happen with -out.log filter, but be safe)
+      if (seenSessionIds.has(parsed.sessionId)) continue;
+      seenSessionIds.add(parsed.sessionId);
+
+      results.push({
+        sessionId: parsed.sessionId,
+        pm2Name: buildPm2Name(parsed.sessionId, parsed.issueId),
+        status: "historical",
+        issueId: parsed.issueId,
+      });
+    }
+
+    return results;
+  } catch {
+    // Log directory doesn't exist or can't be read
+    return [];
+  }
 }

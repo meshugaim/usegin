@@ -104,6 +104,80 @@ describe("pm2 utilities", () => {
   });
 });
 
+describe("parseLogFilename", () => {
+  it("parses log filename with session ID only", async () => {
+    const { parseLogFilename } = await import("../src/pm2");
+    const result = parseLogFilename("crun-01f89845-29b8-4b00-b846-78badad84563-out.log");
+    expect(result).toEqual({
+      sessionId: "01f89845-29b8-4b00-b846-78badad84563",
+    });
+  });
+
+  it("parses log filename with session ID and issue ID", async () => {
+    const { parseLogFilename } = await import("../src/pm2");
+    const result = parseLogFilename("crun-0175aeba-92f2-4d8e-bf03-f08625695bbb-ENG-123-out.log");
+    expect(result).toEqual({
+      sessionId: "0175aeba-92f2-4d8e-bf03-f08625695bbb",
+      issueId: "ENG-123",
+    });
+  });
+
+  it("parses error log filename", async () => {
+    const { parseLogFilename } = await import("../src/pm2");
+    const result = parseLogFilename("crun-01f89845-29b8-4b00-b846-78badad84563-error.log");
+    expect(result).toEqual({
+      sessionId: "01f89845-29b8-4b00-b846-78badad84563",
+    });
+  });
+
+  it("returns null for non-crun logs", async () => {
+    const { parseLogFilename } = await import("../src/pm2");
+    expect(parseLogFilename("other-app-out.log")).toBeNull();
+    expect(parseLogFilename("pm2-web-out.log")).toBeNull();
+  });
+});
+
+describe("listHistoricalProcesses", () => {
+  it("returns an array of historical processes", async () => {
+    const { listHistoricalProcesses } = await import("../src/pm2");
+    const processes = await listHistoricalProcesses();
+    expect(Array.isArray(processes)).toBe(true);
+  });
+
+  it("returns processes with historical status", async () => {
+    const { listHistoricalProcesses } = await import("../src/pm2");
+    const processes = await listHistoricalProcesses();
+
+    for (const proc of processes) {
+      expect(proc.status).toBe("historical");
+      expect(proc.sessionId).toBeDefined();
+      expect(proc.pm2Name.startsWith("crun-")).toBe(true);
+    }
+  });
+
+  it("extracts issue IDs from log filenames", async () => {
+    const { listHistoricalProcesses } = await import("../src/pm2");
+    const processes = await listHistoricalProcesses();
+
+    // Some processes should have issue IDs (based on our data)
+    const withIssues = processes.filter(p => p.issueId);
+    expect(withIssues.length).toBeGreaterThan(0);
+  });
+
+  it("excludes active pm2 processes by default", async () => {
+    const { listHistoricalProcesses, listProcesses } = await import("../src/pm2");
+
+    const active = await listProcesses();
+    const historical = await listHistoricalProcesses();
+
+    // Historical list should not include any active session IDs
+    const activeIds = new Set(active.map(p => p.sessionId));
+    for (const proc of historical) {
+      expect(activeIds.has(proc.sessionId)).toBe(false);
+    }
+  });
+});
+
 describe("pm2 SDK operations", () => {
   // These tests verify the SDK wrapper functions work correctly
   // They use mocking to avoid actual pm2 daemon interactions

@@ -1,7 +1,7 @@
 /**
  * Process status values
  */
-export type ProcessStatus = "running" | "done" | "errored" | "stopped";
+export type ProcessStatus = "running" | "done" | "errored" | "stopped" | "historical";
 
 /**
  * A crun process record
