@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, beforeEach, afterEach } from "bun:test";
+import { describe, expect, it, mock, beforeEach, afterEach, afterAll } from "bun:test";
 import {
   buildPm2Name,
   parsePm2Name,
@@ -445,4 +445,9 @@ describe("pm2 SDK operations", () => {
       expect(elapsed).toBeGreaterThanOrEqual(500);
     }, 5000);
   });
+});
+
+afterAll(async () => {
+  const pm2Module = await import('pm2');
+  pm2Module.default.disconnect();
 });

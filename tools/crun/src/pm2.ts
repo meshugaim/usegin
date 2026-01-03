@@ -406,9 +406,12 @@ export async function followProcess(sessionId: string, issueId?: string): Promis
               pollAttempt++;
               if (pollAttempt < MAX_POLL_ATTEMPTS) {
                 setTimeout(checkProcessStatus, POLL_INTERVAL_MS);
+              } else {
+                // After max attempts, process doesn't exist - clean up and resolve
+                // This prevents hanging forever for non-existent processes
+                cleanup();
+                resolve();
               }
-              // After max attempts, just rely on bus events (process may have
-              // started and exited very quickly, in which case bus should catch it)
             }
           });
         };
