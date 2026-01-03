@@ -41,6 +41,8 @@ export interface SpawnOptions {
   resumeSessionId?: string;
   /** Override default model */
   model?: string;
+  /** Memory limit for pm2 auto-restart (e.g., "500M", "1G"). Defaults to "500M" */
+  maxMemoryRestart?: string;
 }
 
 /**

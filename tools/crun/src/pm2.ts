@@ -11,6 +11,7 @@ import type { CrunProcess, ProcessStatus, SpawnOptions, SpawnResult } from "./ty
 
 const CRUN_PREFIX = "crun-";
 const PM2_LOG_DIR = join(homedir(), ".pm2", "logs");
+const DEFAULT_MAX_MEMORY_RESTART = "500M";
 
 /**
  * Execute an operation with a pm2 connection, ensuring proper connect/disconnect
@@ -191,6 +192,7 @@ fi
           name: pm2Name,
           autorestart: false,
           stop_exit_codes: [0, 1, 2, 137, 143, 255], // Never restart - cover common exit codes and signals
+          max_memory_restart: options.maxMemoryRestart || DEFAULT_MAX_MEMORY_RESTART,
           cwd: process.cwd(),
           env: {
             ...process.env,

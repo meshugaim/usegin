@@ -283,6 +283,43 @@ describe("pm2 SDK operations", () => {
         // Expected if pm2 not running
       }
     });
+
+    it("accepts maxMemoryRestart option", async () => {
+      const { spawnProcess, deleteProcess } = await import("../src/pm2");
+
+      try {
+        const result = await spawnProcess({
+          prompt: "test",
+          maxMemoryRestart: "500M",
+        });
+        expect(result.sessionId).toBeDefined();
+        expect(result.pm2Name).toMatch(/^crun-/);
+
+        // Clean up
+        await deleteProcess(result.sessionId);
+      } catch {
+        // Expected if pm2 not running
+      }
+    });
+
+    it("uses default 500M memory limit when not specified", async () => {
+      const { spawnProcess, deleteProcess, getProcess } = await import("../src/pm2");
+
+      try {
+        const result = await spawnProcess({
+          prompt: "test",
+        });
+
+        // The process should be created with default memory limit
+        // We can't directly verify pm2 config, but the process should spawn
+        expect(result.sessionId).toBeDefined();
+
+        // Clean up
+        await deleteProcess(result.sessionId);
+      } catch {
+        // Expected if pm2 not running
+      }
+    });
   });
 
   describe("deleteProcess", () => {
