@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { listProcesses } from "../pm2";
+import { listProcesses, listHistoricalProcesses } from "../pm2";
 import { getPromptPreview } from "../session";
 import type { CrunProcess } from "../types";
 
@@ -8,6 +8,7 @@ export function createListCommand(): Command {
     .alias("ls")
     .description("List all crun processes")
     .option("--json", "Output as JSON")
+    .option("--all", "Include historical (completed/dead) processes")
     .action(async (opts) => {
       await runList(opts);
     });
@@ -40,7 +41,7 @@ function truncatePrompt(prompt?: string, maxLength: number = 40): string {
 
 function formatTableRow(process: CrunProcess): string {
   const id = process.sessionId.slice(0, 8);
-  const status = process.status.padEnd(8);
+  const status = process.status.padEnd(10);
   const elapsed = formatElapsed(process.startedAt).padEnd(8);
   const issue = (process.issueId || "-").padEnd(10);
   const prompt = truncatePrompt(process.prompt);
@@ -48,18 +49,33 @@ function formatTableRow(process: CrunProcess): string {
   return `${id}  ${status}  ${elapsed}  ${issue}  ${prompt}`;
 }
 
-async function runList(opts: { json?: boolean }): Promise<void> {
+async function runList(opts: { json?: boolean; all?: boolean }): Promise<void> {
   try {
-    const processes = await listProcesses();
+    // Get active processes
+    const activeProcesses = await listProcesses();
 
-    if (processes.length === 0) {
-      console.log("No crun processes found");
+    // Optionally get historical processes
+    let allProcesses: CrunProcess[];
+    if (opts.all) {
+      const historicalProcesses = await listHistoricalProcesses();
+      // Active first, then historical
+      allProcesses = [...activeProcesses, ...historicalProcesses];
+    } else {
+      allProcesses = activeProcesses;
+    }
+
+    if (allProcesses.length === 0) {
+      if (opts.json) {
+        console.log("[]");
+      } else {
+        console.log("No crun processes found");
+      }
       return;
     }
 
     // Fetch prompt previews for all processes
     const processesWithPrompts = await Promise.all(
-      processes.map(async (proc) => ({
+      allProcesses.map(async (proc) => ({
         ...proc,
         prompt: (await getPromptPreview(proc.sessionId)) ?? undefined,
       }))
@@ -71,7 +87,7 @@ async function runList(opts: { json?: boolean }): Promise<void> {
     }
 
     // Print header
-    console.log("ID        STATUS    ELAPSED   ISSUE       PROMPT");
+    console.log("ID        STATUS      ELAPSED   ISSUE       PROMPT");
 
     // Print rows
     for (const proc of processesWithPrompts) {

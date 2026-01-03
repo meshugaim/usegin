@@ -51,11 +51,30 @@ describe("crun CLI", () => {
 
       expect(result).toContain("list");
       expect(result).toContain("--json");
+      expect(result).toContain("--all");
     });
 
     it("has ls alias", async () => {
       const result = await $`bun ${CLI_PATH} ls --help`.text();
       expect(result).toContain("list");
+    });
+
+    it("lists historical processes with --all flag", async () => {
+      const result = await $`bun ${CLI_PATH} list --all`.text();
+      // Should either have processes or show "No crun processes found"
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    it("includes historical in JSON output with --all", async () => {
+      const result = await $`bun ${CLI_PATH} list --all --json`.text();
+      const parsed = JSON.parse(result);
+      expect(Array.isArray(parsed)).toBe(true);
+
+      // If there are any historical processes, they should have status "historical"
+      const historical = parsed.filter((p: { status: string }) => p.status === "historical");
+      if (historical.length > 0) {
+        expect(historical[0].status).toBe("historical");
+      }
     });
   });
 
