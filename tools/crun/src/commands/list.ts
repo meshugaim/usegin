@@ -15,6 +15,7 @@ export function createListCommand(): Command {
     .option("--json", "Output as JSON")
     .option("--all", "Include historical (completed/dead) processes")
     .option("-v, --verbose", "Show output snippet for each process")
+    .option("--issue <id>", "Filter by issue ID (e.g., ENG-779 or 779)")
     .action(async (opts) => {
       await runList(opts);
     });
@@ -112,6 +113,35 @@ export function formatNoLogsIndicator(): string {
 }
 
 /**
+ * Filter processes by issue ID.
+ * Supports short form (779 matches ENG-779) and is case-insensitive.
+ * Exported for testing.
+ */
+export function filterByIssue(
+  processes: CrunProcess[],
+  issueFilter?: string
+): CrunProcess[] {
+  if (!issueFilter || issueFilter.trim() === "") {
+    return processes;
+  }
+
+  const filter = issueFilter.trim();
+  const isShortForm = /^\d+$/.test(filter);
+
+  return processes.filter((p) => {
+    if (!p.issueId) return false;
+
+    if (isShortForm) {
+      // Short form: check if issueId ends with the number (e.g., ENG-779 matches 779)
+      return p.issueId.endsWith(`-${filter}`);
+    } else {
+      // Full form: case-insensitive match
+      return p.issueId.toLowerCase() === filter.toLowerCase();
+    }
+  });
+}
+
+/**
  * Format summary line showing status counts.
  * Example: "3 running, 2 done, 1 errored (6 total)"
  * Exported for testing.
@@ -154,7 +184,7 @@ function formatTableRow(process: CrunProcess): string {
   return `${id}  ${status}  ${elapsed}  ${issue}  ${prompt}`;
 }
 
-async function runList(opts: { json?: boolean; all?: boolean; verbose?: boolean }): Promise<void> {
+async function runList(opts: { json?: boolean; all?: boolean; verbose?: boolean; issue?: string }): Promise<void> {
   try {
     // Get active processes
     const activeProcesses = await listProcesses();
@@ -168,6 +198,9 @@ async function runList(opts: { json?: boolean; all?: boolean; verbose?: boolean 
     } else {
       allProcesses = activeProcesses;
     }
+
+    // Apply issue filter
+    allProcesses = filterByIssue(allProcesses, opts.issue);
 
     if (allProcesses.length === 0) {
       if (opts.json) {

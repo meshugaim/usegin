@@ -5,8 +5,9 @@ import {
   formatSummaryLine,
   getOutputSnippet,
   truncateLine,
+  filterByIssue,
 } from "../src/commands/list";
-import type { ProcessStatus } from "../src/types";
+import type { CrunProcess, ProcessStatus } from "../src/types";
 import { mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
@@ -172,6 +173,85 @@ describe("list command", () => {
     it("handles single process", () => {
       const result = formatSummaryLine(["running"]);
       expect(result).toBe("1 running (1 total)");
+    });
+  });
+
+  describe("filterByIssue", () => {
+    const createProcess = (issueId?: string): CrunProcess => ({
+      sessionId: "test-session-id",
+      pm2Name: "crun-test",
+      status: "running",
+      issueId,
+    });
+
+    it("filters processes by full issue ID", () => {
+      const processes = [
+        createProcess("ENG-779"),
+        createProcess("ENG-780"),
+        createProcess("ENG-779"),
+      ];
+      const result = filterByIssue(processes, "ENG-779");
+      expect(result).toHaveLength(2);
+      expect(result.every((p) => p.issueId === "ENG-779")).toBe(true);
+    });
+
+    it("filters processes by short form (number only)", () => {
+      const processes = [
+        createProcess("ENG-779"),
+        createProcess("ENG-780"),
+        createProcess("ENG-779"),
+      ];
+      const result = filterByIssue(processes, "779");
+      expect(result).toHaveLength(2);
+      expect(result.every((p) => p.issueId === "ENG-779")).toBe(true);
+    });
+
+    it("is case-insensitive for full issue ID", () => {
+      const processes = [
+        createProcess("ENG-779"),
+        createProcess("eng-780"),
+      ];
+      const result = filterByIssue(processes, "eng-779");
+      expect(result).toHaveLength(1);
+      expect(result[0].issueId).toBe("ENG-779");
+    });
+
+    it("excludes processes without issue ID", () => {
+      const processes = [
+        createProcess("ENG-779"),
+        createProcess(undefined),
+        createProcess("ENG-780"),
+      ];
+      const result = filterByIssue(processes, "779");
+      expect(result).toHaveLength(1);
+      expect(result[0].issueId).toBe("ENG-779");
+    });
+
+    it("returns empty array when no matches", () => {
+      const processes = [
+        createProcess("ENG-779"),
+        createProcess("ENG-780"),
+      ];
+      const result = filterByIssue(processes, "999");
+      expect(result).toHaveLength(0);
+    });
+
+    it("returns all processes when filter is undefined", () => {
+      const processes = [
+        createProcess("ENG-779"),
+        createProcess("ENG-780"),
+      ];
+      const result = filterByIssue(processes, undefined);
+      expect(result).toHaveLength(2);
+    });
+
+    it("returns all processes when filter is empty string", () => {
+      const processes = [
+        createProcess("ENG-779"),
+        createProcess("ENG-780"),
+      ];
+      const result = filterByIssue(processes, "");
+      expect(result).toHaveLength(2);
     });
   });
 });
