@@ -45,7 +45,20 @@ function truncatePrompt(prompt?: string, maxLength: number = 40): string {
   return prompt.slice(0, maxLength - 3) + "...";
 }
 
-async function getOutputSnippet(sessionId: string, lines: number = 5): Promise<string | null> {
+/**
+ * Truncate a line to maxLength, adding ellipsis if needed.
+ * Exported for testing.
+ */
+export function truncateLine(line: string, maxLength: number): string {
+  if (line.length <= maxLength) return line;
+  return line.slice(0, maxLength - 3) + "...";
+}
+
+/**
+ * Get last N lines of output from a session's log file.
+ * Exported for testing.
+ */
+export async function getOutputSnippet(sessionId: string, lines: number = 5): Promise<string | null> {
   try {
     const files = await readdir(PM2_LOG_DIR);
     const outLog = files.find(
@@ -63,6 +76,30 @@ async function getOutputSnippet(sessionId: string, lines: number = 5): Promise<s
   } catch {
     return null;
   }
+}
+
+// Column widths for table alignment
+// ID(8) + 2 spaces + STATUS(10) + 2 spaces + ELAPSED(8) + 2 spaces + ISSUE(10) + 2 spaces = 44
+const PROMPT_COLUMN_OFFSET = 44;
+
+/**
+ * Format output snippet with arrow prefix and alignment under PROMPT column.
+ * Exported for testing.
+ */
+export function formatOutputSnippet(
+  snippet: string,
+  maxLineLength: number = 50,
+  maxLines: number = 3
+): string {
+  if (!snippet.trim()) return "";
+
+  const lines = snippet.split("\n").filter((l) => l.trim());
+  const truncatedLines = lines.slice(-maxLines);
+  const indent = " ".repeat(PROMPT_COLUMN_OFFSET);
+
+  return truncatedLines
+    .map((line) => `${indent}→ ${truncateLine(line, maxLineLength)}`)
+    .join("\n");
 }
 
 function formatTableRow(process: CrunProcess): string {
@@ -123,12 +160,10 @@ async function runList(opts: { json?: boolean; all?: boolean; verbose?: boolean 
       if (opts.verbose) {
         const snippet = await getOutputSnippet(proc.sessionId);
         if (snippet) {
-          const indented = snippet
-            .split("\n")
-            .map((l) => `    ${l}`)
-            .join("\n");
-          console.log(indented);
-          console.log();
+          const formatted = formatOutputSnippet(snippet);
+          if (formatted) {
+            console.log(formatted);
+          }
         }
       }
     }
