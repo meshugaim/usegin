@@ -23,12 +23,11 @@ You orchestrate. You ensure things happen. You don't do them directly.
 - Specialized task (review, retro)
 
 **Prompt must include:**
-- Tell them they're a cell worker: "You are a cell worker. Read the cell skill (.claude/skills/cell/worker.md)."
-- Linear issue reference (`plan show <id>`)
-- What to do
+- Tell them to use the cell skill as worker
+- The assignment
 
 ```bash
-crun spawn "You are a cell worker. Read the cell skill (.claude/skills/cell/worker.md). Your assignment: implement ENG-123."
+crun spawn "You are a cell worker. Use the cell skill. Your assignment: implement ENG-123."
 ```
 
 ## Monitoring
