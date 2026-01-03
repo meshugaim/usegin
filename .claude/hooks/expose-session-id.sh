@@ -1,9 +1,13 @@
 #!/bin/bash
-# SessionStart hook: Exposes session ID
-# Writes to /tmp/claude-session-id for bash commands to read
-# Note: CLAUDE_ENV_FILE doesn't persist to main session due to scope isolation
+# SessionStart hook: Exposes session ID as CLAUDE_SESSION_ID environment variable
+# This allows the running session to retrieve its own session ID programmatically
 
 set -e
+
+# Only proceed if CLAUDE_ENV_FILE is set (SessionStart hook)
+if [ -z "$CLAUDE_ENV_FILE" ]; then
+  exit 0
+fi
 
 # Read hook input from stdin (JSON)
 INPUT=$(cat)
@@ -12,6 +16,5 @@ INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 
 if [ -n "$SESSION_ID" ]; then
-  # Write to known location for bash commands to read
-  echo "$SESSION_ID" > /tmp/claude-session-id
+  echo "export CLAUDE_SESSION_ID=\"$SESSION_ID\"" >> "$CLAUDE_ENV_FILE"
 fi
