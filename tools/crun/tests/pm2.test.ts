@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, beforeEach, afterEach, afterAll } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
   buildPm2Name,
   parsePm2Name,
@@ -429,25 +429,17 @@ describe("pm2 SDK operations", () => {
       const start = Date.now();
 
       // followProcess should poll for the process (10 * 100ms = 1 second minimum)
-      // before giving up and relying on bus events. Set a timeout to abort since
-      // for a non-existent process, the bus will never fire an exit event.
-      const timeout = 2000;
-
-      await Promise.race([
-        followProcess(fakeSessionId),
-        new Promise<void>((resolve) => setTimeout(resolve, timeout)),
-      ]);
+      // before giving up and cleaning up. After max poll attempts, it resolves
+      // gracefully rather than hanging forever.
+      await followProcess(fakeSessionId);
 
       const elapsed = Date.now() - start;
 
       // Should have waited at least 500ms (polling attempts), not returned immediately
       // Before the fix, this would return in ~30-50ms
       expect(elapsed).toBeGreaterThanOrEqual(500);
+      // Should complete within 2 seconds (10 polls at 100ms each = 1 second + buffer)
+      expect(elapsed).toBeLessThan(2000);
     }, 5000);
   });
-});
-
-afterAll(async () => {
-  const pm2Module = await import('pm2');
-  pm2Module.default.disconnect();
 });
