@@ -39,7 +39,7 @@ program
   .command("add")
   .description("Add a workflow reminder")
   .argument("<reminder>", "The reminder text")
-  .option("-f, --frequency <number>", "Probability (0-1) of showing this reminder", "1.0")
+  .option("-f, --frequency <number>", "Probability (0-1) of showing this reminder", "0.2")
   .action(async (reminder: string, options: { frequency: string }) => {
     const deps = getDeps();
     const frequency = parseFloat(options.frequency);

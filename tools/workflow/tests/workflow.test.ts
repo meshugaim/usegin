@@ -62,14 +62,14 @@ describe("workflow reminders", () => {
       expect(reminders).toEqual(["spaces around"]);
     });
 
-    test("adds reminder with default frequency 1.0", async () => {
+    test("adds reminder with default frequency 0.2", async () => {
       const deps = createTestDeps();
-      await addReminder("always show", deps);
+      await addReminder("sometimes show", deps);
 
       const rawReminders = await getRawReminders(deps);
       expect(rawReminders).toHaveLength(1);
-      expect(rawReminders[0].text).toBe("always show");
-      expect(rawReminders[0].frequency).toBe(1.0);
+      expect(rawReminders[0].text).toBe("sometimes show");
+      expect(rawReminders[0].frequency).toBe(0.2);
       expect(rawReminders[0].created).toBeDefined();
     });
 

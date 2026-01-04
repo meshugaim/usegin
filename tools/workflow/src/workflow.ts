@@ -81,7 +81,7 @@ export async function addReminder(
   options: AddReminderOptions = {}
 ): Promise<void> {
   const storage = await readStorage(deps);
-  const frequency = clamp(options.frequency ?? 1.0, 0, 1);
+  const frequency = clamp(options.frequency ?? 0.2, 0, 1);
   storage.reminders.push({
     text: reminder.trim(),
     frequency,
