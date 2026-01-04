@@ -1,0 +1,4 @@
+{
+  "name": "implementation",
+  "includes": ["tdd", "commit-often", "coverage", "verify", "update-plan"]
+}

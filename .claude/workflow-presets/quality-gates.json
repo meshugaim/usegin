@@ -1,0 +1,4 @@
+{
+  "name": "quality-gates",
+  "reminder": "Ensure tests pass and coverage reported before closing issues"
+}

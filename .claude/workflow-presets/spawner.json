@@ -1,0 +1,4 @@
+{
+  "name": "spawner",
+  "includes": ["autonomous", "update-plan", "spawn-reviewers", "trigger-retro", "quality-gates"]
+}

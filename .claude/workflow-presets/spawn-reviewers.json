@@ -1,0 +1,4 @@
+{
+  "name": "spawn-reviewers",
+  "reminder": "Spawn code reviewers after worker commits land"
+}

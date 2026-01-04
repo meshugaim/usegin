@@ -1,0 +1,4 @@
+{
+  "name": "review-after-push",
+  "reminder": "Consider triggering code review after risky changes"
+}
