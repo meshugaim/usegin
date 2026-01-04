@@ -24,6 +24,9 @@ Presets live in `~/.claude/workflow-presets/` as JSON files. Use them for consis
 | `checkpoints` | Check in at breakpoints, share reasoning |
 | `autonomous` | Work autonomously, update Linear on outcomes |
 | `fire-and-forget` | Full autonomy, exit when done |
+| `spawn-reviewers` | Spawn code reviewers after worker commits land |
+| `trigger-retro` | Trigger retro worker after feature completion |
+| `quality-gates` | Ensure tests pass and coverage reported before closing |
 
 ### Combined Presets
 
@@ -34,6 +37,12 @@ Combined presets include multiple reminders:
 {
   "name": "implementation",
   "includes": ["tdd", "commit-often", "coverage", "verify", "update-plan"]
+}
+
+// spawner.json - for cell spawner sessions
+{
+  "name": "spawner",
+  "includes": ["autonomous", "update-plan", "spawn-reviewers", "trigger-retro", "quality-gates"]
 }
 ```
 
