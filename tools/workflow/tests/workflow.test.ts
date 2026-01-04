@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import {
   addReminder,
   listReminders,
+  getRawReminders,
   clearReminders,
   removeReminder,
   exportTemplate,
@@ -13,6 +14,7 @@ import {
   importFromSession,
   listSessions,
   type WorkflowDeps,
+  type Reminder,
 } from "../src/workflow";
 
 const TEST_SESSION_ID = "test-session-123";
@@ -55,6 +57,48 @@ describe("workflow reminders", () => {
 
       const reminders = await listReminders(deps);
       expect(reminders).toEqual(["spaces around"]);
+    });
+
+    test("adds reminder with default frequency 1.0", async () => {
+      const deps = createTestDeps();
+      await addReminder("always show", deps);
+
+      const rawReminders = await getRawReminders(deps);
+      expect(rawReminders).toHaveLength(1);
+      expect(rawReminders[0].text).toBe("always show");
+      expect(rawReminders[0].frequency).toBe(1.0);
+      expect(rawReminders[0].created).toBeDefined();
+    });
+
+    test("adds reminder with custom frequency", async () => {
+      const deps = createTestDeps();
+      await addReminder("sometimes show", deps, { frequency: 0.5 });
+
+      const rawReminders = await getRawReminders(deps);
+      expect(rawReminders).toHaveLength(1);
+      expect(rawReminders[0].text).toBe("sometimes show");
+      expect(rawReminders[0].frequency).toBe(0.5);
+    });
+
+    test("clamps frequency to 0-1 range", async () => {
+      const deps = createTestDeps();
+      await addReminder("high freq", deps, { frequency: 1.5 });
+      await addReminder("low freq", deps, { frequency: -0.5 });
+
+      const rawReminders = await getRawReminders(deps);
+      expect(rawReminders[0].frequency).toBe(1.0);
+      expect(rawReminders[1].frequency).toBe(0.0);
+    });
+
+    test("stores created timestamp", async () => {
+      const deps = createTestDeps();
+      const before = new Date().toISOString();
+      await addReminder("timestamped", deps);
+      const after = new Date().toISOString();
+
+      const rawReminders = await getRawReminders(deps);
+      expect(rawReminders[0].created >= before).toBe(true);
+      expect(rawReminders[0].created <= after).toBe(true);
     });
   });
 
@@ -131,6 +175,48 @@ describe("workflow reminders", () => {
 
       expect(reminders1).toEqual(["reminder for session 1"]);
       expect(reminders2).toEqual(["reminder for session 2"]);
+    });
+  });
+
+  describe("JSON storage format", () => {
+    test("stores data as JSON file with .json extension", async () => {
+      const deps = createTestDeps();
+      await addReminder("test reminder", deps);
+
+      const filePath = join(TEST_STORAGE_DIR, `${TEST_SESSION_ID}.json`);
+      const file = Bun.file(filePath);
+      expect(await file.exists()).toBe(true);
+
+      const content = await file.json();
+      expect(content).toHaveProperty("reminders");
+      expect(Array.isArray(content.reminders)).toBe(true);
+    });
+
+    test("JSON structure matches expected format", async () => {
+      const deps = createTestDeps();
+      await addReminder("write tests first", deps, { frequency: 0.8 });
+
+      const filePath = join(TEST_STORAGE_DIR, `${TEST_SESSION_ID}.json`);
+      const content = await Bun.file(filePath).json();
+
+      expect(content.reminders[0]).toMatchObject({
+        text: "write tests first",
+        frequency: 0.8,
+      });
+      expect(typeof content.reminders[0].created).toBe("string");
+    });
+  });
+
+  describe("getRawReminders", () => {
+    test("returns full reminder objects with metadata", async () => {
+      const deps = createTestDeps();
+      await addReminder("reminder 1", deps, { frequency: 1.0 });
+      await addReminder("reminder 2", deps, { frequency: 0.5 });
+
+      const rawReminders = await getRawReminders(deps);
+      expect(rawReminders).toHaveLength(2);
+      expect(rawReminders[0]).toMatchObject({ text: "reminder 1", frequency: 1.0 });
+      expect(rawReminders[1]).toMatchObject({ text: "reminder 2", frequency: 0.5 });
     });
   });
 });
