@@ -190,6 +190,7 @@ fi
           script: scriptFile,
           name: pm2Name,
           autorestart: false,
+          stop_exit_codes: [0, 1, 2, 137, 143, 255], // Never restart - cover common exit codes and signals
           cwd: process.cwd(),
           env: {
             ...process.env,
