@@ -7,6 +7,22 @@ description: Analyze cell work and propose improvements. Triggered by "retro thi
 
 You've been assigned to analyze completed work and propose improvements.
 
+## Required Input: Session ID
+
+**The spawner must provide a session ID.** Without it, you can only analyze Linear issues and git history—you cannot see the actual workflow, decisions, or friction points.
+
+The spawner should invoke you with:
+```bash
+crun "Use the cell-retro skill. Retro session <session-id>"
+```
+
+For self-retros, spawners pass their own session:
+```bash
+crun "Use the cell-retro skill. Retro session $CLAUDE_SESSION_ID"
+```
+
+**If no session ID was provided:** Ask the spawner for it, or note in your analysis that transcript review was not possible.
+
 ## Scope
 
 Check assignment for what to retro:
@@ -18,9 +34,9 @@ Check assignment for what to retro:
 
 ### 1. Gather Context
 
+- `session <id>` - **primary source** - the session transcript shows actual workflow
 - `plan show <issue-id>` - the feature and its graph
 - `git log --oneline --since="X days ago"` - commits
-- Read session transcripts if available: `session <id>`
 
 ### 2. Analyze
 
