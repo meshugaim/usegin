@@ -108,10 +108,11 @@ export async function processStopHook(deps: HookDeps): Promise<StopHookDecision>
     return {};  // decision undefined = allow
   }
 
-  // Has reminders - block and show them
+  // Has reminders - block and show them with tip
+  const tip = "Run workflow unblock-stop to continue (prefer -n 1)";
   return {
     decision: "block",
-    reason: remindersOutput,
+    reason: `${remindersOutput}\n\n${tip}`,
   };
 }
 

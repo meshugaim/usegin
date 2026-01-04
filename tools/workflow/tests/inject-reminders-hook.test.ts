@@ -616,7 +616,23 @@ describe("processStopHook", () => {
       const decision = await processStopHook(deps);
 
       expect(decision.decision).toBe("block");
-      expect(decision.reason).toBe("<workflow-reminder>Reminder 1</workflow-reminder>");
+      expect(decision.reason).toContain("<workflow-reminder>Reminder 1</workflow-reminder>");
+    });
+
+    test("block decision includes unblock-stop tip", async () => {
+      const deps = createTestDeps("stop-hook-tip-test");
+      const workflowPath = join(TEST_STORAGE_DIR, `${deps.sessionId}.json`);
+
+      await Bun.write(workflowPath, JSON.stringify({
+        reminders: [
+          { text: "Write tests", frequency: 1.0, created: "2025-01-01" },
+        ],
+      }));
+
+      const decision = await processStopHook(deps);
+
+      expect(decision.decision).toBe("block");
+      expect(decision.reason).toContain("Run workflow unblock-stop to continue (prefer -n 1)");
     });
   });
 });
@@ -660,7 +676,8 @@ describe("integration: Stop hook subprocess", () => {
     expect(exitCode).toBe(0);
     const decision = JSON.parse(stdout.trim());
     expect(decision.decision).toBe("block");
-    expect(decision.reason).toBe("<workflow-reminder>Integration test reminder</workflow-reminder>");
+    expect(decision.reason).toContain("<workflow-reminder>Integration test reminder</workflow-reminder>");
+    expect(decision.reason).toContain("Run workflow unblock-stop to continue (prefer -n 1)");
   });
 
   test("outputs JSON allow decision when Stop hook has unblock count", async () => {
