@@ -202,7 +202,7 @@ program
 program
   .command("unblock-stop")
   .description("Allow the next N stop operations without blocking")
-  .requiredOption("-n, --number <count>", "Number of stops to allow")
+  .option("-n, --number <count>", "Number of stops to allow", "1")
   .action(async (options: { number: string }) => {
     const deps = getDeps();
     const count = parseInt(options.number, 10);
