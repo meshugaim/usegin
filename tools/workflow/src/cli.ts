@@ -9,6 +9,11 @@ import {
   listReminders,
   clearReminders,
   removeReminder,
+  exportTemplate,
+  importTemplate,
+  listTemplates,
+  listSessions,
+  importFromSession,
   getDefaultStorageDir,
   type WorkflowDeps,
 } from "./workflow";
@@ -84,6 +89,95 @@ program
     const deps = getDeps();
     await clearReminders(deps);
     console.log("Cleared all workflow reminders.");
+  });
+
+// ===== Templates =====
+
+program
+  .command("export")
+  .description("Save current reminders as a template")
+  .argument("<name>", "Template name")
+  .action(async (name: string) => {
+    const deps = getDeps();
+    const reminders = await listReminders(deps);
+    if (reminders.length === 0) {
+      console.error("Error: No reminders to export");
+      process.exit(1);
+    }
+    await exportTemplate(name, deps);
+    console.log(`Exported ${reminders.length} reminders to template: ${name}`);
+  });
+
+program
+  .command("use")
+  .description("Apply a saved template")
+  .argument("<name>", "Template name")
+  .action(async (name: string) => {
+    const deps = getDeps();
+    try {
+      await importTemplate(name, deps);
+      const reminders = await listReminders(deps);
+      console.log(`Applied template: ${name}`);
+      console.log(`Loaded ${reminders.length} reminders.`);
+    } catch (error) {
+      console.error(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      process.exit(1);
+    }
+  });
+
+program
+  .command("templates")
+  .description("List available templates")
+  .action(async () => {
+    const deps = getDeps();
+    const templates = await listTemplates(deps);
+    if (templates.length === 0) {
+      console.log("No templates saved.");
+      return;
+    }
+    console.log("Available templates:");
+    templates.forEach((t) => {
+      console.log(`  - ${t}`);
+    });
+  });
+
+// ===== Session Import =====
+
+program
+  .command("sessions")
+  .description("List sessions with reminders")
+  .action(async () => {
+    const deps = getDeps();
+    const sessions = await listSessions(deps);
+    if (sessions.length === 0) {
+      console.log("No sessions with reminders found.");
+      return;
+    }
+    console.log("Sessions with reminders:");
+    sessions.forEach((s) => {
+      const marker = s === deps.sessionId ? " (current)" : "";
+      console.log(`  - ${s}${marker}`);
+    });
+  });
+
+program
+  .command("import")
+  .description("Import reminders from another session")
+  .argument("<session-id>", "Session ID to import from")
+  .action(async (sessionId: string) => {
+    const deps = getDeps();
+    try {
+      await importFromSession(sessionId, deps);
+      const reminders = await listReminders(deps);
+      console.log(`Imported ${reminders.length} reminders from: ${sessionId}`);
+    } catch (error) {
+      console.error(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      process.exit(1);
+    }
   });
 
 program.parse();
