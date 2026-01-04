@@ -2,6 +2,7 @@ import { describe, test, expect, mock, beforeEach } from "bun:test";
 import {
   run,
   createDefaultDeps,
+  generateSessionId,
   type RunOptions,
   type RunDeps,
 } from "../src/run";
@@ -277,5 +278,33 @@ describe("crun integration", () => {
     const result = await run({ prompt: "test" }, deps);
 
     expect(result.exitCode).toBe(42);
+  });
+
+  test("captures stderr output", async () => {
+    const deps = createTestDeps({
+      claudeCommand: ["sh", "-c", "echo 'stderr output' >&2"],
+    });
+    const result = await run({ prompt: "test" }, deps);
+
+    const logContent = await Bun.file(result.logPath).text();
+    expect(logContent).toContain("stderr output");
+  });
+});
+
+describe("generateSessionId", () => {
+  test("returns a valid UUID", async () => {
+    const id = await generateSessionId();
+
+    // UUID format: 8-4-4-4-12
+    expect(id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+  });
+
+  test("returns unique IDs", async () => {
+    const id1 = await generateSessionId();
+    const id2 = await generateSessionId();
+
+    expect(id1).not.toBe(id2);
   });
 });
