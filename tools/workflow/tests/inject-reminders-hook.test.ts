@@ -11,8 +11,11 @@ import {
   createDefaultDeps,
   parseHookInput,
   getSessionId,
+  processStopHook,
+  type StopHookDecision,
   main,
 } from "../src/inject-reminders-hook";
+import { setUnblockStopCount, getUnblockStopCount } from "../src/workflow";
 
 const TEST_STORAGE_DIR = join(tmpdir(), "inject-reminders-test");
 
@@ -343,10 +346,15 @@ describe("integration: hook subprocess", () => {
   });
 
   test("outputs nothing when no session_id provided", async () => {
+    // Create env without CLAUDE_SESSION_ID to test stdin-only behavior
+    const envWithoutSession = { ...process.env };
+    delete envWithoutSession.CLAUDE_SESSION_ID;
+
     const proc = Bun.spawn(["bun", "run", hookPath], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
+      env: envWithoutSession,
     });
 
     // Feed empty JSON
@@ -361,10 +369,15 @@ describe("integration: hook subprocess", () => {
   });
 
   test("outputs nothing when invalid JSON on stdin", async () => {
+    // Create env without CLAUDE_SESSION_ID to test stdin-only behavior
+    const envWithoutSession = { ...process.env };
+    delete envWithoutSession.CLAUDE_SESSION_ID;
+
     const proc = Bun.spawn(["bun", "run", hookPath], {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
+      env: envWithoutSession,
     });
 
     proc.stdin.write("not valid json");
@@ -484,5 +497,126 @@ describe("integration: hook subprocess", () => {
 
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe("<workflow-reminder>Stdin reminder</workflow-reminder>");
+  });
+});
+
+describe("processStopHook", () => {
+  describe("when unblock count is 0", () => {
+    test("returns block decision with reminders", async () => {
+      const deps = createTestDeps("stop-hook-block-test");
+      const workflowDeps = { storageDir: deps.storageDir, sessionId: deps.sessionId };
+      const workflowPath = join(TEST_STORAGE_DIR, `${deps.sessionId}.json`);
+
+      // Create workflow file with reminders
+      await Bun.write(workflowPath, JSON.stringify({
+        reminders: [
+          { text: "Write tests", frequency: 1.0, created: "2025-01-01" },
+          { text: "Run coverage", frequency: 1.0, created: "2025-01-01" },
+        ],
+      }));
+
+      const decision = await processStopHook(deps);
+
+      expect(decision.decision).toBe("block");
+      expect(decision.reason).toContain("Write tests");
+      expect(decision.reason).toContain("Run coverage");
+    });
+
+    test("returns allow decision when no reminders exist", async () => {
+      const deps = createTestDeps("stop-hook-no-reminders");
+      // No workflow file exists
+
+      const decision = await processStopHook(deps);
+
+      expect(decision.decision).toBe("allow");
+      expect(decision.reason).toBeUndefined();
+    });
+  });
+
+  describe("when unblock count is greater than 0", () => {
+    test("returns allow decision and decrements counter", async () => {
+      const deps = createTestDeps("stop-hook-unblock-test");
+      const workflowDeps = { storageDir: deps.storageDir, sessionId: deps.sessionId };
+      const workflowPath = join(TEST_STORAGE_DIR, `${deps.sessionId}.json`);
+
+      // Create workflow file with reminders and unblock count
+      await Bun.write(workflowPath, JSON.stringify({
+        reminders: [
+          { text: "Write tests", frequency: 1.0, created: "2025-01-01" },
+        ],
+        unblockStopCount: 2,
+      }));
+
+      const decision = await processStopHook(deps);
+
+      expect(decision.decision).toBe("allow");
+      expect(decision.reason).toBeUndefined();
+
+      // Verify counter was decremented
+      const count = await getUnblockStopCount(workflowDeps);
+      expect(count).toBe(1);
+    });
+
+    test("decrements to 0 and allows", async () => {
+      const deps = createTestDeps("stop-hook-decrement-test");
+      const workflowDeps = { storageDir: deps.storageDir, sessionId: deps.sessionId };
+      const workflowPath = join(TEST_STORAGE_DIR, `${deps.sessionId}.json`);
+
+      // Create workflow file with count = 1
+      await Bun.write(workflowPath, JSON.stringify({
+        reminders: [
+          { text: "Write tests", frequency: 1.0, created: "2025-01-01" },
+        ],
+        unblockStopCount: 1,
+      }));
+
+      const decision = await processStopHook(deps);
+
+      expect(decision.decision).toBe("allow");
+
+      // Verify counter is now 0
+      const count = await getUnblockStopCount(workflowDeps);
+      expect(count).toBe(0);
+    });
+
+    test("subsequent call blocks after counter reaches 0", async () => {
+      const deps = createTestDeps("stop-hook-subsequent-test");
+      const workflowPath = join(TEST_STORAGE_DIR, `${deps.sessionId}.json`);
+
+      // Create workflow file with count = 1
+      await Bun.write(workflowPath, JSON.stringify({
+        reminders: [
+          { text: "Write tests", frequency: 1.0, created: "2025-01-01" },
+        ],
+        unblockStopCount: 1,
+      }));
+
+      // First call - should allow
+      const decision1 = await processStopHook(deps);
+      expect(decision1.decision).toBe("allow");
+
+      // Second call - should block
+      const decision2 = await processStopHook(deps);
+      expect(decision2.decision).toBe("block");
+      expect(decision2.reason).toContain("Write tests");
+    });
+  });
+
+  describe("decision format", () => {
+    test("block decision includes workflow-reminder format in reason", async () => {
+      const deps = createTestDeps("stop-hook-format-test");
+      const workflowPath = join(TEST_STORAGE_DIR, `${deps.sessionId}.json`);
+
+      await Bun.write(workflowPath, JSON.stringify({
+        reminders: [
+          { text: "Reminder 1", frequency: 1.0, created: "2025-01-01" },
+        ],
+      }));
+
+      const decision = await processStopHook(deps);
+
+      expect(decision.decision).toBe("block");
+      expect(decision.reason).toBe("<workflow-reminder>Reminder 1</workflow-reminder>");
+    });
   });
 });

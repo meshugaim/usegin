@@ -8,10 +8,21 @@
  */
 
 import { join } from "path";
-import { getDefaultStorageDir, type Reminder } from "./workflow";
+import {
+  getDefaultStorageDir,
+  getUnblockStopCount,
+  decrementUnblockStopCount,
+  type Reminder,
+  type WorkflowDeps,
+} from "./workflow";
 
 export interface HookInput {
   session_id: string;
+}
+
+export interface StopHookDecision {
+  decision: "allow" | "block";
+  reason?: string;
 }
 
 export interface HookDeps {
@@ -64,6 +75,43 @@ export async function injectReminders(deps: HookDeps): Promise<string> {
   } catch {
     return "";
   }
+}
+
+/**
+ * Process Stop hook decision
+ *
+ * If unblockStopCount > 0: allows stop and decrements counter
+ * If unblockStopCount = 0 and reminders exist: blocks with reminders
+ * If no reminders: allows stop
+ */
+export async function processStopHook(deps: HookDeps): Promise<StopHookDecision> {
+  const workflowDeps: WorkflowDeps = {
+    storageDir: deps.storageDir,
+    sessionId: deps.sessionId,
+  };
+
+  // Check unblock counter
+  const unblockCount = await getUnblockStopCount(workflowDeps);
+
+  if (unblockCount > 0) {
+    // Decrement counter and allow
+    await decrementUnblockStopCount(workflowDeps);
+    return { decision: "allow" };
+  }
+
+  // No unblock count - check for reminders
+  const remindersOutput = await injectReminders(deps);
+
+  if (!remindersOutput) {
+    // No reminders - allow stop
+    return { decision: "allow" };
+  }
+
+  // Has reminders - block and show them
+  return {
+    decision: "block",
+    reason: remindersOutput,
+  };
 }
 
 /**
