@@ -20,6 +20,10 @@ Presets live in `~/.claude/workflow-presets/` as JSON files. Use them for consis
 | `coverage` | Run and report coverage before completing |
 | `verify` | Verify your work compiles/runs before finishing |
 | `update-plan` | Update Linear issue with progress |
+| `ask-often` | Ask before decisions, confirm assumptions, pause for review |
+| `checkpoints` | Check in at breakpoints, share reasoning |
+| `autonomous` | Work autonomously, update Linear on outcomes |
+| `fire-and-forget` | Full autonomy, exit when done |
 
 ### Combined Presets
 
@@ -53,6 +57,45 @@ The reminders are injected at session start and displayed again when the agent f
 ## Interactive Setup
 
 For interactive sessions, interview the user about preferences. Keep it quick - a few questions max.
+
+### Autonomy Level
+
+Ask about involvement level first - this shapes everything else:
+
+```
+← More involved                    More autonomous →
+micro-manage    collaborate    delegate    fire-and-forget
+every step      checkpoints    outcomes    trust fully
+```
+
+| Level | Claude behavior |
+|-------|-----------------|
+| **Micro-manage** | Ask before each action, confirm assumptions, pause often |
+| **Collaborate** | Check in at checkpoints, share reasoning, pause for review |
+| **Delegate** | Work autonomously, update on outcomes, pause only if blocked |
+| **Fire-and-forget** | Full autonomy, update Linear, exit when done |
+
+This affects:
+- How often to ask vs decide
+- Whether to use cell pattern (spawner + workers)
+- How much to pause for review
+
+### Cell Pattern
+
+For complex/long work at "delegate" or "fire-and-forget" autonomy:
+
+**When to suggest cell:**
+- Work exceeds single context
+- Multi-file implementation
+- User wants hands-off execution
+- Parallel work identified
+
+**Cell setup questions:**
+- Should we use spawner/worker pattern?
+- What reminders should workers get?
+- Sequential or parallel workers?
+
+If using cell, spawner orchestrates - see [cell skill](../cell/SKILL.md).
 
 ### Example Categories
 

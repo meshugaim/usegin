@@ -31,5 +31,6 @@ Workers are uniform - differentiation via context and skills, not type.
 
 ## See Also
 
+- [workflow-setup skill](../workflow-setup/SKILL.md) - configure autonomy level and workflow preferences
 - [code-review skill](../code-review/SKILL.md) - for review assignments
 - [cell-retro skill](../cell-retro/SKILL.md) - for retro assignments
