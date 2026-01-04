@@ -32,7 +32,8 @@ function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
     logDir: TEST_LOG_DIR,
     claudeCommand: ["echo"],
     workflowsDir: TEST_WORKFLOWS_DIR,
-    presetsDir: TEST_PRESETS_DIR,
+    userPresetsDir: TEST_PRESETS_DIR,
+    // No repoPresetsDir in tests by default - tests use userPresetsDir only
     ...overrides,
   };
 }
@@ -48,7 +49,8 @@ function createTestDeps(overrides: Partial<RunDeps> = {}): RunDeps {
     generateSessionId: mock(() => Promise.resolve(TEST_SESSION_ID)),
     logDir: TEST_LOG_DIR,
     workflowsDir: TEST_WORKFLOWS_DIR,
-    presetsDir: TEST_PRESETS_DIR,
+    userPresetsDir: TEST_PRESETS_DIR,
+    // No repoPresetsDir in tests by default - tests use userPresetsDir only
     // Use 'echo' to test the actual spawn logic without running claude
     claudeCommand: ["echo", "ARGS:"],
     ...overrides,

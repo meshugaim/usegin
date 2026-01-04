@@ -5,7 +5,7 @@
 import { mkdir } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
-import { loadPresets, getDefaultPresetsDir, type PresetDeps } from "./presets";
+import { loadPresets, getDefaultPresetsDir, getRepoPresetsDir, type PresetDeps } from "./presets";
 import { getDefaultStorageDir } from "../../workflow/src/workflow";
 
 export interface RunOptions {
@@ -41,7 +41,10 @@ export interface RunDeps {
   logDir: string;
   claudeCommand: string[];
   workflowsDir: string;
-  presetsDir: string;
+  /** User presets directory (~/.claude/workflow-presets/) */
+  userPresetsDir: string;
+  /** Repo presets directory (.claude/workflow-presets/) - optional */
+  repoPresetsDir?: string;
 }
 
 export interface RunResult {
@@ -77,7 +80,8 @@ export function createDefaultDeps(): RunDeps {
     logDir: getDefaultLogDir(),
     claudeCommand: ["bun", "run", "--bun", "claude", "-p", "--dangerously-skip-permissions"],
     workflowsDir: getDefaultStorageDir(),
-    presetsDir: getDefaultPresetsDir(),
+    userPresetsDir: getDefaultPresetsDir(),
+    repoPresetsDir: getRepoPresetsDir(),
   };
 }
 
@@ -180,7 +184,10 @@ export async function run(
 
   // Write workflow reminders if --remind was provided
   if (options.remind && options.remind.length > 0) {
-    const presets = await loadPresets(options.remind, { presetsDir: deps.presetsDir });
+    const presets = await loadPresets(options.remind, {
+      userPresetsDir: deps.userPresetsDir,
+      repoPresetsDir: deps.repoPresetsDir,
+    });
     const reminders = presets
       .filter((p) => p.reminder)
       .map((p) => ({
