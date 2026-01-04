@@ -18,11 +18,12 @@ import {
 
 export interface HookInput {
   session_id: string;
+  hook_event_name?: "SessionStart" | "Stop" | string;
 }
 
 export interface StopHookDecision {
-  decision: "allow" | "block";
-  reason?: string;
+  decision?: "block";  // undefined = allow, "block" = prevent stopping
+  reason?: string;     // required when decision is "block"
 }
 
 export interface HookDeps {
@@ -96,7 +97,7 @@ export async function processStopHook(deps: HookDeps): Promise<StopHookDecision>
   if (unblockCount > 0) {
     // Decrement counter and allow
     await decrementUnblockStopCount(workflowDeps);
-    return { decision: "allow" };
+    return {};  // decision undefined = allow
   }
 
   // No unblock count - check for reminders
@@ -104,7 +105,7 @@ export async function processStopHook(deps: HookDeps): Promise<StopHookDecision>
 
   if (!remindersOutput) {
     // No reminders - allow stop
-    return { decision: "allow" };
+    return {};  // decision undefined = allow
   }
 
   // Has reminders - block and show them
@@ -160,6 +161,16 @@ export async function main(): Promise<void> {
   }
 
   const deps = createDefaultDeps(sessionId);
+
+  // Check if this is a Stop hook call
+  if (input?.hook_event_name === "Stop") {
+    const decision = await processStopHook(deps);
+    // Output JSON decision for Stop hook
+    console.log(JSON.stringify(decision));
+    return;
+  }
+
+  // For SessionStart and other hooks, output reminders as plain text
   const output = await injectReminders(deps);
 
   if (output) {

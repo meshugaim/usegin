@@ -528,7 +528,7 @@ describe("processStopHook", () => {
 
       const decision = await processStopHook(deps);
 
-      expect(decision.decision).toBe("allow");
+      expect(decision.decision).toBeUndefined();  // undefined = allow
       expect(decision.reason).toBeUndefined();
     });
   });
@@ -549,7 +549,7 @@ describe("processStopHook", () => {
 
       const decision = await processStopHook(deps);
 
-      expect(decision.decision).toBe("allow");
+      expect(decision.decision).toBeUndefined();  // undefined = allow
       expect(decision.reason).toBeUndefined();
 
       // Verify counter was decremented
@@ -572,7 +572,7 @@ describe("processStopHook", () => {
 
       const decision = await processStopHook(deps);
 
-      expect(decision.decision).toBe("allow");
+      expect(decision.decision).toBeUndefined();  // undefined = allow
 
       // Verify counter is now 0
       const count = await getUnblockStopCount(workflowDeps);
@@ -593,7 +593,7 @@ describe("processStopHook", () => {
 
       // First call - should allow
       const decision1 = await processStopHook(deps);
-      expect(decision1.decision).toBe("allow");
+      expect(decision1.decision).toBeUndefined();  // undefined = allow
 
       // Second call - should block
       const decision2 = await processStopHook(deps);
@@ -618,5 +618,129 @@ describe("processStopHook", () => {
       expect(decision.decision).toBe("block");
       expect(decision.reason).toBe("<workflow-reminder>Reminder 1</workflow-reminder>");
     });
+  });
+});
+
+describe("integration: Stop hook subprocess", () => {
+  const hookPath = join(import.meta.dir, "../src/inject-reminders-hook.ts");
+
+  test("outputs JSON block decision when Stop hook has reminders", async () => {
+    const sessionId = "stop-hook-integration-block";
+    const storageDir = TEST_STORAGE_DIR;
+    const workflowPath = join(storageDir, `${sessionId}.json`);
+
+    // Create workflow file with reminders
+    await Bun.write(
+      workflowPath,
+      JSON.stringify({
+        reminders: [
+          { text: "Integration test reminder", frequency: 1.0, created: "2025-01-01" },
+        ],
+      })
+    );
+
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        WORKFLOW_STORAGE_DIR: storageDir,
+      },
+    });
+
+    // Feed JSON with hook_event_name = "Stop"
+    const input = JSON.stringify({ session_id: sessionId, hook_event_name: "Stop" });
+    proc.stdin.write(input);
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    const decision = JSON.parse(stdout.trim());
+    expect(decision.decision).toBe("block");
+    expect(decision.reason).toBe("<workflow-reminder>Integration test reminder</workflow-reminder>");
+  });
+
+  test("outputs JSON allow decision when Stop hook has unblock count", async () => {
+    const sessionId = "stop-hook-integration-allow";
+    const storageDir = TEST_STORAGE_DIR;
+    const workflowPath = join(storageDir, `${sessionId}.json`);
+
+    // Create workflow file with reminders AND unblock count
+    await Bun.write(
+      workflowPath,
+      JSON.stringify({
+        reminders: [
+          { text: "Should be skipped", frequency: 1.0, created: "2025-01-01" },
+        ],
+        unblockStopCount: 1,
+      })
+    );
+
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        WORKFLOW_STORAGE_DIR: storageDir,
+      },
+    });
+
+    const input = JSON.stringify({ session_id: sessionId, hook_event_name: "Stop" });
+    proc.stdin.write(input);
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    const decision = JSON.parse(stdout.trim());
+    expect(decision.decision).toBeUndefined();  // undefined = allow
+    expect(decision.reason).toBeUndefined();
+
+    // Verify counter was decremented
+    const count = await getUnblockStopCount({ storageDir, sessionId });
+    expect(count).toBe(0);
+  });
+
+  test("outputs plain text reminders for SessionStart hook", async () => {
+    const sessionId = "session-start-integration";
+    const storageDir = TEST_STORAGE_DIR;
+    const workflowPath = join(storageDir, `${sessionId}.json`);
+
+    // Create workflow file with reminders
+    await Bun.write(
+      workflowPath,
+      JSON.stringify({
+        reminders: [
+          { text: "SessionStart reminder", frequency: 1.0, created: "2025-01-01" },
+        ],
+      })
+    );
+
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        WORKFLOW_STORAGE_DIR: storageDir,
+      },
+    });
+
+    // Feed JSON with hook_event_name = "SessionStart"
+    const input = JSON.stringify({ session_id: sessionId, hook_event_name: "SessionStart" });
+    proc.stdin.write(input);
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    // Should be plain text, not JSON
+    expect(stdout.trim()).toBe("<workflow-reminder>SessionStart reminder</workflow-reminder>");
   });
 });
