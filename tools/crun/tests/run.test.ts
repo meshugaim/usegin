@@ -19,7 +19,7 @@ function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
       })
     ),
     logDir: TEST_LOG_DIR,
-    claudeCommand: ["bun", "run", "--bun", "claude", "--dangerously-skip-permissions"],
+    claudeCommand: ["bun", "run", "--bun", "claude", "-p", "--dangerously-skip-permissions"],
     ...overrides,
   };
 }

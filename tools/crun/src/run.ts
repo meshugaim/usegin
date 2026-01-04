@@ -68,7 +68,7 @@ export function createDefaultDeps(): RunDeps {
     generateSessionId,
     spawnClaude: spawnClaudeProcess,
     logDir: getDefaultLogDir(),
-    claudeCommand: ["bun", "run", "--bun", "claude", "--dangerously-skip-permissions"],
+    claudeCommand: ["bun", "run", "--bun", "claude", "-p", "--dangerously-skip-permissions"],
   };
 }
 
@@ -78,7 +78,7 @@ export function createDefaultDeps(): RunDeps {
 async function spawnClaudeProcess(
   options: SpawnClaudeOptions
 ): Promise<SpawnClaudeResult> {
-  const args = ["-p"];
+  const args: string[] = [];
 
   if (options.resume) {
     args.push("--resume", options.resume);
