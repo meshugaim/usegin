@@ -24,19 +24,21 @@ Patterns for managing spawned Claude workers effectively.
 ## Spawning Workers
 
 ```bash
-# Spawn with clear task (follows by default)
-crun spawn "implement ENG-745: crun CLI"
+# Run worker with clear task (blocks until complete)
+crun "implement ENG-745: crun CLI"
 
-# With issue linking
-crun spawn --issue ENG-745 "implement the crun CLI per spec"
+# Background for long-running tasks
+crun "implement the full feature" &
 
-# Detach for long-running tasks
-crun spawn --detach "implement the full feature"
+# With reminder presets
+crun --remind tdd,commit-often "implement per spec"
 
-# Parallel workers
-crun spawn --detach --issue ENG-100 "implement auth"
-crun spawn --detach --issue ENG-101 "implement logging"
-crun list  # see both
+# In specific directory
+crun --cwd /path/to/repo "implement the feature"
+
+# Parallel workers (backgrounded)
+crun "implement auth" &
+crun "implement logging" &
 ```
 
 ## Guiding Workers
@@ -63,7 +65,7 @@ Use patterns from tools/session/ for CLI structure.
 Commit often, push often. Don't batch - push after each commit.
 PROMPT
 
-crun spawn "$(cat /tmp/task.txt)"
+crun --prompt-file /tmp/task.txt
 ```
 
 ### Nudging / Checkpoints
@@ -71,16 +73,13 @@ crun spawn "$(cat /tmp/task.txt)"
 Check progress and send guidance:
 
 ```bash
-# Check progress (short ID works)
+# Check progress via session transcript (short ID works)
 session <id> | tail -50
 
-# Kill if needed
-crun kill <id>
+# Resume a session with follow-up
+crun --resume <session-id> "checkpoint: self-review, commit working code, push"
 
-# Send follow-up to running worker
-crun send <id> "checkpoint: self-review, commit working code, push"
-
-# Or resume a stopped session with detailed nudge
+# Or with detailed nudge from file
 cat > /tmp/nudge.txt << 'PROMPT'
 Pause and checkpoint.
 
@@ -91,7 +90,7 @@ Pause and checkpoint.
 Be honest in your assessment.
 PROMPT
 
-cat /tmp/nudge.txt | claude -p -r "<session-id>"
+crun --resume <session-id> --prompt-file /tmp/nudge.txt
 ```
 
 ### Self-Review Prompt
@@ -113,18 +112,15 @@ Be honest - if something could be better, say so.
 ## Monitoring
 
 ```bash
-# List all workers
-crun list
-
-# Check specific worker
-crun status <id>
-
 # View transcript (short ID works)
 session <id>
 session <id> | tail -50  # just recent activity
 
-# Tail live output
-crun tail <id>
+# List recent sessions
+session list -n 5 --output id
+
+# Check logs directory
+ls ~/.crun/logs/
 ```
 
 ## After Worker Finishes
@@ -143,7 +139,7 @@ git add -A && git commit -m "feat: description
 
 Closes: ENG-XXX
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
@@ -157,15 +153,14 @@ git pull --rebase origin main && git push origin main
 # 1. Create issue with spec
 plan create "implement feature X" --description "$(cat spec.md)"
 
-# 2. Spawn worker (detach for long tasks)
-crun spawn --detach --issue ENG-XXX "implement per spec, TDD, commit often"
+# 2. Run worker (background for long tasks)
+crun --remind tdd,commit-often "implement per spec, commit often" &
 
 # 3. Check progress periodically
-crun list
 session <id> | tail -50
 
-# 4. Nudge if needed
-crun send <id> "checkpoint: self-review, commit and push working code"
+# 4. Resume if needed for follow-up
+crun --resume <id> "checkpoint: self-review, commit and push working code"
 
 # 5. When done - verify and commit any uncommitted work
 git status
@@ -215,10 +210,10 @@ Solution: spawn fresh worker with handoff:
 
 ```bash
 # Get summary from current worker
-echo "summarize what you've done and what's left" | claude -p -r "<old-id>"
+crun --resume <old-id> "summarize what you've done and what's left"
 
 # Spawn new worker with context
-crun spawn "continuing from <old-id>: <summary>. Next: <remaining work>"
+crun "continuing from previous session: <summary>. Next: <remaining work>"
 ```
 
 ## Nesting (Advanced)
@@ -227,8 +222,8 @@ Workflow Claude managing worker Claudes:
 
 ```
 Manager Claude
-  └── crun spawn "implement auth"
-  └── crun spawn "implement logging"
+  └── crun "implement auth" &
+  └── crun "implement logging" &
   └── (monitors both, guides as needed)
   └── (integrates their work)
 ```

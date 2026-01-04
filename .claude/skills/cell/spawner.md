@@ -20,8 +20,8 @@ You orchestrate. You ensure things happen. You don't do them directly.
 
 **Anti-pattern - micromanaging:**
 ```bash
-# ❌ Don't do this - duplicates what code-review skill already says
-crun spawn "Review ENG-123. Focus on:
+# Don't do this - duplicates what code-review skill already says
+crun "Review ENG-123. Focus on:
 1. Test quality - are tests meaningful?
 2. Error handling
 3. Security issues
@@ -30,8 +30,8 @@ Post findings to Linear, fix critical issues..."
 
 **Pattern - delegate to skill:**
 ```bash
-# ✓ Do this - trust the skill
-crun spawn "Use the code-review skill. Review ENG-123."
+# Do this - trust the skill
+crun "Use the code-review skill. Review ENG-123."
 ```
 
 Workers read skills. Skills contain the process. Your prompt is just:
@@ -40,20 +40,20 @@ Workers read skills. Skills contain the process. Your prompt is just:
 
 **For implementation tasks**, the cell skill as worker includes TDD - don't repeat it:
 ```bash
-crun spawn "Use the cell skill as worker. Implement ENG-456."
+crun "Use the cell skill as worker. Implement ENG-456."
 ```
 
 **For specialized tasks**, name the skill:
 ```bash
-crun spawn "Use the cell-retro skill. Retro ENG-789."
-crun spawn "Use the code-review skill. Review ENG-789."
+crun "Use the cell-retro skill. Retro ENG-789."
+crun "Use the code-review skill. Review ENG-789."
 ```
 
 ## Spawning Workers
 
 **Before spawning:**
 1. `plan start <id>` - mark the issue in-progress
-2. Check `crun --help` if unsure about available commands
+2. Check `crun --help` if unsure about available options
 
 **When:**
 - New slice ready
@@ -63,7 +63,7 @@ crun spawn "Use the code-review skill. Review ENG-789."
 
 ## Monitoring
 
-**Primary signal:** Worker responses (crun follows by default).
+**Primary signal:** Worker responses (crun blocks by default).
 
 **Other signals:** git commits, Linear updates, CI status.
 
@@ -80,13 +80,13 @@ crun spawn "Use the code-review skill. Review ENG-789."
 
 **Spawn fresh when:**
 - New task, even on related issue
-- Different skill needed (implementation → review)
+- Different skill needed (implementation -> review)
 - Worker finished their task
 - Context exhausted or polluted
 
 ```bash
 # Fresh worker - default
-crun spawn "Use the cell skill as worker. Implement ENG-456."
+crun "Use the cell skill as worker. Implement ENG-456."
 
 # Resume - continuing same task
 crun --resume <session-id> "Tests are failing. Fix the auth test."
@@ -100,9 +100,14 @@ crun --resume <session-id> "Tests are failing. Fix the auth test."
 
 ## Running Workers
 
-`crun spawn` follows by default - you get notified when worker responds.
+`crun` blocks by default - you see output when worker finishes.
 
-For parallel work, spawn multiple and monitor.
+For parallel work, background with `&`:
+
+```bash
+crun "implement auth" &
+crun "implement logging" &
+```
 
 ## Isolation
 
@@ -114,7 +119,7 @@ When workers might conflict:
 
 ```bash
 worktree create feature-x
-crun spawn --cwd /path/to/feature-x "Use the cell skill as worker. Implement ENG-123."
+crun --cwd /path/to/feature-x "Use the cell skill as worker. Implement ENG-123."
 ```
 
 ## Context Optimization
@@ -125,7 +130,10 @@ crun spawn --cwd /path/to/feature-x "Use the cell skill as worker. Implement ENG
 
 ## Tools
 
-- `crun spawn/list/send/kill` - worker management
+- `crun "prompt"` - run worker (blocks until done)
+- `crun --resume <id> "prompt"` - continue session
+- `crun --remind <presets> "prompt"` - inject reminders
+- `crun --cwd <path> "prompt"` - run in directory
 - `worktree create/destroy/list` - isolation
 - `session <id>` - view transcript
 - `plan show/create/update/start/close` - Linear
@@ -138,7 +146,7 @@ You trigger, workers execute:
 - **Retro:** After feature completion
 - **Self-retro:** Retro your own session via worker. Pass your session ID:
 ```bash
-crun spawn "Use the cell-retro skill. Retro session $CLAUDE_SESSION_ID"
+crun "Use the cell-retro skill. Retro session $CLAUDE_SESSION_ID"
 ```
 
 ## Ensuring Quality

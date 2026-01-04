@@ -54,30 +54,35 @@ JSON output includes `session_id` for later resume:
 
 ## Using crun (Recommended)
 
-For managed processes with pm2:
+Thin wrapper around `claude -p` with conveniences:
 
 ```bash
-# Spawn and stream output (default - follows until done)
-crun spawn "implement the feature"
-# → (streams output, exits when done)
+# Run synchronously (blocks until complete)
+crun "implement the feature"
 
-# Spawn in background (detached)
-crun spawn --detach "fix the bug"
-# → Started: abc123
+# Run in background
+crun "fix the bug" &
 
-# List running workers
-crun list
+# Resume existing session
+crun --resume abc123 "also add tests"
 
-# Send follow-up to existing session
-crun send abc123 "also add tests"
+# With reminder presets
+crun --remind tdd,commit-often "implement per spec"
 
-# Kill a worker
-crun kill abc123
+# In specific directory
+crun --cwd /path/to/repo "implement the feature"
 
-# View output (short ID works)
+# From prompt file
+crun --prompt-file /tmp/task.txt
+
+# View session transcript (short ID works)
 session abc123
 session 502de9c7  # prefix also works
 ```
+
+### Logs
+
+Logs are stored at `~/.crun/logs/` for later inspection.
 
 ### Non-blocking from Claude Code
 
@@ -85,9 +90,9 @@ When spawning workers from within Claude Code, use the Task tool with `run_in_ba
 
 ```
 Task tool with run_in_background: true
-→ spawns worker
-→ parent continues immediately
-→ use TaskOutput to check results later
+-> spawns worker
+-> parent continues immediately
+-> use TaskOutput to check results later
 ```
 
 ## Using session CLI
@@ -145,6 +150,6 @@ echo "Run the tests and fix any failures" | claude -p -r "$id"
 
 ## Reference
 
-- `crun --help` - Background process management
+- `crun --help` - Thin wrapper for claude -p
 - `session --help` - Session parsing and viewing
 - `claude --help` - All CLI options
