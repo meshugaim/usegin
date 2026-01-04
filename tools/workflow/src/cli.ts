@@ -7,6 +7,7 @@ import { Command } from "commander";
 import {
   addReminder,
   listReminders,
+  getRawReminders,
   clearReminders,
   removeReminder,
   exportTemplate,
@@ -36,25 +37,39 @@ program
   .command("add")
   .description("Add a workflow reminder")
   .argument("<reminder>", "The reminder text")
-  .action(async (reminder: string) => {
+  .option("-f, --frequency <number>", "Probability (0-1) of showing this reminder", "1.0")
+  .action(async (reminder: string, options: { frequency: string }) => {
     const deps = getDeps();
-    await addReminder(reminder, deps);
-    console.log(`Added: ${reminder}`);
+    const frequency = parseFloat(options.frequency);
+    if (isNaN(frequency)) {
+      console.error("Error: Frequency must be a number");
+      process.exit(1);
+    }
+    await addReminder(reminder, deps, { frequency });
+    const freqDisplay = frequency < 1.0 ? ` (${Math.round(frequency * 100)}% chance)` : "";
+    console.log(`Added: ${reminder}${freqDisplay}`);
   });
 
 program
   .command("list")
   .description("List all workflow reminders")
-  .action(async () => {
+  .option("-v, --verbose", "Show frequency and metadata")
+  .action(async (options: { verbose?: boolean }) => {
     const deps = getDeps();
-    const reminders = await listReminders(deps);
+    const reminders = await getRawReminders(deps);
     if (reminders.length === 0) {
       console.log("No workflow reminders set.");
       return;
     }
     console.log("Workflow reminders:");
     reminders.forEach((r, i) => {
-      console.log(`  ${i + 1}. ${r}`);
+      if (options.verbose) {
+        const freqPercent = Math.round(r.frequency * 100);
+        console.log(`  ${i + 1}. ${r.text} [${freqPercent}%]`);
+      } else {
+        const freqNote = r.frequency < 1.0 ? ` (${Math.round(r.frequency * 100)}%)` : "";
+        console.log(`  ${i + 1}. ${r.text}${freqNote}`);
+      }
     });
   });
 
