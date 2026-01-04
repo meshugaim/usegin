@@ -134,9 +134,20 @@ crun --cwd /path/to/feature-x "Use the cell skill as worker. Implement ENG-123."
 - `crun --resume <id> "prompt"` - continue session
 - `crun --remind <presets> "prompt"` - inject reminders
 - `crun --cwd <path> "prompt"` - run in directory
+- `crun -n "next step" "prompt"` - note-to-self for workflow continuity
 - `worktree create/destroy/list` - isolation
 - `session <id>` - view transcript
 - `plan show/create/update/start/close` - Linear
+
+**Note-to-self (`-n`):** Use for workflow continuity, not just labels. Describe what happens next:
+```bash
+# Good - guides next action
+crun -n "If passes, close issue and push" "Review ENG-123"
+crun -n "Fix issues found, then spawn retro" "Implement feature"
+
+# Bad - just a label, no continuity
+crun -n "Review done" "Review ENG-123"
+```
 
 ## Quality Triggers
 
