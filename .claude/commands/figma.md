@@ -1,12 +1,12 @@
 ---
-description: load figma comparison context and continue mapping diffs
+description: load figma comparison project context
 ---
 
 # Figma Comparison Project
 
-You are working on comparing Figma designs to the live app implementation.
+You are oriented on the Figma-to-app comparison project. This command loads context only - wait for user instructions before taking action.
 
-## Workflow (from skill)
+## Workflow Reference
 
 !`cat .claude/skills/figma-comparison/SKILL.md`
 
@@ -20,23 +20,20 @@ You are working on comparing Figma designs to the live app implementation.
 
 !`cat figma-app/comparisons/diffs.json`
 
-## File Keys
+## Tools Available
 
-- **Personal file** (for design data): Use `figma_file_personal` from manifest above
-- **Team file** (for comments): Use `figma_file_team` from manifest above
+| MCP | Purpose | Example |
+|-----|---------|---------|
+| `figma-personal` | Design data, images | `get_figma_data`, `download_figma_images` |
+| `figma-browser` | Designer comments | `figma_get_comments` |
+| `playwright` | App navigation, screenshots | `browser_navigate`, `browser_snapshot`, `browser_take_screenshot` |
 
-## Your Task
-
-1. **Orient**: Check which frames have `status: not_started` in the manifest
-2. **Pick one**: Start with the first not_started frame
-3. **Gather context**: Load Figma, comments, app view, AND check codebase
-4. **Map diffs**: Only after full context, identify and document differences
-5. **Screenshot**: Every diff needs both figma and app screenshots
-6. **Update**: Modify diffs.json, update manifest status, link Linear issues
-7. **Commit**: Small commits with `Part of: ENG-241`
+**File keys** (from manifest): `figma_file_personal` for design data, `figma_file_team` for comments.
 
 ## Linear Context
 
-!`plan show 241 --tree 2>/dev/null || echo "Run 'plan show 241' for Linear context"`
+!`plan show 800 --tree 2>/dev/null || echo "Run 'plan show 800' for Linear context"`
 
-Ready to continue. Which frame should we work on next?
+---
+
+Context loaded. Awaiting instructions.
