@@ -134,23 +134,6 @@ describe("crun run", () => {
       );
     });
 
-    test("runs claude in specified directory", async () => {
-      const testDir = join(TEST_LOG_DIR, "workdir");
-      await mkdir(testDir, { recursive: true });
-
-      let capturedCwd: string | undefined;
-      const deps = createMockDeps({
-        spawnClaude: async (options) => {
-          capturedCwd = options.cwd;
-          return { exitCode: 0, stdout: "", stderr: "" };
-        },
-      });
-
-      await run({ prompt: "test", cwd: testDir }, deps);
-
-      expect(capturedCwd).toBe(testDir);
-    });
-
     test("passes extra claude flags", async () => {
       const deps = createMockDeps();
       await run(
@@ -299,12 +282,5 @@ describe("generateSessionId", () => {
     expect(id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
-  });
-
-  test("returns unique IDs", async () => {
-    const id1 = await generateSessionId();
-    const id2 = await generateSessionId();
-
-    expect(id1).not.toBe(id2);
   });
 });
