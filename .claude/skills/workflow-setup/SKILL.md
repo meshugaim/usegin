@@ -125,6 +125,9 @@ Use `AskUserQuestion` with relevant categories for the task at hand.
 2. Run `workflow add` for each reminder
 3. Show final list with `workflow list`
 4. Confirm configuration
+5. Run `workflow unblock-stop -n 1` to allow one stop without blocking
+
+**Important:** Always use `-n 1` for `unblock-stop`, not larger values. This ensures you review each stop point before continuing, maintaining the collaborative rhythm.
 
 ## Creating New Presets
 
