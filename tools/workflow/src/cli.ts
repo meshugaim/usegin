@@ -15,6 +15,8 @@ import {
   listTemplates,
   listSessions,
   importFromSession,
+  setUnblockStopCount,
+  getUnblockStopCount,
   getDefaultStorageDir,
   type WorkflowDeps,
 } from "./workflow";
@@ -192,6 +194,43 @@ program
         `Error: ${error instanceof Error ? error.message : "Unknown error"}`
       );
       process.exit(1);
+    }
+  });
+
+// ===== Unblock Stop =====
+
+program
+  .command("unblock-stop")
+  .description("Allow the next N stop operations without blocking")
+  .requiredOption("-n, --number <count>", "Number of stops to allow")
+  .action(async (options: { number: string }) => {
+    const deps = getDeps();
+    const count = parseInt(options.number, 10);
+    if (isNaN(count)) {
+      console.error("Error: Count must be a number");
+      process.exit(1);
+    }
+    try {
+      await setUnblockStopCount(count, deps);
+      console.log(`Unblocked next ${count} stop operation(s).`);
+    } catch (error) {
+      console.error(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      process.exit(1);
+    }
+  });
+
+program
+  .command("stop-status")
+  .description("Show current unblock stop count")
+  .action(async () => {
+    const deps = getDeps();
+    const count = await getUnblockStopCount(deps);
+    if (count === 0) {
+      console.log("Stop hook will block (no unblock count set).");
+    } else {
+      console.log(`Next ${count} stop operation(s) will be allowed.`);
     }
   });
 
