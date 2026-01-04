@@ -109,6 +109,25 @@ describe("crun run", () => {
       );
     });
 
+    test("runs claude in specified directory", async () => {
+      // Use a real directory to verify Bun.spawn respects cwd
+      const testDir = join(TEST_LOG_DIR, "workdir");
+      await mkdir(testDir, { recursive: true });
+
+      // Create a mock that captures the spawn options
+      let capturedCwd: string | undefined;
+      const deps = createMockDeps({
+        spawnClaude: async (options) => {
+          capturedCwd = options.cwd;
+          return { exitCode: 0, stdout: "", stderr: "" };
+        },
+      });
+
+      await run({ prompt: "test", cwd: testDir }, deps);
+
+      expect(capturedCwd).toBe(testDir);
+    });
+
     test("passes extra claude flags", async () => {
       const deps = createMockDeps();
       await run(
