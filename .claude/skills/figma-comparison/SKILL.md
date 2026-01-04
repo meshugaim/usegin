@@ -5,7 +5,7 @@ description: Compare Figma designs to the live app. Triggered by "compare figma"
 
 # Figma Comparison
 
-Compare Figma designs to the live app. Every diff requires full context and screenshots.
+Compare Figma designs to the live app. Every diff requires **broad context first**, then screenshots.
 
 ## Source of Truth
 
@@ -17,50 +17,59 @@ figma-app/public/screenshots/        # figma/ and app/ subdirs
 
 Start by reading manifest.json to find frames with `status: not_started`.
 
-## Two Figma MCPs
+## Three MCPs
 
 | MCP | File Key | Purpose |
 |-----|----------|---------|
 | `mcp__figma-personal__*` | `figma_file_personal` in manifest | Design data, downloading images |
 | `mcp__figma-browser__*` | `figma_file_team` in manifest | Designer comments |
+| `mcp__playwright__*` | N/A | App screenshots, navigation |
 
-Use **personal** for `get_figma_data` and `download_figma_images`.
-Use **team** for `figma_get_comments`.
+Use **figma-personal** for `get_figma_data` and `download_figma_images`.
+Use **figma-browser** for `figma_get_comments`.
+Use **playwright** for app navigation and screenshots.
 
 ## Workflow Per Frame
 
-### 1. Gather Context First
+### 1. Gather Broad Context First
 
-Before identifying any diffs, you need full context:
+**Before identifying ANY differences**, build complete understanding:
 
-**Load Figma design:**
+**A. Load Figma design:**
 ```
 mcp__figma-personal__get_figma_data(fileKey="<figma_file_personal>", nodeId="<figma_node>", depth=3)
 ```
 
-**Read designer comments:**
+**B. Read designer comments:**
 ```
 mcp__figma-browser__figma_get_comments(file_key="<figma_file_team>")
 ```
 
-**Load app view:**
+**C. Load app view:**
 ```
 mcp__playwright__browser_navigate(url="http://localhost:3000/<app_route>")
 mcp__playwright__browser_snapshot()
 ```
 
-**Check codebase** for relevant components - understand WHY things look the way they do.
+**D. Check the codebase** - This is critical:
+- Find the component files for this view (grep/glob for route or component name)
+- Read the actual CSS/styles - understand current spacing, colors, layout
+- Check if features exist but are hidden/disabled
+- Look for TODOs, comments explaining technical constraints
+- Check if there's a Linear issue already tracking the gap
+
+Only with this full context can you accurately identify what's a real diff vs intentional deviation.
 
 ### 2. Identify Differences (With Context)
 
-Only after you have full context, identify differences. For each potential diff, ask:
+Now that you have broad context, identify differences. For each potential diff, ask:
 
 1. **What does Figma show?** - Be specific about the element
 2. **What does the app show?** - Or is it missing entirely?
-3. **What do comments say?** - Designer may have noted "this will change" → don't log it
-4. **What does the code show?** - Is there a technical reason? CSS constraint? Feature not built?
+3. **What do designer comments say?** - "this will change" or "placeholder" → don't log
+4. **What does the code reveal?** - Is there a technical reason? CSS constraint? Feature not built yet? Existing Linear issue?
 
-Focus on high-level differences (layout, missing features, UX patterns). Skip small CSS tweaks.
+Focus on high-level differences (layout, missing features, UX patterns). Skip minor CSS tweaks unless they fundamentally change the design.
 
 ### 3. Create Diff with Screenshots
 
@@ -79,9 +88,11 @@ mcp__figma-personal__download_figma_images(
 ```
 
 **Capture App screenshot:**
+
+Playwright saves relative to its output directory. Use absolute path to save directly to the app:
 ```
 mcp__playwright__browser_take_screenshot(
-  filename="app/<diff-id>-<desc>-app.png",
+  filename="/workspaces/test-mvp/figma-app/public/screenshots/app/<diff-id>-<desc>-app.png",
   element="<human description>",
   ref="<ref from snapshot>"
 )
@@ -93,10 +104,9 @@ ls figma-app/public/screenshots/figma/
 ls figma-app/public/screenshots/app/
 ```
 
-If app screenshots missing, copy from Docker:
+If Playwright saved elsewhere, copy to app directory:
 ```bash
-docker ps | grep playwright
-docker cp <container>:/tmp/playwright-output/app/ figma-app/public/screenshots/
+cp /path/to/screenshot.png figma-app/public/screenshots/app/
 ```
 
 ### 4. Log to diffs.json
@@ -121,9 +131,24 @@ docker cp <container>:/tmp/playwright-output/app/ figma-app/public/screenshots/
 
 Types: `layout`, `feature`, `ux`, `content`, `css`
 
-### 5. Update Manifest
+### 5. Update Tracking
 
-Set frame status to `completed` and add notes about diffs logged.
+**A. Update manifest.json:**
+- Set frame `status` to `completed`
+- Add `notes` about which diffs were logged
+
+**B. Link to Linear when relevant:**
+- If a diff relates to an existing issue, set `linear_issue` field
+- If a diff warrants a new issue, create via `plan create` and link it
+- Use `plan search` to find existing issues before creating duplicates
+
+**C. Commit progress:**
+```bash
+git add figma-app/comparisons/
+git commit -m "figma: map diffs for <frame-id>
+
+Part of: ENG-241"
+```
 
 ## Rate Limits
 
@@ -131,6 +156,23 @@ Figma API has aggressive limits. On 429 errors:
 - Wait 2-3 minutes
 - Work on app screenshots while waiting
 - Use `depth=2` or `depth=3`, not higher
+
+## Screenshot Path Convention
+
+The app serves from `figma-app/` and expects:
+```
+figma-app/public/screenshots/
+├── figma/<diff-id>-<desc>-figma.png
+└── app/<diff-id>-<desc>-app.png
+```
+
+In `diffs.json`, store **relative paths** from `public/screenshots/`:
+```json
+"figma_image": "figma/feature-001-plan-usage-figma.png",
+"app_image": "app/feature-001-projects-app.png"
+```
+
+The app prepends `public/screenshots/` when loading images.
 
 ## Verification
 
