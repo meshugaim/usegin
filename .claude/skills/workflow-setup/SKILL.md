@@ -5,63 +5,105 @@ description: Interactive workflow setup. Triggered by "let's set up workflow", "
 
 # Workflow Setup
 
-Interview the user about their workflow preferences for this session, then populate workflow reminders.
+Configure workflow reminders to guide how we work together. These reminders surface at key moments (session start, end of turn) to keep consistent practices.
 
-## Purpose
+## Quick Start with Presets
 
-Establish shared understanding of how we'll work together:
-- Testing approach (TDD? Tests after?)
-- Review cadence (after each change? end of task?)
-- Commit frequency
-- Quality checks
+Presets live in `~/.claude/workflow-presets/` as JSON files. Use them for consistent workflows across sessions.
 
-## Interview Flow
+### Available Presets
 
-Use `AskUserQuestion` for each topic. Keep it quick - 3-4 questions max.
+| Preset | Reminder |
+|--------|----------|
+| `tdd` | Write tests first, then implement |
+| `commit-often` | Commit after each change, push frequently |
+| `coverage` | Run and report coverage before completing |
+| `verify` | Verify your work compiles/runs before finishing |
+| `update-plan` | Update Linear issue with progress |
 
-### Question 1: Testing Approach
+### Combined Presets
 
-| Option | Reminder Added |
-|--------|----------------|
-| TDD | "Write tests first, then implement" |
-| Tests after | "Write tests after implementation" |
-| No tests | (none) |
+Combined presets include multiple reminders:
 
-### Question 2: Code Review
+```json
+// implementation.json - bundles common implementation practices
+{
+  "name": "implementation",
+  "includes": ["tdd", "commit-often", "coverage", "verify", "update-plan"]
+}
+```
 
-| Option | Reminder Added |
-|--------|----------------|
-| After each change | "Pause for review after each change" |
-| After feature complete | "Review when feature is complete" |
-| None | (none) |
+### Using Presets with crun
 
-### Question 3: Commits
+When spawning workers with `crun`, use `--remind` to load presets:
 
-| Option | Reminder Added |
-|--------|----------------|
-| Frequent (per file/change) | "Commit frequently, small changes" |
-| Logical chunks | "Commit at logical checkpoints" |
-| End of task | "Commit when task is complete" |
+```bash
+# Single preset
+crun --remind tdd -n "Tests added" "Add tests for auth module"
 
-### Question 4: Other Reminders (open-ended)
+# Multiple presets
+crun --remind tdd,commit-often -n "Feature complete" "Implement login flow"
 
-Let user add any custom reminders.
+# Combined preset (expands to all included)
+crun --remind implementation -n "Done" "Build the feature"
+```
 
-## After Interview
+The reminders are injected at session start and displayed again when the agent finishes (via Stop hook).
 
-1. Run `workflow clear` to start fresh
-2. Run `workflow add` for each selected reminder
+## Interactive Setup
+
+For interactive sessions, interview the user about preferences. Keep it quick - a few questions max.
+
+### Example Categories
+
+**Testing**
+- TDD (tests first)
+- Tests after implementation
+- No tests for this task
+
+**Commits**
+- After each change
+- At logical checkpoints
+- End of task only
+
+**Review**
+- Pause after each change
+- Review when complete
+- No review needed
+
+**Custom**
+- Let user add specific reminders
+
+Use `AskUserQuestion` with relevant categories for the task at hand.
+
+## After Setup
+
+1. Run `workflow clear` to reset
+2. Run `workflow add` for each reminder
 3. Show final list with `workflow list`
-4. Confirm: "Workflow configured. These reminders will guide our session."
+4. Confirm configuration
 
-## Quick Setup
+## Creating New Presets
 
-If user says "quick" or "default":
-- TDD
-- Review after feature complete
-- Commit at logical checkpoints
+Add a JSON file to `~/.claude/workflow-presets/`:
 
-## Import Previous
+```json
+// Simple preset
+{
+  "name": "my-preset",
+  "reminder": "The reminder text shown to agent"
+}
 
-If user says "use previous" or "same as last time":
-- Use `workflow import` to pick from recent sessions
+// Combined preset
+{
+  "name": "my-bundle",
+  "includes": ["tdd", "commit-often", "my-preset"]
+}
+```
+
+## How Reminders Surface
+
+- **SessionStart hook**: Reminders injected at start of session
+- **Stop hook**: Reminders shown when agent finishes turn
+
+This keeps practices consistent throughout the work.
