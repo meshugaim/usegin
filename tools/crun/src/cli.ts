@@ -14,6 +14,10 @@ const program = new Command()
   .option("-m, --model <model>", "Override model")
   .option("-C, --cwd <path>", "Run in directory")
   .option("-f, --prompt-file <file>", "Read prompt from file")
+  .option(
+    "--remind <presets>",
+    "Comma-separated preset names (e.g., tdd,commit-often)"
+  )
   .requiredOption(
     "-n, --note-to-self <note>",
     "Reminder for when work completes (required)"
@@ -32,6 +36,7 @@ async function main(
     model?: string;
     cwd?: string;
     promptFile?: string;
+    remind?: string;
     noteToSelf: string;
   }
 ) {
@@ -63,6 +68,11 @@ async function main(
   console.log(`Log: ~/.crun/logs/${sessionId}.log`);
   console.log("─".repeat(40));
 
+  // Parse remind flag (comma-separated preset names)
+  const remind = options.remind
+    ? options.remind.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
+
   try {
     const result = await run(
       {
@@ -73,6 +83,7 @@ async function main(
         cwd: options.cwd,
         claudeFlags: claudeFlags.length > 0 ? claudeFlags : undefined,
         noteToSelf: options.noteToSelf,
+        remind,
       },
       {
         ...deps,
