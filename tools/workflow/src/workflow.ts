@@ -15,7 +15,7 @@ export interface WorkflowDeps {
  * Get default storage directory
  */
 export function getDefaultStorageDir(): string {
-  return join(homedir(), ".crun", "workflows");
+  return join(homedir(), ".claude", "workflows");
 }
 
 /**
