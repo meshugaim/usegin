@@ -4,6 +4,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import {
   addReminder,
+  addReminders,
   listReminders,
   getRawReminders,
   clearReminders,
@@ -220,6 +221,60 @@ describe("workflow reminders", () => {
       expect(rawReminders).toHaveLength(2);
       expect(rawReminders[0]).toMatchObject({ text: "reminder 1", frequency: 1.0 });
       expect(rawReminders[1]).toMatchObject({ text: "reminder 2", frequency: 0.5 });
+    });
+  });
+
+  describe("addReminders", () => {
+    test("adds multiple reminders in one call", async () => {
+      const deps = createTestDeps();
+      await addReminders(["tdd", "commit-often", "verify"], deps);
+
+      const reminders = await listReminders(deps);
+      expect(reminders).toEqual(["tdd", "commit-often", "verify"]);
+    });
+
+    test("adds to existing reminders", async () => {
+      const deps = createTestDeps();
+      await addReminder("existing", deps);
+      await addReminders(["new1", "new2"], deps);
+
+      const reminders = await listReminders(deps);
+      expect(reminders).toEqual(["existing", "new1", "new2"]);
+    });
+
+    test("applies same frequency to all reminders", async () => {
+      const deps = createTestDeps();
+      await addReminders(["a", "b", "c"], deps, { frequency: 0.5 });
+
+      const rawReminders = await getRawReminders(deps);
+      expect(rawReminders).toHaveLength(3);
+      expect(rawReminders[0].frequency).toBe(0.5);
+      expect(rawReminders[1].frequency).toBe(0.5);
+      expect(rawReminders[2].frequency).toBe(0.5);
+    });
+
+    test("trims whitespace from all reminders", async () => {
+      const deps = createTestDeps();
+      await addReminders(["  spaced  ", "  also spaced  "], deps);
+
+      const reminders = await listReminders(deps);
+      expect(reminders).toEqual(["spaced", "also spaced"]);
+    });
+
+    test("handles empty array", async () => {
+      const deps = createTestDeps();
+      await addReminders([], deps);
+
+      const reminders = await listReminders(deps);
+      expect(reminders).toEqual([]);
+    });
+
+    test("handles single item array", async () => {
+      const deps = createTestDeps();
+      await addReminders(["only one"], deps);
+
+      const reminders = await listReminders(deps);
+      expect(reminders).toEqual(["only one"]);
     });
   });
 });

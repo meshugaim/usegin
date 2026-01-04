@@ -91,6 +91,30 @@ export async function addReminder(
 }
 
 /**
+ * Add multiple reminders at once
+ */
+export async function addReminders(
+  reminders: string[],
+  deps: WorkflowDeps,
+  options: AddReminderOptions = {}
+): Promise<void> {
+  if (reminders.length === 0) {
+    return;
+  }
+  const storage = await readStorage(deps);
+  const frequency = clamp(options.frequency ?? 0.2, 0, 1);
+  const created = new Date().toISOString();
+  for (const reminder of reminders) {
+    storage.reminders.push({
+      text: reminder.trim(),
+      frequency,
+      created,
+    });
+  }
+  await writeStorage(storage, deps);
+}
+
+/**
  * List all reminders (text only, for backward compatibility)
  */
 export async function listReminders(deps: WorkflowDeps): Promise<string[]> {

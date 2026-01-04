@@ -6,6 +6,7 @@
 import { Command } from "commander";
 import {
   addReminder,
+  addReminders,
   listReminders,
   getRawReminders,
   clearReminders,
@@ -37,19 +38,25 @@ const program = new Command()
 
 program
   .command("add")
-  .description("Add a workflow reminder")
-  .argument("<reminder>", "The reminder text")
-  .option("-f, --frequency <number>", "Probability (0-1) of showing this reminder", "0.2")
-  .action(async (reminder: string, options: { frequency: string }) => {
+  .description("Add workflow reminders (one or more)")
+  .argument("<reminders...>", "One or more reminder texts")
+  .option("-f, --frequency <number>", "Probability (0-1) of showing these reminders", "0.2")
+  .action(async (reminders: string[], options: { frequency: string }) => {
     const deps = getDeps();
     const frequency = parseFloat(options.frequency);
     if (isNaN(frequency)) {
       console.error("Error: Frequency must be a number");
       process.exit(1);
     }
-    await addReminder(reminder, deps, { frequency });
     const freqDisplay = frequency < 1.0 ? ` (${Math.round(frequency * 100)}% chance)` : "";
-    console.log(`Added: ${reminder}${freqDisplay}`);
+    if (reminders.length === 1) {
+      await addReminder(reminders[0], deps, { frequency });
+      console.log(`Added: ${reminders[0]}${freqDisplay}`);
+    } else {
+      await addReminders(reminders, deps, { frequency });
+      console.log(`Added ${reminders.length} reminders${freqDisplay}:`);
+      reminders.forEach((r) => console.log(`  - ${r}`));
+    }
   });
 
 program
