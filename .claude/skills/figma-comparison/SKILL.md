@@ -5,136 +5,140 @@ description: Compare Figma designs to the live app. Triggered by "compare figma"
 
 # Figma Comparison
 
-Compare Figma designs to the live app, find meaningful differences, and create actionable recommendations.
+Compare Figma designs to the live app. Every diff requires full context and screenshots.
 
-## Philosophy
-
-### Classification Types
-
-| Type | What It Means |
-|------|---------------|
-| `css` | Colors, fonts, spacing, borders, shadows |
-| `layout` | Grid, positioning, element order, alignment |
-| `component` | Component design (chat bubble shape, card styling) |
-| `ux` | Interaction/flow differs from Figma |
-| `feature` | Feature in Figma doesn't exist in app |
-
-### The Core Process
-
-For each difference you find:
-
-1. **Check Figma comments** - Designer may have noted "this needs to change" → mark `wontfix`, don't implement
-2. **Check codebase** - Understand WHY it differs. Is the feature built? Is it a CSS oversight?
-3. **Create recommendation** - Be specific: file, line, what to change. Or explain why not actionable.
-
-### Statuses
-
-- `new` - Just identified
-- `acknowledged` - Reviewed, not acting yet
-- `in_progress` - Being fixed
-- `wontfix` - Intentional or awaiting Figma change
-- `resolved` - App matches Figma
-
-## Data Locations
+## Source of Truth
 
 ```
-figma-app/
-├── comparisons/
-│   ├── manifest.json    # Frames to compare, status
-│   └── diffs.json       # Comparison results
-└── public/screenshots/
-    ├── figma/           # Figma exports
-    └── app/             # App screenshots
+figma-app/comparisons/manifest.json  # Frames to compare (status, node IDs, routes)
+figma-app/comparisons/diffs.json     # Logged differences
+figma-app/public/screenshots/        # figma/ and app/ subdirs
 ```
 
-Figma file: `jkd27vp0cgfg7CLBRvfeC3` (AskEffie)
+Start by reading manifest.json to find frames with `status: not_started`.
 
-## Workflow
+## Two Figma MCPs
 
-### 1. Orient
+| MCP | File Key | Purpose |
+|-----|----------|---------|
+| `mcp__figma-personal__*` | `figma_file_personal` in manifest | Design data, downloading images |
+| `mcp__figma-browser__*` | `figma_file_team` in manifest | Designer comments |
 
+Use **personal** for `get_figma_data` and `download_figma_images`.
+Use **team** for `figma_get_comments`.
+
+## Workflow Per Frame
+
+### 1. Gather Context First
+
+Before identifying any diffs, you need full context:
+
+**Load Figma design:**
+```
+mcp__figma-personal__get_figma_data(fileKey="<figma_file_personal>", nodeId="<figma_node>", depth=3)
+```
+
+**Read designer comments:**
+```
+mcp__figma-browser__figma_get_comments(file_key="<figma_file_team>")
+```
+
+**Load app view:**
+```
+mcp__playwright__browser_navigate(url="http://localhost:3000/<app_route>")
+mcp__playwright__browser_snapshot()
+```
+
+**Check codebase** for relevant components - understand WHY things look the way they do.
+
+### 2. Identify Differences (With Context)
+
+Only after you have full context, identify differences. For each potential diff, ask:
+
+1. **What does Figma show?** - Be specific about the element
+2. **What does the app show?** - Or is it missing entirely?
+3. **What do comments say?** - Designer may have noted "this will change" → don't log it
+4. **What does the code show?** - Is there a technical reason? CSS constraint? Feature not built?
+
+Focus on high-level differences (layout, missing features, UX patterns). Skip small CSS tweaks.
+
+### 3. Create Diff with Screenshots
+
+**A diff is only valid if it has:**
+- Full description with context
+- Figma screenshot of the specific element
+- App screenshot of the corresponding area
+
+**Capture Figma screenshot:**
+```
+mcp__figma-personal__download_figma_images(
+  fileKey="<figma_file_personal>",
+  nodes=[{"nodeId": "<element_node>", "fileName": "<diff-id>-<desc>-figma.png"}],
+  localPath="/workspaces/test-mvp/figma-app/public/screenshots/figma"
+)
+```
+
+**Capture App screenshot:**
+```
+mcp__playwright__browser_take_screenshot(
+  filename="app/<diff-id>-<desc>-app.png",
+  element="<human description>",
+  ref="<ref from snapshot>"
+)
+```
+
+**Verify screenshots exist:**
 ```bash
-cat figma-app/comparisons/manifest.json
+ls figma-app/public/screenshots/figma/
+ls figma-app/public/screenshots/app/
 ```
 
-Pick a frame with `status: not_started`. If manifest is empty, read `.claude/handoffs/figma-populate-manifest.md`.
+If app screenshots missing, copy from Docker:
+```bash
+docker ps | grep playwright
+docker cp <container>:/tmp/playwright-output/app/ figma-app/public/screenshots/
+```
 
-### 2. Load Both Views
-
-**Figma:** Use `mcp__figma__get_figma_data` with the frame's `figma_node`.
-
-**Comments:** Use `mcp__figma-browser__figma_get_comments` to get designer discussions.
-
-**App:** Use `mcp__playwright__browser_navigate` to the `app_route`, then `browser_snapshot`.
-
-For Playwright usage details, see the `closed-loop-web-development` skill.
-
-### 3. Analyze (The Critical Step)
-
-**DO NOT auto-create diffs.** Carefully compare:
-
-- Layout and structure
-- Component by component
-- Styling details
-- Missing features
-
-**For each potential difference, ask:**
-1. Is this actually different?
-2. Is it intentional? (check Figma comments)
-3. Is it worth tracking?
-4. What's the root cause? (check codebase)
-
-**Check the codebase** - Find the component file. Understand why it looks the way it does.
-
-### 4. Create Diffs (Only for Real Differences)
-
-For each meaningful difference:
-
-**Take specific screenshots** (element-level, not full page):
-- Figma: `mcp__figma__download_figma_images` with specific node
-- App: `mcp__playwright__browser_take_screenshot` with element ref
-
-**Create diff entry:**
+### 4. Log to diffs.json
 
 ```json
 {
-  "id": "dashboard-sidebar-001",
-  "frame_id": "dashboard",
+  "id": "feature-001",
+  "frame_id": "active-projects-overview",
   "parent_id": null,
-  "component": "Sidebar > Icons",
-  "description": "Icons are 24px in Figma, 20px in app",
-  "type": "css",
+  "component": "Plan Usage Indicator",
+  "description": "Figma shows 'Using 2 of 3 in Free plan'. App has no plan tracking.",
+  "type": "feature",
   "status": "new",
-  "recommendation": "Update src/components/Sidebar.tsx:45 - change h-5 w-5 to h-6 w-6",
-  "figma_comments": [],
-  "figma_image": "figma/dashboard-sidebar-001.png",
-  "app_image": "app/dashboard-sidebar-001.png",
+  "recommendation": "Not implemented. Requires backend for plan limits.",
+  "figma_comments": ["Designer noted: 'confirm with PM on copy'"],
+  "figma_image": "figma/feature-001-plan-usage-figma.png",
+  "app_image": "app/feature-001-projects-app.png",
   "linear_issue": null,
   "created_at": "2026-01-04"
 }
 ```
 
-**Good recommendations include:** file path, line number, specific change.
+Types: `layout`, `feature`, `ux`, `content`, `css`
 
-**If not actionable:** Explain why (e.g., "Awaiting Figma update per chris.baum comment", "Blocked on feature ENG-XXX").
+### 5. Update Manifest
 
-### 5. Save & Update Status
+Set frame status to `completed` and add notes about diffs logged.
 
-- Add diffs to `figma-app/comparisons/diffs.json`
-- Update frame status in manifest (`in_progress` or `complete`)
-- Zero diffs is valid if app matches Figma
+## Rate Limits
 
-## What NOT To Do
+Figma API has aggressive limits. On 429 errors:
+- Wait 2-3 minutes
+- Work on app screenshots while waiting
+- Use `depth=2` or `depth=3`, not higher
 
-- Don't auto-create diffs for every element
-- Don't screenshot full pages for component-level diffs
-- Don't ignore Figma comments
-- Don't skip codebase verification
-- Don't create duplicates (check existing diffs first)
+## Verification
 
-## References
+View diffs at `http://localhost:5555`. Click a diff - both images should display.
 
-- **Manifest population:** `.claude/handoffs/figma-populate-manifest.md`
-- **Starting comparisons:** `.claude/handoffs/figma-start-comparing.md`
-- **Playwright usage:** `.claude/skills/closed-loop-web-development/SKILL.md`
-- **Linear tracking:** ENG-800
+## Don't
+
+- Create diffs without reading comments first
+- Create diffs without checking if feature exists in codebase
+- Log diffs without screenshots
+- Screenshot full pages instead of specific elements
