@@ -27,6 +27,9 @@ Presets live in `~/.claude/workflow-presets/` as JSON files. Use them for consis
 | `spawn-reviewers` | Spawn code reviewers after worker commits land |
 | `trigger-retro` | Trigger retro worker after feature completion |
 | `quality-gates` | Ensure tests pass and coverage reported before closing |
+| `review-after-push` | Consider triggering code review after risky changes |
+| `retro-on-complete` | Trigger retro after feature completion |
+| `ask-when-blocked` | Surface blockers to user, don't spin |
 
 ### Combined Presets
 
@@ -65,9 +68,48 @@ The reminders are injected at session start and displayed again when the agent f
 
 ## Interactive Setup
 
-For interactive sessions, interview the user about preferences. Keep it quick - a few questions max.
+For interactive sessions, interview the user about preferences using `AskUserQuestion`. The interview has five categories:
 
-### Autonomy Level
+1. **Autonomy level** - How involved should the user be?
+2. **Frequency** - How often should reminders appear?
+3. **Cell pattern** - Should we use spawner/workers?
+4. **Quality triggers** - When to review/retro?
+5. **Custom reminders** - User-defined nudges
+
+### Interview Flow
+
+Use `AskUserQuestion` with these categories. You can ask multiple questions in one call:
+
+```typescript
+// Example AskUserQuestion call structure
+{
+  questions: [
+    {
+      header: "Autonomy",
+      question: "How involved do you want to be in decisions?",
+      options: [
+        { label: "Micro-manage", description: "Ask before each action" },
+        { label: "Collaborate", description: "Check in at checkpoints" },
+        { label: "Delegate", description: "Work autonomously, update on outcomes" },
+        { label: "Fire-and-forget", description: "Full autonomy, exit when done" }
+      ],
+      multiSelect: false
+    },
+    {
+      header: "Frequency",
+      question: "How often should reminders appear?",
+      options: [
+        { label: "Light (20%)", description: "Occasional nudges" },
+        { label: "Medium (50%)", description: "Regular reminders" },
+        { label: "Heavy (100%)", description: "Every turn" }
+      ],
+      multiSelect: false
+    }
+  ]
+}
+```
+
+### Category 1: Autonomy Level
 
 Ask about involvement level first - this shapes everything else:
 
@@ -89,9 +131,33 @@ This affects:
 - Whether to use cell pattern (spawner + workers)
 - How much to pause for review
 
-### Cell Pattern
+### Category 2: Frequency
 
-For complex/long work at "delegate" or "fire-and-forget" autonomy:
+Ask how often reminders should surface. This sets the `--frequency` flag for `workflow add`:
+
+| Option | Frequency | When to use |
+|--------|-----------|-------------|
+| Light (20%) | 0.2 | Background nudges, experienced users |
+| Medium (50%) | 0.5 | Balanced, learning workflows |
+| Heavy (100%) | 1.0 | Critical practices, new patterns |
+
+**AskUserQuestion format:**
+```typescript
+{
+  header: "Frequency",
+  question: "How often should reminders appear?",
+  options: [
+    { label: "Light (20%)", description: "Occasional nudges, won't interrupt flow" },
+    { label: "Medium (50%) (Recommended)", description: "Regular reminders at key moments" },
+    { label: "Heavy (100%)", description: "Every turn, for critical practices" }
+  ],
+  multiSelect: false
+}
+```
+
+### Category 3: Cell Pattern
+
+For complex/long work, ask about spawner/worker pattern. Only ask if autonomy is "delegate" or "fire-and-forget".
 
 **When to suggest cell:**
 - Work exceeds single context
@@ -99,32 +165,90 @@ For complex/long work at "delegate" or "fire-and-forget" autonomy:
 - User wants hands-off execution
 - Parallel work identified
 
-**Cell setup questions:**
-- Should we use spawner/worker pattern?
-- What reminders should workers get?
-- Sequential or parallel workers?
+**AskUserQuestion format:**
+```typescript
+{
+  header: "Cell pattern",
+  question: "Should we use spawner/worker pattern for this work?",
+  options: [
+    { label: "Yes", description: "Orchestrate workers for complex/parallel work" },
+    { label: "No (Recommended)", description: "Single session, simpler workflow" }
+  ],
+  multiSelect: false
+}
+```
+
+If yes, follow up with:
+```typescript
+{
+  header: "Workers",
+  question: "How should workers be organized?",
+  options: [
+    { label: "Sequential", description: "One at a time, ordered slices" },
+    { label: "Parallel", description: "Multiple workers, independent tasks" }
+  ],
+  multiSelect: false
+}
+```
 
 If using cell, spawner orchestrates - see [cell skill](../cell/SKILL.md).
 
-### Example Categories
+### Category 4: Quality Triggers
 
-**Testing**
-- TDD (tests first)
-- Tests after implementation
-- No tests for this task
+Ask about when to trigger quality processes. Use multiSelect since these aren't mutually exclusive:
 
-**Commits**
-- After each change
-- At logical checkpoints
-- End of task only
+**AskUserQuestion format:**
+```typescript
+{
+  header: "Quality",
+  question: "When should quality checks trigger?",
+  options: [
+    { label: "Review after risky pushes", description: "Spawn reviewer after complex changes" },
+    { label: "Retro on completion", description: "Trigger retro after feature done" },
+    { label: "Ask when blocked", description: "Surface blockers instead of spinning" },
+    { label: "None", description: "Skip quality triggers" }
+  ],
+  multiSelect: true
+}
+```
 
-**Review**
-- Pause after each change
-- Review when complete
-- No review needed
+Maps to presets:
+- "Review after risky pushes" → `review-after-push`
+- "Retro on completion" → `retro-on-complete`
+- "Ask when blocked" → `ask-when-blocked`
 
-**Custom**
-- Let user add specific reminders
+### Category 5: Custom Reminders
+
+Allow user to add specific text reminders. After the structured questions, offer:
+
+**AskUserQuestion format:**
+```typescript
+{
+  header: "Custom",
+  question: "Any custom reminders to add?",
+  options: [
+    { label: "Yes", description: "Add specific text reminders" },
+    { label: "No", description: "Use selected presets only" }
+  ],
+  multiSelect: false
+}
+```
+
+If "Yes", ask follow-up in plain text:
+> What reminders would you like? (One per line, or comma-separated)
+
+Add each as a custom reminder via `workflow add "reminder text"`.
+
+### Example Questions by Task Type
+
+**For implementation tasks:**
+- Autonomy, Frequency, Quality triggers
+
+**For complex/long work:**
+- Autonomy, Frequency, Cell pattern, Quality triggers
+
+**For quick fixes:**
+- Skip interview, use sensible defaults
 
 Use `AskUserQuestion` with relevant categories for the task at hand.
 
