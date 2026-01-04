@@ -13,6 +13,8 @@ import { tmpdir } from "os";
 // Test fixtures
 const TEST_SESSION_ID = "test-1234-5678-abcd-ef0123456789";
 const TEST_LOG_DIR = join(tmpdir(), "crun-test-logs");
+const TEST_WORKFLOWS_DIR = join(tmpdir(), "crun-test-workflows");
+const TEST_PRESETS_DIR = join(tmpdir(), "crun-test-presets-run");
 
 /**
  * Create mock deps with spawnClaude mocked (for unit tests)
@@ -29,6 +31,8 @@ function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
     ),
     logDir: TEST_LOG_DIR,
     claudeCommand: ["echo"],
+    workflowsDir: TEST_WORKFLOWS_DIR,
+    presetsDir: TEST_PRESETS_DIR,
     ...overrides,
   };
 }
@@ -43,6 +47,8 @@ function createTestDeps(overrides: Partial<RunDeps> = {}): RunDeps {
     ...defaults,
     generateSessionId: mock(() => Promise.resolve(TEST_SESSION_ID)),
     logDir: TEST_LOG_DIR,
+    workflowsDir: TEST_WORKFLOWS_DIR,
+    presetsDir: TEST_PRESETS_DIR,
     // Use 'echo' to test the actual spawn logic without running claude
     claudeCommand: ["echo", "ARGS:"],
     ...overrides,
@@ -51,7 +57,11 @@ function createTestDeps(overrides: Partial<RunDeps> = {}): RunDeps {
 
 beforeEach(async () => {
   await rm(TEST_LOG_DIR, { recursive: true, force: true });
+  await rm(TEST_WORKFLOWS_DIR, { recursive: true, force: true });
+  await rm(TEST_PRESETS_DIR, { recursive: true, force: true });
   await mkdir(TEST_LOG_DIR, { recursive: true });
+  await mkdir(TEST_WORKFLOWS_DIR, { recursive: true });
+  await mkdir(TEST_PRESETS_DIR, { recursive: true });
 });
 
 describe("crun run", () => {
@@ -317,5 +327,104 @@ describe("note-to-self", () => {
     const result = await run({ prompt: "test" }, deps);
 
     expect(result.noteToSelf).toBeUndefined();
+  });
+});
+
+describe("remind flag", () => {
+  test("writes reminders to workflow file before spawning", async () => {
+    // Create preset files
+    await Bun.write(
+      join(TEST_PRESETS_DIR, "tdd.json"),
+      JSON.stringify({ name: "tdd", reminder: "Write tests first" })
+    );
+    await Bun.write(
+      join(TEST_PRESETS_DIR, "commit-often.json"),
+      JSON.stringify({ name: "commit-often", reminder: "Commit after each change" })
+    );
+
+    const deps = createMockDeps();
+    await run({ prompt: "test", remind: ["tdd", "commit-often"] }, deps);
+
+    // Check workflow file was created with reminders
+    const workflowPath = join(TEST_WORKFLOWS_DIR, `${TEST_SESSION_ID}.json`);
+    const workflow = await Bun.file(workflowPath).json();
+
+    expect(workflow.reminders).toHaveLength(2);
+    expect(workflow.reminders[0].text).toBe("Write tests first");
+    expect(workflow.reminders[1].text).toBe("Commit after each change");
+  });
+
+  test("expands combined presets", async () => {
+    await Bun.write(
+      join(TEST_PRESETS_DIR, "tdd.json"),
+      JSON.stringify({ name: "tdd", reminder: "Write tests first" })
+    );
+    await Bun.write(
+      join(TEST_PRESETS_DIR, "commit-often.json"),
+      JSON.stringify({ name: "commit-often", reminder: "Commit after each change" })
+    );
+    await Bun.write(
+      join(TEST_PRESETS_DIR, "implementation.json"),
+      JSON.stringify({ name: "implementation", includes: ["tdd", "commit-often"] })
+    );
+
+    const deps = createMockDeps();
+    await run({ prompt: "test", remind: ["implementation"] }, deps);
+
+    const workflowPath = join(TEST_WORKFLOWS_DIR, `${TEST_SESSION_ID}.json`);
+    const workflow = await Bun.file(workflowPath).json();
+
+    expect(workflow.reminders).toHaveLength(2);
+    expect(workflow.reminders.map((r: { text: string }) => r.text)).toEqual([
+      "Write tests first",
+      "Commit after each change",
+    ]);
+  });
+
+  test("skips missing presets", async () => {
+    await Bun.write(
+      join(TEST_PRESETS_DIR, "tdd.json"),
+      JSON.stringify({ name: "tdd", reminder: "Write tests first" })
+    );
+
+    const deps = createMockDeps();
+    await run({ prompt: "test", remind: ["tdd", "nonexistent"] }, deps);
+
+    const workflowPath = join(TEST_WORKFLOWS_DIR, `${TEST_SESSION_ID}.json`);
+    const workflow = await Bun.file(workflowPath).json();
+
+    expect(workflow.reminders).toHaveLength(1);
+    expect(workflow.reminders[0].text).toBe("Write tests first");
+  });
+
+  test("does not create workflow file when no remind flag", async () => {
+    const deps = createMockDeps();
+    await run({ prompt: "test" }, deps);
+
+    const workflowPath = join(TEST_WORKFLOWS_DIR, `${TEST_SESSION_ID}.json`);
+    const exists = await Bun.file(workflowPath).exists();
+
+    expect(exists).toBe(false);
+  });
+
+  test("writes workflow before spawning claude", async () => {
+    await Bun.write(
+      join(TEST_PRESETS_DIR, "tdd.json"),
+      JSON.stringify({ name: "tdd", reminder: "Write tests first" })
+    );
+
+    let workflowExistedBeforeSpawn = false;
+    const deps = createMockDeps({
+      spawnClaude: mock(async () => {
+        // Check if workflow file exists when claude is spawned
+        const workflowPath = join(TEST_WORKFLOWS_DIR, `${TEST_SESSION_ID}.json`);
+        workflowExistedBeforeSpawn = await Bun.file(workflowPath).exists();
+        return { exitCode: 0, stdout: "", stderr: "" };
+      }),
+    });
+
+    await run({ prompt: "test", remind: ["tdd"] }, deps);
+
+    expect(workflowExistedBeforeSpawn).toBe(true);
   });
 });

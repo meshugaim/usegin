@@ -5,6 +5,8 @@
 import { mkdir } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
+import { loadPresets, getDefaultPresetsDir, type PresetDeps } from "./presets";
+import { getDefaultStorageDir } from "../../workflow/src/workflow";
 
 export interface RunOptions {
   prompt?: string;
@@ -14,6 +16,7 @@ export interface RunOptions {
   cwd?: string;
   claudeFlags?: string[];
   noteToSelf?: string;
+  remind?: string[];
 }
 
 export interface SpawnClaudeOptions {
@@ -37,6 +40,8 @@ export interface RunDeps {
   spawnClaude: (options: SpawnClaudeOptions) => Promise<SpawnClaudeResult>;
   logDir: string;
   claudeCommand: string[];
+  workflowsDir: string;
+  presetsDir: string;
 }
 
 export interface RunResult {
@@ -71,6 +76,8 @@ export function createDefaultDeps(): RunDeps {
     spawnClaude: spawnClaudeProcess,
     logDir: getDefaultLogDir(),
     claudeCommand: ["bun", "run", "--bun", "claude", "-p", "--dangerously-skip-permissions"],
+    workflowsDir: getDefaultStorageDir(),
+    presetsDir: getDefaultPresetsDir(),
   };
 }
 
@@ -134,6 +141,19 @@ async function spawnClaudeProcess(
 }
 
 /**
+ * Write reminders to workflow file
+ */
+async function writeWorkflowReminders(
+  sessionId: string,
+  reminders: Array<{ text: string; frequency: number; created: string }>,
+  workflowsDir: string
+): Promise<void> {
+  await mkdir(workflowsDir, { recursive: true });
+  const workflowPath = join(workflowsDir, `${sessionId}.json`);
+  await Bun.write(workflowPath, JSON.stringify({ reminders }, null, 2));
+}
+
+/**
  * Main run function
  */
 export async function run(
@@ -157,6 +177,22 @@ export async function run(
   // Ensure log directory exists
   await mkdir(deps.logDir, { recursive: true });
   const logPath = join(deps.logDir, `${sessionId}.log`);
+
+  // Write workflow reminders if --remind was provided
+  if (options.remind && options.remind.length > 0) {
+    const presets = await loadPresets(options.remind, { presetsDir: deps.presetsDir });
+    const reminders = presets
+      .filter((p) => p.reminder)
+      .map((p) => ({
+        text: p.reminder!,
+        frequency: 1,
+        created: new Date().toISOString(),
+      }));
+
+    if (reminders.length > 0) {
+      await writeWorkflowReminders(sessionId, reminders, deps.workflowsDir);
+    }
+  }
 
   // Spawn claude (streams to console during execution)
   const result = await deps.spawnClaude({
