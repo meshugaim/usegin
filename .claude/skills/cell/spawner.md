@@ -144,9 +144,10 @@ You trigger, workers execute:
 
 - **Review:** Assign after risky pushes or at slice end
 - **Retro:** After feature completion
-- **Self-retro:** Retro your own session via worker. Pass your session ID:
+- **Self-retro:** Retro your own session via worker. Pass your session ID explicitly (don't rely on shell expansion):
 ```bash
-crun "Use the cell-retro skill. Retro session $CLAUDE_SESSION_ID"
+# Get your session ID first, then pass it directly
+crun "Use the cell-retro skill. Retro session <your-session-id>"
 ```
 
 ## Ensuring Quality
