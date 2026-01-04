@@ -150,6 +150,11 @@ You trigger, workers execute:
 crun "Use the cell-retro skill. Retro session <your-session-id>"
 ```
 
+**After retro:** The retro worker identifies improvements but doesn't implement them. You (spawner) must:
+1. Review the retro findings
+2. Create issues for actionable improvements (`plan create`)
+3. Prioritize and assign work as needed
+
 ## Ensuring Quality
 
 Verify workers follow practices:
