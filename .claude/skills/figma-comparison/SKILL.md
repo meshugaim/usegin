@@ -89,24 +89,21 @@ mcp__figma-personal__download_figma_images(
 
 **Capture App screenshot:**
 
-Playwright saves relative to its output directory. Use absolute path to save directly to the app:
+Playwright runs in Docker with `figma-app/public/screenshots` mounted. Use **relative path**:
 ```
 mcp__playwright__browser_take_screenshot(
-  filename="/workspaces/test-mvp/figma-app/public/screenshots/app/<diff-id>-<desc>-app.png",
+  filename="app/<diff-id>-<desc>-app.png",
   element="<human description>",
   ref="<ref from snapshot>"
 )
 ```
 
+This saves to the mounted volume at `figma-app/public/screenshots/app/`.
+
 **Verify screenshots exist:**
 ```bash
 ls figma-app/public/screenshots/figma/
 ls figma-app/public/screenshots/app/
-```
-
-If Playwright saved elsewhere, copy to app directory:
-```bash
-cp /path/to/screenshot.png figma-app/public/screenshots/app/
 ```
 
 ### 4. Log to diffs.json
