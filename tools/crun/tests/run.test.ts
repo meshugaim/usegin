@@ -1,5 +1,10 @@
 import { describe, test, expect, mock, beforeEach } from "bun:test";
-import { run, type RunOptions, type RunDeps } from "../src/run";
+import {
+  run,
+  createDefaultDeps,
+  type RunOptions,
+  type RunDeps,
+} from "../src/run";
 import { mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -8,6 +13,9 @@ import { tmpdir } from "os";
 const TEST_SESSION_ID = "test-1234-5678-abcd-ef0123456789";
 const TEST_LOG_DIR = join(tmpdir(), "crun-test-logs");
 
+/**
+ * Create mock deps with spawnClaude mocked (for unit tests)
+ */
 function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
   return {
     generateSessionId: mock(() => Promise.resolve(TEST_SESSION_ID)),
@@ -19,7 +27,23 @@ function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
       })
     ),
     logDir: TEST_LOG_DIR,
-    claudeCommand: ["bun", "run", "--bun", "claude", "-p", "--dangerously-skip-permissions"],
+    claudeCommand: ["echo"],
+    ...overrides,
+  };
+}
+
+/**
+ * Create real deps with a test command instead of claude (for integration tests)
+ * Uses the real spawnClaude implementation but with `echo` as the command
+ */
+function createTestDeps(overrides: Partial<RunDeps> = {}): RunDeps {
+  const defaults = createDefaultDeps();
+  return {
+    ...defaults,
+    generateSessionId: mock(() => Promise.resolve(TEST_SESSION_ID)),
+    logDir: TEST_LOG_DIR,
+    // Use 'echo' to test the actual spawn logic without running claude
+    claudeCommand: ["echo", "ARGS:"],
     ...overrides,
   };
 }
@@ -110,11 +134,9 @@ describe("crun run", () => {
     });
 
     test("runs claude in specified directory", async () => {
-      // Use a real directory to verify Bun.spawn respects cwd
       const testDir = join(TEST_LOG_DIR, "workdir");
       await mkdir(testDir, { recursive: true });
 
-      // Create a mock that captures the spawn options
       let capturedCwd: string | undefined;
       const deps = createMockDeps({
         spawnClaude: async (options) => {
@@ -199,5 +221,61 @@ describe("crun run", () => {
       expect(result.sessionId).toBe(TEST_SESSION_ID);
       expect(result.logPath).toBe(join(TEST_LOG_DIR, `${TEST_SESSION_ID}.log`));
     });
+  });
+});
+
+describe("crun integration", () => {
+  test("spawns process with correct args for new session", async () => {
+    const deps = createTestDeps();
+    const result = await run({ prompt: "test prompt" }, deps);
+
+    // echo outputs the args, which get captured in the log
+    const logContent = await Bun.file(result.logPath).text();
+    expect(logContent).toContain("ARGS:");
+    expect(logContent).toContain("--session-id");
+    expect(logContent).toContain(TEST_SESSION_ID);
+    expect(result.exitCode).toBe(0);
+  });
+
+  test("spawns process with --resume for existing session", async () => {
+    const deps = createTestDeps();
+    const result = await run(
+      { prompt: "test", resume: "existing-id" },
+      deps
+    );
+
+    const logContent = await Bun.file(result.logPath).text();
+    expect(logContent).toContain("--resume");
+    expect(logContent).toContain("existing-id");
+  });
+
+  test("spawns process with --model flag", async () => {
+    const deps = createTestDeps();
+    const result = await run({ prompt: "test", model: "opus" }, deps);
+
+    const logContent = await Bun.file(result.logPath).text();
+    expect(logContent).toContain("--model");
+    expect(logContent).toContain("opus");
+  });
+
+  test("spawns process with extra flags", async () => {
+    const deps = createTestDeps();
+    const result = await run(
+      { prompt: "test", claudeFlags: ["--verbose", "--no-cache"] },
+      deps
+    );
+
+    const logContent = await Bun.file(result.logPath).text();
+    expect(logContent).toContain("--verbose");
+    expect(logContent).toContain("--no-cache");
+  });
+
+  test("captures non-zero exit code", async () => {
+    const deps = createTestDeps({
+      claudeCommand: ["sh", "-c", "exit 42"],
+    });
+    const result = await run({ prompt: "test" }, deps);
+
+    expect(result.exitCode).toBe(42);
   });
 });
