@@ -92,17 +92,26 @@ export async function parseHookInput(): Promise<HookInput | null> {
 }
 
 /**
+ * Get session ID from stdin input or CLAUDE_SESSION_ID env var fallback
+ */
+export function getSessionId(input: HookInput | null): string | undefined {
+  // Prefer stdin session_id, fall back to CLAUDE_SESSION_ID env var
+  return input?.session_id || process.env.CLAUDE_SESSION_ID;
+}
+
+/**
  * Main entry point when run as hook
  */
 export async function main(): Promise<void> {
   const input = await parseHookInput();
+  const sessionId = getSessionId(input);
 
-  if (!input?.session_id) {
-    // No session ID, nothing to do
+  if (!sessionId) {
+    // No session ID from either stdin or env var, nothing to do
     return;
   }
 
-  const deps = createDefaultDeps(input.session_id);
+  const deps = createDefaultDeps(sessionId);
   const output = await injectReminders(deps);
 
   if (output) {

@@ -10,6 +10,7 @@ import {
   shouldShowReminder,
   createDefaultDeps,
   parseHookInput,
+  getSessionId,
   main,
 } from "../src/inject-reminders-hook";
 
@@ -230,6 +231,73 @@ describe("createDefaultDeps", () => {
   });
 });
 
+describe("getSessionId", () => {
+  test("returns session_id from input when present", () => {
+    const input: HookInput = { session_id: "stdin-session" };
+    const result = getSessionId(input);
+    expect(result).toBe("stdin-session");
+  });
+
+  test("returns CLAUDE_SESSION_ID env var when input is null", () => {
+    const originalEnv = process.env.CLAUDE_SESSION_ID;
+    process.env.CLAUDE_SESSION_ID = "env-session";
+    try {
+      const result = getSessionId(null);
+      expect(result).toBe("env-session");
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.CLAUDE_SESSION_ID;
+      } else {
+        process.env.CLAUDE_SESSION_ID = originalEnv;
+      }
+    }
+  });
+
+  test("returns CLAUDE_SESSION_ID env var when input has no session_id", () => {
+    const originalEnv = process.env.CLAUDE_SESSION_ID;
+    process.env.CLAUDE_SESSION_ID = "env-session";
+    try {
+      const result = getSessionId({} as HookInput);
+      expect(result).toBe("env-session");
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.CLAUDE_SESSION_ID;
+      } else {
+        process.env.CLAUDE_SESSION_ID = originalEnv;
+      }
+    }
+  });
+
+  test("stdin session_id takes precedence over env var", () => {
+    const originalEnv = process.env.CLAUDE_SESSION_ID;
+    process.env.CLAUDE_SESSION_ID = "env-session";
+    try {
+      const input: HookInput = { session_id: "stdin-session" };
+      const result = getSessionId(input);
+      expect(result).toBe("stdin-session");
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.CLAUDE_SESSION_ID;
+      } else {
+        process.env.CLAUDE_SESSION_ID = originalEnv;
+      }
+    }
+  });
+
+  test("returns undefined when neither source provides session_id", () => {
+    const originalEnv = process.env.CLAUDE_SESSION_ID;
+    delete process.env.CLAUDE_SESSION_ID;
+    try {
+      const result = getSessionId(null);
+      expect(result).toBeUndefined();
+    } finally {
+      if (originalEnv !== undefined) {
+        process.env.CLAUDE_SESSION_ID = originalEnv;
+      }
+    }
+  });
+});
+
 describe("integration: hook subprocess", () => {
   const hookPath = join(import.meta.dir, "../src/inject-reminders-hook.ts");
 
@@ -328,5 +396,93 @@ describe("integration: hook subprocess", () => {
 
     expect(exitCode).toBe(0);
     expect(stdout).toBe("");
+  });
+
+  test("falls back to CLAUDE_SESSION_ID env var when stdin has no session_id", async () => {
+    const sessionId = "env-var-session";
+    const storageDir = TEST_STORAGE_DIR;
+    const workflowPath = join(storageDir, `${sessionId}.json`);
+
+    // Create workflow file with reminders
+    await Bun.write(
+      workflowPath,
+      JSON.stringify({
+        reminders: [
+          { text: "Env var fallback reminder", frequency: 1.0, created: "2025-01-01" },
+        ],
+      })
+    );
+
+    // Spawn the hook with CLAUDE_SESSION_ID env var but no session_id in stdin
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        WORKFLOW_STORAGE_DIR: storageDir,
+        CLAUDE_SESSION_ID: sessionId,
+      },
+    });
+
+    // Feed empty JSON (no session_id)
+    proc.stdin.write("{}");
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe(
+      "<workflow-reminder>Env var fallback reminder</workflow-reminder>"
+    );
+  });
+
+  test("stdin session_id takes precedence over CLAUDE_SESSION_ID env var", async () => {
+    const stdinSessionId = "stdin-session";
+    const envSessionId = "env-session";
+    const storageDir = TEST_STORAGE_DIR;
+
+    // Create workflow file for stdin session
+    await Bun.write(
+      join(storageDir, `${stdinSessionId}.json`),
+      JSON.stringify({
+        reminders: [
+          { text: "Stdin reminder", frequency: 1.0, created: "2025-01-01" },
+        ],
+      })
+    );
+
+    // Create workflow file for env session
+    await Bun.write(
+      join(storageDir, `${envSessionId}.json`),
+      JSON.stringify({
+        reminders: [
+          { text: "Env reminder", frequency: 1.0, created: "2025-01-01" },
+        ],
+      })
+    );
+
+    // Spawn with both stdin session_id and CLAUDE_SESSION_ID env var
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        WORKFLOW_STORAGE_DIR: storageDir,
+        CLAUDE_SESSION_ID: envSessionId,
+      },
+    });
+
+    // Feed session_id in stdin (should take precedence)
+    proc.stdin.write(JSON.stringify({ session_id: stdinSessionId }));
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe("<workflow-reminder>Stdin reminder</workflow-reminder>");
   });
 });
