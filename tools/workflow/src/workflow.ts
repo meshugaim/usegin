@@ -14,6 +14,7 @@ export interface Reminder {
 
 export interface WorkflowStorage {
   reminders: Reminder[];
+  unblockStopCount?: number;
 }
 
 export interface WorkflowDeps {
@@ -121,10 +122,12 @@ export async function removeReminder(
 }
 
 /**
- * Clear all reminders
+ * Clear all reminders (preserves unblockStopCount)
  */
 export async function clearReminders(deps: WorkflowDeps): Promise<void> {
-  await writeStorage({ reminders: [] }, deps);
+  const storage = await readStorage(deps);
+  storage.reminders = [];
+  await writeStorage(storage, deps);
 }
 
 // ===== Templates =====
@@ -220,4 +223,41 @@ export async function importFromSession(
   } catch {
     throw new Error(`Session not found: ${sessionId}`);
   }
+}
+
+// ===== Unblock Stop =====
+
+/**
+ * Set the number of allowed stop operations before blocking again
+ */
+export async function setUnblockStopCount(
+  count: number,
+  deps: WorkflowDeps
+): Promise<void> {
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error("Count must be a positive integer");
+  }
+  const storage = await readStorage(deps);
+  storage.unblockStopCount = count;
+  await writeStorage(storage, deps);
+}
+
+/**
+ * Get the current unblock stop count (0 if not set)
+ */
+export async function getUnblockStopCount(deps: WorkflowDeps): Promise<number> {
+  const storage = await readStorage(deps);
+  return storage.unblockStopCount ?? 0;
+}
+
+/**
+ * Decrement the unblock stop count by 1 (minimum 0)
+ */
+export async function decrementUnblockStopCount(
+  deps: WorkflowDeps
+): Promise<void> {
+  const storage = await readStorage(deps);
+  const current = storage.unblockStopCount ?? 0;
+  storage.unblockStopCount = Math.max(0, current - 1);
+  await writeStorage(storage, deps);
 }

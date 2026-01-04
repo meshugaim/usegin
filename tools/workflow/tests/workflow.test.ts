@@ -13,6 +13,9 @@ import {
   listTemplates,
   importFromSession,
   listSessions,
+  setUnblockStopCount,
+  getUnblockStopCount,
+  decrementUnblockStopCount,
   type WorkflowDeps,
   type Reminder,
 } from "../src/workflow";
@@ -310,6 +313,110 @@ describe("workflow import from session", () => {
       await expect(importFromSession("non-existent", deps)).rejects.toThrow(
         "Session not found"
       );
+    });
+  });
+});
+
+describe("workflow unblock-stop", () => {
+  describe("setUnblockStopCount", () => {
+    test("sets unblock count in storage", async () => {
+      const deps = createTestDeps();
+      await setUnblockStopCount(3, deps);
+
+      const count = await getUnblockStopCount(deps);
+      expect(count).toBe(3);
+    });
+
+    test("overwrites previous count", async () => {
+      const deps = createTestDeps();
+      await setUnblockStopCount(5, deps);
+      await setUnblockStopCount(2, deps);
+
+      const count = await getUnblockStopCount(deps);
+      expect(count).toBe(2);
+    });
+
+    test("validates count is positive integer", async () => {
+      const deps = createTestDeps();
+      await expect(setUnblockStopCount(-1, deps)).rejects.toThrow(
+        "Count must be a positive integer"
+      );
+      await expect(setUnblockStopCount(0, deps)).rejects.toThrow(
+        "Count must be a positive integer"
+      );
+      await expect(setUnblockStopCount(1.5, deps)).rejects.toThrow(
+        "Count must be a positive integer"
+      );
+    });
+  });
+
+  describe("getUnblockStopCount", () => {
+    test("returns 0 when no count set", async () => {
+      const deps = createTestDeps();
+      const count = await getUnblockStopCount(deps);
+      expect(count).toBe(0);
+    });
+
+    test("returns 0 when storage file doesn't exist", async () => {
+      const deps = { ...createTestDeps(), sessionId: "nonexistent-session" };
+      const count = await getUnblockStopCount(deps);
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("decrementUnblockStopCount", () => {
+    test("decrements count by 1", async () => {
+      const deps = createTestDeps();
+      await setUnblockStopCount(3, deps);
+      await decrementUnblockStopCount(deps);
+
+      const count = await getUnblockStopCount(deps);
+      expect(count).toBe(2);
+    });
+
+    test("does not go below 0", async () => {
+      const deps = createTestDeps();
+      await setUnblockStopCount(1, deps);
+      await decrementUnblockStopCount(deps);
+      await decrementUnblockStopCount(deps);
+
+      const count = await getUnblockStopCount(deps);
+      expect(count).toBe(0);
+    });
+
+    test("works when no count was set", async () => {
+      const deps = createTestDeps();
+      await decrementUnblockStopCount(deps);
+
+      const count = await getUnblockStopCount(deps);
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("storage integration", () => {
+    test("unblock count coexists with reminders", async () => {
+      const deps = createTestDeps();
+      await addReminder("test reminder", deps);
+      await setUnblockStopCount(2, deps);
+
+      const reminders = await listReminders(deps);
+      const count = await getUnblockStopCount(deps);
+
+      expect(reminders).toEqual(["test reminder"]);
+      expect(count).toBe(2);
+    });
+
+    test("clearReminders does not affect unblock count", async () => {
+      const deps = createTestDeps();
+      await addReminder("test reminder", deps);
+      await setUnblockStopCount(2, deps);
+      await clearReminders(deps);
+
+      const reminders = await listReminders(deps);
+      const count = await getUnblockStopCount(deps);
+
+      expect(reminders).toEqual([]);
+      expect(count).toBe(2);
     });
   });
 });
