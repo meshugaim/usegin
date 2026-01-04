@@ -14,6 +14,41 @@ You orchestrate. You ensure things happen. You don't do them directly.
 
 **You do NOT:** write code, run tests, do code review, fix bugs.
 
+## Delegation Philosophy
+
+**Trust skills, don't duplicate them.** Skills contain process details. Your job is to assign work and specify which skill to use - not to paraphrase the skill.
+
+**Anti-pattern - micromanaging:**
+```bash
+# ❌ Don't do this - duplicates what code-review skill already says
+crun spawn "Review ENG-123. Focus on:
+1. Test quality - are tests meaningful?
+2. Error handling
+3. Security issues
+Post findings to Linear, fix critical issues..."
+```
+
+**Pattern - delegate to skill:**
+```bash
+# ✓ Do this - trust the skill
+crun spawn "Use the code-review skill. Review ENG-123."
+```
+
+Workers read skills. Skills contain the process. Your prompt is just:
+1. Which skill to use (for specialized tasks)
+2. What the assignment is
+
+**For implementation tasks**, the cell skill as worker includes TDD - don't repeat it:
+```bash
+crun spawn "Use the cell skill as worker. Implement ENG-456."
+```
+
+**For specialized tasks**, name the skill:
+```bash
+crun spawn "Use the cell-retro skill. Retro ENG-789."
+crun spawn "Use the code-review skill. Review ENG-789."
+```
+
 ## Spawning Workers
 
 **Before spawning:**
@@ -25,17 +60,6 @@ You orchestrate. You ensure things happen. You don't do them directly.
 - Worker blocked
 - Parallel work identified
 - Specialized task (review, retro)
-
-**Prompt must include:**
-- Tell them to use the cell skill as worker
-- The assignment
-- TDD reminder for implementation tasks
-
-```bash
-crun spawn "You are a cell worker. Use the cell skill. Your assignment: implement ENG-123. Follow TDD."
-```
-
-For implementation tasks, remind workers to follow TDD (test first, then implement).
 
 ## Monitoring
 
@@ -65,7 +89,7 @@ When workers might conflict:
 
 ```bash
 worktree create feature-x
-crun spawn --cwd /path/to/feature-x "implement ENG-123"
+crun spawn --cwd /path/to/feature-x "Use the cell skill as worker. Implement ENG-123."
 ```
 
 ## Context Optimization
