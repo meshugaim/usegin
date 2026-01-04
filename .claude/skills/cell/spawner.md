@@ -69,7 +69,32 @@ crun spawn "Use the code-review skill. Review ENG-789."
 
 ## Decisions
 
-**Continue vs fresh worker:** Your call. Use judgment based on progress and context state.
+### When to Resume vs Spawn Fresh
+
+**Default: spawn fresh.** Workers are uniform and interchangeable. Linear is the handoff mechanism.
+
+**Resume when:**
+- Same worker continuing same task (e.g., "fix the test failure from your implementation")
+- Worker blocked then unblocked - continue their work
+- Context rebuild would be expensive and previous context is directly relevant
+
+**Spawn fresh when:**
+- New task, even on related issue
+- Different skill needed (implementation → review)
+- Worker finished their task
+- Context exhausted or polluted
+
+```bash
+# Fresh worker - default
+crun spawn "Use the cell skill as worker. Implement ENG-456."
+
+# Resume - continuing same task
+crun --resume <session-id> "Tests are failing. Fix the auth test."
+```
+
+**Reviews: always fresh.** Independence matters for review quality. Reviewer shouldn't inherit implementer's assumptions.
+
+**Retros: fresh, but view the session.** Use `session <id>` to analyze transcripts - don't resume into the work session.
 
 **Handling blockers:** Your call. Reassign, spawn fresh, or refocus.
 
