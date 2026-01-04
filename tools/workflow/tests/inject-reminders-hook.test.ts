@@ -6,7 +6,7 @@ import {
   type HookInput,
   type HookDeps,
   injectReminders,
-  formatReminder,
+  formatReminders,
   shouldShowReminder,
   createDefaultDeps,
   parseHookInput,
@@ -32,15 +32,25 @@ beforeEach(async () => {
   await mkdir(TEST_STORAGE_DIR, { recursive: true });
 });
 
-describe("formatReminder", () => {
-  test("wraps text in XML tags", () => {
-    const output = formatReminder("Write tests first");
-    expect(output).toBe("<workflow-reminder>Write tests first</workflow-reminder>");
+describe("formatReminders", () => {
+  test("wraps single reminder in XML tags", () => {
+    const output = formatReminders(["Write tests first"]);
+    expect(output).toBe("<workflow-reminders>\nWrite tests first\n</workflow-reminders>");
+  });
+
+  test("wraps multiple reminders with newlines", () => {
+    const output = formatReminders(["Write tests first", "Commit often"]);
+    expect(output).toBe("<workflow-reminders>\nWrite tests first\nCommit often\n</workflow-reminders>");
+  });
+
+  test("returns empty string for empty array", () => {
+    const output = formatReminders([]);
+    expect(output).toBe("");
   });
 
   test("handles reminder with special characters", () => {
-    const output = formatReminder("Use <code> blocks");
-    expect(output).toBe("<workflow-reminder>Use <code> blocks</workflow-reminder>");
+    const output = formatReminders(["Use <code> blocks"]);
+    expect(output).toBe("<workflow-reminders>\nUse <code> blocks\n</workflow-reminders>");
   });
 });
 
@@ -89,7 +99,7 @@ describe("injectReminders", () => {
       }));
 
       const output = await injectReminders(deps);
-      expect(output).toBe("<workflow-reminder>Write tests first</workflow-reminder>");
+      expect(output).toBe("<workflow-reminders>\nWrite tests first\n</workflow-reminders>");
     });
 
     test("handles multiple reminders", async () => {
@@ -103,10 +113,7 @@ describe("injectReminders", () => {
       }));
 
       const output = await injectReminders(deps);
-      expect(output).toBe(
-        "<workflow-reminder>Write tests first</workflow-reminder>\n" +
-        "<workflow-reminder>Commit often</workflow-reminder>"
-      );
+      expect(output).toBe("<workflow-reminders>\nWrite tests first\nCommit often\n</workflow-reminders>");
     });
   });
 
@@ -188,7 +195,7 @@ describe("injectReminders", () => {
       }));
 
       const output = await injectReminders(deps);
-      expect(output).toBe("<workflow-reminder>Session specific</workflow-reminder>");
+      expect(output).toBe("<workflow-reminders>\nSession specific\n</workflow-reminders>");
     });
   });
 });
@@ -341,7 +348,7 @@ describe("integration: hook subprocess", () => {
 
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe(
-      "<workflow-reminder>Integration test reminder</workflow-reminder>"
+      "<workflow-reminders>\nIntegration test reminder\n</workflow-reminders>"
     );
   });
 
@@ -447,7 +454,7 @@ describe("integration: hook subprocess", () => {
 
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe(
-      "<workflow-reminder>Env var fallback reminder</workflow-reminder>"
+      "<workflow-reminders>\nEnv var fallback reminder\n</workflow-reminders>"
     );
   });
 
@@ -496,7 +503,7 @@ describe("integration: hook subprocess", () => {
     const stdout = await new Response(proc.stdout).text();
 
     expect(exitCode).toBe(0);
-    expect(stdout.trim()).toBe("<workflow-reminder>Stdin reminder</workflow-reminder>");
+    expect(stdout.trim()).toBe("<workflow-reminders>\nStdin reminder\n</workflow-reminders>");
   });
 });
 
@@ -603,7 +610,7 @@ describe("processStopHook", () => {
   });
 
   describe("decision format", () => {
-    test("block decision includes workflow-reminder format in reason", async () => {
+    test("block decision includes workflow-reminders format in reason", async () => {
       const deps = createTestDeps("stop-hook-format-test");
       const workflowPath = join(TEST_STORAGE_DIR, `${deps.sessionId}.json`);
 
@@ -616,7 +623,7 @@ describe("processStopHook", () => {
       const decision = await processStopHook(deps);
 
       expect(decision.decision).toBe("block");
-      expect(decision.reason).toContain("<workflow-reminder>Reminder 1</workflow-reminder>");
+      expect(decision.reason).toContain("<workflow-reminders>\nReminder 1\n</workflow-reminders>");
     });
 
     test("block decision includes unblock-stop tip", async () => {
@@ -676,7 +683,7 @@ describe("integration: Stop hook subprocess", () => {
     expect(exitCode).toBe(0);
     const decision = JSON.parse(stdout.trim());
     expect(decision.decision).toBe("block");
-    expect(decision.reason).toContain("<workflow-reminder>Integration test reminder</workflow-reminder>");
+    expect(decision.reason).toContain("<workflow-reminders>\nIntegration test reminder\n</workflow-reminders>");
     expect(decision.reason).toContain("Run workflow unblock-stop to continue (prefer -n 1)");
   });
 
@@ -758,6 +765,6 @@ describe("integration: Stop hook subprocess", () => {
 
     expect(exitCode).toBe(0);
     // Should be plain text, not JSON
-    expect(stdout.trim()).toBe("<workflow-reminder>SessionStart reminder</workflow-reminder>");
+    expect(stdout.trim()).toBe("<workflow-reminders>\nSessionStart reminder\n</workflow-reminders>");
   });
 });

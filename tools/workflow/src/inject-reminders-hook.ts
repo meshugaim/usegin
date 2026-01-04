@@ -33,10 +33,11 @@ export interface HookDeps {
 }
 
 /**
- * Format a reminder as XML tag
+ * Format reminders as a single XML block with newline-separated items
  */
-export function formatReminder(text: string): string {
-  return `<workflow-reminder>${text}</workflow-reminder>`;
+export function formatReminders(texts: string[]): string {
+  if (texts.length === 0) return "";
+  return `<workflow-reminders>\n${texts.join("\n")}\n</workflow-reminders>`;
 }
 
 /**
@@ -68,11 +69,11 @@ export async function injectReminders(deps: HookDeps): Promise<string> {
     }
 
     const reminders = content.reminders as Reminder[];
-    const output = reminders
+    const texts = reminders
       .filter((r) => shouldShowReminder(r.frequency, deps.random))
-      .map((r) => formatReminder(r.text));
+      .map((r) => r.text);
 
-    return output.join("\n");
+    return formatReminders(texts);
   } catch {
     return "";
   }
