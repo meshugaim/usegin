@@ -9,7 +9,12 @@ Configure workflow reminders to guide how we work together. These reminders surf
 
 ## Quick Start with Presets
 
-Presets live in `~/.claude/workflow-presets/` as JSON files. Use them for consistent workflows across sessions.
+Presets are JSON files that define workflow reminders. They can live in two locations:
+
+1. **Repo presets**: `.claude/workflow-presets/` (relative to repo root) - version-controlled, shared across team
+2. **User presets**: `~/.claude/workflow-presets/` - personal, machine-specific
+
+**Precedence:** Repo presets override user presets with the same name. This allows teams to share presets while users can customize locally.
 
 ### Available Presets
 
@@ -264,7 +269,9 @@ Use `AskUserQuestion` with relevant categories for the task at hand.
 
 ## Creating New Presets
 
-Add a JSON file to `~/.claude/workflow-presets/`:
+Add a JSON file to either location:
+- **Repo (shared)**: `.claude/workflow-presets/my-preset.json`
+- **User (personal)**: `~/.claude/workflow-presets/my-preset.json`
 
 ```json
 // Simple preset
@@ -279,6 +286,8 @@ Add a JSON file to `~/.claude/workflow-presets/`:
   "includes": ["tdd", "commit-often", "my-preset"]
 }
 ```
+
+**Tip:** Add team-wide presets to `.claude/workflow-presets/` in your repo and commit them. They'll be available in all environments and shared with collaborators.
 
 ## How Reminders Surface
 

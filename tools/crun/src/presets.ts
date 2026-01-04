@@ -1,5 +1,9 @@
 /**
  * Workflow presets for crun --remind flag
+ *
+ * Presets can be loaded from two sources:
+ * 1. Repo presets: .claude/workflow-presets/ (relative to cwd) - takes precedence
+ * 2. User presets: ~/.claude/workflow-presets/ - fallback
  */
 
 import { join } from "path";
@@ -13,39 +17,68 @@ export interface Preset {
 }
 
 export interface PresetDeps {
-  presetsDir: string;
+  /** User presets directory (~/.claude/workflow-presets/) */
+  userPresetsDir: string;
+  /** Repo presets directory (.claude/workflow-presets/) - optional */
+  repoPresetsDir?: string;
 }
 
 /**
- * Get default presets directory
+ * Get default user presets directory (~/.claude/workflow-presets/)
  */
 export function getDefaultPresetsDir(): string {
   return join(homedir(), ".claude", "workflow-presets");
 }
 
 /**
- * Create default dependencies
+ * Get repo presets directory (.claude/workflow-presets/ relative to cwd)
+ */
+export function getRepoPresetsDir(): string {
+  return join(process.cwd(), ".claude", "workflow-presets");
+}
+
+/**
+ * Create default dependencies with both repo and user dirs
  */
 export function createDefaultPresetDeps(): PresetDeps {
   return {
-    presetsDir: getDefaultPresetsDir(),
+    userPresetsDir: getDefaultPresetsDir(),
+    repoPresetsDir: getRepoPresetsDir(),
   };
 }
 
 /**
- * Load a single preset by name
+ * Try to load a preset from a specific directory
  */
-export async function loadPreset(
+async function loadPresetFromDir(
   name: string,
-  deps: PresetDeps
+  dir: string
 ): Promise<Preset | null> {
-  const path = join(deps.presetsDir, `${name}.json`);
+  const path = join(dir, `${name}.json`);
   try {
     const content = await Bun.file(path).json();
     return content as Preset;
   } catch {
     return null;
   }
+}
+
+/**
+ * Load a single preset by name
+ * Checks repo presets first (if available), then falls back to user presets
+ */
+export async function loadPreset(
+  name: string,
+  deps: PresetDeps
+): Promise<Preset | null> {
+  // Try repo presets first (takes precedence)
+  if (deps.repoPresetsDir) {
+    const repoPreset = await loadPresetFromDir(name, deps.repoPresetsDir);
+    if (repoPreset) return repoPreset;
+  }
+
+  // Fall back to user presets
+  return loadPresetFromDir(name, deps.userPresetsDir);
 }
 
 /**
@@ -84,15 +117,33 @@ export async function loadPresets(
 }
 
 /**
- * List all available preset names
+ * List preset names from a specific directory
  */
-export async function listPresets(deps: PresetDeps): Promise<string[]> {
+async function listPresetsFromDir(dir: string): Promise<string[]> {
   try {
-    const files = await readdir(deps.presetsDir);
+    const files = await readdir(dir);
     return files
       .filter((f) => f.endsWith(".json"))
       .map((f) => f.replace(/\.json$/, ""));
   } catch {
     return [];
   }
+}
+
+/**
+ * List all available preset names from both repo and user dirs
+ * Returns unique names (deduped)
+ */
+export async function listPresets(deps: PresetDeps): Promise<string[]> {
+  const userPresets = await listPresetsFromDir(deps.userPresetsDir);
+
+  if (!deps.repoPresetsDir) {
+    return userPresets;
+  }
+
+  const repoPresets = await listPresetsFromDir(deps.repoPresetsDir);
+
+  // Merge and deduplicate
+  const allPresets = new Set([...repoPresets, ...userPresets]);
+  return Array.from(allPresets);
 }
