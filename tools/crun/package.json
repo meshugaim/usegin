@@ -1,7 +1,7 @@
 {
   "name": "crun",
-  "version": "0.1.0",
-  "description": "CLI for spawning and managing background Claude processes",
+  "version": "0.2.0",
+  "description": "Minimal synchronous wrapper for claude -p",
   "type": "module",
   "bin": {
     "crun": "./src/cli.ts"
@@ -10,12 +10,11 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "commander": "^14.0.2",
-    "pm2": "^6.0.14"
-  },
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "commander": "^14.0.2"
   }
 }
