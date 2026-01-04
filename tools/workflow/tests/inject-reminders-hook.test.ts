@@ -8,6 +8,9 @@ import {
   injectReminders,
   formatReminder,
   shouldShowReminder,
+  createDefaultDeps,
+  parseHookInput,
+  main,
 } from "../src/inject-reminders-hook";
 
 const TEST_STORAGE_DIR = join(tmpdir(), "inject-reminders-test");
@@ -192,5 +195,138 @@ describe("hook stdin parsing", () => {
     // The hook receives: { "session_id": "..." } on stdin
     const input: HookInput = { session_id: "abc-123" };
     expect(input.session_id).toBe("abc-123");
+  });
+});
+
+describe("createDefaultDeps", () => {
+  test("uses WORKFLOW_STORAGE_DIR when set", () => {
+    const originalEnv = process.env.WORKFLOW_STORAGE_DIR;
+    process.env.WORKFLOW_STORAGE_DIR = "/custom/storage";
+    try {
+      const deps = createDefaultDeps("test-session");
+      expect(deps.storageDir).toBe("/custom/storage");
+      expect(deps.sessionId).toBe("test-session");
+      expect(typeof deps.random).toBe("function");
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.WORKFLOW_STORAGE_DIR;
+      } else {
+        process.env.WORKFLOW_STORAGE_DIR = originalEnv;
+      }
+    }
+  });
+
+  test("uses default storage dir when env not set", () => {
+    const originalEnv = process.env.WORKFLOW_STORAGE_DIR;
+    delete process.env.WORKFLOW_STORAGE_DIR;
+    try {
+      const deps = createDefaultDeps("test-session");
+      expect(deps.storageDir).toContain(".claude/workflows");
+    } finally {
+      if (originalEnv !== undefined) {
+        process.env.WORKFLOW_STORAGE_DIR = originalEnv;
+      }
+    }
+  });
+});
+
+describe("integration: hook subprocess", () => {
+  const hookPath = join(import.meta.dir, "../src/inject-reminders-hook.ts");
+
+  test("outputs reminders to stdout when workflow file exists", async () => {
+    const sessionId = "integration-test-session";
+    const storageDir = TEST_STORAGE_DIR;
+    const workflowPath = join(storageDir, `${sessionId}.json`);
+
+    // Create workflow file with reminders
+    await Bun.write(
+      workflowPath,
+      JSON.stringify({
+        reminders: [
+          { text: "Integration test reminder", frequency: 1.0, created: "2025-01-01" },
+        ],
+      })
+    );
+
+    // Spawn the hook as subprocess
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        WORKFLOW_STORAGE_DIR: storageDir,
+      },
+    });
+
+    // Feed JSON on stdin
+    const input = JSON.stringify({ session_id: sessionId });
+    proc.stdin.write(input);
+    proc.stdin.end();
+
+    // Wait for completion
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe(
+      "<workflow-reminder>Integration test reminder</workflow-reminder>"
+    );
+  });
+
+  test("outputs nothing when no session_id provided", async () => {
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    // Feed empty JSON
+    proc.stdin.write("{}");
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("");
+  });
+
+  test("outputs nothing when invalid JSON on stdin", async () => {
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    proc.stdin.write("not valid json");
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("");
+  });
+
+  test("outputs nothing when workflow file does not exist", async () => {
+    const proc = Bun.spawn(["bun", "run", hookPath], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        WORKFLOW_STORAGE_DIR: TEST_STORAGE_DIR,
+      },
+    });
+
+    proc.stdin.write(JSON.stringify({ session_id: "nonexistent-session" }));
+    proc.stdin.end();
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toBe("");
   });
 });

@@ -68,10 +68,11 @@ export async function injectReminders(deps: HookDeps): Promise<string> {
 
 /**
  * Create default dependencies for production use
+ * Respects WORKFLOW_STORAGE_DIR env var for testing
  */
 export function createDefaultDeps(sessionId: string): HookDeps {
   return {
-    storageDir: getDefaultStorageDir(),
+    storageDir: process.env.WORKFLOW_STORAGE_DIR || getDefaultStorageDir(),
     sessionId,
     random: Math.random,
   };
