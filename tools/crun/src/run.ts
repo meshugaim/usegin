@@ -13,6 +13,7 @@ export interface RunOptions {
   model?: string;
   cwd?: string;
   claudeFlags?: string[];
+  noteToSelf?: string;
 }
 
 export interface SpawnClaudeOptions {
@@ -42,6 +43,7 @@ export interface RunResult {
   sessionId: string;
   logPath: string;
   exitCode: number;
+  noteToSelf?: string;
 }
 
 /**
@@ -167,13 +169,18 @@ export async function run(
     extraFlags: options.claudeFlags,
   });
 
-  // Write to log file
-  const logContent = [result.stdout, result.stderr].filter(Boolean).join("\n");
+  // Build log content
+  const logParts = [result.stdout, result.stderr].filter(Boolean);
+  if (options.noteToSelf) {
+    logParts.push(`\nNOTE TO SELF: ${options.noteToSelf}`);
+  }
+  const logContent = logParts.join("\n");
   await Bun.write(logPath, logContent);
 
   return {
     sessionId,
     logPath,
     exitCode: result.exitCode,
+    noteToSelf: options.noteToSelf,
   };
 }

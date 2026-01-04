@@ -14,6 +14,10 @@ const program = new Command()
   .option("-m, --model <model>", "Override model")
   .option("-C, --cwd <path>", "Run in directory")
   .option("-f, --prompt-file <file>", "Read prompt from file")
+  .requiredOption(
+    "-n, --note-to-self <note>",
+    "Reminder for when work completes (required)"
+  )
   .allowUnknownOption() // Allow claude flags after --
   .action(async (prompt: string | undefined, options) => {
     await main(prompt, options);
@@ -28,6 +32,7 @@ async function main(
     model?: string;
     cwd?: string;
     promptFile?: string;
+    noteToSelf: string;
   }
 ) {
   // Extract claude flags (everything after --)
@@ -44,9 +49,9 @@ async function main(
 
   if (!prompt && !options.promptFile) {
     console.error("Error: No prompt provided");
-    console.error("Usage: crun [options] <prompt>");
-    console.error("       echo 'prompt' | crun");
-    console.error("       crun --prompt-file task.md");
+    console.error("Usage: crun [options] <prompt> -n <note>");
+    console.error("       echo 'prompt' | crun -n <note>");
+    console.error("       crun --prompt-file task.md -n <note>");
     process.exit(1);
   }
 
@@ -67,6 +72,7 @@ async function main(
         model: options.model,
         cwd: options.cwd,
         claudeFlags: claudeFlags.length > 0 ? claudeFlags : undefined,
+        noteToSelf: options.noteToSelf,
       },
       {
         ...deps,
@@ -75,6 +81,9 @@ async function main(
     );
 
     console.log("─".repeat(40));
+    if (result.noteToSelf) {
+      console.log(`\n📝 NOTE TO SELF: ${result.noteToSelf}\n`);
+    }
     console.log(`Exit: ${result.exitCode}`);
     process.exit(result.exitCode);
   } catch (error) {

@@ -284,3 +284,38 @@ describe("generateSessionId", () => {
     );
   });
 });
+
+describe("note-to-self", () => {
+  test("includes noteToSelf in result", async () => {
+    const deps = createMockDeps();
+    const result = await run(
+      { prompt: "test", noteToSelf: "verify tests pass" },
+      deps
+    );
+
+    expect(result.noteToSelf).toBe("verify tests pass");
+  });
+
+  test("appends noteToSelf to log file", async () => {
+    const deps = createMockDeps({
+      spawnClaude: mock(() =>
+        Promise.resolve({ exitCode: 0, stdout: "output", stderr: "" })
+      ),
+    });
+
+    const result = await run(
+      { prompt: "test", noteToSelf: "check for regressions" },
+      deps
+    );
+
+    const logContent = await Bun.file(result.logPath).text();
+    expect(logContent).toContain("NOTE TO SELF: check for regressions");
+  });
+
+  test("works without noteToSelf for backwards compatibility", async () => {
+    const deps = createMockDeps();
+    const result = await run({ prompt: "test" }, deps);
+
+    expect(result.noteToSelf).toBeUndefined();
+  });
+});
