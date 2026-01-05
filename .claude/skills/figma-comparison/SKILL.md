@@ -1,1 +1,0 @@
-../../../tools/figma/SKILL.md

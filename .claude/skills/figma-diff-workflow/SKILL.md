@@ -12,8 +12,8 @@ For implementing changes from app to match Figma, use `/figma-apply` instead.
 ## Source of Truth
 
 ```
-figma/figma-diff/comparisons/manifest.json  # Frames to compare (status, node IDs, routes)
-figma/figma-diff/comparisons/diffs.json     # Logged differences
+tools/figma/figma-diff/comparisons/manifest.json  # Frames to compare (status, node IDs, routes)
+tools/figma/figma-diff/comparisons/diffs.json     # Logged differences
 ```
 
 Screenshots are stored at:
@@ -147,7 +147,7 @@ Types: `layout`, `feature`, `ux`, `content`, `css`
 
 **C. Commit progress:**
 ```bash
-git add figma/figma-diff/comparisons/
+git add tools/figma/figma-diff/comparisons/
 git commit -m "figma-diff: map diffs for <frame-id>
 
 Part of: ENG-241"

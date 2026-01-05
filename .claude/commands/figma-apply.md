@@ -25,11 +25,11 @@ Before browsing the app, ensure the **new UI toggle is enabled**:
 
 ### Manifest (pages to implement)
 
-!`cat figma/figma-apply/comparisons/manifest.json`
+!`cat tools/figma/figma-apply/comparisons/manifest.json`
 
 ### Diffs (implementation plans)
 
-!`cat figma/figma-apply/comparisons/diffs.json`
+!`cat tools/figma/figma-apply/comparisons/diffs.json`
 
 ## Tools Available
 

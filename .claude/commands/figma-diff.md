@@ -18,11 +18,11 @@ For implementing changes from app to match Figma, use `/figma-apply` instead.
 
 ### Manifest (frames to compare)
 
-!`cat figma/figma-diff/comparisons/manifest.json`
+!`cat tools/figma/figma-diff/comparisons/manifest.json`
 
 ### Diffs (logged differences)
 
-!`cat figma/figma-diff/comparisons/diffs.json`
+!`cat tools/figma/figma-diff/comparisons/diffs.json`
 
 ## Tools Available
 

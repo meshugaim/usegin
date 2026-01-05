@@ -12,8 +12,8 @@ For documenting differences without implementation plans, use `/figma-diff` inst
 ## Source of Truth
 
 ```
-figma/figma-apply/comparisons/manifest.json  # App pages to compare (organized by routes)
-figma/figma-apply/comparisons/diffs.json     # Implementation plans
+tools/figma/figma-apply/comparisons/manifest.json  # App pages to compare (organized by routes)
+tools/figma/figma-apply/comparisons/diffs.json     # Implementation plans
 ```
 
 Screenshots are stored at:
@@ -190,7 +190,7 @@ For each significant difference, create an entry in diffs.json:
 
 **C. Commit progress:**
 ```bash
-git add figma/figma-apply/comparisons/
+git add tools/figma/figma-apply/comparisons/
 git commit -m "figma-apply: implementation plans for <page-id>
 
 Part of: ENG-XXX"
