@@ -28,7 +28,7 @@ bun add -g @sentry/cli
 
 ```bash
 # List issues for a project
-~/.bun/bin/sentry-cli issues list --org askeffi --project javascript-nextjs
+~/.bun/bin/sentry-cli issues list --org askeffi --project nextjs-app
 ~/.bun/bin/sentry-cli issues list --org askeffi --project python-fastapi
 
 # Get issue details
@@ -125,10 +125,10 @@ const nextConfig: NextConfig = {
 
 ```bash
 # List recent issues
-~/.bun/bin/sentry-cli issues list --org askeffi --project javascript-nextjs
+~/.bun/bin/sentry-cli issues list --org askeffi --project nextjs-app
 
 # Get details for specific issue
-~/.bun/bin/sentry-cli issues show JAVASCRIPT-NEXTJS-1 --org askeffi
+~/.bun/bin/sentry-cli issues show NEXTJS-APP-1 --org askeffi
 ```
 
 In Sentry UI:
@@ -150,7 +150,7 @@ In Sentry UI:
 ```bash
 git commit -m "Fix authentication bug
 
-Fixes JAVASCRIPT-NEXTJS-1"
+Fixes NEXTJS-APP-1"
 ```
 
 **Via PR Description**:
