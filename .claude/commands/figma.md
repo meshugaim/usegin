@@ -14,11 +14,11 @@ You are oriented on the Figma-to-app comparison project. This command loads cont
 
 ### Manifest (frames to compare)
 
-!`cat figma-app/comparisons/manifest.json`
+!`cat tools/figma/data/manifest.json`
 
 ### Diffs (logged differences)
 
-!`cat figma-app/comparisons/diffs.json`
+!`cat tools/figma/data/diffs.json`
 
 ## Tools Available
 
