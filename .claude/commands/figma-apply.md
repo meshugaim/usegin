@@ -19,7 +19,7 @@ Before browsing the app, ensure the **new UI toggle is enabled**:
 
 ## Workflow Reference
 
-!`cat .claude/skills/figma-apply/SKILL.md`
+!`cat .claude/skills/figma-apply-workflow/SKILL.md`
 
 ## Current State
 

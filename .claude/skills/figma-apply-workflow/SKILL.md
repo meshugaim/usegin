@@ -1,6 +1,6 @@
 ---
-name: figma-apply
-description: Create implementation plans to make the app match Figma designs. Triggered by "figma apply", "implement figma", or "apply figma changes".
+name: figma-apply-workflow
+description: Workflow for creating implementation plans to make the app match Figma designs.
 ---
 
 # Figma Apply

@@ -1,6 +1,6 @@
 ---
-name: figma-diff
-description: Map differences between Figma designs and the live app. Triggered by "figma diff", "compare figma", or "map figma differences".
+name: figma-diff-workflow
+description: Workflow for mapping differences between Figma designs and the live app.
 ---
 
 # Figma Diff

@@ -12,7 +12,7 @@ For implementing changes from app to match Figma, use `/figma-apply` instead.
 
 ## Workflow Reference
 
-!`cat .claude/skills/figma-diff/SKILL.md`
+!`cat .claude/skills/figma-diff-workflow/SKILL.md`
 
 ## Current State
 
