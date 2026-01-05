@@ -105,6 +105,17 @@ Post to Linear issue:
 
 If follow-up needed, create sub-issue for fixes.
 
+## Fixing Issues
+
+**Fix what you find.** Don't just note issues - fix them. Both critical and small.
+
+- Bugs, test gaps, security → fix immediately
+- Duplication, simplification → fix if straightforward
+- Minor naming, style → fix if quick (< 2 min)
+- Only note if fix requires significant context you lack
+
+Commit fixes with message like: `fix(review): [what was fixed]`
+
 ## Priorities
 
 High priority:
@@ -113,13 +124,18 @@ High priority:
 3. Security issues
 4. Clear duplication
 
-Lower priority (note but don't block):
-- Style preferences
-- Minor naming
-- "I would have done it differently"
+Lower priority (still fix if quick):
+- Style inconsistencies
+- Minor naming improvements
+- Small simplifications
+
+Skip (just note):
+- "I would have done it differently" without clear improvement
+- Architectural preferences requiring major changes
 
 ## Signaling
 
-1. Post review to Linear
-2. Create follow-up issues if needed
-3. Exit cleanly
+1. Fix issues found
+2. Post review summary to Linear
+3. Create follow-up issues only for things you couldn't fix
+4. Exit cleanly
