@@ -9,6 +9,37 @@ Create implementation plans from app to Figma. Direction: **App → Figma** (imp
 
 For documenting differences without implementation plans, use `/figma-diff` instead.
 
+## ⚠️ CRITICAL: Before You Start
+
+### 1. Login Required
+
+**You MUST authenticate into the app before taking any screenshots.** Unauthenticated screenshots are useless - most pages redirect to sign-in or show empty states.
+
+```
+1. Navigate to http://localhost:3000/sign-in
+2. Enter a valid email and complete magic link auth
+3. Verify you see actual content (workspaces, projects, etc.)
+4. ONLY THEN proceed with taking screenshots
+```
+
+If you cannot authenticate, STOP and ask the user for credentials or a test account.
+
+### 2. Screenshot Specific Elements, Not Full Pages
+
+**Screenshots must show the EXACT element being compared, not the entire page.**
+
+- ✅ Correct: Screenshot of the workspace card component only
+- ✅ Correct: Screenshot of the header navigation section
+- ❌ Wrong: Full page screenshot when comparing a button style
+- ❌ Wrong: Full page screenshot when comparing a card layout
+
+**Exception:** Layout diffs that compare overall page structure CAN use full-page screenshots.
+
+For Figma: Use the specific `nodeId` of the component, not the page frame.
+For App: Use the `element` and `ref` params to capture specific elements from the snapshot.
+
+---
+
 ## Source of Truth
 
 ```
@@ -246,8 +277,18 @@ Each plan should be detailed enough for another Claude to implement without addi
 ## Verification
 
 Before marking complete, verify:
+- [ ] You authenticated into the app before taking screenshots
 - [ ] Screenshots captured for both Figma and app
+- [ ] Screenshots show specific elements, not full pages (unless layout diff)
 - [ ] Pointers include valid URLs and paths
 - [ ] Implementation plan has specific, actionable steps
 - [ ] Complexity is accurately assessed
 - [ ] Status updated in manifest.json
+
+## Don't
+
+- Take ANY screenshots before authenticating into the app
+- Screenshot full pages instead of specific elements (unless it's a layout diff)
+- Export Figma page frames when you need a specific component node
+- Create implementation plans without both Figma and app screenshots
+- Write vague plans like "make it look like Figma"

@@ -9,6 +9,37 @@ Map differences from Figma designs to the app. Direction: **Figma → App** (doc
 
 For implementing changes from app to match Figma, use `/figma-apply` instead.
 
+## ⚠️ CRITICAL: Before You Start
+
+### 1. Login Required
+
+**You MUST authenticate into the app before taking any screenshots.** Unauthenticated screenshots are useless - most pages redirect to sign-in or show empty states.
+
+```
+1. Navigate to http://localhost:3000/sign-in
+2. Enter a valid email and complete magic link auth
+3. Verify you see actual content (workspaces, projects, etc.)
+4. ONLY THEN proceed with taking screenshots
+```
+
+If you cannot authenticate, STOP and ask the user for credentials or a test account.
+
+### 2. Screenshot Specific Elements, Not Full Pages
+
+**Screenshots must show the EXACT element being compared, not the entire page.**
+
+- ✅ Correct: Screenshot of the workspace card component only
+- ✅ Correct: Screenshot of the header navigation section
+- ❌ Wrong: Full page screenshot when comparing a button style
+- ❌ Wrong: Full page screenshot when comparing a card layout
+
+**Exception:** Layout diffs that compare overall page structure CAN use full-page screenshots.
+
+For Figma: Use the specific `nodeId` of the component, not the page frame.
+For App: Use the `element` and `ref` params to capture specific elements from the snapshot.
+
+---
+
 ## Source of Truth
 
 ```
@@ -183,7 +214,9 @@ View diffs at `http://localhost:5555`. Click a diff - both images should display
 
 ## Don't
 
+- Take ANY screenshots before authenticating into the app
 - Create diffs without reading comments first
 - Create diffs without checking if feature exists in codebase
 - Log diffs without screenshots
-- Screenshot full pages instead of specific elements
+- Screenshot full pages instead of specific elements (unless it's a layout diff)
+- Export Figma page frames when you need a specific component node
