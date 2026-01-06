@@ -49,12 +49,23 @@ crun "Use the cell-retro skill. Retro ENG-789."
 crun "Use the code-review skill. Review ENG-789."
 ```
 
+## Verify Alignment First
+
+**Rephrase the task back before creating issues or spawning.**
+
+Even when a request seems clear, rephrase your understanding:
+- "So: filter test commits by excluding commits that only touch test file paths. Correct?"
+- "So: add retry logic to the API client with exponential backoff. Correct?"
+
+This catches misunderstandings early. Pivoting mid-implementation is expensive.
+
 ## Spawning Workers
 
 **Before spawning:**
-1. **Verify minimal MCP state** - Workers inherit your MCP config. Many MCPs = token burn on every worker. Run `/mcp` to check enabled MCPs and disable unnecessary ones before spawning.
-2. `plan start <id>` - mark the issue in-progress
-3. Check `crun --help` if unsure about available options
+1. **Verify alignment** - Rephrase understanding, get confirmation
+2. **Verify minimal MCP state** - Workers inherit your MCP config. Many MCPs = token burn on every worker. Run `/mcp` to check enabled MCPs and disable unnecessary ones before spawning.
+3. `plan start <id>` - mark the issue in-progress
+4. Check `crun --help` if unsure about available options
 
 **When:**
 - New slice ready
