@@ -5,15 +5,25 @@ import {
   getAutoCompactEnabled,
   setAutoCompactEnabled,
   getSettingsPath,
+  getUserSettingsPath,
+  readUserSettings,
+  writeUserSettings,
 } from "../src/lib/settings";
 import { mkdir, rm, writeFile } from "fs/promises";
 import { join } from "path";
-import { tmpdir } from "os";
+import { tmpdir, homedir } from "os";
 
 describe("getSettingsPath", () => {
   it("returns .claude/settings.json path for project", () => {
     const result = getSettingsPath("/some/project");
     expect(result).toBe("/some/project/.claude/settings.json");
+  });
+});
+
+describe("getUserSettingsPath", () => {
+  it("returns ~/.claude/settings.json path", () => {
+    const result = getUserSettingsPath();
+    expect(result).toBe(join(homedir(), ".claude", "settings.json"));
   });
 });
 
@@ -89,10 +99,12 @@ describe("writeProjectSettings", () => {
 
 describe("getAutoCompactEnabled", () => {
   let testDir: string;
+  let settingsPath: string;
 
   beforeEach(async () => {
     testDir = join(tmpdir(), `ccfg-autocompact-test-${Date.now()}`);
     await mkdir(join(testDir, ".claude"), { recursive: true });
+    settingsPath = join(testDir, ".claude", "settings.json");
   });
 
   afterEach(async () => {
@@ -100,47 +112,40 @@ describe("getAutoCompactEnabled", () => {
   });
 
   it("returns true when autoCompactEnabled is true", async () => {
-    await writeFile(
-      join(testDir, ".claude/settings.json"),
-      JSON.stringify({ autoCompactEnabled: true })
-    );
+    await writeFile(settingsPath, JSON.stringify({ autoCompactEnabled: true }));
 
-    const result = await getAutoCompactEnabled(testDir);
+    const result = await getAutoCompactEnabled(settingsPath);
     expect(result).toBe(true);
   });
 
   it("returns false when autoCompactEnabled is false", async () => {
-    await writeFile(
-      join(testDir, ".claude/settings.json"),
-      JSON.stringify({ autoCompactEnabled: false })
-    );
+    await writeFile(settingsPath, JSON.stringify({ autoCompactEnabled: false }));
 
-    const result = await getAutoCompactEnabled(testDir);
+    const result = await getAutoCompactEnabled(settingsPath);
     expect(result).toBe(false);
   });
 
   it("returns undefined when autoCompactEnabled is not set", async () => {
-    await writeFile(
-      join(testDir, ".claude/settings.json"),
-      JSON.stringify({ otherSetting: "value" })
-    );
+    await writeFile(settingsPath, JSON.stringify({ otherSetting: "value" }));
 
-    const result = await getAutoCompactEnabled(testDir);
+    const result = await getAutoCompactEnabled(settingsPath);
     expect(result).toBeUndefined();
   });
 
   it("returns undefined when settings.json does not exist", async () => {
-    const result = await getAutoCompactEnabled(testDir);
+    const result = await getAutoCompactEnabled(settingsPath);
     expect(result).toBeUndefined();
   });
 });
 
 describe("setAutoCompactEnabled", () => {
   let testDir: string;
+  let settingsPath: string;
 
   beforeEach(async () => {
     testDir = join(tmpdir(), `ccfg-autocompact-test-${Date.now()}`);
     await mkdir(join(testDir, ".claude"), { recursive: true });
+    settingsPath = join(testDir, ".claude", "settings.json");
   });
 
   afterEach(async () => {
@@ -148,26 +153,20 @@ describe("setAutoCompactEnabled", () => {
   });
 
   it("sets autoCompactEnabled to true", async () => {
-    await writeFile(
-      join(testDir, ".claude/settings.json"),
-      JSON.stringify({ autoCompactEnabled: false })
-    );
+    await writeFile(settingsPath, JSON.stringify({ autoCompactEnabled: false }));
 
-    await setAutoCompactEnabled(testDir, true);
+    await setAutoCompactEnabled(true, settingsPath);
 
-    const result = await getAutoCompactEnabled(testDir);
+    const result = await getAutoCompactEnabled(settingsPath);
     expect(result).toBe(true);
   });
 
   it("sets autoCompactEnabled to false", async () => {
-    await writeFile(
-      join(testDir, ".claude/settings.json"),
-      JSON.stringify({ autoCompactEnabled: true })
-    );
+    await writeFile(settingsPath, JSON.stringify({ autoCompactEnabled: true }));
 
-    await setAutoCompactEnabled(testDir, false);
+    await setAutoCompactEnabled(false, settingsPath);
 
-    const result = await getAutoCompactEnabled(testDir);
+    const result = await getAutoCompactEnabled(settingsPath);
     expect(result).toBe(false);
   });
 
@@ -177,14 +176,11 @@ describe("setAutoCompactEnabled", () => {
       hooks: { PreCompact: [] },
       enabledPlugins: { "some-plugin": true },
     };
-    await writeFile(
-      join(testDir, ".claude/settings.json"),
-      JSON.stringify(originalSettings)
-    );
+    await writeFile(settingsPath, JSON.stringify(originalSettings));
 
-    await setAutoCompactEnabled(testDir, true);
+    await setAutoCompactEnabled(true, settingsPath);
 
-    const file = Bun.file(join(testDir, ".claude/settings.json"));
+    const file = Bun.file(settingsPath);
     const result = await file.json();
     expect(result).toEqual({
       ...originalSettings,
@@ -193,9 +189,9 @@ describe("setAutoCompactEnabled", () => {
   });
 
   it("creates settings file if it does not exist", async () => {
-    await setAutoCompactEnabled(testDir, true);
+    await setAutoCompactEnabled(true, settingsPath);
 
-    const result = await getAutoCompactEnabled(testDir);
+    const result = await getAutoCompactEnabled(settingsPath);
     expect(result).toBe(true);
   });
 });
