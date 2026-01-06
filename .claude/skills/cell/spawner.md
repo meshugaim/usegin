@@ -114,6 +114,11 @@ crun "implement logging"
 
 **Worker completion:** Claude Code natively notifies you when workers complete via `<bash-notification>`. Use `TaskOutput` to retrieve results. No polling needed - just wait for the notification.
 
+**Don't use timeouts.** Workers need time to complete, commit, and push. Killing a worker mid-task loses work. If worried about a stuck worker, monitor with:
+```bash
+session <worker-session-id> | tail
+```
+
 ## Isolation
 
 When workers might conflict:
