@@ -52,8 +52,9 @@ crun "Use the code-review skill. Review ENG-789."
 ## Spawning Workers
 
 **Before spawning:**
-1. `plan start <id>` - mark the issue in-progress
-2. Check `crun --help` if unsure about available options
+1. **Verify minimal MCP state** - Workers inherit your MCP config. Many MCPs = token burn on every worker. Run `/mcp` to check enabled MCPs and disable unnecessary ones before spawning.
+2. `plan start <id>` - mark the issue in-progress
+3. Check `crun --help` if unsure about available options
 
 **When:**
 - New slice ready
