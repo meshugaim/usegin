@@ -101,16 +101,18 @@ crun --resume <session-id> "Tests are failing. Fix the auth test."
 
 ## Running Workers
 
-`crun` blocks by default - you see output when worker finishes.
-
-For parallel work, use Bash tool's `run_in_background: true`:
+**Always use `run_in_background: true`** when spawning workers via the Bash tool. This keeps you responsive and lets you monitor progress or spawn additional workers.
 
 ```bash
-crun "implement auth" &
-crun "implement logging" &
+# Single worker - still background it
+crun "implement auth"
+
+# Multiple workers - background all
+crun "implement auth"
+crun "implement logging"
 ```
 
-**Worker completion:** When using `run_in_background`, Claude Code natively notifies you when workers complete via `<bash-notification>`. Use `TaskOutput` to retrieve results. No polling needed - just wait for the notification.
+**Worker completion:** Claude Code natively notifies you when workers complete via `<bash-notification>`. Use `TaskOutput` to retrieve results. No polling needed - just wait for the notification.
 
 ## Isolation
 
