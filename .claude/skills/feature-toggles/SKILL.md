@@ -5,18 +5,132 @@ description: Guide for implementing feature toggles. Triggered by "add feature t
 
 # Feature Toggles
 
-User-scoped feature toggle system using localStorage. Allows gradual rollout and easy rollback of experimental features.
+Three types of feature toggles for different use cases.
 
-## Architecture
+## Toggle Types
 
-### Frontend (localStorage)
-- Storage key: `feature_flags` (JSON array of enabled flag names)
-- UI: Hidden page at `/toggles` with toggle switches
-- API: Flags included in chat requests as `feature_flags: string[]`
+| Type | Storage | Scope | SSR | Use Case |
+|------|---------|-------|-----|----------|
+| **localStorage** | Browser `feature_flags` key | Per-browser, client-only | No | API request flags, user opt-in |
+| **Cookie** | Individual cookies | Per-browser | Yes | UI toggles (avoids hydration flash) |
+| **Database** | `feature_toggles` table | System-wide | Yes | Instant rollback, admin-controlled |
 
-### Backend
-- Request models accept `feature_flags: list[str] = []`
-- Services check for specific flags before enabling new behavior
+### When to Use Each
+
+| Scenario | Type |
+|----------|------|
+| User opts into experimental feature | localStorage |
+| UI change that needs SSR (no flash) | Cookie |
+| System-wide rollout controlled by admins | Database |
+| Middleware/server-side gating | Database or Cookie |
+| Feature passed to Python backend | localStorage (via request) |
+
+## 1. localStorage Toggles
+
+Per-user flags stored in browser, passed to backend in API requests.
+
+### Files
+- `nextjs-app/lib/feature-flags.ts` - Client utilities
+- `nextjs-app/app/toggles/toggles-client.tsx` - UI component
+
+### Usage
+
+```typescript
+// nextjs-app/lib/feature-flags.ts
+import { getEnabledFlags, toggleFeature, isFeatureEnabled } from "@/lib/feature-flags"
+
+// Check if enabled
+if (isFeatureEnabled("my_feature")) { ... }
+
+// Get all enabled flags (for API requests)
+const flags = getEnabledFlags()  // string[]
+
+// Toggle on/off
+toggleFeature("my_feature", true)
+toggleFeature("my_feature", false)
+```
+
+### Backend Check
+
+```python
+# Flags passed in request body
+if "my_feature" in request.feature_flags:
+    # New behavior
+```
+
+## 2. Cookie Toggles
+
+SSR-friendly flags available on both server and client. No hydration mismatch.
+
+### Files
+- `nextjs-app/lib/feature-flags-cookie.ts` - Cookie utilities
+- `nextjs-app/lib/feature-flags-server.ts` - Server-side readers
+
+### Usage
+
+```typescript
+// Client-side
+import { getFeatureFlagFromCookie, setFeatureFlagCookie } from "@/lib/feature-flags-cookie"
+
+setFeatureFlagCookie("my-flag", true)
+const enabled = getFeatureFlagFromCookie("my-flag")
+
+// Server-side (Server Components, middleware)
+import { cookies } from "next/headers"
+
+const cookieStore = await cookies()
+const enabled = cookieStore.get("my-flag")?.value === "true"
+```
+
+### Example: New UI Toggle
+
+```typescript
+// Already implemented for "effi-new-ui" cookie
+import { isNewUIEnabled, toggleNewUI } from "@/lib/feature-flags-cookie"
+import { isNewUIEnabledServer } from "@/lib/feature-flags-server"
+```
+
+## 3. Database Toggles
+
+System-wide toggles stored in `feature_toggles` table. Admin-controlled via `/toggles` page.
+
+### Files
+- `nextjs-app/lib/feature-toggles-server.ts` - Server check
+- `nextjs-app/app/actions/feature-toggles.ts` - CRUD actions
+- `supabase/migrations/20251222000001_feature_toggles.sql` - Schema
+
+### Schema
+
+```sql
+CREATE TABLE feature_toggles (
+  name TEXT PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  description TEXT,
+  updated_at TIMESTAMPTZ,
+  updated_by TEXT
+);
+```
+
+### Usage
+
+```typescript
+// Server-side only
+import { isFeatureEnabled } from "@/lib/feature-toggles-server"
+
+if (await isFeatureEnabled("my_feature")) {
+    // New behavior
+}
+```
+
+### Adding a New Toggle
+
+```sql
+-- In a migration or directly in DB
+INSERT INTO feature_toggles (name, enabled, description) VALUES
+  ('my_feature', false, 'Description of what this toggles');
+```
+
+Admins can then enable/disable via `/toggles` page.
 
 ## Placement Principle
 
@@ -39,56 +153,6 @@ async def handle_chat_request(request: ChatRequest):
 async def process_message(msg):
     if "new_feature" in flags:  # Don't do this
         # ...
-    result = transform(msg)
-    if "new_feature" in flags:  # Or this
-        # ...
-```
-
-## Adding a New Toggle
-
-### 1. Define the flag
-
-```typescript
-// nextjs-app/app/toggles/page.tsx
-const AVAILABLE_FLAGS = [
-    {
-        name: "my_feature",
-        label: "My Feature",
-        description: "Description shown to users",
-    },
-    // ... existing flags
-] as const
-```
-
-### 2. Check flag in backend
-
-```python
-# At the highest appropriate entry point
-if "my_feature" in request.feature_flags:
-    # New behavior
-else:
-    # Existing behavior
-```
-
-### 3. Test both paths
-
-Ensure tests cover both flag enabled and disabled states.
-
-## Utilities
-
-```typescript
-// nextjs-app/lib/feature-flags.ts
-import { getEnabledFlags, toggleFeature, clearAllFlags } from "@/lib/feature-flags"
-
-// Get currently enabled flags
-const flags = getEnabledFlags()  // string[]
-
-// Toggle a specific flag
-toggleFeature("my_feature", true)   // enable
-toggleFeature("my_feature", false)  // disable
-
-// Clear all flags
-clearAllFlags()
 ```
 
 ## When to Use Toggles
@@ -102,5 +166,5 @@ clearAllFlags()
 
 ## Related
 
-- ENG-483: Feature toggle system implementation
-- `/toggles` page for user self-service
+- `/toggles` page for toggle management
+- Current DB toggles: `content_sync_v2`
