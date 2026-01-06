@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { createMcpCommand } from "./commands/mcp";
+import { createAutocompactCommand } from "./commands/autocompact";
 
 const program = new Command()
   .name("ccfg")
@@ -9,6 +10,7 @@ const program = new Command()
 
 // Add commands
 program.addCommand(createMcpCommand());
+program.addCommand(createAutocompactCommand());
 
 // Parse arguments
 program.parse();
