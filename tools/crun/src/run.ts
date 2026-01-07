@@ -7,6 +7,13 @@ import { join } from "path";
 import { homedir } from "os";
 import { loadPresets, getDefaultPresetsDir, getRepoPresetsDir, type PresetDeps } from "./presets";
 import { getDefaultStorageDir } from "../../workflow/src/workflow";
+import {
+  recordInvocation,
+  updateInvocation,
+  generateInvocationId as defaultGenerateInvocationId,
+  getInvocationsPath,
+  type InvocationStatus,
+} from "./invocations";
 
 export interface RunOptions {
   prompt?: string;
@@ -37,6 +44,7 @@ export interface SpawnClaudeResult {
 
 export interface RunDeps {
   generateSessionId: () => Promise<string>;
+  generateInvocationId: () => string;
   spawnClaude: (options: SpawnClaudeOptions) => Promise<SpawnClaudeResult>;
   logDir: string;
   claudeCommand: string[];
@@ -45,10 +53,13 @@ export interface RunDeps {
   userPresetsDir: string;
   /** Repo presets directory (.claude/workflow-presets/) - optional */
   repoPresetsDir?: string;
+  /** Path to invocations JSONL file */
+  invocationsPath: string;
 }
 
 export interface RunResult {
   sessionId: string;
+  invocationId: string;
   logPath: string;
   exitCode: number;
   noteToSelf?: string;
@@ -76,12 +87,14 @@ export function getDefaultLogDir(): string {
 export function createDefaultDeps(): RunDeps {
   return {
     generateSessionId,
+    generateInvocationId: defaultGenerateInvocationId,
     spawnClaude: spawnClaudeProcess,
     logDir: getDefaultLogDir(),
     claudeCommand: ["bun", "run", "--bun", "claude", "-p", "--dangerously-skip-permissions"],
     workflowsDir: getDefaultStorageDir(),
     userPresetsDir: getDefaultPresetsDir(),
     repoPresetsDir: getRepoPresetsDir(),
+    invocationsPath: getInvocationsPath(),
   };
 }
 
@@ -175,12 +188,28 @@ export async function run(
     throw new Error("No prompt provided");
   }
 
-  // Resolve session ID
+  // Resolve session ID and invocation ID
   const sessionId = options.resume || (await deps.generateSessionId());
+  const invocationId = deps.generateInvocationId();
 
   // Ensure log directory exists
   await mkdir(deps.logDir, { recursive: true });
   const logPath = join(deps.logDir, `${sessionId}.log`);
+
+  // Record invocation at start
+  await recordInvocation(
+    {
+      id: invocationId,
+      sessionId,
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+      prompt,
+      cwd: options.cwd || process.cwd(),
+      status: "running",
+      noteToSelf: options.noteToSelf,
+    },
+    deps.invocationsPath
+  );
 
   // Write workflow reminders if --remind was provided
   if (options.remind && options.remind.length > 0) {
@@ -212,6 +241,18 @@ export async function run(
     extraFlags: options.claudeFlags,
   });
 
+  // Update invocation on completion
+  const status: InvocationStatus = result.exitCode === 0 ? "completed" : "failed";
+  await updateInvocation(
+    invocationId,
+    {
+      completedAt: new Date().toISOString(),
+      exitCode: result.exitCode,
+      status,
+    },
+    deps.invocationsPath
+  );
+
   // Build log content
   const logParts = [result.stdout, result.stderr].filter(Boolean);
   if (options.noteToSelf) {
@@ -222,6 +263,7 @@ export async function run(
 
   return {
     sessionId,
+    invocationId,
     logPath,
     exitCode: result.exitCode,
     noteToSelf: options.noteToSelf,
