@@ -16,7 +16,6 @@ export function createIssueCommand(): Command {
     .description("Show issue summary with event statistics")
     .argument("<issue-id>", "Issue ID (e.g., NEXTJS-APP-1)")
     .option("-o, --org <org>", "Organization slug", DEFAULT_ORG)
-    .option("--stats", "Show detailed event statistics breakdown")
     .option("--json", "Output as JSON")
     .action(async (issueId: string, opts: IssueOptions) => {
       await runIssueCommand(issueId, opts);
@@ -27,7 +26,6 @@ export function createIssueCommand(): Command {
 
 interface IssueOptions {
   org: string;
-  stats?: boolean;
   json?: boolean;
 }
 
@@ -58,10 +56,8 @@ async function runIssueCommand(
     console.log(formatIssueSummary(issue, opts.org));
     console.log("");
 
-    // Show stats if requested or by default in rich view
-    if (opts.stats || !opts.json) {
-      console.log(formatIssueStats(stats));
-    }
+    // Stats are always shown in rich view (default behavior)
+    console.log(formatIssueStats(stats));
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);
