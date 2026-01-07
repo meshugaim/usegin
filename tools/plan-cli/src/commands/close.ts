@@ -73,11 +73,12 @@ async function runClose(
         )
       );
     } else {
-      if (opts.reason) {
-        console.log(`${colors.success("Closed")}: ${colors.identifier(issue.identifier)} - ${issue.title} ${dim(`(${opts.reason})`)}`);
-      } else {
-        console.log(`${colors.success("Closed")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
-      }
+      const suffix = opts.reason
+        ? ` ${dim(`(${opts.reason})`)}`
+        : opts.comment
+          ? ` ${dim("(with comment)")}`
+          : "";
+      console.log(`${colors.success("Closed")}: ${colors.identifier(issue.identifier)} - ${issue.title}${suffix}`);
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);
