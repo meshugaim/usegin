@@ -228,6 +228,33 @@ describe("formatReplayJson", () => {
   });
 });
 
+describe("timestamp normalization", () => {
+  test("normalizes seconds timestamps to milliseconds", () => {
+    // Timestamp in seconds (before Jan 1, 2000 in ms)
+    const events: RrwebEvent[] = [
+      {
+        type: RrwebEventType.Meta,
+        timestamp: 1704067200, // seconds
+        data: { href: "https://example.com" },
+      },
+    ];
+    const parsed = parseRrwebEvents(events);
+    expect(parsed[0].timestamp).toBe(1704067200000); // converted to ms
+  });
+
+  test("preserves milliseconds timestamps", () => {
+    const events: RrwebEvent[] = [
+      {
+        type: RrwebEventType.Meta,
+        timestamp: 1704067200000, // already ms
+        data: { href: "https://example.com" },
+      },
+    ];
+    const parsed = parseRrwebEvents(events);
+    expect(parsed[0].timestamp).toBe(1704067200000);
+  });
+});
+
 // Hydration error specific tests
 describe("parseRrwebEvents hydration filter", () => {
   const hydrationEvents: RrwebEvent[] = [
@@ -280,5 +307,17 @@ describe("parseRrwebEvents hydration filter", () => {
     const parsed = parseRrwebEvents(hydrationEvents, { type: "hydration" });
     // Should include the custom error with hydration message
     expect(parsed.some((e) => e.details.includes("Hydration"))).toBe(true);
+  });
+
+  test("includes data-reactroot attribute changes", () => {
+    const parsed = parseRrwebEvents(hydrationEvents, { type: "hydration" });
+    // Should include mutation with data-reactroot attribute
+    expect(parsed.some((e) => e.details.includes("data-reactroot"))).toBe(true);
+  });
+
+  test("excludes unrelated mutations from hydration filter", () => {
+    const parsed = parseRrwebEvents(hydrationEvents, { type: "hydration" });
+    // Should NOT include the regular div mutation (first event)
+    expect(parsed.every((e) => !e.details.includes("+1 nodes (div)"))).toBe(true);
   });
 });
