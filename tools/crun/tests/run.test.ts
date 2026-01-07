@@ -6,15 +6,18 @@ import {
   type RunOptions,
   type RunDeps,
 } from "../src/run";
+import { listInvocations, type InvocationEntry } from "../src/invocations";
 import { mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
 // Test fixtures
 const TEST_SESSION_ID = "test-1234-5678-abcd-ef0123456789";
+const TEST_INVOCATION_ID = "test-inv1";
 const TEST_LOG_DIR = join(tmpdir(), "crun-test-logs");
 const TEST_WORKFLOWS_DIR = join(tmpdir(), "crun-test-workflows");
 const TEST_PRESETS_DIR = join(tmpdir(), "crun-test-presets-run");
+const TEST_INVOCATIONS_PATH = join(tmpdir(), "crun-test-invocations", "invocations.jsonl");
 
 /**
  * Create mock deps with spawnClaude mocked (for unit tests)
@@ -22,6 +25,7 @@ const TEST_PRESETS_DIR = join(tmpdir(), "crun-test-presets-run");
 function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
   return {
     generateSessionId: mock(() => Promise.resolve(TEST_SESSION_ID)),
+    generateInvocationId: mock(() => TEST_INVOCATION_ID),
     spawnClaude: mock(() =>
       Promise.resolve({
         exitCode: 0,
@@ -33,6 +37,7 @@ function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
     claudeCommand: ["echo"],
     workflowsDir: TEST_WORKFLOWS_DIR,
     userPresetsDir: TEST_PRESETS_DIR,
+    invocationsPath: TEST_INVOCATIONS_PATH,
     // No repoPresetsDir in tests by default - tests use userPresetsDir only
     ...overrides,
   };
@@ -47,9 +52,11 @@ function createTestDeps(overrides: Partial<RunDeps> = {}): RunDeps {
   return {
     ...defaults,
     generateSessionId: mock(() => Promise.resolve(TEST_SESSION_ID)),
+    generateInvocationId: mock(() => TEST_INVOCATION_ID),
     logDir: TEST_LOG_DIR,
     workflowsDir: TEST_WORKFLOWS_DIR,
     userPresetsDir: TEST_PRESETS_DIR,
+    invocationsPath: TEST_INVOCATIONS_PATH,
     // No repoPresetsDir in tests by default - tests use userPresetsDir only
     // Use 'echo' to test the actual spawn logic without running claude
     claudeCommand: ["echo", "ARGS:"],
@@ -61,6 +68,7 @@ beforeEach(async () => {
   await rm(TEST_LOG_DIR, { recursive: true, force: true });
   await rm(TEST_WORKFLOWS_DIR, { recursive: true, force: true });
   await rm(TEST_PRESETS_DIR, { recursive: true, force: true });
+  await rm(join(tmpdir(), "crun-test-invocations"), { recursive: true, force: true });
   await mkdir(TEST_LOG_DIR, { recursive: true });
   await mkdir(TEST_WORKFLOWS_DIR, { recursive: true });
   await mkdir(TEST_PRESETS_DIR, { recursive: true });
@@ -428,5 +436,96 @@ describe("remind flag", () => {
     await run({ prompt: "test", remind: ["tdd"] }, deps);
 
     expect(workflowExistedBeforeSpawn).toBe(true);
+  });
+});
+
+describe("invocation tracking", () => {
+  test("records invocation at start with running status", async () => {
+    const deps = createMockDeps();
+    await run({ prompt: "test prompt" }, deps);
+
+    const invocations = await listInvocations({}, TEST_INVOCATIONS_PATH);
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0].id).toBe(TEST_INVOCATION_ID);
+    expect(invocations[0].sessionId).toBe(TEST_SESSION_ID);
+    expect(invocations[0].prompt).toContain("test prompt");
+    expect(invocations[0].cwd).toBeDefined();
+    expect(invocations[0].pid).toBeDefined();
+  });
+
+  test("updates invocation on completion with exit code 0", async () => {
+    const deps = createMockDeps({
+      spawnClaude: mock(() =>
+        Promise.resolve({ exitCode: 0, stdout: "", stderr: "" })
+      ),
+    });
+    await run({ prompt: "test" }, deps);
+
+    const invocations = await listInvocations({}, TEST_INVOCATIONS_PATH);
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0].status).toBe("completed");
+    expect(invocations[0].exitCode).toBe(0);
+    expect(invocations[0].completedAt).toBeDefined();
+  });
+
+  test("updates invocation on failure with non-zero exit code", async () => {
+    const deps = createMockDeps({
+      spawnClaude: mock(() =>
+        Promise.resolve({ exitCode: 1, stdout: "", stderr: "" })
+      ),
+    });
+    await run({ prompt: "test" }, deps);
+
+    const invocations = await listInvocations({}, TEST_INVOCATIONS_PATH);
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0].status).toBe("failed");
+    expect(invocations[0].exitCode).toBe(1);
+    expect(invocations[0].completedAt).toBeDefined();
+  });
+
+  test("includes noteToSelf in invocation entry", async () => {
+    const deps = createMockDeps();
+    await run({ prompt: "test", noteToSelf: "if tests pass, merge" }, deps);
+
+    const invocations = await listInvocations({}, TEST_INVOCATIONS_PATH);
+    expect(invocations[0].noteToSelf).toBe("if tests pass, merge");
+  });
+
+  test("returns invocationId in result", async () => {
+    const deps = createMockDeps();
+    const result = await run({ prompt: "test" }, deps);
+
+    expect(result.invocationId).toBe(TEST_INVOCATION_ID);
+  });
+
+  test("records invocation before spawning claude", async () => {
+    let invocationExistedBeforeSpawn = false;
+    const deps = createMockDeps({
+      spawnClaude: mock(async () => {
+        const invocations = await listInvocations({}, TEST_INVOCATIONS_PATH);
+        invocationExistedBeforeSpawn = invocations.length > 0;
+        return { exitCode: 0, stdout: "", stderr: "" };
+      }),
+    });
+
+    await run({ prompt: "test" }, deps);
+
+    expect(invocationExistedBeforeSpawn).toBe(true);
+  });
+
+  test("records cwd from options or uses process.cwd()", async () => {
+    const deps = createMockDeps();
+    await run({ prompt: "test", cwd: "/custom/path" }, deps);
+
+    const invocations = await listInvocations({}, TEST_INVOCATIONS_PATH);
+    expect(invocations[0].cwd).toBe("/custom/path");
+  });
+
+  test("uses process.cwd() when no cwd option provided", async () => {
+    const deps = createMockDeps();
+    await run({ prompt: "test" }, deps);
+
+    const invocations = await listInvocations({}, TEST_INVOCATIONS_PATH);
+    expect(invocations[0].cwd).toBe(process.cwd());
   });
 });
