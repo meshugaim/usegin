@@ -56,6 +56,19 @@ export interface RrwebEvent {
   data?: Record<string, unknown>;
 }
 
+/**
+ * Normalize timestamp to milliseconds
+ * rrweb uses milliseconds, but some Sentry custom events use seconds
+ */
+function normalizeTimestamp(ts: number): number {
+  // If timestamp is before year 2000 in milliseconds, it's likely in seconds
+  // 946684800000 = Jan 1, 2000 in ms
+  if (ts < 946684800000) {
+    return ts * 1000;
+  }
+  return ts;
+}
+
 export type ParsedEventType =
   | "meta"
   | "snapshot"
@@ -143,7 +156,8 @@ function parseEvent(
   event: RrwebEvent,
   options: ParseOptions
 ): ParsedReplayEvent | null {
-  const { type, timestamp, data } = event;
+  const { type, data } = event;
+  const timestamp = normalizeTimestamp(event.timestamp);
 
   switch (type) {
     case RrwebEventType.Meta:

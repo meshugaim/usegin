@@ -49,8 +49,11 @@ async function runReplayCommand(
   try {
     const client = new SentryClient({ org: opts.org });
 
-    // Fetch replay metadata
-    const replay = (await client.getReplay(replayId)) as ReplayMetadata;
+    // Fetch replay metadata (API returns data nested under 'data' key)
+    const replayResponse = (await client.getReplay(replayId)) as
+      | ReplayMetadata
+      | { data: ReplayMetadata };
+    const replay = "data" in replayResponse ? replayResponse.data : replayResponse;
 
     // Determine project slug
     const projectSlug = opts.project || replay.project?.slug;
