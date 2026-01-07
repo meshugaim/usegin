@@ -65,7 +65,7 @@ describe("formatInvocationsTable", () => {
 
     const output = formatInvocationsTable(invocations);
     expect(output).toContain("abc123");
-    expect(output).toContain("ce8ff...");
+    expect(output).toContain("ce8ff1..."); // 6 chars + ellipsis
     expect(output).toContain("If tests pass, review");
     expect(output).toContain("running");
   });
