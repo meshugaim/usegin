@@ -123,7 +123,13 @@ crun "implement auth"
 crun "implement logging"
 ```
 
-**Worker completion:** Claude Code natively notifies you when workers complete via `<bash-notification>`. Use `TaskOutput` to retrieve results. No polling needed - just wait for the notification.
+**Worker completion:** Claude Code natively notifies you when workers complete via `<bash-notification>`. When the notification arrives, use `TaskOutput` to retrieve results.
+
+**Don't block on TaskOutput.** Using `block=true` freezes the conversation and prevents the user from sending messages. Instead:
+1. Spawn worker with `run_in_background: true`
+2. Optionally check status with `TaskOutput block=false`
+3. Wait for `<bash-notification>` (keep conversation open)
+4. Read results with `TaskOutput` after notification
 
 **Don't use timeouts.** Workers need time to complete, commit, and push. Killing a worker mid-task loses work. If worried about a stuck worker, monitor with:
 ```bash
