@@ -75,7 +75,20 @@ This catches misunderstandings early. Pivoting mid-implementation is expensive.
 
 ## Monitoring
 
-**Primary signal:** Worker responses (crun blocks by default).
+**Primary signal:** `<bash-notification>` when workers complete. Don't sleep-poll.
+
+```bash
+# Anti-pattern - wastes time:
+crun "implement feature"
+sleep 60 && git log --oneline -10  # arbitrary wait
+TaskOutput worker_id
+
+# Pattern - wait for notification:
+crun "implement feature"
+# ... notification arrives ...
+git log --oneline -10  # verify commits
+TaskOutput worker_id block=false  # get results
+```
 
 **Other signals:** git commits, Linear updates, CI status.
 
@@ -136,18 +149,45 @@ crun "implement logging"
 session <worker-session-id> | tail
 ```
 
+## Parallel Workers
+
+When multiple workers can run simultaneously (shared dependencies complete, no file conflicts), use worktrees:
+
+```bash
+# 1. Create worktrees for each parallel task
+worktree create eng-926
+worktree create eng-925
+worktree create eng-928
+
+# 2. Spawn all workers in parallel
+crun --cwd $(worktree path eng-926) "Use the cell skill as worker. Implement ENG-926."
+crun --cwd $(worktree path eng-925) "Use the cell skill as worker. Implement ENG-925."
+crun --cwd $(worktree path eng-928) "Use the cell skill as worker. Implement ENG-928."
+
+# 3. Wait for <bash-notification> for each
+# 4. Verify results with TaskOutput
+# 5. Clean up worktrees
+worktree destroy eng-926
+worktree destroy eng-925
+worktree destroy eng-928
+```
+
+**When to parallelize:**
+- Shared foundation complete (e.g., library built, dependent features ready)
+- Tasks touch different files
+- Time savings outweigh coordination overhead
+
+**Don't parallelize:**
+- When tasks have dependencies on each other
+- When file conflicts are likely and worktrees aren't used
+
 ## Isolation
 
 When workers might conflict:
 
 1. **Time separation** - Sequential. Default, simplest.
 2. **Same repo parallel** - Different files, no conflict.
-3. **Worktrees** - File overlap expected.
-
-```bash
-worktree create feature-x
-crun --cwd /path/to/feature-x "Use the cell skill as worker. Implement ENG-123."
-```
+3. **Worktrees** - File overlap expected. See "Parallel Workers" above.
 
 ## Context Optimization
 
@@ -204,3 +244,15 @@ Verify workers follow practices:
 - Did they report coverage?
 - Did lint pass?
 - Check Linear updates for coverage notes
+
+## Feature Completion Checklist
+
+Before ending your session after a feature:
+
+- [ ] All sub-issues closed in Linear
+- [ ] Parent issue closed
+- [ ] Final review passed
+- [ ] Retro spawned AND awaited (wait for notification)
+- [ ] Retro-generated issues created in Linear
+
+**Don't just spawn the retro - await its completion.** The retro may identify critical improvements that need tracking.
