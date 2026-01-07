@@ -5,10 +5,32 @@
 
 import { Command } from "commander";
 import { run, createDefaultDeps } from "./run";
+import { runList, parseListArgs } from "./list";
 
 const program = new Command()
   .name("crun")
-  .description("Minimal synchronous wrapper for claude -p")
+  .description("Minimal synchronous wrapper for claude -p");
+
+// List subcommand
+program
+  .command("list")
+  .description("List recent invocations")
+  .option("--running", "Filter to running invocations only")
+  .option("--today", "Filter to today's invocations only")
+  .option("-l, --limit <n>", "Limit number of results", "10")
+  .action(async (options) => {
+    const listOptions = {
+      running: options.running || false,
+      today: options.today || false,
+      limit: parseInt(options.limit, 10) || 10,
+    };
+
+    const output = await runList(listOptions);
+    console.log(output);
+  });
+
+// Default run command (when no subcommand is given)
+program
   .argument("[prompt]", "The prompt to send to Claude")
   .option("-r, --resume <id>", "Continue existing session")
   .option("-m, --model <model>", "Override model")
@@ -18,12 +40,17 @@ const program = new Command()
     "--remind <presets>",
     "Comma-separated preset names (e.g., tdd,commit-often)"
   )
-  .requiredOption(
+  .option(
     "-n, --note-to-self <note>",
-    "Reminder for when work completes (required)"
+    "Reminder for when work completes (required for run)"
   )
   .allowUnknownOption() // Allow claude flags after --
   .action(async (prompt: string | undefined, options) => {
+    // Don't run the main action if a subcommand was invoked
+    // Commander handles this automatically via the subcommand action
+    if (process.argv[2] === "list") {
+      return;
+    }
     await main(prompt, options);
   });
 
@@ -37,7 +64,7 @@ async function main(
     cwd?: string;
     promptFile?: string;
     remind?: string;
-    noteToSelf: string;
+    noteToSelf?: string;
   }
 ) {
   // Extract claude flags (everything after --)
@@ -57,6 +84,13 @@ async function main(
     console.error("Usage: crun [options] <prompt> -n <note>");
     console.error("       echo 'prompt' | crun -n <note>");
     console.error("       crun --prompt-file task.md -n <note>");
+    console.error("       crun list [--running] [--today] [--limit N]");
+    process.exit(1);
+  }
+
+  if (!options.noteToSelf) {
+    console.error("Error: --note-to-self is required");
+    console.error("Usage: crun [options] <prompt> -n <note>");
     process.exit(1);
   }
 
