@@ -64,9 +64,9 @@ async function main(
   const deps = createDefaultDeps();
   const sessionId = options.resume || (await deps.generateSessionId());
 
-  console.log(`Session: ${sessionId}`);
-  console.log(`Log: ~/.crun/logs/${sessionId}.log`);
-  console.log("─".repeat(40));
+  console.error(`Session: ${sessionId}`);
+  console.error(`Log: ~/.crun/logs/${sessionId}.log`);
+  console.error("─".repeat(40));
 
   // Parse remind flag (comma-separated preset names)
   const remind = options.remind
