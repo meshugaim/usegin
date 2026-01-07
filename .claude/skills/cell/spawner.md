@@ -63,7 +63,7 @@ This catches misunderstandings early. Pivoting mid-implementation is expensive.
 
 **Before spawning:**
 1. **Verify alignment** - Rephrase understanding, get confirmation
-2. **Verify minimal MCP state** - Workers inherit your MCP config. Many MCPs = token burn on every worker. Run `/mcp` to check enabled MCPs and disable unnecessary ones before spawning.
+2. **Verify minimal MCP state** - Workers inherit your MCP config. Many MCPs = token burn on every worker. Run `ccfg mcp list` to check enabled MCPs and `ccfg mcp disable <name>` to disable unnecessary ones before spawning.
 3. `plan start <id>` - mark the issue in-progress
 4. Check `crun --help` if unsure about available options
 
