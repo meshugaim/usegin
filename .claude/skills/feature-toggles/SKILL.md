@@ -82,13 +82,24 @@ const cookieStore = await cookies()
 const enabled = cookieStore.get("my-flag")?.value === "true"
 ```
 
-### Example: New UI Toggle
+### Example: New UI / New UX Toggles
 
 ```typescript
-// Already implemented for "effi-new-ui" cookie
+// newUI toggle (effi-new-ui cookie)
 import { isNewUIEnabled, toggleNewUI } from "@/lib/feature-flags-cookie"
 import { isNewUIEnabledServer } from "@/lib/feature-flags-server"
+
+// newUX toggle (effi-new-ux cookie) - layered on newUI
+import { isNewUXEnabled, toggleNewUX } from "@/lib/feature-flags-cookie"
+import { isNewUXEnabledServer } from "@/lib/feature-flags-server"
+
+// Layered usage: newUX builds on newUI
+const newUI = await isNewUIEnabledServer();
+const newUX = await isNewUXEnabledServer();
+className={newUX ? "newux-style" : newUI ? "newui-style" : "old-style"}
 ```
+
+**Layered dependency:** Enabling newUX auto-enables newUI. Disabling newUI auto-disables newUX.
 
 ## 3. Database Toggles
 
