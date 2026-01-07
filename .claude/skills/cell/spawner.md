@@ -175,10 +175,14 @@ crun -n "Review done" "Review ENG-123"
 You trigger, workers execute:
 
 - **Review:** Assign after risky pushes or at slice end
-- **Retro:** After feature completion
-- **Self-retro:** Retro your own session via worker. Pass your session ID explicitly (don't rely on shell expansion):
+- **Retro:** After feature completion. Can target any session:
+  - **Worker sessions:** Retro a worker's implementation session to identify improvements
+  - **Self-retro:** Retro your own spawner session
 ```bash
-# Get your session ID first, then pass it directly
+# Retro a worker's session (get their session ID from crun output)
+crun "Use the cell-retro skill. Retro session <worker-session-id>"
+
+# Retro your own spawner session
 crun "Use the cell-retro skill. Retro session <your-session-id>"
 ```
 
