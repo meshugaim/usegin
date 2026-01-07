@@ -1,38 +1,49 @@
 ---
-description: Build UX enhancements under newUX toggle using figma-design-oria branch and Figma
+description: Build UX enhancements under newUX toggle
 ---
 
 # UX Development Mode
 
-You are now in UX development mode. Build enhanced UX under the `newUX` toggle.
+Build enhanced UX under the `newUX` toggle by referencing `figma-design-oria` branch and Figma designs.
 
-## Context Loaded
+## Toggle System
 
-!`cat .claude/skills/ux/SKILL.md`
+All work goes under the `newUX` cookie toggle (layered on `newUI`):
 
-## Page Mapping (Figma reference)
+```typescript
+const newUI = await isNewUIEnabledServer();
+const newUX = await isNewUXEnabledServer();
 
-!`cat tools/figma/page-mapping.json`
-
-## MCP Tools
-
-Use `mcp__figma-personal__*` tools to fetch Figma designs. If not enabled, the user will be prompted to approve.
-
-**File key:** `A0DV8pRwHWgs9EF07sVYxG`
-
-## Quick Reference
-
-```bash
-# View branch changes
-git diff --stat main..origin/figma-design-oria
-
-# View specific file from branch
-git show origin/figma-design-oria:nextjs-app/path/to/file.tsx
-
-# Fetch Figma frame (use node_ids from page-mapping.json)
-# mcp__figma-personal__get_figma_data with file_key and node_id
+// Three-way conditional
+className={newUX ? "newux-style" : newUI ? "newui-style" : "old-style"}
 ```
 
-## Ready
+Enable at `/toggles` or via cookie `effi-new-ux=true`.
 
-What UX enhancement should we build?
+## Reference Branch
+
+```bash
+# See what changed
+git diff --stat main..origin/figma-design-oria
+
+# View specific file
+git show origin/figma-design-oria:nextjs-app/path/to/file.tsx
+```
+
+### Key files on figma-design-oria
+
+| Area | Files |
+|------|-------|
+| Layouts | `app/projects/[projectId]/layout.tsx`, `app/workspaces/[workspaceId]/layout.tsx` |
+| Project views | `app/projects/[projectId]/page.tsx`, `project-home-client.tsx` |
+| Files page | `app/projects/[projectId]/files/page.tsx`, `project-files-client.tsx` |
+| Chat | `app/projects/[projectId]/chat/page.tsx` |
+| Settings | `app/projects/[projectId]/settings/page.tsx` |
+
+## Figma Reference
+
+Use `mcp__figma-personal__*` tools. File key: `A0DV8pRwHWgs9EF07sVYxG`
+
+Page mapping: `tools/figma/page-mapping.json`
+
+## What to build?
