@@ -15,6 +15,44 @@ Three types of feature toggles for different use cases.
 | **Cookie** | Individual cookies | Per-browser | Yes | UI toggles (avoids hydration flash) |
 | **Database** | `feature_toggles` table | System-wide | Yes | Instant rollback, admin-controlled |
 
+## ⚠️ CRITICAL: Hydration Safety
+
+**NEVER mix localStorage and cookie flags for the same feature.**
+
+If a feature flag affects:
+
+* **Layout, styles, or component selection** → MUST use Cookie or Database
+* **Only API parameters or analytics** → Can use localStorage
+
+**Why:** Server renders before client JavaScript runs. localStorage is unavailable on the server, so:
+
+* Server sees: flag = undefined/false
+* Client sees: flag = true (from localStorage)
+* React detects mismatch → Hydration Error
+
+**Example bug pattern (NEXTJS-APP-1):**
+```tsx
+// layout.tsx - WRONG: reads localStorage during hydration
+const script = `
+  if (localStorage.getItem('flag')) {
+    document.documentElement.setAttribute('data-flag', 'true');
+  }
+`;
+// But the toggle system uses cookies!
+// Server renders without attribute, client adds it → hydration error
+```
+
+**Correct pattern:**
+```tsx
+// layout.tsx - reads cookie (available to server)
+const script = `
+  if (document.cookie.includes('flag=true')) {
+    document.documentElement.setAttribute('data-flag', 'true');
+  }
+`;
+// Server and client both read from cookie → no mismatch
+```
+
 ### When to Use Each
 
 | Scenario | Type |
