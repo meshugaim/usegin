@@ -1,5 +1,6 @@
 ---
 description: Build UX enhancements under newUX toggle using figma-design-oria branch and Figma
+allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Task
 ---
 
 # UX Development Mode
