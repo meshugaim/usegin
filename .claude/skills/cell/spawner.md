@@ -172,12 +172,12 @@ crun -n "Review done" "Review ENG-123"
 
 ## Quality Triggers
 
-You trigger, workers execute:
+You ensure the workflow happens. Workers execute.
 
-- **Review:** Assign after risky pushes or at slice end
-- **Retro:** After feature completion. Can target any session:
-  - **Worker sessions:** Retro a worker's implementation session to identify improvements
-  - **Self-retro:** Retro your own spawner session
+- **Review:** Spawn a worker to review after risky pushes or at slice end
+- **Retro:** Spawn a worker to retro after feature completion. Can target any session:
+  - **Worker sessions:** Retro a worker's implementation session
+  - **Spawner sessions:** Retro your own orchestration session
 ```bash
 # Retro a worker's session (get their session ID from crun output)
 crun "Use the cell-retro skill. Retro session <worker-session-id>"

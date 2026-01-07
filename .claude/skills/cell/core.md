@@ -13,7 +13,7 @@ Shared by spawner and workers.
 ## Development Practices
 
 **Trunk-based:**
-- Push to main often
+- Push to main ASAP - don't accumulate local commits
 - Small commits, frequent pushes
 - Feature toggles for risky/incomplete work
 - Autosync enabled
