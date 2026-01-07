@@ -216,4 +216,4 @@ async def process_message(msg):
 ## Related
 
 - `/toggles` page for toggle management
-- Current DB toggles: `content_sync_v2`
+- Current DB toggles: `terms_acceptance_required`
