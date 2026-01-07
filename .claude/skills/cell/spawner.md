@@ -174,7 +174,7 @@ crun -n "Review done" "Review ENG-123"
 
 You ensure the workflow happens. Workers execute.
 
-- **Review:** Spawn a worker to review after risky pushes or at slice end
+- **Review:** Spawn a worker to review after implementation (always, not just risky work)
 - **Retro:** Spawn a worker to retro after feature completion. Can target any session:
   - **Worker sessions:** Retro a worker's implementation session
   - **Spawner sessions:** Retro your own orchestration session

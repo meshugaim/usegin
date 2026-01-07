@@ -50,7 +50,7 @@ Commit after:
 
 Triggered by spawner, executed by workers:
 
-**Code review:** Spawner assigns to worker. Inline for risky, batched for routine.
+**Code review:** Always. Spawner assigns to worker after implementation.
 
 **CI awareness:** Spawner monitors. If CI fails, assigns fix.
 
