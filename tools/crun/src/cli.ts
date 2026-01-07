@@ -60,10 +60,12 @@ async function main(
     process.exit(1);
   }
 
-  // Generate session ID early for header
+  // Generate IDs early for header
   const deps = createDefaultDeps();
   const sessionId = options.resume || (await deps.generateSessionId());
+  const invocationId = deps.generateInvocationId();
 
+  console.error(`Invocation: ${invocationId}`);
   console.error(`Session: ${sessionId}`);
   console.error(`Log: ~/.crun/logs/${sessionId}.log`);
   console.error("─".repeat(40));
@@ -88,6 +90,7 @@ async function main(
       {
         ...deps,
         generateSessionId: async () => sessionId,
+        generateInvocationId: () => invocationId,
       }
     );
 
