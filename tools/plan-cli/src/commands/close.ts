@@ -9,6 +9,7 @@ export function createCloseCommand(): Command {
     .description("Close an issue (set status to Done)")
     .argument("<id>", "Issue identifier (e.g., ENG-20 or just 20)")
     .option("--reason <text>", "Add a comment explaining why (e.g., 'duplicate of ENG-15')")
+    .option("--comment <text>", "Add a comment when closing (raw text, no prefix)")
     .option("--json", "Output as JSON")
     .option("--quiet", "No output on success")
     .option("--stats", "Show API call statistics")
@@ -23,6 +24,7 @@ async function runClose(
   identifier: string,
   opts: {
     reason?: string;
+    comment?: string;
     json?: boolean;
     quiet?: boolean;
     stats?: boolean;
@@ -38,9 +40,14 @@ async function runClose(
   try {
     const client = new LinearClient({ apiKey });
 
-    // Add reason as comment if provided
+    // Add reason as comment if provided (prefixed with "Closed:")
     if (opts.reason) {
       await client.addComment(identifier, `Closed: ${opts.reason}`);
+    }
+
+    // Add raw comment if provided (no prefix)
+    if (opts.comment) {
+      await client.addComment(identifier, opts.comment);
     }
 
     // Update status to "Done"
@@ -59,6 +66,7 @@ async function runClose(
             title: issue.title,
             status: issue.status,
             reason: opts.reason,
+            comment: opts.comment,
           },
           null,
           2
