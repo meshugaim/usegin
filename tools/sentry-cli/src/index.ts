@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { $ } from "bun";
 import { createEventsCommand } from "./commands/events";
+import { createIssueCommand } from "./commands/issue";
 import { createReplayCommand } from "./commands/replay";
 
 const DEFAULT_ORG = "askeffi";
@@ -13,6 +14,7 @@ const program = new Command()
 
 // Add our custom commands
 program.addCommand(createEventsCommand());
+program.addCommand(createIssueCommand());
 program.addCommand(createReplayCommand());
 
 // Passthrough command for anything else - delegates to @sentry/cli
