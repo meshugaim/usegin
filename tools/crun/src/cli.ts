@@ -5,7 +5,7 @@
 
 import { Command } from "commander";
 import { run, createDefaultDeps } from "./run";
-import { runList, parseListArgs } from "./list";
+import { runList } from "./list";
 import { runKill } from "./kill";
 import {
   isSessionIdOrPrefix,

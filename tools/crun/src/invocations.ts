@@ -37,11 +37,6 @@ export interface InvocationEntry {
   status: InvocationStatus;
 }
 
-/** Partial update for an invocation */
-export type InvocationUpdate = Partial<Omit<InvocationEntry, "id">> & {
-  id: string;
-};
-
 /** Filter options for listing invocations */
 export interface ListInvocationsOptions {
   /** Only show running invocations */
