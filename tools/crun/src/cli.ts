@@ -6,6 +6,12 @@
 import { Command } from "commander";
 import { run, createDefaultDeps } from "./run";
 import { runList, parseListArgs } from "./list";
+import {
+  isSessionIdOrPrefix,
+  resolveSessionPath,
+  extractSessionIdFromPath,
+  AmbiguousSessionError,
+} from "../../session/src/finder";
 
 const program = new Command()
   .name("crun")
@@ -56,6 +62,22 @@ program
 
 program.parse();
 
+/**
+ * Resolve a short session ID prefix to the full session UUID.
+ * If already a full UUID or path, returns it unchanged.
+ * Throws AmbiguousSessionError if multiple sessions match the prefix.
+ */
+async function resolveSessionId(input: string): Promise<string> {
+  // If it doesn't look like an ID or prefix, return unchanged
+  if (!isSessionIdOrPrefix(input)) {
+    return input;
+  }
+
+  // Resolve to full path, then extract session ID
+  const resolvedPath = await resolveSessionPath(input);
+  return extractSessionIdFromPath(resolvedPath);
+}
+
 async function main(
   prompt: string | undefined,
   options: {
@@ -94,9 +116,27 @@ async function main(
     process.exit(1);
   }
 
+  // Resolve short session ID prefixes to full UUIDs
+  let resolvedResume = options.resume;
+  if (options.resume) {
+    try {
+      resolvedResume = await resolveSessionId(options.resume);
+    } catch (error) {
+      if (error instanceof AmbiguousSessionError) {
+        console.error(`Error: ${error.message}`);
+        process.exit(1);
+      }
+      if (error instanceof Error && error.message.includes("not found")) {
+        console.error(`Error: ${error.message}`);
+        process.exit(1);
+      }
+      throw error;
+    }
+  }
+
   // Generate IDs early for header
   const deps = createDefaultDeps();
-  const sessionId = options.resume || (await deps.generateSessionId());
+  const sessionId = resolvedResume || (await deps.generateSessionId());
   const invocationId = deps.generateInvocationId();
 
   console.error(`Invocation: ${invocationId}`);
@@ -114,7 +154,7 @@ async function main(
       {
         prompt,
         promptFile: options.promptFile,
-        resume: options.resume,
+        resume: resolvedResume,
         model: options.model,
         cwd: options.cwd,
         claudeFlags: claudeFlags.length > 0 ? claudeFlags : undefined,
