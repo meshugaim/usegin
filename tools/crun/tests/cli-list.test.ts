@@ -49,7 +49,7 @@ describe("formatInvocationsTable", () => {
     expect(output).toContain("STATUS");
   });
 
-  test("formats single invocation row", () => {
+  test("formats single invocation row with prompt column", () => {
     const invocations: InvocationEntry[] = [
       {
         id: "abc123",
@@ -58,7 +58,7 @@ describe("formatInvocationsTable", () => {
         startedAt: "2024-01-01T00:00:00.000Z",
         cwd: "/test",
         status: "running",
-        prompt: "Test prompt",
+        prompt: "Implement ENG-969: config page UI",
         noteToSelf: "If tests pass, review code",
       },
     ];
@@ -66,8 +66,33 @@ describe("formatInvocationsTable", () => {
     const output = formatInvocationsTable(invocations);
     expect(output).toContain("abc123");
     expect(output).toContain("ce8ff1..."); // 6 chars + ellipsis
+    expect(output).toContain("Implement ENG-969: config pag..."); // truncated prompt
     expect(output).toContain("If tests pass, review");
     expect(output).toContain("running");
+  });
+
+  test("displays PROMPT column header", () => {
+    const output = formatInvocationsTable([]);
+    expect(output).toContain("PROMPT");
+  });
+
+  test("truncates long prompts for display", () => {
+    const invocations: InvocationEntry[] = [
+      {
+        id: "abc123",
+        sessionId: "ce8ff123",
+        pid: 12345,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt:
+          "This is a very long prompt that should be truncated for display in the table output to keep it readable",
+      },
+    ];
+
+    const output = formatInvocationsTable(invocations);
+    // Should truncate to ~28 chars + ellipsis
+    expect(output).toContain("This is a very long prompt t...");
   });
 
   test("truncates session ID to 6 chars + ellipsis", () => {
