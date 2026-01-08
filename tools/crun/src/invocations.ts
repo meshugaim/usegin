@@ -35,6 +35,8 @@ export interface InvocationEntry {
   cwd: string;
   /** Current status */
   status: InvocationStatus;
+  /** Number of times this session has been resumed (0 for original) */
+  resumeCount?: number;
 }
 
 /** Filter options for listing invocations */
@@ -330,6 +332,51 @@ export async function killInvocation(
       message: `Failed to kill process ${invocation.pid}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
+}
+
+/**
+ * Get the resume count for a session
+ *
+ * Returns the number of invocations for this session.
+ * If this is a new session, returns 0.
+ * If there's been one invocation, returns 1 (the next would be the 1st resume).
+ */
+export async function getResumeCountForSession(
+  sessionId: string,
+  filePath: string = getInvocationsPath()
+): Promise<number> {
+  const file = Bun.file(filePath);
+  const exists = await file.exists();
+
+  if (!exists) {
+    return 0;
+  }
+
+  const content = await file.text();
+  if (!content.trim()) {
+    return 0;
+  }
+
+  const lines = content.trim().split("\n");
+
+  // Track unique invocation IDs for this session
+  const invocationIds = new Set<string>();
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as Partial<InvocationEntry> & { id: string };
+      // Only count entries that have sessionId matching and appear to be original records
+      // (have startedAt field, not just updates)
+      if (entry.sessionId === sessionId && entry.startedAt) {
+        invocationIds.add(entry.id);
+      }
+    } catch {
+      // Skip malformed lines
+      continue;
+    }
+  }
+
+  return invocationIds.size;
 }
 
 /**

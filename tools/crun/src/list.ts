@@ -29,6 +29,15 @@ function truncate(str: string, maxLength: number): string {
 }
 
 /**
+ * Format ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+ */
+function formatOrdinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+/**
  * Format session ID for display (first 6 chars + ellipsis)
  */
 function formatSessionId(sessionId: string): string {
@@ -75,6 +84,49 @@ export function formatInvocationsTable(invocations: InvocationEntry[]): string {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Format invocations in multi-line readable format
+ *
+ * Output format:
+ *   ID  session...  status  resumed (Nth)
+ *     Prompt: <full prompt text>
+ *     Note:   <full note text>
+ *
+ *   ID  session...  status
+ *     Prompt: <full prompt text>
+ */
+export function formatInvocationsMultiLine(invocations: InvocationEntry[]): string {
+  const blocks: string[] = [];
+
+  for (const inv of invocations) {
+    const lines: string[] = [];
+
+    // Header line: ID, session, status, resume count
+    const sessionDisplay = formatSessionId(inv.sessionId);
+    const statusDisplay = formatStatus(inv);
+    const resumeDisplay =
+      inv.resumeCount && inv.resumeCount > 0
+        ? `  resumed (${formatOrdinal(inv.resumeCount)})`
+        : "";
+
+    lines.push(`${inv.id}  ${sessionDisplay}  ${statusDisplay}${resumeDisplay}`);
+
+    // Prompt line (indented)
+    if (inv.prompt) {
+      lines.push(`  Prompt: ${inv.prompt}`);
+    }
+
+    // Note line (indented) - only if present
+    if (inv.noteToSelf) {
+      lines.push(`  Note:   ${inv.noteToSelf}`);
+    }
+
+    blocks.push(lines.join("\n"));
+  }
+
+  return blocks.join("\n\n");
 }
 
 /**
