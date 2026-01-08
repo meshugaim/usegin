@@ -208,3 +208,131 @@ export async function listInvocations(
 
   return results;
 }
+
+/**
+ * Get a single invocation by ID
+ *
+ * Returns the merged invocation entry or null if not found.
+ */
+export async function getInvocation(
+  id: string,
+  filePath: string = getInvocationsPath()
+): Promise<InvocationEntry | null> {
+  const file = Bun.file(filePath);
+  const exists = await file.exists();
+
+  if (!exists) {
+    return null;
+  }
+
+  const content = await file.text();
+  if (!content.trim()) {
+    return null;
+  }
+
+  const lines = content.trim().split("\n");
+
+  // Parse and merge entries for this ID
+  let result: InvocationEntry | null = null;
+
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as Partial<InvocationEntry> & { id: string };
+      if (entry.id === id) {
+        if (result) {
+          result = { ...result, ...entry } as InvocationEntry;
+        } else {
+          result = entry as InvocationEntry;
+        }
+      }
+    } catch {
+      // Skip malformed lines
+      continue;
+    }
+  }
+
+  return result;
+}
+
+/** Result of attempting to kill an invocation */
+export type KillResult = {
+  status: "killed" | "not_found" | "already_stopped" | "process_not_found" | "kill_failed";
+  message: string;
+};
+
+/**
+ * Check if a process exists
+ */
+function processExists(pid: number): boolean {
+  try {
+    // Sending signal 0 checks if process exists without actually sending a signal
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Kill a running invocation by ID
+ *
+ * Sends SIGTERM to the worker process and updates tracking.
+ * Handles various edge cases like already stopped or stale entries.
+ */
+export async function killInvocation(
+  id: string,
+  filePath: string = getInvocationsPath()
+): Promise<KillResult> {
+  const invocation = await getInvocation(id, filePath);
+
+  if (!invocation) {
+    return {
+      status: "not_found",
+      message: `Invocation '${id}' not found`,
+    };
+  }
+
+  // Check if already stopped
+  if (invocation.status === "completed" || invocation.status === "failed") {
+    return {
+      status: "already_stopped",
+      message: `Invocation '${id}' already stopped (${invocation.status})`,
+    };
+  }
+
+  // Check if process still exists
+  if (!processExists(invocation.pid)) {
+    // Mark as failed since process is gone but wasn't properly tracked
+    await updateInvocation(id, {
+      status: "failed",
+      completedAt: new Date().toISOString(),
+    }, filePath);
+
+    return {
+      status: "process_not_found",
+      message: `Process ${invocation.pid} no longer exists. Marked invocation as failed.`,
+    };
+  }
+
+  // Try to kill the process
+  try {
+    process.kill(invocation.pid, "SIGTERM");
+
+    // Update invocation status
+    await updateInvocation(id, {
+      status: "failed",
+      completedAt: new Date().toISOString(),
+      exitCode: -15, // SIGTERM signal number (negated by convention)
+    }, filePath);
+
+    return {
+      status: "killed",
+      message: `Sent SIGTERM to process ${invocation.pid}`,
+    };
+  } catch (error) {
+    return {
+      status: "kill_failed",
+      message: `Failed to kill process ${invocation.pid}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
