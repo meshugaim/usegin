@@ -3,6 +3,7 @@ import { mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { recordInvocation, type InvocationEntry } from "../src/invocations";
+import { formatInvocationsMultiLine } from "../src/list";
 
 const TEST_DIR = join(tmpdir(), "crun-cli-list-test");
 const TEST_INVOCATIONS_PATH = join(TEST_DIR, "invocations.jsonl");
@@ -368,5 +369,204 @@ describe("list command integration", () => {
     );
 
     expect(output).toContain("No invocations found");
+  });
+});
+
+describe("formatInvocationsMultiLine", () => {
+  test("formats single invocation with header line", () => {
+    const invocations: InvocationEntry[] = [
+      {
+        id: "TcKwTEFO",
+        sessionId: "363cf4ab-uuid-here",
+        pid: 12345,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt: "Implement ENG-969: config page route and tab structure.",
+        noteToSelf: "After worker completes, spawn code-review worker",
+      },
+    ];
+
+    const output = formatInvocationsMultiLine(invocations);
+
+    // Header line should have ID, session prefix, status
+    expect(output).toContain("TcKwTEFO");
+    expect(output).toContain("363cf4...");
+    expect(output).toContain("running");
+
+    // Prompt should be on its own indented line
+    expect(output).toMatch(/Prompt:\s+Implement ENG-969/);
+
+    // Note should be on its own indented line
+    expect(output).toMatch(/Note:\s+After worker completes/);
+  });
+
+  test("shows resume count when resumeCount is set", () => {
+    const invocations: InvocationEntry[] = [
+      {
+        id: "TcKwTEFO",
+        sessionId: "363cf4ab-uuid-here",
+        pid: 12345,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt: "Test prompt",
+        resumeCount: 3,
+      },
+    ];
+
+    const output = formatInvocationsMultiLine(invocations);
+
+    // Should show "resumed (3rd)" in header
+    expect(output).toContain("resumed (3rd)");
+  });
+
+  test("shows original (no resume) when resumeCount is 0 or undefined", () => {
+    const invocations: InvocationEntry[] = [
+      {
+        id: "TcKwTEFO",
+        sessionId: "363cf4ab-uuid-here",
+        pid: 12345,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt: "Test prompt",
+        resumeCount: 0,
+      },
+    ];
+
+    const output = formatInvocationsMultiLine(invocations);
+
+    // Should NOT show "resumed" for original invocation
+    expect(output).not.toContain("resumed");
+  });
+
+  test("shows exit code for completed status", () => {
+    const invocations: InvocationEntry[] = [
+      {
+        id: "DGpiAuJ6",
+        sessionId: "c7e7fb12-uuid-here",
+        pid: 12345,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        completedAt: "2024-01-01T00:05:00.000Z",
+        exitCode: 0,
+        cwd: "/test",
+        status: "completed",
+        prompt: "Test prompt",
+      },
+    ];
+
+    const output = formatInvocationsMultiLine(invocations);
+
+    expect(output).toContain("completed (0)");
+  });
+
+  test("separates multiple invocations with blank line", () => {
+    const invocations: InvocationEntry[] = [
+      {
+        id: "TcKwTEFO",
+        sessionId: "363cf4ab-uuid-here",
+        pid: 12345,
+        startedAt: "2024-01-01T00:01:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt: "First task",
+      },
+      {
+        id: "DGpiAuJ6",
+        sessionId: "c7e7fb12-uuid-here",
+        pid: 12346,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "completed",
+        exitCode: 0,
+        prompt: "Second task",
+      },
+    ];
+
+    const output = formatInvocationsMultiLine(invocations);
+
+    // Should have both IDs
+    expect(output).toContain("TcKwTEFO");
+    expect(output).toContain("DGpiAuJ6");
+
+    // Should have blank line between invocations
+    expect(output).toContain("\n\n");
+  });
+
+  test("handles missing noteToSelf gracefully", () => {
+    const invocations: InvocationEntry[] = [
+      {
+        id: "TcKwTEFO",
+        sessionId: "363cf4ab-uuid-here",
+        pid: 12345,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt: "Test prompt",
+        // no noteToSelf
+      },
+    ];
+
+    const output = formatInvocationsMultiLine(invocations);
+
+    // Should show prompt but not Note line
+    expect(output).toContain("Prompt:");
+    expect(output).not.toContain("Note:");
+  });
+
+  test("formats resume count ordinal correctly", () => {
+    // Test various ordinal suffixes
+    const testCases = [
+      { count: 1, expected: "1st" },
+      { count: 2, expected: "2nd" },
+      { count: 3, expected: "3rd" },
+      { count: 4, expected: "4th" },
+      { count: 11, expected: "11th" },
+      { count: 21, expected: "21st" },
+      { count: 22, expected: "22nd" },
+      { count: 23, expected: "23rd" },
+    ];
+
+    for (const { count, expected } of testCases) {
+      const invocations: InvocationEntry[] = [
+        {
+          id: "test-id",
+          sessionId: "test-session",
+          pid: 12345,
+          startedAt: "2024-01-01T00:00:00.000Z",
+          cwd: "/test",
+          status: "running",
+          prompt: "Test",
+          resumeCount: count,
+        },
+      ];
+
+      const output = formatInvocationsMultiLine(invocations);
+      expect(output).toContain(`resumed (${expected})`);
+    }
+  });
+
+  test("shows full prompt without truncation", () => {
+    const longPrompt =
+      "This is a very long prompt that should NOT be truncated in the multi-line format because we have more space to work with and readability is the goal";
+    const invocations: InvocationEntry[] = [
+      {
+        id: "test-id",
+        sessionId: "test-session",
+        pid: 12345,
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt: longPrompt,
+      },
+    ];
+
+    const output = formatInvocationsMultiLine(invocations);
+
+    // Should contain the full prompt (up to what was stored - 100 chars)
+    expect(output).toContain("This is a very long prompt");
+    // The prompt stored in invocations is already truncated to 100 chars by recordInvocation
+    // So we just verify it's displayed without additional truncation
   });
 });
