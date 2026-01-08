@@ -206,15 +206,54 @@ When workers might conflict:
 - `session <id>` - view transcript
 - `plan show/create/update/start/close` - Linear
 
-**Note-to-self (`-n`):** Use for workflow continuity, not just labels. Describe what happens next:
-```bash
-# Good - guides next action
-crun -n "If passes, close issue and push" "Review ENG-123"
-crun -n "Fix issues found, then spawn retro" "Implement feature"
+**Note-to-self (`-n`):** Use for workflow continuity. See [Note-to-Self Patterns](#note-to-self-patterns) below.
 
-# Bad - just a label, no continuity
-crun -n "Review done" "Review ENG-123"
+## Note-to-Self Patterns
+
+The `-n` flag is for **workflow continuity** - reminding yourself what to do next when a worker completes. Write notes that guide your next decision.
+
+### Bad Patterns
+
+These waste the field - they don't help you decide what's next:
+
+```bash
+# Restates what worker already does
+crun -n "Close and notify" "Implement ENG-123"
+
+# Obvious/empty guidance
+crun -n "Finish the task" "Review ENG-456"
+
+# Just a label
+crun -n "Implementation" "Implement ENG-789"
+
+# Empty or missing when workflow has branches
+crun "Implement ENG-123"  # What do you do when it completes?
 ```
+
+### Good Patterns
+
+These guide your next action based on outcome:
+
+```bash
+# Conditional next step
+crun -n "If passes, spawn reviewer for code review" "Implement ENG-123"
+
+# Failure handling
+crun -n "If fails, check test output and adjust slice scope" "Implement ENG-456"
+
+# Workflow sequencing
+crun -n "After merge, start slice 3 (ENG-971)" "Review ENG-970"
+
+# Multiple outcomes
+crun -n "If approved, close and spawn retro. If changes requested, resume worker." "Review ENG-789"
+
+# Dependency tracking
+crun -n "Unblocks ENG-925 and ENG-926 - spawn both in parallel after" "Implement ENG-924"
+```
+
+### Key Principle
+
+Ask yourself: "When this worker completes, what decision do I need to make?" Write that.
 
 ## Quality Triggers
 
