@@ -2,20 +2,7 @@
  * Tests for short session ID resolution in crun --resume
  */
 
-import { describe, test, expect, mock, beforeEach } from "bun:test";
-import { mkdir, rm } from "fs/promises";
-import { join } from "path";
-import { tmpdir, homedir } from "os";
-
-// Test fixtures
-const TEST_SESSION_ID = "test-1234-5678-abcd-ef0123456789";
-const TEST_INVOCATION_ID = "test-inv1";
-const TEST_LOG_DIR = join(tmpdir(), "crun-session-test-logs");
-const TEST_WORKFLOWS_DIR = join(tmpdir(), "crun-session-test-workflows");
-const TEST_PRESETS_DIR = join(tmpdir(), "crun-session-test-presets");
-const TEST_INVOCATIONS_PATH = join(tmpdir(), "crun-session-test-invocations", "invocations.jsonl");
-
-// Import the session resolution function from session tool
+import { describe, test, expect } from "bun:test";
 import {
   isSessionIdOrPrefix,
   AmbiguousSessionError,
@@ -23,42 +10,6 @@ import {
   discoverSessions,
   extractSessionIdFromPath,
 } from "../../session/src/finder";
-
-// Import run deps for testing
-import { type RunDeps, type RunOptions, run } from "../src/run";
-
-/**
- * Create mock deps with spawnClaude mocked
- */
-function createMockDeps(overrides: Partial<RunDeps> = {}): RunDeps {
-  return {
-    generateSessionId: mock(() => Promise.resolve(TEST_SESSION_ID)),
-    generateInvocationId: mock(() => TEST_INVOCATION_ID),
-    spawnClaude: mock(() =>
-      Promise.resolve({
-        exitCode: 0,
-        stdout: "Claude output here",
-        stderr: "",
-      })
-    ),
-    logDir: TEST_LOG_DIR,
-    claudeCommand: ["echo"],
-    workflowsDir: TEST_WORKFLOWS_DIR,
-    userPresetsDir: TEST_PRESETS_DIR,
-    invocationsPath: TEST_INVOCATIONS_PATH,
-    ...overrides,
-  };
-}
-
-beforeEach(async () => {
-  await rm(TEST_LOG_DIR, { recursive: true, force: true });
-  await rm(TEST_WORKFLOWS_DIR, { recursive: true, force: true });
-  await rm(TEST_PRESETS_DIR, { recursive: true, force: true });
-  await rm(join(tmpdir(), "crun-session-test-invocations"), { recursive: true, force: true });
-  await mkdir(TEST_LOG_DIR, { recursive: true });
-  await mkdir(TEST_WORKFLOWS_DIR, { recursive: true });
-  await mkdir(TEST_PRESETS_DIR, { recursive: true });
-});
 
 describe("session ID prefix detection", () => {
   test("recognizes full UUID as valid", () => {
