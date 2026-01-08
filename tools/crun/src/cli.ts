@@ -6,6 +6,7 @@
 import { Command } from "commander";
 import { run, createDefaultDeps } from "./run";
 import { runList, parseListArgs } from "./list";
+import { runKill } from "./kill";
 import {
   isSessionIdOrPrefix,
   resolveSessionPath,
@@ -35,6 +36,16 @@ program
     console.log(output);
   });
 
+// Kill subcommand
+program
+  .command("kill")
+  .description("Terminate a running worker invocation")
+  .argument("<id>", "The invocation ID to kill")
+  .action(async (id: string) => {
+    const output = await runKill(id);
+    console.log(output);
+  });
+
 // Default run command (when no subcommand is given)
 program
   .argument("[prompt]", "The prompt to send to Claude")
@@ -54,7 +65,8 @@ program
   .action(async (prompt: string | undefined, options) => {
     // Don't run the main action if a subcommand was invoked
     // Commander handles this automatically via the subcommand action
-    if (process.argv[2] === "list") {
+    const subcommands = ["list", "kill"];
+    if (subcommands.includes(process.argv[2])) {
       return;
     }
     await main(prompt, options);
