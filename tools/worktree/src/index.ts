@@ -4,6 +4,7 @@ import { createCreateCommand } from "./commands/create";
 import { createDestroyCommand } from "./commands/destroy";
 import { createListCommand } from "./commands/list";
 import { createLaunchCommand } from "./commands/launch";
+import { createPathCommand } from "./commands/path";
 
 const program = new Command()
   .name("worktree")
@@ -14,5 +15,6 @@ program.addCommand(createCreateCommand());
 program.addCommand(createDestroyCommand());
 program.addCommand(createListCommand());
 program.addCommand(createLaunchCommand());
+program.addCommand(createPathCommand());
 
 program.parse();
