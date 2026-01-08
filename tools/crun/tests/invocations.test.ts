@@ -543,6 +543,99 @@ describe("getInvocation", () => {
   });
 });
 
+describe("cleanupStaleInvocations", () => {
+  // Import the function - we'll create it
+  const { cleanupStaleInvocations } = require("../src/invocations");
+
+  test("marks stale running invocations as failed", async () => {
+    // Create an invocation with a non-existent PID
+    const entry: InvocationEntry = {
+      id: "stale-id",
+      sessionId: "session-123",
+      pid: 999999999, // Very unlikely to exist
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "running",
+      prompt: "Stale test",
+    };
+
+    await recordInvocation(entry, TEST_INVOCATIONS_PATH);
+
+    const cleaned = await cleanupStaleInvocations(TEST_INVOCATIONS_PATH);
+    expect(cleaned).toBe(1);
+
+    // Verify the status was updated
+    const updated = await getInvocation("stale-id", TEST_INVOCATIONS_PATH);
+    expect(updated!.status).toBe("failed");
+  });
+
+  test("does not affect running invocations with valid PID", async () => {
+    // Use current process PID which definitely exists
+    const entry: InvocationEntry = {
+      id: "active-id",
+      sessionId: "session-123",
+      pid: process.pid,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "running",
+      prompt: "Active test",
+    };
+
+    await recordInvocation(entry, TEST_INVOCATIONS_PATH);
+
+    const cleaned = await cleanupStaleInvocations(TEST_INVOCATIONS_PATH);
+    expect(cleaned).toBe(0);
+
+    // Verify status unchanged
+    const updated = await getInvocation("active-id", TEST_INVOCATIONS_PATH);
+    expect(updated!.status).toBe("running");
+  });
+
+  test("does not affect completed/failed invocations", async () => {
+    const entry: InvocationEntry = {
+      id: "completed-id",
+      sessionId: "session-123",
+      pid: 999999999, // Non-existent, but already completed
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "Completed test",
+    };
+
+    await recordInvocation(entry, TEST_INVOCATIONS_PATH);
+
+    const cleaned = await cleanupStaleInvocations(TEST_INVOCATIONS_PATH);
+    expect(cleaned).toBe(0);
+
+    // Verify status unchanged
+    const updated = await getInvocation("completed-id", TEST_INVOCATIONS_PATH);
+    expect(updated!.status).toBe("completed");
+  });
+
+  test("returns 0 for empty file", async () => {
+    const cleaned = await cleanupStaleInvocations(TEST_INVOCATIONS_PATH);
+    expect(cleaned).toBe(0);
+  });
+
+  test("cleans up multiple stale entries", async () => {
+    for (let i = 0; i < 3; i++) {
+      await recordInvocation({
+        id: `stale-${i}`,
+        sessionId: `session-${i}`,
+        pid: 999999990 + i, // All non-existent
+        startedAt: "2024-01-01T00:00:00.000Z",
+        cwd: "/test",
+        status: "running",
+        prompt: `Stale ${i}`,
+      }, TEST_INVOCATIONS_PATH);
+    }
+
+    const cleaned = await cleanupStaleInvocations(TEST_INVOCATIONS_PATH);
+    expect(cleaned).toBe(3);
+  });
+});
+
 describe("killInvocation", () => {
   test("returns not_found for non-existent invocation", async () => {
     const result = await killInvocation("non-existent", TEST_INVOCATIONS_PATH);

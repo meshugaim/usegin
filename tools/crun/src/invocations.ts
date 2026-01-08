@@ -263,7 +263,7 @@ export type KillResult = {
 /**
  * Check if a process exists
  */
-function processExists(pid: number): boolean {
+export function processExists(pid: number): boolean {
   try {
     // Sending signal 0 checks if process exists without actually sending a signal
     process.kill(pid, 0);
@@ -335,4 +335,31 @@ export async function killInvocation(
       message: `Failed to kill process ${invocation.pid}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
+}
+
+/**
+ * Clean up stale invocations where PID no longer exists
+ *
+ * Finds all "running" invocations and checks if the process still exists.
+ * If not, marks them as "failed".
+ *
+ * Returns the number of stale entries cleaned up.
+ */
+export async function cleanupStaleInvocations(
+  filePath: string = getInvocationsPath()
+): Promise<number> {
+  const invocations = await listInvocations({ running: true }, filePath);
+  let cleaned = 0;
+
+  for (const inv of invocations) {
+    if (!processExists(inv.pid)) {
+      await updateInvocation(inv.id, {
+        status: "failed",
+        completedAt: new Date().toISOString(),
+      }, filePath);
+      cleaned++;
+    }
+  }
+
+  return cleaned;
 }
