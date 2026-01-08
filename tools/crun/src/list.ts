@@ -177,5 +177,6 @@ export async function runList(
     return "No invocations found.";
   }
 
-  return formatInvocationsTable(invocations);
+  // Use multi-line format by default for better readability
+  return formatInvocationsMultiLine(invocations);
 }
