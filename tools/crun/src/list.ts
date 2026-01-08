@@ -54,6 +54,7 @@ export function formatInvocationsTable(invocations: InvocationEntry[]): string {
   const columns = [
     { header: "ID", width: 10 },
     { header: "SESSION", width: 12 },
+    { header: "PROMPT", width: 35 },
     { header: "NOTE-TO-SELF", width: 35 },
     { header: "STATUS", width: 16 },
   ];
@@ -66,10 +67,11 @@ export function formatInvocationsTable(invocations: InvocationEntry[]): string {
   for (const inv of invocations) {
     const id = inv.id.padEnd(columns[0].width);
     const session = formatSessionId(inv.sessionId).padEnd(columns[1].width);
-    const note = truncate(inv.noteToSelf || "", 32).padEnd(columns[2].width);
-    const status = formatStatus(inv).padEnd(columns[3].width);
+    const prompt = truncate(inv.prompt || "", 32).padEnd(columns[2].width);
+    const note = truncate(inv.noteToSelf || "", 32).padEnd(columns[3].width);
+    const status = formatStatus(inv).padEnd(columns[4].width);
 
-    lines.push(`${id}${session}${note}${status}`);
+    lines.push(`${id}${session}${prompt}${note}${status}`);
   }
 
   return lines.join("\n");

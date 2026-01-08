@@ -66,7 +66,7 @@ describe("formatInvocationsTable", () => {
     const output = formatInvocationsTable(invocations);
     expect(output).toContain("abc123");
     expect(output).toContain("ce8ff1..."); // 6 chars + ellipsis
-    expect(output).toContain("Implement ENG-969: config pag..."); // truncated prompt
+    expect(output).toContain("Implement ENG-969: config page U..."); // truncated prompt (32 chars)
     expect(output).toContain("If tests pass, review");
     expect(output).toContain("running");
   });
@@ -91,8 +91,8 @@ describe("formatInvocationsTable", () => {
     ];
 
     const output = formatInvocationsTable(invocations);
-    // Should truncate to ~28 chars + ellipsis
-    expect(output).toContain("This is a very long prompt t...");
+    // Should truncate to 32 chars + ellipsis
+    expect(output).toContain("This is a very long prompt that ...");
   });
 
   test("truncates session ID to 6 chars + ellipsis", () => {
