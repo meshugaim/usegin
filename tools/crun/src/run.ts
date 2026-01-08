@@ -12,6 +12,7 @@ import {
   updateInvocation,
   generateInvocationId as defaultGenerateInvocationId,
   getInvocationsPath,
+  getResumeCountForSession,
   type InvocationStatus,
 } from "./invocations";
 
@@ -196,6 +197,11 @@ export async function run(
   await mkdir(deps.logDir, { recursive: true });
   const logPath = join(deps.logDir, `${sessionId}.log`);
 
+  // Calculate resume count (how many times this session has been invoked before)
+  const resumeCount = options.resume
+    ? await getResumeCountForSession(sessionId, deps.invocationsPath)
+    : 0;
+
   // Record invocation at start
   await recordInvocation(
     {
@@ -207,6 +213,7 @@ export async function run(
       cwd: options.cwd || process.cwd(),
       status: "running",
       noteToSelf: options.noteToSelf,
+      resumeCount,
     },
     deps.invocationsPath
   );
