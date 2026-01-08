@@ -10,6 +10,7 @@ import {
   getInvocationsPath,
   getInvocation,
   killInvocation,
+  getResumeCountForSession,
   type InvocationEntry,
   type InvocationStatus,
   type KillResult,
@@ -739,5 +740,188 @@ describe("killInvocation", () => {
     expect(alreadyStopped.status).toBe("already_stopped");
     expect(processNotFound.status).toBe("process_not_found");
     expect(killFailed.status).toBe("kill_failed");
+  });
+});
+
+describe("resumeCount tracking", () => {
+  test("InvocationEntry supports resumeCount field", () => {
+    const entry: InvocationEntry = {
+      id: "abc123",
+      sessionId: "session-uuid",
+      pid: 12345,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/workspaces/test",
+      status: "running",
+      prompt: "Test prompt",
+      resumeCount: 3,
+    };
+
+    expect(entry.resumeCount).toBe(3);
+  });
+
+  test("resumeCount defaults to 0 for original invocation (no resume)", () => {
+    const entry: InvocationEntry = {
+      id: "abc123",
+      sessionId: "session-uuid",
+      pid: 12345,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/workspaces/test",
+      status: "running",
+      prompt: "Test prompt",
+    };
+
+    // resumeCount should be undefined or 0 for original invocations
+    expect(entry.resumeCount ?? 0).toBe(0);
+  });
+
+  test("resumeCount is stored and retrieved correctly", async () => {
+    const entry: InvocationEntry = {
+      id: "resume-test",
+      sessionId: "session-123",
+      pid: 1234,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "running",
+      prompt: "Test",
+      resumeCount: 5,
+    };
+
+    await recordInvocation(entry, TEST_INVOCATIONS_PATH);
+
+    const result = await getInvocation("resume-test", TEST_INVOCATIONS_PATH);
+    expect(result).not.toBeNull();
+    expect(result!.resumeCount).toBe(5);
+  });
+});
+
+describe("getResumeCountForSession", () => {
+  test("returns 0 for session with no previous invocations", async () => {
+    const count = await getResumeCountForSession("new-session", TEST_INVOCATIONS_PATH);
+    expect(count).toBe(0);
+  });
+
+  test("returns 1 after one invocation", async () => {
+    const entry: InvocationEntry = {
+      id: "inv-1",
+      sessionId: "session-123",
+      pid: 1234,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "First invocation",
+      resumeCount: 0,
+    };
+
+    await recordInvocation(entry, TEST_INVOCATIONS_PATH);
+
+    const count = await getResumeCountForSession("session-123", TEST_INVOCATIONS_PATH);
+    expect(count).toBe(1);
+  });
+
+  test("returns correct count after multiple resumes", async () => {
+    // Original invocation
+    await recordInvocation({
+      id: "inv-1",
+      sessionId: "session-123",
+      pid: 1234,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "Original",
+      resumeCount: 0,
+    }, TEST_INVOCATIONS_PATH);
+
+    // First resume
+    await recordInvocation({
+      id: "inv-2",
+      sessionId: "session-123",
+      pid: 1235,
+      startedAt: "2024-01-01T00:05:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "First resume",
+      resumeCount: 1,
+    }, TEST_INVOCATIONS_PATH);
+
+    // Second resume
+    await recordInvocation({
+      id: "inv-3",
+      sessionId: "session-123",
+      pid: 1236,
+      startedAt: "2024-01-01T00:10:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "Second resume",
+      resumeCount: 2,
+    }, TEST_INVOCATIONS_PATH);
+
+    const count = await getResumeCountForSession("session-123", TEST_INVOCATIONS_PATH);
+    expect(count).toBe(3);
+  });
+
+  test("counts only invocations for the specified session", async () => {
+    // Session A
+    await recordInvocation({
+      id: "inv-a1",
+      sessionId: "session-A",
+      pid: 1234,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "Session A original",
+    }, TEST_INVOCATIONS_PATH);
+
+    await recordInvocation({
+      id: "inv-a2",
+      sessionId: "session-A",
+      pid: 1235,
+      startedAt: "2024-01-01T00:05:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "Session A resume",
+    }, TEST_INVOCATIONS_PATH);
+
+    // Session B
+    await recordInvocation({
+      id: "inv-b1",
+      sessionId: "session-B",
+      pid: 1236,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "completed",
+      exitCode: 0,
+      prompt: "Session B original",
+    }, TEST_INVOCATIONS_PATH);
+
+    const countA = await getResumeCountForSession("session-A", TEST_INVOCATIONS_PATH);
+    const countB = await getResumeCountForSession("session-B", TEST_INVOCATIONS_PATH);
+
+    expect(countA).toBe(2);
+    expect(countB).toBe(1);
+  });
+
+  test("ignores update entries (only counts unique invocation IDs)", async () => {
+    const entry: InvocationEntry = {
+      id: "inv-1",
+      sessionId: "session-123",
+      pid: 1234,
+      startedAt: "2024-01-01T00:00:00.000Z",
+      cwd: "/test",
+      status: "running",
+      prompt: "Test",
+    };
+
+    await recordInvocation(entry, TEST_INVOCATIONS_PATH);
+    // Update the same invocation (shouldn't count as additional resume)
+    await updateInvocation("inv-1", { status: "completed", exitCode: 0 }, TEST_INVOCATIONS_PATH);
+
+    const count = await getResumeCountForSession("session-123", TEST_INVOCATIONS_PATH);
+    expect(count).toBe(1);
   });
 });
