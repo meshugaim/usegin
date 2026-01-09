@@ -43,6 +43,17 @@ Only after user confirmation:
 bunx supabase db push --db-url "postgresql://postgres.becbrfnfxrgezhtkrsrm:$SUPABASE_DB_PASSWORD@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
 ```
 
+## NEVER Use MCP for Migrations
+
+**Do NOT use `mcp__supabase-local__apply_migration` for migrations.**
+
+The MCP tool generates its own timestamps instead of using file names, causing version drift between the database and code. This breaks the GitHub integration which compares DB versions against file names.
+
+**Always use the CLI approach above.** If CLI connection fails:
+1. Fix the connection issue (check env vars, network)
+2. Ask the user for help
+3. Do NOT fall back to MCP
+
 ## Troubleshooting
 
 - If connection fails, verify `SUPABASE_DB_PASSWORD` is set: `echo $SUPABASE_DB_PASSWORD`
