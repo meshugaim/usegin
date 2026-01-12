@@ -7,6 +7,84 @@ description: Build UX enhancements under the newUX toggle. Manages work against 
 
 Build enhanced UX under the `newUX` toggle, tracked in Linear.
 
+---
+
+## Feature Toggle Reference
+
+Three types of feature toggles for different use cases.
+
+### Toggle Types
+
+| Type | Storage | Scope | SSR | Use Case |
+|------|---------|-------|-----|----------|
+| **localStorage** | Browser `feature_flags` key | Per-browser, client-only | No | API request flags, user opt-in |
+| **Cookie** | Individual cookies | Per-browser | Yes | UI toggles (avoids hydration flash) |
+| **Database** | `feature_toggles` table | System-wide | Yes | Instant rollback, admin-controlled |
+
+### ⚠️ CRITICAL: Hydration Safety
+
+**NEVER mix localStorage and cookie flags for the same feature.**
+
+If a feature flag affects:
+
+* **Layout, styles, or component selection** → MUST use Cookie or Database
+* **Only API parameters or analytics** → Can use localStorage
+
+**Why:** Server renders before client JavaScript runs. localStorage is unavailable on the server, so:
+
+* Server sees: flag = undefined/false
+* Client sees: flag = true (from localStorage)
+* React detects mismatch → Hydration Error
+
+### Cookie Toggles (for UX work)
+
+SSR-friendly flags available on both server and client. No hydration mismatch.
+
+**Files:**
+- `nextjs-app/lib/feature-flags-cookie.ts` - Cookie utilities
+- `nextjs-app/lib/feature-flags-server.ts` - Server-side readers
+
+**Client-side:**
+```typescript
+import { getFeatureFlagFromCookie, setFeatureFlagCookie } from "@/lib/feature-flags-cookie"
+
+setFeatureFlagCookie("my-flag", true)
+const enabled = getFeatureFlagFromCookie("my-flag")
+```
+
+**Server-side (Server Components, middleware):**
+```typescript
+import { cookies } from "next/headers"
+
+const cookieStore = await cookies()
+const enabled = cookieStore.get("my-flag")?.value === "true"
+```
+
+### Layered Toggles (newUI → newUX)
+
+```typescript
+// newUI toggle (effi-new-ui cookie)
+import { isNewUIEnabled, toggleNewUI } from "@/lib/feature-flags-cookie"
+import { isNewUIEnabledServer } from "@/lib/feature-flags-server"
+
+// newUX toggle (effi-new-ux cookie) - layered on newUI
+import { isNewUXEnabled, toggleNewUX } from "@/lib/feature-flags-cookie"
+import { isNewUXEnabledServer } from "@/lib/feature-flags-server"
+```
+
+**Layered dependency:** Enabling newUX auto-enables newUI. Disabling newUI auto-disables newUX.
+
+### Placement Principle
+
+**Place toggles at the highest-level entry point possible.**
+
+| Good | Bad |
+|------|-----|
+| Check toggle in page.tsx | Scatter checks throughout components |
+| Single toggle controls entire feature | Multiple toggles for one feature |
+
+---
+
 ## First: Orient on Linear
 
 Check current UX work status:
