@@ -5,6 +5,8 @@ import { createDestroyCommand } from "./commands/destroy";
 import { createLaunchCommand } from "./commands/launch";
 import { createListCommand } from "./commands/list";
 import { createPathCommand } from "./commands/path";
+import { createStatusCommand } from "./commands/status";
+import { createSyncCommand } from "./commands/sync";
 
 const program = new Command()
   .name("clone")
@@ -16,5 +18,7 @@ program.addCommand(createDestroyCommand());
 program.addCommand(createLaunchCommand());
 program.addCommand(createListCommand());
 program.addCommand(createPathCommand());
+program.addCommand(createStatusCommand());
+program.addCommand(createSyncCommand());
 
 program.parse();
