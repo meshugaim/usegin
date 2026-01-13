@@ -9,6 +9,7 @@ describe("clone CLI", () => {
     expect(result).toContain("Git reference clone lifecycle management");
     expect(result).toContain("create");
     expect(result).toContain("destroy");
+    expect(result).toContain("launch");
     expect(result).toContain("list");
     expect(result).toContain("path");
   });
@@ -59,6 +60,17 @@ describe("clone CLI", () => {
 
       expect(result).toContain("Get the absolute path to a clone directory");
       expect(result).toContain("<name>");
+    });
+  });
+
+  describe("launch command", () => {
+    it("shows help for launch command", async () => {
+      const result = await $`bun run src/index.ts launch --help`.text();
+
+      expect(result).toContain("Launch Claude in a clone with MCP control");
+      expect(result).toContain("<name>");
+      expect(result).toContain("--no-mcp");
+      expect(result).toContain("--mcp-config");
     });
   });
 });
