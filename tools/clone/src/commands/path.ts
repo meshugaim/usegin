@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { CLONES_DIR } from "./list";
+import { CLONES_DIR } from "../shared";
 
 export interface PathDeps {
   getCwd: () => string;

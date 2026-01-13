@@ -1,8 +1,10 @@
 import { Command } from "commander";
 import { $ } from "bun";
-import { readdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { CLONES_DIR } from "./list";
+import {
+  CLONES_DIR,
+  buildClonePath,
+  listCloneDirectories as sharedListCloneDirectories,
+} from "../shared";
 
 export interface StatusInfo {
   name: string;
@@ -28,15 +30,9 @@ export interface StatusDeps {
 
 export function getDefaultDeps(): StatusDeps {
   return {
-    listCloneDirectories: async () => {
-      if (!existsSync(CLONES_DIR)) {
-        return [];
-      }
-      const entries = await readdir(CLONES_DIR, { withFileTypes: true });
-      return entries.filter((e) => e.isDirectory()).map((e) => e.name);
-    },
+    listCloneDirectories: sharedListCloneDirectories,
     getCloneStatus: async (name: string) => {
-      const clonePath = `${CLONES_DIR}/${name}`;
+      const clonePath = buildClonePath(name);
 
       const branch = await $`git -C ${clonePath} rev-parse --abbrev-ref HEAD`
         .text()
@@ -121,7 +117,7 @@ async function parseStatuses(
 
     statuses.push({
       name,
-      path: `${CLONES_DIR}/${name}`,
+      path: buildClonePath(name),
       branch,
       isDirty,
       ahead,

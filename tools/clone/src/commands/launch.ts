@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { existsSync } from "node:fs";
-import { CLONES_DIR } from "./create";
+import { buildClonePath as sharedBuildClonePath } from "../shared";
 
 export interface LaunchOptions {
   noMcp?: boolean;
@@ -43,7 +43,7 @@ export function createLaunchCommand(): Command {
 }
 
 export function buildClonePath(name: string): string {
-  return `${CLONES_DIR}/${name}`;
+  return sharedBuildClonePath(name);
 }
 
 export async function cloneExists(

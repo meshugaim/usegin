@@ -1,8 +1,9 @@
 import { Command } from "commander";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
+import { CLONES_DIR, buildClonePath as sharedBuildClonePath } from "../shared";
 
-export const CLONES_DIR = ".clones";
+export { CLONES_DIR };
 
 export interface DestroyConfig {
   clonesDir: string;
@@ -42,7 +43,7 @@ export function buildClonePath(
   name: string,
   config = getDefaultConfig()
 ): string {
-  return `${config.clonesDir}/${name}`;
+  return sharedBuildClonePath(name, config.clonesDir);
 }
 
 export function createDestroyCommand(): Command {

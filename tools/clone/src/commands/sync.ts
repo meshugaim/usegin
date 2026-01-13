@@ -1,8 +1,9 @@
 import { Command } from "commander";
 import { $ } from "bun";
-import { readdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { CLONES_DIR } from "./list";
+import {
+  buildClonePath,
+  listCloneDirectories as sharedListCloneDirectories,
+} from "../shared";
 
 export interface SyncResult {
   name: string;
@@ -23,15 +24,9 @@ export interface SyncDeps {
 
 export function getDefaultDeps(): SyncDeps {
   return {
-    listCloneDirectories: async () => {
-      if (!existsSync(CLONES_DIR)) {
-        return [];
-      }
-      const entries = await readdir(CLONES_DIR, { withFileTypes: true });
-      return entries.filter((e) => e.isDirectory()).map((e) => e.name);
-    },
+    listCloneDirectories: sharedListCloneDirectories,
     syncClone: async (name: string) => {
-      const clonePath = `${CLONES_DIR}/${name}`;
+      const clonePath = buildClonePath(name);
       await $`git -C ${clonePath} pull --rebase origin main`.quiet();
     },
     output: console.log,
