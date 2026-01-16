@@ -35,14 +35,14 @@ Use the driver pattern from the start:
 2. Write tests using driver methods
 3. Add `data-testid` to components as needed
 
-### 3. Iterate with e2e-dev Mode
+### 3. Iterate with e2e CLI
 
 Keep services running for fast iteration:
 
 ```bash
-just e2e-dev my-test.spec.ts   # First run starts services (~50s)
-just e2e-dev my-test.spec.ts   # Subsequent runs reuse them (~4s)
-just e2e-cleanup               # Clean up when done
+e2e up                           # Start services once
+e2e run -- my-test.spec.ts       # Run tests (fast, services already up)
+e2e down                         # Clean up when done
 ```
 
 ## When to Use E2E vs Unit Tests
@@ -345,7 +345,7 @@ See `tests/e2e/drivers/conversation.driver.ts` for a complete example of:
 
 - [ ] Explore the flow manually with Playwright MCP
 - [ ] Add `data-testid` to interactive elements in component
-- [ ] Start services with `just e2e-dev`
+- [ ] Start services with `e2e up`
 
 ### While Writing
 
@@ -355,23 +355,13 @@ See `tests/e2e/drivers/conversation.driver.ts` for a complete example of:
 - [ ] Clean up test data BEFORE and AFTER tests (see Avoiding Flakiness)
 - [ ] Use polling for async state verification, not fixed waits
 - [ ] Use 15s+ timeouts for database operations in CI
-- [ ] Run with `just e2e-dev <file>` for fast iteration
+- [ ] Run with `e2e run -- <file>` for fast iteration
 
 ### After Writing
 
-- [ ] Run full suite with `just e2e` to verify
-- [ ] Clean up with `just e2e-cleanup`
+- [ ] Run full suite with `e2e run` to verify
+- [ ] Clean up with `e2e down`
 
 ## Running Tests
 
-```bash
-just e2e                      # All tests
-just e2e example.spec.ts      # Specific file
-just e2e-dev example.spec.ts  # Fast iteration (keeps services running)
-just e2e-cleanup              # Clean up containers
-```
-
-## Reference
-
-- Full e2e docs: `tests/e2e/README.md`
-- Running tests skill: `running-e2e-tests`
+Use the `e2e` CLI. Run `e2e --help` or `e2e docs` for documentation.
