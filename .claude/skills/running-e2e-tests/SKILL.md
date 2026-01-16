@@ -28,9 +28,8 @@ just e2e-cleanup            # Clean up when done
 ## Key Files
 
 - `tests/e2e/tests/*.spec.ts` - Test specs
-- `tests/e2e/global-setup.ts` - Starts Supabase + Python API
-- `tests/e2e/global-teardown.ts` - Stops services
 - `tests/e2e/fixtures/` - Auth injection, logging
+- `tools/e2e/` - E2E CLI for service management
 
 ## Troubleshooting
 
