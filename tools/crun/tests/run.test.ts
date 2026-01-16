@@ -305,6 +305,50 @@ describe("generateSessionId", () => {
   });
 });
 
+describe("environment filtering", () => {
+  test("strips ANTHROPIC_API_KEY from spawned process environment", async () => {
+    // Set the env var in the current process
+    process.env.ANTHROPIC_API_KEY = "test-api-key-should-not-appear";
+
+    const deps = createTestDeps({
+      // Use printenv to show environment variables
+      claudeCommand: ["sh", "-c", "printenv | grep -E '^(ANTHROPIC_API_KEY|CLAUDE_API_KEY)=' || echo 'NO_API_KEYS_FOUND'"],
+    });
+
+    const result = await run({ prompt: "test" }, deps);
+    const logContent = await Bun.file(result.logPath).text();
+
+    // Should NOT contain the API key
+    expect(logContent).not.toContain("test-api-key-should-not-appear");
+    // Should contain our marker indicating no API keys were found
+    expect(logContent).toContain("NO_API_KEYS_FOUND");
+
+    // Clean up
+    delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  test("strips CLAUDE_API_KEY from spawned process environment", async () => {
+    // Set the env var in the current process
+    process.env.CLAUDE_API_KEY = "test-claude-key-should-not-appear";
+
+    const deps = createTestDeps({
+      // Use printenv to show environment variables
+      claudeCommand: ["sh", "-c", "printenv | grep -E '^(ANTHROPIC_API_KEY|CLAUDE_API_KEY)=' || echo 'NO_API_KEYS_FOUND'"],
+    });
+
+    const result = await run({ prompt: "test" }, deps);
+    const logContent = await Bun.file(result.logPath).text();
+
+    // Should NOT contain the API key
+    expect(logContent).not.toContain("test-claude-key-should-not-appear");
+    // Should contain our marker indicating no API keys were found
+    expect(logContent).toContain("NO_API_KEYS_FOUND");
+
+    // Clean up
+    delete process.env.CLAUDE_API_KEY;
+  });
+});
+
 describe("note-to-self", () => {
   test("includes noteToSelf in result", async () => {
     const deps = createMockDeps();

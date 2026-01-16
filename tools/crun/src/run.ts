@@ -100,6 +100,20 @@ export function createDefaultDeps(): RunDeps {
 }
 
 /**
+ * Build environment for spawned Claude process.
+ * Removes API key env vars to force OAuth authentication.
+ */
+function buildClaudeEnv(): Record<string, string | undefined> {
+  const env = { ...process.env };
+  // Remove API key env vars to force OAuth authentication
+  // This prevents "Credit balance is too low" errors when an API key
+  // with insufficient credits is present but OAuth would work fine
+  delete env.ANTHROPIC_API_KEY;
+  delete env.CLAUDE_API_KEY;
+  return env;
+}
+
+/**
  * Spawn claude process and stream output
  */
 async function spawnClaudeProcess(
@@ -126,6 +140,7 @@ async function spawnClaudeProcess(
     stdout: "pipe",
     stderr: "pipe",
     cwd: options.cwd,
+    env: buildClaudeEnv(),
   });
 
   // Stream and capture output concurrently
