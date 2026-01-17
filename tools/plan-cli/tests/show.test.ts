@@ -2,6 +2,11 @@ import { describe, expect, it } from "bun:test";
 import { formatShowHuman, formatShowJson, formatHistoryHuman } from "../src/lib/output";
 import type { PlanIssueDetail, PlanComment, IssueHistoryEntry } from "../src/types";
 
+// Helper to strip ANSI color codes from output for testing
+function stripAnsi(str: string): string {
+  return str.replace(/\u001B\[[0-9;]*m/g, "");
+}
+
 const mockComments: PlanComment[] = [
   {
     id: "comment-1",
@@ -54,47 +59,47 @@ const mockIssue: PlanIssueDetail = {
 describe("formatShowHuman", () => {
   it("shows identifier and title as header", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("ENG-20: Refactor API client");
+    expect(stripAnsi(output)).toContain("ENG-20: Refactor API client");
   });
 
   it("shows status", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Status: Backlog");
+    expect(stripAnsi(output)).toContain("Status: Backlog");
   });
 
   it("shows assignee with @ prefix", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Assignee: @nitsan");
+    expect(stripAnsi(output)).toContain("Assignee: @nitsan");
   });
 
   it("shows position", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Position: #2");
+    expect(stripAnsi(output)).toContain("Position: #2");
   });
 
   it("shows description indented", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Description:");
-    expect(output).toContain("Break up the monolithic API client");
+    expect(stripAnsi(output)).toContain("Description:");
+    expect(stripAnsi(output)).toContain("Break up the monolithic API client");
   });
 
   it("shows sub-issues section when present", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Sub-issues:");
-    expect(output).toContain("ENG-21");
-    expect(output).toContain("Extract types");
-    expect(output).toContain("ENG-23");
-    expect(output).toContain("Update imports");
+    expect(stripAnsi(output)).toContain("Sub-issues:");
+    expect(stripAnsi(output)).toContain("ENG-21");
+    expect(stripAnsi(output)).toContain("Extract types");
+    expect(stripAnsi(output)).toContain("ENG-23");
+    expect(stripAnsi(output)).toContain("Update imports");
   });
 
   it("shows blockedBy as (none) when empty", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Blocked by: (none)");
+    expect(stripAnsi(output)).toContain("Blocked by: (none)");
   });
 
   it("shows blocks list when present", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Blocks: ENG-30");
+    expect(stripAnsi(output)).toContain("Blocks: ENG-30");
   });
 
   it("handles missing optional fields gracefully", () => {
@@ -111,19 +116,19 @@ describe("formatShowHuman", () => {
     };
 
     const output = formatShowHuman(minimalIssue);
-    expect(output).toContain("ENG-1: Simple issue");
-    expect(output).toContain("Assignee: (unassigned)");
+    expect(stripAnsi(output)).toContain("ENG-1: Simple issue");
+    expect(stripAnsi(output)).toContain("Assignee: (unassigned)");
     expect(output).not.toContain("Sub-issues:");
   });
 
   it("shows labels when present", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Labels: refactor, tech-debt");
+    expect(stripAnsi(output)).toContain("Labels: refactor, tech-debt");
   });
 
   it("shows project when present", () => {
     const output = formatShowHuman(mockIssue);
-    expect(output).toContain("Project: MVP");
+    expect(stripAnsi(output)).toContain("Project: MVP");
   });
 
   it("renders markdown in description (removes markdown markers)", () => {
@@ -133,9 +138,9 @@ describe("formatShowHuman", () => {
     };
     const output = formatShowHuman(issueWithMarkdown);
     // Should contain the text
-    expect(output).toContain("Header");
-    expect(output).toContain("inline code");
-    expect(output).toContain("bold");
+    expect(stripAnsi(output)).toContain("Header");
+    expect(stripAnsi(output)).toContain("inline code");
+    expect(stripAnsi(output)).toContain("bold");
     // Markdown markers should be removed by the renderer
     expect(output).not.toContain("##");
     expect(output).not.toContain("**");
@@ -237,21 +242,21 @@ describe("formatShowHuman with comments", () => {
   it("shows comments section header with count when comments present", () => {
     const issueWithComments = { ...mockIssue, comments: mockComments };
     const output = formatShowHuman(issueWithComments);
-    expect(output).toContain("Comments (2):");
+    expect(stripAnsi(output)).toContain("Comments (2):");
   });
 
   it("shows comment author with @ prefix", () => {
     const issueWithComments = { ...mockIssue, comments: mockComments };
     const output = formatShowHuman(issueWithComments);
-    expect(output).toContain("@nitsan");
-    expect(output).toContain("@alice");
+    expect(stripAnsi(output)).toContain("@nitsan");
+    expect(stripAnsi(output)).toContain("@alice");
   });
 
   it("shows comment body", () => {
     const issueWithComments = { ...mockIssue, comments: mockComments };
     const output = formatShowHuman(issueWithComments);
-    expect(output).toContain("This is the first comment");
-    expect(output).toContain("A quick follow-up");
+    expect(stripAnsi(output)).toContain("This is the first comment");
+    expect(stripAnsi(output)).toContain("A quick follow-up");
   });
 
   it("shows relative time for comments", () => {
@@ -269,8 +274,8 @@ describe("formatShowHuman with comments", () => {
     };
     const issueWithComment = { ...mockIssue, comments: [commentWithoutUser] };
     const output = formatShowHuman(issueWithComment);
-    expect(output).toContain("(unknown)");
-    expect(output).toContain("Anonymous comment");
+    expect(stripAnsi(output)).toContain("(unknown)");
+    expect(stripAnsi(output)).toContain("Anonymous comment");
   });
 
   it("renders markdown in comment body (removes markdown markers)", () => {
@@ -283,8 +288,8 @@ describe("formatShowHuman with comments", () => {
     const issueWithComment = { ...mockIssue, comments: [commentWithMarkdown] };
     const output = formatShowHuman(issueWithComment);
     // Should contain the text
-    expect(output).toContain("this code");
-    expect(output).toContain("important");
+    expect(stripAnsi(output)).toContain("this code");
+    expect(stripAnsi(output)).toContain("important");
     // Markdown markers should be removed by the renderer
     expect(output).not.toContain("**");
   });
@@ -294,15 +299,15 @@ describe("formatShowHuman with comment count hint", () => {
   it("shows comment count with hint when commentCount > 0 and comments not loaded", () => {
     const issueWithCommentCount = { ...mockIssue, commentCount: 3 };
     const output = formatShowHuman(issueWithCommentCount);
-    expect(output).toContain("Comments:");
-    expect(output).toContain("3 comments");
-    expect(output).toContain("(use --comments to view)");
+    expect(stripAnsi(output)).toContain("Comments:");
+    expect(stripAnsi(output)).toContain("3 comments");
+    expect(stripAnsi(output)).toContain("(use --comments to view)");
   });
 
   it("shows singular form for 1 comment", () => {
     const issueWithOneComment = { ...mockIssue, commentCount: 1 };
     const output = formatShowHuman(issueWithOneComment);
-    expect(output).toContain("1 comment");
+    expect(stripAnsi(output)).toContain("1 comment");
     expect(output).not.toContain("1 comments");
   });
 
@@ -328,8 +333,8 @@ describe("formatShowHuman with comment count hint", () => {
     };
     const output = formatShowHuman(issueWithBothCommentsAndCount);
     // Should show full comments, not the hint
-    expect(output).toContain("Comments (2):");
-    expect(output).toContain("@nitsan");
+    expect(stripAnsi(output)).toContain("Comments (2):");
+    expect(stripAnsi(output)).toContain("@nitsan");
     expect(output).not.toContain("use --comments to view");
   });
 });
@@ -360,7 +365,7 @@ describe("formatShowJson with commentCount", () => {
 describe("formatHistoryHuman", () => {
   it("shows (no history) for empty array", () => {
     const output = formatHistoryHuman([]);
-    expect(output).toContain("(no history)");
+    expect(stripAnsi(output)).toContain("(no history)");
   });
 
   it("shows status changes", () => {
@@ -374,9 +379,9 @@ describe("formatHistoryHuman", () => {
       },
     ];
     const output = formatHistoryHuman(history);
-    expect(output).toContain("@Test User");
-    expect(output).toContain("Backlog");
-    expect(output).toContain("In Progress");
+    expect(stripAnsi(output)).toContain("@Test User");
+    expect(stripAnsi(output)).toContain("Backlog");
+    expect(stripAnsi(output)).toContain("In Progress");
   });
 
   it("shows assignment changes", () => {
@@ -389,7 +394,7 @@ describe("formatHistoryHuman", () => {
       },
     ];
     const output = formatHistoryHuman(history);
-    expect(output).toContain("Assigned to @Developer");
+    expect(stripAnsi(output)).toContain("Assigned to @Developer");
   });
 
   it("shows title changes", () => {
@@ -403,7 +408,7 @@ describe("formatHistoryHuman", () => {
       },
     ];
     const output = formatHistoryHuman(history);
-    expect(output).toContain('Title changed: "Old title" → "New title"');
+    expect(stripAnsi(output)).toContain('Title changed: "Old title" → "New title"');
   });
 
   it("shows (no meaningful changes recorded) for entries with no tracked changes", () => {
@@ -416,6 +421,6 @@ describe("formatHistoryHuman", () => {
       },
     ];
     const output = formatHistoryHuman(history);
-    expect(output).toContain("(no meaningful changes recorded)");
+    expect(stripAnsi(output)).toContain("(no meaningful changes recorded)");
   });
 });
