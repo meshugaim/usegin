@@ -62,11 +62,14 @@ function formatValue(metricType: MetricType, value: number): string {
 function getColumns(metricType: MetricType, showDetails: boolean): string[] {
   const base = ["File", "Score"];
 
+  // Always show details for churn metric
+  if (metricType === "churn") {
+    return [...base, "Lines", "Changes"];
+  }
+
   if (!showDetails) return base;
 
   switch (metricType) {
-    case "churn":
-      return [...base, "Lines", "Changes"];
     case "recency-weighted-churn":
       return [...base, "Lines", "Changes", "Weighted"];
     case "bug-density":
@@ -86,15 +89,18 @@ function getColumns(metricType: MetricType, showDetails: boolean): string[] {
 function getRowData(result: MetricResult, metricType: MetricType, showDetails: boolean): string[] {
   const base = [result.file, formatValue(metricType, result.value)];
 
+  // Always show details for churn metric
+  if (metricType === "churn" && result.details) {
+    return [
+      ...base,
+      result.details.lines.toLocaleString(),
+      result.details.changes.toLocaleString(),
+    ];
+  }
+
   if (!showDetails || !result.details) return base;
 
   switch (metricType) {
-    case "churn":
-      return [
-        ...base,
-        result.details.lines.toLocaleString(),
-        result.details.changes.toLocaleString(),
-      ];
     case "recency-weighted-churn":
       return [
         ...base,
