@@ -1,0 +1,20 @@
+{
+  "name": "cctx",
+  "version": "0.1.0",
+  "description": "Claude context utilization checker",
+  "type": "module",
+  "bin": {
+    "cctx": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "commander": "^14.0.2"
+  }
+}
