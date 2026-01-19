@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, readFile } from "fs/promises";
 import { join } from "path";
 
 /**
@@ -155,4 +155,83 @@ The reviewer will verify coverage and coherence before creating Linear sub-issue
     join(workspacePath, "events.jsonl"),
     JSON.stringify(spawnEvent) + "\n"
   );
+}
+
+/**
+ * Read team state from workspace
+ */
+export async function readTeamState(
+  issueId: string,
+  deps: TeamWorkspaceDeps
+): Promise<TeamState> {
+  const workspacePath = getTeamWorkspacePath(issueId, deps);
+  const statePath = join(workspacePath, "state.json");
+  const content = await readFile(statePath, "utf-8");
+  return JSON.parse(content);
+}
+
+/**
+ * Update team state
+ */
+export async function updateTeamState(
+  issueId: string,
+  updates: Partial<TeamState>,
+  deps: TeamWorkspaceDeps
+): Promise<TeamState> {
+  const workspacePath = getTeamWorkspacePath(issueId, deps);
+  const statePath = join(workspacePath, "state.json");
+
+  const currentState = await readTeamState(issueId, deps);
+  const newState: TeamState = {
+    ...currentState,
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await writeFile(statePath, JSON.stringify(newState, null, 2));
+  return newState;
+}
+
+/**
+ * Append event to events.jsonl
+ */
+export async function appendTeamEvent(
+  issueId: string,
+  event: string,
+  data: Record<string, unknown>,
+  deps: TeamWorkspaceDeps
+): Promise<void> {
+  const workspacePath = getTeamWorkspacePath(issueId, deps);
+  const eventsPath = join(workspacePath, "events.jsonl");
+
+  const eventEntry: TeamEvent = {
+    timestamp: new Date().toISOString(),
+    event,
+    data,
+  };
+
+  await Bun.write(eventsPath, JSON.stringify(eventEntry) + "\n", {
+    // @ts-ignore - Bun's append mode
+    flags: "a",
+  });
+}
+
+/**
+ * Append to progress.md log
+ */
+export async function appendProgress(
+  issueId: string,
+  message: string,
+  deps: TeamWorkspaceDeps
+): Promise<void> {
+  const workspacePath = getTeamWorkspacePath(issueId, deps);
+  const progressPath = join(workspacePath, "progress.md");
+
+  const timestamp = new Date().toISOString();
+  const entry = `- [${timestamp}] ${message}\n`;
+
+  await Bun.write(progressPath, entry, {
+    // @ts-ignore - Bun's append mode
+    flags: "a",
+  });
 }

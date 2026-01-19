@@ -17,9 +17,9 @@ afterEach(async () => {
 });
 
 describe("team plan command", () => {
-  test("creates planning team workspace", async () => {
+  test("creates planning team workspace (dry-run)", async () => {
     const result =
-      await $`bun ${CLI_PATH} plan ENG-123 --teams-dir ${TEST_TEAMS_DIR}`.nothrow();
+      await $`bun ${CLI_PATH} plan ENG-123 --teams-dir ${TEST_TEAMS_DIR} --dry-run`.nothrow();
 
     expect(result.exitCode).toBe(0);
 
@@ -32,12 +32,13 @@ describe("team plan command", () => {
     expect(state.phase).toBe("analysis");
   });
 
-  test("outputs success message", async () => {
+  test("outputs success message (dry-run)", async () => {
     const result =
-      await $`bun ${CLI_PATH} plan ENG-456 --teams-dir ${TEST_TEAMS_DIR}`.text();
+      await $`bun ${CLI_PATH} plan ENG-456 --teams-dir ${TEST_TEAMS_DIR} --dry-run`.text();
 
     expect(result).toContain("Planning team workspace created");
     expect(result).toContain("ENG-456");
+    expect(result).toContain("Dry run");
   });
 
   test("fails if issue ID is missing", async () => {
@@ -47,14 +48,14 @@ describe("team plan command", () => {
     expect(result.stderr.toString()).toContain("issue-id");
   });
 
-  test("uses default teams directory when not specified", async () => {
+  test("uses default teams directory when not specified (dry-run)", async () => {
     // This test verifies the CLI has a sensible default
     const defaultDir = join(process.cwd(), ".claude", "teams");
 
     // Clean up default location for test
     await rm(defaultDir, { recursive: true, force: true });
 
-    const result = await $`bun ${CLI_PATH} plan ENG-789`.nothrow();
+    const result = await $`bun ${CLI_PATH} plan ENG-789 --dry-run`.nothrow();
 
     expect(result.exitCode).toBe(0);
 
@@ -67,8 +68,8 @@ describe("team plan command", () => {
     await rm(defaultDir, { recursive: true, force: true });
   });
 
-  test("creates progress.md in workspace", async () => {
-    await $`bun ${CLI_PATH} plan ENG-222 --teams-dir ${TEST_TEAMS_DIR}`;
+  test("creates progress.md in workspace (dry-run)", async () => {
+    await $`bun ${CLI_PATH} plan ENG-222 --teams-dir ${TEST_TEAMS_DIR} --dry-run`;
 
     const progressPath = join(TEST_TEAMS_DIR, "ENG-222", "progress.md");
     const content = await readFile(progressPath, "utf-8");
@@ -77,8 +78,8 @@ describe("team plan command", () => {
     expect(content).toContain("ENG-222");
   });
 
-  test("creates slice.md with spec content placeholder", async () => {
-    await $`bun ${CLI_PATH} plan ENG-333 --teams-dir ${TEST_TEAMS_DIR}`;
+  test("creates slice.md with spec content placeholder (dry-run)", async () => {
+    await $`bun ${CLI_PATH} plan ENG-333 --teams-dir ${TEST_TEAMS_DIR} --dry-run`;
 
     const slicePath = join(TEST_TEAMS_DIR, "ENG-333", "slice.md");
     const content = await readFile(slicePath, "utf-8");
@@ -86,8 +87,8 @@ describe("team plan command", () => {
     expect(content).toContain("Spec Issue: ENG-333");
   });
 
-  test("state.json includes all required fields", async () => {
-    await $`bun ${CLI_PATH} plan ENG-444 --teams-dir ${TEST_TEAMS_DIR}`;
+  test("state.json includes all required fields (dry-run)", async () => {
+    await $`bun ${CLI_PATH} plan ENG-444 --teams-dir ${TEST_TEAMS_DIR} --dry-run`;
 
     const statePath = join(TEST_TEAMS_DIR, "ENG-444", "state.json");
     const state = JSON.parse(await readFile(statePath, "utf-8"));
