@@ -67,9 +67,11 @@ describe("createTeamWorkspace", () => {
 
     expect(state.type).toBe("plan");
     expect(state.issueId).toBe("ENG-123");
-    expect(state.phase).toBe("planning");
-    expect(state.lastUpdated).toBeDefined();
-    expect(new Date(state.lastUpdated).getTime()).toBeGreaterThan(0);
+    expect(state.phase).toBe("analysis");
+    expect(state.createdAt).toBeDefined();
+    expect(state.updatedAt).toBeDefined();
+    expect(new Date(state.createdAt).getTime()).toBeGreaterThan(0);
+    expect(new Date(state.updatedAt).getTime()).toBeGreaterThan(0);
   });
 
   test("creates state.json with correct initial state for implementation team", async () => {
@@ -87,7 +89,8 @@ describe("createTeamWorkspace", () => {
     expect(state.subtasksTotal).toBe(0);
     expect(state.subtasksComplete).toBe(0);
     expect(state.blockers).toEqual([]);
-    expect(state.lastUpdated).toBeDefined();
+    expect(state.createdAt).toBeDefined();
+    expect(state.updatedAt).toBeDefined();
   });
 
   test("creates progress.md file", async () => {
@@ -96,8 +99,8 @@ describe("createTeamWorkspace", () => {
 
     const progressPath = join(TEST_TEAMS_DIR, "ENG-123", "progress.md");
     const content = await readFile(progressPath, "utf-8");
-    expect(content).toContain("# Team Progress: ENG-123");
-    expect(content).toContain("Type: plan");
+    expect(content).toContain("# Planning Team Progress");
+    expect(content).toContain("Issue: ENG-123");
   });
 
   test("creates events.jsonl file", async () => {

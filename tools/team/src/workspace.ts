@@ -26,7 +26,8 @@ export interface TeamState {
   currentWorkerSession?: string;
   reviewerSession?: string;
   blockers?: string[];
-  lastUpdated: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -52,16 +53,18 @@ export function getTeamWorkspacePath(
  * Create initial team state based on team type
  */
 function createInitialState(issueId: string, type: TeamType): TeamState {
+  const now = new Date().toISOString();
   const baseState = {
     type,
     issueId,
-    lastUpdated: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   };
 
   if (type === "plan") {
     return {
       ...baseState,
-      phase: "planning",
+      phase: "analysis",
     };
   } else {
     return {
@@ -100,15 +103,43 @@ export async function createTeamWorkspace(
   );
 
   // Create progress.md
-  const progressContent = `# Team Progress: ${issueId}
+  const progressContent = type === "plan"
+    ? `# Planning Team Progress
 
-Type: ${type}
-Started: ${state.lastUpdated}
+Issue: ${issueId}
+Started: ${state.createdAt}
+
+## Log
+
+`
+    : `# Implementation Team Progress
+
+Issue: ${issueId}
+Started: ${state.createdAt}
 
 ## Log
 
 `;
   await writeFile(join(workspacePath, "progress.md"), progressContent);
+
+  // Create slice.md for planning teams
+  if (type === "plan") {
+    const sliceContent = `# Spec Issue: ${issueId}
+
+The spec content will be loaded from Linear by the planning team.
+
+## Instructions
+
+The planning team worker should:
+1. Read the spec from Linear: \`plan show ${issueId}\`
+2. Analyze the spec and propose vertical slices
+3. For each slice, define acceptance criteria and test approach
+4. Return proposal to reviewer for feedback
+
+The reviewer will verify coverage and coherence before creating Linear sub-issues.
+`;
+    await writeFile(join(workspacePath, "slice.md"), sliceContent);
+  }
 
   // Create events.jsonl with team_spawn event
   const spawnEvent: TeamEvent = {

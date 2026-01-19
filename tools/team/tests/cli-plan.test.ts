@@ -29,7 +29,7 @@ describe("team plan command", () => {
 
     expect(state.type).toBe("plan");
     expect(state.issueId).toBe("ENG-123");
-    expect(state.phase).toBe("planning");
+    expect(state.phase).toBe("analysis");
   });
 
   test("outputs success message", async () => {
@@ -65,5 +65,37 @@ describe("team plan command", () => {
 
     // Cleanup
     await rm(defaultDir, { recursive: true, force: true });
+  });
+
+  test("creates progress.md in workspace", async () => {
+    await $`bun ${CLI_PATH} plan ENG-222 --teams-dir ${TEST_TEAMS_DIR}`;
+
+    const progressPath = join(TEST_TEAMS_DIR, "ENG-222", "progress.md");
+    const content = await readFile(progressPath, "utf-8");
+
+    expect(content).toContain("# Planning Team Progress");
+    expect(content).toContain("ENG-222");
+  });
+
+  test("creates slice.md with spec content placeholder", async () => {
+    await $`bun ${CLI_PATH} plan ENG-333 --teams-dir ${TEST_TEAMS_DIR}`;
+
+    const slicePath = join(TEST_TEAMS_DIR, "ENG-333", "slice.md");
+    const content = await readFile(slicePath, "utf-8");
+
+    expect(content).toContain("Spec Issue: ENG-333");
+  });
+
+  test("state.json includes all required fields", async () => {
+    await $`bun ${CLI_PATH} plan ENG-444 --teams-dir ${TEST_TEAMS_DIR}`;
+
+    const statePath = join(TEST_TEAMS_DIR, "ENG-444", "state.json");
+    const state = JSON.parse(await readFile(statePath, "utf-8"));
+
+    expect(state).toHaveProperty("type", "plan");
+    expect(state).toHaveProperty("issueId", "ENG-444");
+    expect(state).toHaveProperty("phase", "analysis");
+    expect(state).toHaveProperty("createdAt");
+    expect(state).toHaveProperty("updatedAt");
   });
 });

@@ -32,14 +32,29 @@ crun "Use teamwork skill as planning worker. Analyze spec ENG-XXX and propose ve
 ### Phase 2: Review
 
 **Reviewer checks:**
+
+**Individual slice quality:**
 - Are slices truly vertical (end-to-end, not layers)?
 - Are acceptance criteria clear and testable?
 - Is ordering correct (dependencies)?
 - Are independence markers accurate?
 - Are slices right-sized (not too big)?
 
+**Aggregate coverage (CRITICAL):**
+- **Complete coverage**: Do the slices together fully implement the spec? Any gaps?
+- **No overlap**: Is each requirement covered by exactly one slice? Any duplication?
+- **Coherent story**: Do the slices build on each other logically?
+- **Spec alignment**: Does each requirement in the spec map to a slice?
+
+**Coverage verification process:**
+1. List all requirements from spec
+2. For each requirement, identify which slice(s) cover it
+3. Verify each requirement covered exactly once
+4. Verify no slices include work outside the spec
+
 **Reviewer actions:**
-- If issues found → provide specific feedback → spawn worker again
+- If coverage gaps/overlaps found → provide specific feedback → spawn worker again
+- If individual quality issues → provide specific feedback → spawn worker again
 - If approved → move to Phase 3
 
 ### Phase 3: Create Sub-Issues
