@@ -89,4 +89,37 @@ describe("teamwork skill files", () => {
     expect(content).toContain("domain expert");
     expect(content).toContain("cctx");
   });
+
+  test("spawner.md exists and has required sections", async () => {
+    const content = await readFile(join(SKILLS_DIR, "spawner.md"), "utf-8");
+
+    expect(content).toContain("# Spawner");
+    expect(content).toContain("## Overview");
+    expect(content).toContain("## Workflow Steps");
+    expect(content).toContain("### 1. Receive Spec");
+    expect(content).toContain("### 2. Start Planning");
+    expect(content).toContain("### 3. Review Slices");
+    expect(content).toContain("### 4. Implement Slices");
+    expect(content).toContain("### 5. Monitor Progress");
+    expect(content).toContain("## Retry Logic");
+    expect(content).toContain("## Context Monitoring");
+    expect(content).toContain("## State Management");
+  });
+
+  test("spawner.md has retry logic guidance", async () => {
+    const content = await readFile(join(SKILLS_DIR, "spawner.md"), "utf-8");
+
+    expect(content).toContain("up to 3 attempts");
+    expect(content).toContain("failure summary");
+    expect(content).toContain("team plan");
+    expect(content).toContain("team impl");
+  });
+
+  test("spawner.md references Linear and context tools", async () => {
+    const content = await readFile(join(SKILLS_DIR, "spawner.md"), "utf-8");
+
+    expect(content).toContain("plan");
+    expect(content).toContain("cctx");
+    expect(content).toContain("Linear");
+  });
 });
