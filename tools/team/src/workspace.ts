@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile } from "fs/promises";
+import { mkdir, writeFile, readFile, readdir, stat } from "fs/promises";
 import { join } from "path";
 
 /**
@@ -234,4 +234,71 @@ export async function appendProgress(
     // @ts-ignore - Bun's append mode
     flags: "a",
   });
+}
+
+/**
+ * Check if a team workspace exists
+ */
+export async function teamExists(
+  issueId: string,
+  deps: TeamWorkspaceDeps
+): Promise<boolean> {
+  const workspacePath = getTeamWorkspacePath(issueId, deps);
+  const statePath = join(workspacePath, "state.json");
+  return Bun.file(statePath).exists();
+}
+
+/**
+ * List all team workspaces
+ */
+export async function listTeams(
+  deps: TeamWorkspaceDeps
+): Promise<TeamState[]> {
+  const teamsDir = deps.teamsDir;
+
+  // Check if teams directory exists
+  let dirStat;
+  try {
+    dirStat = await stat(teamsDir);
+  } catch {
+    return [];
+  }
+
+  if (!dirStat.isDirectory()) {
+    return [];
+  }
+
+  // Read all subdirectories
+  let entries: string[];
+  try {
+    entries = await readdir(teamsDir);
+  } catch {
+    return [];
+  }
+
+  // Read state from each team workspace
+  const teams: TeamState[] = [];
+  for (const entry of entries) {
+    // Skip hidden files and non-ENG directories
+    if (entry.startsWith(".") || !entry.startsWith("ENG-")) {
+      continue;
+    }
+
+    try {
+      const state = await readTeamState(entry, deps);
+      teams.push(state);
+    } catch {
+      // Skip directories without valid state.json
+      continue;
+    }
+  }
+
+  // Sort by updatedAt (most recent first)
+  teams.sort((a, b) => {
+    const dateA = new Date(a.updatedAt).getTime();
+    const dateB = new Date(b.updatedAt).getTime();
+    return dateB - dateA;
+  });
+
+  return teams;
 }
