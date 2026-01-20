@@ -179,6 +179,7 @@ export async function createImplWorkspace(
     timeoutMinutes,
     createdAt: now,
     updatedAt: now,
+    attemptCount: 0,
   };
   await writeFile(
     join(workspacePath, "state.json"),

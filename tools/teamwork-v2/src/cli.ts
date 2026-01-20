@@ -19,8 +19,22 @@ import {
 } from "./impl-workflow";
 import {
   getImplWorkspacePath,
+  updateImplState,
   type ImplState,
 } from "./impl-state-machine";
+import {
+  hasExitCodeFailure,
+  isTimedOut,
+  isStuck,
+  generateFailureSummary,
+  writeFailureSummary,
+  incrementAttempt,
+  shouldEscalate,
+  clearFailureState,
+  markAborted,
+  emitEscalationEvent,
+} from "./failure-detection";
+import { emitEvent } from "./events";
 
 /**
  * Generic workspace state (either plan or impl)
@@ -38,6 +52,7 @@ interface TeamInfo {
   updatedAt: string;
   startedAt?: string;
   completedAt?: string;
+  failedAt?: string;
 }
 
 /**
@@ -159,6 +174,7 @@ async function getTeamInfo(workspacesDir: string, id: string): Promise<TeamInfo 
       updatedAt: state.updatedAt,
       startedAt: state.startedAt,
       completedAt: state.completedAt,
+      failedAt: (state as ImplState).failedAt,
     };
   } catch {
     return null;
@@ -312,9 +328,13 @@ program
     for (const team of teams) {
       const createdDate = team.createdAt.split("T")[0];
       const updatedDate = team.updatedAt.split("T")[0];
-      console.log(`  ${team.id}`);
+      const failedIndicator = team.failedAt ? " [failed]" : "";
+      console.log(`  ${team.id}${failedIndicator}`);
       console.log(`    Type: ${team.type}`);
       console.log(`    Phase: ${team.phase}`);
+      if (team.failedAt) {
+        console.log(`    Status: failed`);
+      }
       console.log(`    Created: ${createdDate}`);
       console.log(`    Updated: ${updatedDate}`);
       console.log("");
@@ -431,6 +451,22 @@ program
           console.log(`  Type: ${state.type}`);
           console.log(`  Spec ID: ${state.specId}`);
 
+          // Check for failure conditions
+          const hasFailed = hasExitCodeFailure(events);
+          const timedOut = isTimedOut(state);
+          const stuck = isStuck(events);
+
+          // Show failure status
+          if (hasFailed) {
+            console.log(`  Status: failed (exit code failure)`);
+          }
+          if (timedOut) {
+            console.log(`  Status: timed out`);
+          }
+          if (stuck) {
+            console.log(`  Status: stuck (same error 3+ times in 5 minutes)`);
+          }
+
           // Test Progress
           const totalTests = state.tests.length;
           if (totalTests > 0) {
@@ -457,7 +493,7 @@ program
           }
 
           if (state.escalated) {
-            console.log(`  Escalated: ${state.escalatedAt}`);
+            console.log(`  Status: escalated at ${state.escalatedAt}`);
           }
         } else {
           // Read planning state
@@ -469,6 +505,22 @@ program
           console.log(`  Timeout: ${state.timeoutMinutes} minutes`);
           console.log(`  Created: ${state.createdAt}`);
           console.log(`  Updated: ${state.updatedAt}`);
+
+          // Check for failure conditions
+          const hasFailed = hasExitCodeFailure(events);
+          const timedOut = isTimedOut(state);
+          const stuck = isStuck(events);
+
+          // Show failure status
+          if (hasFailed) {
+            console.log(`  Status: failed (exit code failure)`);
+          }
+          if (timedOut) {
+            console.log(`  Status: timed out`);
+          }
+          if (stuck) {
+            console.log(`  Status: stuck (same error 3+ times in 5 minutes)`);
+          }
 
           // Elapsed time or status
           if (state.completedAt && state.startedAt) {
@@ -482,7 +534,7 @@ program
           }
 
           if (state.escalated) {
-            console.log(`  Escalated: ${state.escalatedAt}`);
+            console.log(`  Status: escalated at ${state.escalatedAt}`);
           }
         }
 
@@ -892,6 +944,243 @@ program
     } catch (error) {
       console.error(
         `Error: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Resume command
+program
+  .command("resume")
+  .description("Resume a paused or interrupted workflow from its checkpoint")
+  .argument("<id>", "The workspace ID to resume")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option("--dry-run", "Check resumability without starting workflow")
+  .action(async (id: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Check if workspace exists
+    const planExists = await workspaceExists(id, deps);
+    const implExists = await implWorkspaceExists(id, deps);
+
+    if (!planExists && !implExists) {
+      console.error(`Error: Workspace for ${id} not found`);
+      process.exit(1);
+    }
+
+    try {
+      // Read state
+      const statePath = join(workspacesDir, id, "state.json");
+      const content = await readFile(statePath, "utf-8");
+      const state = JSON.parse(content) as WorkspaceState;
+
+      // Check if workspace is already complete
+      if (state.completedAt || state.phase === "complete") {
+        console.error(`Error: Workspace ${id} is already complete`);
+        process.exit(1);
+      }
+
+      // Check if workspace is aborted
+      const abortedAt = (state as ImplState).abortedAt;
+      if (abortedAt) {
+        console.error(`Error: Workspace ${id} has been aborted`);
+        process.exit(1);
+      }
+
+      // Emit resume_started event
+      await emitEvent(id, "resume_started", {
+        fromPhase: state.phase,
+        timestamp: new Date().toISOString(),
+      }, deps);
+
+      // Get current test info for impl workspaces
+      let testInfo = "";
+      if (state.type === "impl") {
+        const implState = state as ImplState;
+        if (implState.tests.length > 0 && implState.currentTestIndex < implState.tests.length) {
+          const currentTest = implState.tests[implState.currentTestIndex];
+          testInfo = ` (next: ${currentTest.name})`;
+        }
+      }
+
+      console.log(`Resuming workflow for ${id} from phase ${state.phase}${testInfo}`);
+
+      if (options.dryRun) {
+        console.log("Dry run: would resume workflow");
+      } else {
+        // TODO: Actually resume the workflow
+        console.log("Workflow resumed...");
+      }
+    } catch (error) {
+      console.error(
+        `Error resuming workspace: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Retry command
+program
+  .command("retry")
+  .description("Retry a failed workflow with failure context")
+  .argument("<id>", "The workspace ID to retry")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option("--dry-run", "Generate failure summary without starting retry")
+  .action(async (id: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Check if workspace exists
+    const planExists = await workspaceExists(id, deps);
+    const implExists = await implWorkspaceExists(id, deps);
+
+    if (!planExists && !implExists) {
+      console.error(`Error: Workspace for ${id} not found`);
+      process.exit(1);
+    }
+
+    try {
+      // Read state
+      const statePath = join(workspacesDir, id, "state.json");
+      const content = await readFile(statePath, "utf-8");
+      const state = JSON.parse(content) as WorkspaceState;
+
+      // Check if workspace is already complete
+      if (state.completedAt || state.phase === "complete") {
+        console.error(`Error: Workspace ${id} is already complete`);
+        process.exit(1);
+      }
+
+      // Check if workspace is aborted
+      const abortedAt = (state as ImplState).abortedAt;
+      if (abortedAt) {
+        console.error(`Error: Workspace ${id} has been aborted`);
+        process.exit(1);
+      }
+
+      // Check if workspace is in failed state (either failedAt or failureReason must be set)
+      const failedAt = (state as ImplState).failedAt;
+      const failureReason = (state as ImplState).failureReason;
+      if (!failedAt && !failureReason) {
+        console.error(`Error: Workspace ${id} is not in failed state`);
+        process.exit(1);
+      }
+
+      // Check attempt count
+      const attemptCount = (state as ImplState).attemptCount || 0;
+      if (attemptCount >= 3) {
+        console.error(`Error: Workspace ${id} has reached maximum retries (3)`);
+
+        // Generate failure summary
+        const summary = await generateFailureSummary(id, deps);
+        await writeFailureSummary(id, summary, deps);
+
+        // Emit escalation event
+        await emitEscalationEvent(id, state as ImplState, deps);
+
+        process.exit(1);
+      }
+
+      // Generate failure summary
+      const summary = await generateFailureSummary(id, deps);
+      await writeFailureSummary(id, summary, deps);
+
+      // Increment attempt count
+      const newAttemptCount = await incrementAttempt(id, deps);
+
+      // Get failure reason (already declared above, just provide default if empty)
+      const previousFailureReason = failureReason || "Unknown failure";
+
+      // Emit retry_started event
+      await emitEvent(id, "retry_started", {
+        attemptNumber: newAttemptCount,
+        previousFailure: previousFailureReason,
+        timestamp: new Date().toISOString(),
+      }, deps);
+
+      // Clear failure state
+      await clearFailureState(id, deps);
+
+      console.log(`Retrying workflow for ${id} (attempt ${newAttemptCount} of 3)`);
+      console.log(`Previous failure: ${previousFailureReason}`);
+
+      if (options.dryRun) {
+        console.log("Dry run: would retry workflow");
+      } else {
+        // TODO: Actually retry the workflow
+        console.log("Workflow retrying...");
+      }
+    } catch (error) {
+      console.error(
+        `Error retrying workspace: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Abort command
+program
+  .command("abort")
+  .description("Abort a running workflow")
+  .argument("<id>", "The workspace ID to abort")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option("--reason <reason>", "Reason for aborting the workflow")
+  .action(async (id: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Check if workspace exists
+    const planExists = await workspaceExists(id, deps);
+    const implExists = await implWorkspaceExists(id, deps);
+
+    if (!planExists && !implExists) {
+      console.error(`Error: Workspace for ${id} not found`);
+      process.exit(1);
+    }
+
+    try {
+      // Read state
+      const statePath = join(workspacesDir, id, "state.json");
+      const content = await readFile(statePath, "utf-8");
+      const state = JSON.parse(content) as WorkspaceState;
+
+      // Check if workspace is already complete
+      if (state.completedAt || state.phase === "complete") {
+        console.error(`Error: Workspace ${id} is already complete`);
+        process.exit(1);
+      }
+
+      // Check if workspace is already aborted
+      const abortedAt = (state as ImplState).abortedAt;
+      if (abortedAt) {
+        console.error(`Error: Workspace ${id} is already aborted`);
+        process.exit(1);
+      }
+
+      // Mark as aborted
+      const reason = options.reason || "Manual abort requested";
+      await markAborted(id, reason, deps);
+
+      console.log(`Aborted workflow for ${id}`);
+      if (options.reason) {
+        console.log(`Reason: ${reason}`);
+      }
+    } catch (error) {
+      console.error(
+        `Error aborting workspace: ${error instanceof Error ? error.message : String(error)}`
       );
       process.exit(1);
     }

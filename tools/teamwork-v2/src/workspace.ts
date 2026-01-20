@@ -35,6 +35,12 @@ export interface PlanningState {
   timeoutMinutes: number;
   createdAt: string;
   updatedAt: string;
+  // Retry & recovery fields
+  attemptCount: number;
+  failedAt?: string;
+  failureReason?: string;
+  abortedAt?: string;
+  abortReason?: string;
 }
 
 /**
@@ -81,6 +87,7 @@ function createInitialState(
     timeoutMinutes: options.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES,
     createdAt: now,
     updatedAt: now,
+    attemptCount: 0,
   };
 }
 

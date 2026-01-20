@@ -50,6 +50,12 @@ export interface ImplState {
   linearIssueStatus?: string;
   createdAt: string;
   updatedAt: string;
+  // Retry & recovery fields
+  attemptCount: number;
+  failedAt?: string;
+  failureReason?: string;
+  abortedAt?: string;
+  abortReason?: string;
 }
 
 /**
