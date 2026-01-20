@@ -166,6 +166,9 @@ export async function createImplWorkspace(
   // Create sessions subdirectory
   await mkdir(join(workspacePath, "sessions"), { recursive: true });
 
+  // Create checkpoints subdirectory
+  await mkdir(join(workspacePath, "checkpoints"), { recursive: true });
+
   // Create state.json
   const now = new Date().toISOString();
   const state: ImplState = {

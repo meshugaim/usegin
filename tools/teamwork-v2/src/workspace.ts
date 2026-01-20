@@ -41,6 +41,11 @@ export interface PlanningState {
   failureReason?: string;
   abortedAt?: string;
   abortReason?: string;
+  // Health monitoring fields (ENG-1272)
+  contextUtilization?: number;
+  lastHealthCheck?: string;
+  handoffCount?: number;
+  lastHandoffAt?: string;
 }
 
 /**
@@ -151,6 +156,9 @@ export async function createPlanningWorkspace(
 
   // Create sessions subdirectory
   await mkdir(join(workspacePath, "sessions"), { recursive: true });
+
+  // Create checkpoints subdirectory
+  await mkdir(join(workspacePath, "checkpoints"), { recursive: true });
 
   // Create state.json
   const state = createInitialState(specId, options);

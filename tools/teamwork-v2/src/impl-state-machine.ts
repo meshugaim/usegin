@@ -56,6 +56,11 @@ export interface ImplState {
   failureReason?: string;
   abortedAt?: string;
   abortReason?: string;
+  // Health monitoring fields (ENG-1272)
+  contextUtilization?: number;
+  lastHealthCheck?: string;
+  handoffCount?: number;
+  lastHandoffAt?: string;
 }
 
 /**

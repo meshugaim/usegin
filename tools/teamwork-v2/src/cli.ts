@@ -35,6 +35,14 @@ import {
   emitEscalationEvent,
 } from "./failure-detection";
 import { emitEvent } from "./events";
+import {
+  getWorkspaceHealth,
+  updateContextUtilization,
+  performHandoff,
+  getAgentRole,
+  getHealthStatus,
+  type HealthInfo,
+} from "./health-monitoring";
 
 /**
  * Generic workspace state (either plan or impl)
@@ -451,6 +459,11 @@ program
           console.log(`  Type: ${state.type}`);
           console.log(`  Spec ID: ${state.specId}`);
 
+          // Show context utilization if tracked
+          if (state.contextUtilization !== undefined) {
+            console.log(`  context: ${state.contextUtilization}%`);
+          }
+
           // Check for failure conditions
           const hasFailed = hasExitCodeFailure(events);
           const timedOut = isTimedOut(state);
@@ -502,6 +515,12 @@ program
           console.log(`  Phase: ${state.phase}`);
           console.log(`  Type: ${state.type}`);
           console.log(`  Revision count: ${state.revisionCount}`);
+
+          // Show context utilization if tracked
+          if (state.contextUtilization !== undefined) {
+            console.log(`  context: ${state.contextUtilization}%`);
+          }
+
           console.log(`  Timeout: ${state.timeoutMinutes} minutes`);
           console.log(`  Created: ${state.createdAt}`);
           console.log(`  Updated: ${state.updatedAt}`);
@@ -1181,6 +1200,206 @@ program
     } catch (error) {
       console.error(
         `Error aborting workspace: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Health command
+program
+  .command("health")
+  .description("Show health status and context utilization for agents")
+  .argument("[id]", "Specific workspace ID to show health for")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option("--json", "Output as JSON")
+  .action(async (id: string | undefined, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    if (id) {
+      // Show health for specific workspace
+      const planExists = await workspaceExists(id, deps);
+      const implExists = await implWorkspaceExists(id, deps);
+
+      if (!planExists && !implExists) {
+        console.error(`Error: Workspace ${id} not found`);
+        process.exit(1);
+      }
+
+      try {
+        const health = await getWorkspaceHealth(id, deps);
+
+        if (options.json) {
+          console.log(JSON.stringify(health, null, 2));
+          return;
+        }
+
+        console.log(`Health for ${id}:`);
+        console.log(`  Phase: ${health.phase}`);
+        console.log(`  Agent Role: ${health.agentRole}`);
+        console.log(`  Context: ${health.contextUtilization}%`);
+        console.log(`  Status: ${health.status}`);
+        console.log(`  Last check: ${health.lastHealthCheck || "not tracked"}`);
+        console.log(`  Handoffs: ${health.handoffCount}`);
+        if (health.lastHandoffAt) {
+          console.log(`  Last handoff: ${health.lastHandoffAt}`);
+        }
+      } catch (error) {
+        console.error(
+          `Error reading health: ${error instanceof Error ? error.message : String(error)}`
+        );
+        process.exit(1);
+      }
+    } else {
+      // Show health for all active agents
+      const teams = await getAllTeams(workspacesDir);
+      const activeTeams = teams.filter((t) => t.phase !== "complete" && !t.completedAt);
+
+      if (activeTeams.length === 0) {
+        console.log("No active agents found");
+        return;
+      }
+
+      const healthInfos: HealthInfo[] = [];
+
+      for (const team of activeTeams) {
+        try {
+          const health = await getWorkspaceHealth(team.id, deps);
+          healthInfos.push(health);
+        } catch {
+          // Skip workspaces with errors
+        }
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify(healthInfos, null, 2));
+        return;
+      }
+
+      console.log("Agent Health:");
+      console.log("");
+
+      for (const health of healthInfos) {
+        const statusIndicator =
+          health.status === "critical"
+            ? "[critical]"
+            : health.status === "warning"
+            ? "[warning]"
+            : "[healthy]";
+
+        console.log(`  ${health.id} ${statusIndicator}`);
+        console.log(`    Role: ${health.agentRole}`);
+        console.log(`    Context: ${health.contextUtilization}%`);
+        console.log(`    Phase: ${health.phase}`);
+        console.log("");
+      }
+
+      console.log(`${healthInfos.length} active agents`);
+    }
+  });
+
+// Handoff command
+program
+  .command("handoff")
+  .description("Trigger handoff for a workspace")
+  .argument("<id>", "The workspace ID to handoff")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option(
+    "--agent <role>",
+    "Agent role for the handoff (worker, reviewer, planner)"
+  )
+  .action(async (id: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Check if workspace exists
+    const planExists = await workspaceExists(id, deps);
+    const implExists = await implWorkspaceExists(id, deps);
+
+    if (!planExists && !implExists) {
+      console.error(`Error: Workspace ${id} not found`);
+      process.exit(1);
+    }
+
+    try {
+      // Read state to determine type and check completion
+      const statePath = join(workspacesDir, id, "state.json");
+      const content = await readFile(statePath, "utf-8");
+      const state = JSON.parse(content) as WorkspaceState;
+
+      // Check if workspace is completed
+      if (state.completedAt || state.phase === "complete") {
+        console.error(`Error: Workspace ${id} is already complete`);
+        process.exit(1);
+      }
+
+      // Determine agent role
+      const agentRole = options.agent || getAgentRole(state.type);
+
+      // Perform handoff
+      const result = await performHandoff(id, agentRole, deps);
+
+      console.log(`Handoff triggered for ${id}`);
+      console.log("");
+      console.log("Files created:");
+      console.log(`  Checkpoint: ${result.checkpointPath}`);
+      console.log(`  Context: ${result.contextPath}`);
+      console.log(`  Session: ${result.sessionPath}`);
+      console.log("");
+      console.log("Continue by resuming this workspace with the checkpoint.");
+      console.log(`Use: teamwork-v2 resume ${id}`);
+    } catch (error) {
+      console.error(
+        `Error during handoff: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Update-context command (internal)
+program
+  .command("update-context")
+  .description("Update context utilization for a workspace (internal)")
+  .argument("<id>", "The workspace ID")
+  .option("--utilization <percent>", "Context utilization percentage (0-100)")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .action(async (id: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Check if workspace exists
+    const planExists = await workspaceExists(id, deps);
+    const implExists = await implWorkspaceExists(id, deps);
+
+    if (!planExists && !implExists) {
+      console.error(`Error: Workspace ${id} not found`);
+      process.exit(1);
+    }
+
+    const utilization = parseInt(options.utilization, 10);
+    if (isNaN(utilization) || utilization < 0 || utilization > 100) {
+      console.error("Error: --utilization must be a number between 0 and 100");
+      process.exit(1);
+    }
+
+    try {
+      await updateContextUtilization(id, utilization, deps);
+      console.log(`Context utilization updated to ${utilization}% for ${id}`);
+    } catch (error) {
+      console.error(
+        `Error updating context: ${error instanceof Error ? error.message : String(error)}`
       );
       process.exit(1);
     }
