@@ -8,7 +8,8 @@
  * Also checks context utilization and nudges for handoff when high.
  */
 
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import {
   getDefaultStorageDir,
   getUnblockStopCount,
@@ -16,6 +17,10 @@ import {
   type Reminder,
   type WorkflowDeps,
 } from "./workflow";
+
+// Resolve absolute path to cctx (relative to this file: ../../cctx/src/cli.ts)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CCTX_PATH = join(__dirname, "..", "..", "cctx", "src", "cli.ts");
 
 /**
  * Context thresholds for handoff nudging
@@ -38,8 +43,8 @@ function debug(msg: string): void {
  */
 async function getContextUtilization(sessionId?: string): Promise<number | null> {
   try {
-    // Pass session ID if available, otherwise cctx will find most recent
-    const args = ["cctx", "--percent"];
+    // Use absolute path to cctx to avoid PATH issues in hooks
+    const args = ["bun", CCTX_PATH, "--percent"];
     if (sessionId) {
       args.push(sessionId);
     }
