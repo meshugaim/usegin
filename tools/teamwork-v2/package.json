@@ -1,0 +1,20 @@
+{
+  "name": "teamwork-v2",
+  "version": "0.1.0",
+  "description": "Planning team orchestration CLI for autonomous multi-agent workflows",
+  "type": "module",
+  "bin": {
+    "teamwork-v2": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "commander": "^14.0.2"
+  }
+}
