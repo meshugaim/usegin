@@ -12,6 +12,14 @@ import {
   type WorkspaceDeps,
 } from "./workspace";
 import { readEvents } from "./events";
+import {
+  createImplWorkspace,
+  readImplState,
+} from "./impl-workflow";
+import {
+  getImplWorkspacePath,
+  type ImplState,
+} from "./impl-state-machine";
 
 /**
  * Validate spec ID format.
@@ -20,6 +28,27 @@ import { readEvents } from "./events";
 function isValidSpecId(specId: string): boolean {
   return /^(ENG|SPEC)-\d+$/i.test(specId);
 }
+
+/**
+ * Validate slice ID format.
+ * Valid formats: ENG-XXX-N, SPEC-XXX-N (case insensitive, any number of digits)
+ */
+function isValidSliceId(sliceId: string): boolean {
+  return /^(ENG|SPEC)-\d+-\d+$/i.test(sliceId);
+}
+
+/**
+ * Extract spec ID from slice ID (e.g., ENG-123-1 -> ENG-123)
+ */
+function extractSpecIdFromSliceId(sliceId: string): string {
+  const match = sliceId.match(/^((?:ENG|SPEC)-\d+)-\d+$/i);
+  return match ? match[1] : "";
+}
+
+/**
+ * Default timeout for implementation in minutes
+ */
+const DEFAULT_IMPL_TIMEOUT_MINUTES = 30;
 
 /**
  * Get the default workspaces directory
@@ -48,6 +77,23 @@ async function isWritable(dir: string): Promise<boolean> {
     await mkdir(dir, { recursive: true });
     // Check if we can access it
     await access(dir);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if an impl workspace exists
+ */
+async function implWorkspaceExists(
+  sliceId: string,
+  deps: WorkspaceDeps
+): Promise<boolean> {
+  const workspacePath = getImplWorkspacePath(sliceId, deps);
+  const statePath = join(workspacePath, "state.json");
+  try {
+    await access(statePath);
     return true;
   } catch {
     return false;
@@ -152,7 +198,7 @@ program
 program
   .command("status")
   .description("Show status of workspaces")
-  .argument("[spec-id]", "Specific spec ID to show status for")
+  .argument("[spec-id]", "Specific spec ID or slice ID to show status for")
   .option(
     "--workspaces-dir <dir>",
     "Directory where workspaces are stored",
@@ -163,29 +209,63 @@ program
     const deps: WorkspaceDeps = { workspacesDir };
 
     if (specId) {
-      // Show status for specific workspace
-      if (!(await workspaceExists(specId, deps))) {
+      // Show status for specific workspace (could be plan or impl)
+      // We check both locations but we need to read the actual state to determine the type
+      const planWorkspaceExists = await workspaceExists(specId, deps);
+      const implWorkspaceExistsResult = await implWorkspaceExists(specId, deps);
+
+      if (!planWorkspaceExists && !implWorkspaceExistsResult) {
         console.error(`Error: Workspace for ${specId} not found`);
         process.exit(1);
       }
 
       try {
-        const state = await readPlanningState(specId, deps);
-        console.log(`Status for ${specId}:`);
-        console.log(`  Phase: ${state.phase}`);
-        console.log(`  Type: ${state.type}`);
-        console.log(`  Revision count: ${state.revisionCount}`);
-        console.log(`  Timeout: ${state.timeoutMinutes} minutes`);
-        console.log(`  Created: ${state.createdAt}`);
-        console.log(`  Updated: ${state.updatedAt}`);
-        if (state.startedAt) {
-          console.log(`  Started: ${state.startedAt}`);
-        }
-        if (state.completedAt) {
-          console.log(`  Completed: ${state.completedAt}`);
-        }
-        if (state.escalated) {
-          console.log(`  Escalated: ${state.escalatedAt}`);
+        // Read state.json to determine the type
+        const workspacePath = join(workspacesDir, specId, "state.json");
+        const content = await readFile(workspacePath, "utf-8");
+        const rawState = JSON.parse(content);
+
+        if (rawState.type === "impl") {
+          // Read impl state
+          const state = await readImplState(specId, deps);
+          console.log(`Status for ${specId}:`);
+          console.log(`  Phase: ${state.phase}`);
+          console.log(`  Type: ${state.type}`);
+          console.log(`  Spec ID: ${state.specId}`);
+          console.log(`  Tests: ${state.tests.length}`);
+          console.log(`  Current Test Index: ${state.currentTestIndex}`);
+          console.log(`  Commits: ${state.commits.length}`);
+          console.log(`  Timeout: ${state.timeoutMinutes} minutes`);
+          console.log(`  Created: ${state.createdAt}`);
+          console.log(`  Updated: ${state.updatedAt}`);
+          if (state.startedAt) {
+            console.log(`  Started: ${state.startedAt}`);
+          }
+          if (state.completedAt) {
+            console.log(`  Completed: ${state.completedAt}`);
+          }
+          if (state.escalated) {
+            console.log(`  Escalated: ${state.escalatedAt}`);
+          }
+        } else {
+          // Read planning state
+          const state = await readPlanningState(specId, deps);
+          console.log(`Status for ${specId}:`);
+          console.log(`  Phase: ${state.phase}`);
+          console.log(`  Type: ${state.type}`);
+          console.log(`  Revision count: ${state.revisionCount}`);
+          console.log(`  Timeout: ${state.timeoutMinutes} minutes`);
+          console.log(`  Created: ${state.createdAt}`);
+          console.log(`  Updated: ${state.updatedAt}`);
+          if (state.startedAt) {
+            console.log(`  Started: ${state.startedAt}`);
+          }
+          if (state.completedAt) {
+            console.log(`  Completed: ${state.completedAt}`);
+          }
+          if (state.escalated) {
+            console.log(`  Escalated: ${state.escalatedAt}`);
+          }
         }
       } catch (error) {
         console.error(
@@ -205,8 +285,16 @@ program
       console.log("Active workspaces:");
       for (const ws of workspaces) {
         try {
-          const state = await readPlanningState(ws, deps);
-          console.log(`  ${ws}: ${state.phase}`);
+          // Try to read the state.json and check its type
+          const workspacePath = join(workspacesDir, ws, "state.json");
+          const content = await readFile(workspacePath, "utf-8");
+          const state = JSON.parse(content);
+
+          if (state.type === "impl") {
+            console.log(`  ${ws}: ${state.type} - ${state.phase}`);
+          } else {
+            console.log(`  ${ws}: ${state.type} - ${state.phase}`);
+          }
         } catch {
           console.log(`  ${ws}: (error reading state)`);
         }
@@ -261,6 +349,179 @@ program
     } catch (error) {
       console.error(
         `Error reading events: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Impl command
+program
+  .command("impl")
+  .description("Start implementation workflow for a slice")
+  .argument("[slice-id]", "The slice ID to implement (e.g., ENG-123-1)")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory to store workspaces",
+    getDefaultWorkspacesDir()
+  )
+  .option("--dry-run", "Create workspace only, do not start workflow")
+  .option(
+    "--timeout <minutes>",
+    "Timeout in minutes for the implementation workflow",
+    String(DEFAULT_IMPL_TIMEOUT_MINUTES)
+  )
+  .option("--spec-id <id>", "Associate with parent spec")
+  .option("--all <spec-id>", "Implement all slices for a spec sequentially")
+  .action(async (sliceId: string | undefined, options) => {
+    const workspacesDir = options.workspacesDir;
+    const timeoutMinutes = parseInt(options.timeout, 10);
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Handle --all mode
+    if (options.all) {
+      const specId = options.all;
+
+      // Check if spec-id is actually provided (not another option)
+      if (!specId || specId.startsWith("-")) {
+        console.error("Error: Missing required argument: spec-id for --all option");
+        console.error("Usage: teamwork-v2 impl --all <spec-id> [options]");
+        process.exit(1);
+      }
+
+      // Validate spec ID format
+      if (!isValidSpecId(specId)) {
+        console.error(`Error: Planning workspace for ${specId} not found`);
+        process.exit(1);
+      }
+
+      // Check if planning workspace exists
+      if (!(await workspaceExists(specId, deps))) {
+        console.error(`Error: Planning workspace for ${specId} not found`);
+        process.exit(1);
+      }
+
+      // Read slices from planning workspace
+      const planWorkspacePath = getWorkspacePath(specId, deps);
+      const slicesPath = join(planWorkspacePath, "slices.json");
+
+      let slices: Array<{
+        title: string;
+        description: string;
+        acceptanceCriteria: string[];
+        testApproach: string;
+        dependencies: string[];
+        isIndependent: boolean;
+      }>;
+
+      try {
+        const slicesContent = await readFile(slicesPath, "utf-8");
+        slices = JSON.parse(slicesContent);
+      } catch {
+        console.error(`Error: No slices found in planning workspace for ${specId}`);
+        process.exit(1);
+      }
+
+      if (!slices || slices.length === 0) {
+        console.error(`Error: No slices found in planning workspace for ${specId}`);
+        process.exit(1);
+      }
+
+      console.log(`Starting implementation for ${slices.length} slices`);
+
+      // Implement slices sequentially
+      for (let i = 0; i < slices.length; i++) {
+        const slice = slices[i];
+        const currentSliceId = `${specId}-${i + 1}`;
+
+        console.log(`Implementing slice ${i + 1} of ${slices.length}: ${slice.title}`);
+
+        // Check if workspaces directory is writable
+        if (!(await isWritable(workspacesDir))) {
+          console.error(`Error: Cannot write to workspaces directory: ${workspacesDir}`);
+          process.exit(1);
+        }
+
+        // Check if workspace already exists
+        if (await implWorkspaceExists(currentSliceId, deps)) {
+          console.log(`Workspace for ${currentSliceId} already exists, skipping`);
+          continue;
+        }
+
+        try {
+          // Create the workspace
+          await createImplWorkspace(currentSliceId, specId, deps, timeoutMinutes);
+
+          const workspacePath = getImplWorkspacePath(currentSliceId, deps);
+
+          console.log(`Implementation workspace created for ${currentSliceId}`);
+          console.log(`Location: ${workspacePath}`);
+
+          if (options.dryRun) {
+            console.log("Dry run: workspace created, workflow not started");
+          } else {
+            // TODO: Start the actual workflow
+            console.log("Workflow started...");
+          }
+        } catch (error) {
+          console.error(
+            `Error creating workspace for ${currentSliceId}: ${error instanceof Error ? error.message : String(error)}`
+          );
+          process.exit(1);
+        }
+      }
+
+      console.log("Implementation complete");
+      return;
+    }
+
+    // Single slice mode
+    if (!sliceId) {
+      console.error("Error: Missing required argument: slice-id");
+      console.error("Usage: teamwork-v2 impl <slice-id> [options]");
+      console.error("Or use: teamwork-v2 impl --all <spec-id> [options]");
+      process.exit(1);
+    }
+
+    // Validate slice ID format
+    if (!isValidSliceId(sliceId)) {
+      console.error(`Error: Invalid slice ID format: ${sliceId}`);
+      console.error("Expected format: ENG-XXX-N or SPEC-XXX-N (e.g., ENG-123-1, SPEC-456-2)");
+      process.exit(1);
+    }
+
+    // Get spec ID from option or extract from slice ID
+    const specId = options.specId || extractSpecIdFromSliceId(sliceId);
+
+    // Check if workspaces directory is writable
+    if (!(await isWritable(workspacesDir))) {
+      console.error(`Error: Cannot write to workspaces directory: ${workspacesDir}`);
+      process.exit(1);
+    }
+
+    // Check if workspace already exists
+    if (await implWorkspaceExists(sliceId, deps)) {
+      console.error(`Error: Workspace for ${sliceId} already exists`);
+      process.exit(1);
+    }
+
+    try {
+      // Create the workspace
+      await createImplWorkspace(sliceId, specId, deps, timeoutMinutes);
+
+      const workspacePath = getImplWorkspacePath(sliceId, deps);
+
+      console.log(`Implementation workspace created for ${sliceId}`);
+      console.log(`Location: ${workspacePath}`);
+
+      if (options.dryRun) {
+        console.log("Dry run: workspace created, workflow not started");
+      } else {
+        // TODO: Start the actual workflow
+        console.log("Workflow started...");
+      }
+    } catch (error) {
+      console.error(
+        `Error: ${error instanceof Error ? error.message : String(error)}`
       );
       process.exit(1);
     }
