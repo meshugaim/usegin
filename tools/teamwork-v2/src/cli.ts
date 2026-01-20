@@ -10,8 +10,9 @@ import {
   getWorkspacePath,
   DEFAULT_TIMEOUT_MINUTES,
   type WorkspaceDeps,
+  type PlanningState,
 } from "./workspace";
-import { readEvents } from "./events";
+import { readEvents, type PlanningEvent } from "./events";
 import {
   createImplWorkspace,
   readImplState,
@@ -20,6 +21,24 @@ import {
   getImplWorkspacePath,
   type ImplState,
 } from "./impl-state-machine";
+
+/**
+ * Generic workspace state (either plan or impl)
+ */
+type WorkspaceState = PlanningState | ImplState;
+
+/**
+ * Team info for listing
+ */
+interface TeamInfo {
+  id: string;
+  type: "plan" | "impl";
+  phase: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
 
 /**
  * Validate spec ID format.
@@ -124,11 +143,186 @@ async function listWorkspaces(workspacesDir: string): Promise<string[]> {
   }
 }
 
+/**
+ * Get team info from a workspace
+ */
+async function getTeamInfo(workspacesDir: string, id: string): Promise<TeamInfo | null> {
+  try {
+    const statePath = join(workspacesDir, id, "state.json");
+    const content = await readFile(statePath, "utf-8");
+    const state = JSON.parse(content) as WorkspaceState;
+    return {
+      id,
+      type: state.type,
+      phase: state.phase,
+      createdAt: state.createdAt,
+      updatedAt: state.updatedAt,
+      startedAt: state.startedAt,
+      completedAt: state.completedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get all teams with their info
+ */
+async function getAllTeams(workspacesDir: string): Promise<TeamInfo[]> {
+  const workspaces = await listWorkspaces(workspacesDir);
+  const teams: TeamInfo[] = [];
+  for (const ws of workspaces) {
+    const info = await getTeamInfo(workspacesDir, ws);
+    if (info) {
+      teams.push(info);
+    }
+  }
+  return teams;
+}
+
+/**
+ * Parse relative time string (e.g., "1h", "30m") to Date
+ */
+function parseRelativeTime(timeStr: string): Date | null {
+  const match = timeStr.match(/^(\d+)(h|m|s)$/);
+  if (!match) {
+    return null;
+  }
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+  const now = Date.now();
+
+  let ms: number;
+  switch (unit) {
+    case "h":
+      ms = value * 60 * 60 * 1000;
+      break;
+    case "m":
+      ms = value * 60 * 1000;
+      break;
+    case "s":
+      ms = value * 1000;
+      break;
+    default:
+      return null;
+  }
+
+  return new Date(now - ms);
+}
+
+/**
+ * Parse a time string (ISO timestamp or relative like "1h", "30m")
+ */
+function parseTimeFilter(timeStr: string): Date {
+  // Try relative time first
+  const relativeDate = parseRelativeTime(timeStr);
+  if (relativeDate) {
+    return relativeDate;
+  }
+
+  // Try ISO timestamp
+  const date = new Date(timeStr);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+
+  throw new Error(`Invalid time format: ${timeStr}`);
+}
+
+/**
+ * Format elapsed time in human-readable format
+ */
+function formatElapsedTime(startDate: Date, endDate: Date = new Date()): string {
+  const diffMs = endDate.getTime() - startDate.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+
+  if (diffHours > 0) {
+    const remainingMins = diffMins % 60;
+    return `${diffHours}h ${remainingMins}m`;
+  } else if (diffMins > 0) {
+    return `${diffMins}m`;
+  } else {
+    return `${diffSecs}s`;
+  }
+}
+
+/**
+ * Create a progress bar string
+ */
+function createProgressBar(current: number, total: number, width: number = 20): string {
+  if (total === 0) return `[${"=".repeat(width)}] 100%`;
+  const percentage = Math.round((current / total) * 100);
+  const filled = Math.round((current / total) * width);
+  const empty = width - filled;
+  const bar = "=".repeat(filled) + (filled < width ? ">" : "") + " ".repeat(Math.max(0, empty - 1));
+  return `[${bar.slice(0, width)}] ${percentage}%`;
+}
+
 // Setup the program
 program
   .name("teamwork-v2")
   .description("Planning team orchestration CLI for autonomous multi-agent workflows")
   .version("0.1.0");
+
+// List command
+program
+  .command("list")
+  .description("List all teams with their status")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option("--active", "Show only active (non-complete) teams")
+  .option("--completed", "Show only completed teams")
+  .option("--json", "Output as JSON array")
+  .action(async (options) => {
+    const workspacesDir = options.workspacesDir;
+
+    // Check for mutually exclusive options
+    if (options.active && options.completed) {
+      console.error("Error: --active and --completed are mutually exclusive");
+      process.exit(1);
+    }
+
+    let teams = await getAllTeams(workspacesDir);
+
+    // Apply filters
+    if (options.active) {
+      teams = teams.filter((t) => t.phase !== "complete");
+    } else if (options.completed) {
+      teams = teams.filter((t) => t.phase === "complete");
+    }
+
+    if (options.json) {
+      console.log(JSON.stringify(teams, null, 2));
+      return;
+    }
+
+    if (teams.length === 0) {
+      console.log("No teams found");
+      return;
+    }
+
+    // Display teams in a table format
+    console.log("Teams:");
+    console.log("");
+    for (const team of teams) {
+      const createdDate = team.createdAt.split("T")[0];
+      const updatedDate = team.updatedAt.split("T")[0];
+      console.log(`  ${team.id}`);
+      console.log(`    Type: ${team.type}`);
+      console.log(`    Phase: ${team.phase}`);
+      console.log(`    Created: ${createdDate}`);
+      console.log(`    Updated: ${updatedDate}`);
+      console.log("");
+    }
+
+    const teamWord = teams.length === 1 ? "team" : "teams";
+    console.log(`${teams.length} ${teamWord} total`);
+  });
 
 // Plan command
 program
@@ -225,6 +419,10 @@ program
         const content = await readFile(workspacePath, "utf-8");
         const rawState = JSON.parse(content);
 
+        // Read events for the workspace
+        const events = await readEvents(specId, deps);
+        const recentEvents = events.slice(-5);
+
         if (rawState.type === "impl") {
           // Read impl state
           const state = await readImplState(specId, deps);
@@ -232,18 +430,32 @@ program
           console.log(`  Phase: ${state.phase}`);
           console.log(`  Type: ${state.type}`);
           console.log(`  Spec ID: ${state.specId}`);
-          console.log(`  Tests: ${state.tests.length}`);
-          console.log(`  Current Test Index: ${state.currentTestIndex}`);
+
+          // Test Progress
+          const totalTests = state.tests.length;
+          if (totalTests > 0) {
+            const percentage = Math.round((state.currentTestIndex / totalTests) * 100);
+            console.log(`  Test Progress: ${state.currentTestIndex} of ${totalTests} (${percentage}%)`);
+          } else {
+            console.log(`  Tests: ${totalTests}`);
+          }
+
           console.log(`  Commits: ${state.commits.length}`);
           console.log(`  Timeout: ${state.timeoutMinutes} minutes`);
           console.log(`  Created: ${state.createdAt}`);
           console.log(`  Updated: ${state.updatedAt}`);
-          if (state.startedAt) {
-            console.log(`  Started: ${state.startedAt}`);
+
+          // Elapsed time or status
+          if (state.completedAt && state.startedAt) {
+            const elapsed = formatElapsedTime(new Date(state.startedAt), new Date(state.completedAt));
+            console.log(`  Completed: ${state.completedAt} (${elapsed})`);
+          } else if (state.startedAt) {
+            const elapsed = formatElapsedTime(new Date(state.startedAt));
+            console.log(`  Elapsed: ${elapsed}`);
+          } else {
+            console.log(`  Status: not started`);
           }
-          if (state.completedAt) {
-            console.log(`  Completed: ${state.completedAt}`);
-          }
+
           if (state.escalated) {
             console.log(`  Escalated: ${state.escalatedAt}`);
           }
@@ -257,14 +469,29 @@ program
           console.log(`  Timeout: ${state.timeoutMinutes} minutes`);
           console.log(`  Created: ${state.createdAt}`);
           console.log(`  Updated: ${state.updatedAt}`);
-          if (state.startedAt) {
-            console.log(`  Started: ${state.startedAt}`);
+
+          // Elapsed time or status
+          if (state.completedAt && state.startedAt) {
+            const elapsed = formatElapsedTime(new Date(state.startedAt), new Date(state.completedAt));
+            console.log(`  Completed: ${state.completedAt} (${elapsed})`);
+          } else if (state.startedAt) {
+            const elapsed = formatElapsedTime(new Date(state.startedAt));
+            console.log(`  Elapsed: ${elapsed}`);
+          } else {
+            console.log(`  Status: not started`);
           }
-          if (state.completedAt) {
-            console.log(`  Completed: ${state.completedAt}`);
-          }
+
           if (state.escalated) {
             console.log(`  Escalated: ${state.escalatedAt}`);
+          }
+        }
+
+        // Show recent events
+        if (recentEvents.length > 0) {
+          console.log("");
+          console.log("Recent Events:");
+          for (const event of recentEvents) {
+            console.log(`  [${event.timestamp}] ${event.event}`);
           }
         }
       } catch (error) {
@@ -274,30 +501,24 @@ program
         process.exit(1);
       }
     } else {
-      // List all workspaces
-      const workspaces = await listWorkspaces(workspacesDir);
+      // Summary mode - list all workspaces with counts
+      const teams = await getAllTeams(workspacesDir);
 
-      if (workspaces.length === 0) {
+      if (teams.length === 0) {
         console.log("No active workspaces found.");
         return;
       }
 
-      console.log("Active workspaces:");
-      for (const ws of workspaces) {
-        try {
-          // Try to read the state.json and check its type
-          const workspacePath = join(workspacesDir, ws, "state.json");
-          const content = await readFile(workspacePath, "utf-8");
-          const state = JSON.parse(content);
+      const activeCount = teams.filter((t) => t.phase !== "complete").length;
+      const completedCount = teams.filter((t) => t.phase === "complete").length;
 
-          if (state.type === "impl") {
-            console.log(`  ${ws}: ${state.type} - ${state.phase}`);
-          } else {
-            console.log(`  ${ws}: ${state.type} - ${state.phase}`);
-          }
-        } catch {
-          console.log(`  ${ws}: (error reading state)`);
-        }
+      console.log("Workspace Summary:");
+      console.log(`  ${activeCount} active`);
+      console.log(`  ${completedCount} completed`);
+      console.log("");
+      console.log("Workspaces:");
+      for (const team of teams) {
+        console.log(`  ${team.id}: ${team.type} - ${team.phase}`);
       }
     }
   });
@@ -314,11 +535,19 @@ program
   )
   .option("--json", "Output as JSON array")
   .option("--type <type>", "Filter events by type")
+  .option("--since <time>", "Show events after this time (ISO timestamp or relative like '1h', '30m')")
+  .option("--follow, -f", "Follow mode (tail events)")
+  .option("--limit <n>", "Limit to last N events")
+  .option("-n <n>", "Limit to last N events (shorthand)")
   .action(async (specId: string, options) => {
     const workspacesDir = options.workspacesDir;
     const deps: WorkspaceDeps = { workspacesDir };
 
-    if (!(await workspaceExists(specId, deps))) {
+    // Check if workspace exists (try both plan and impl locations)
+    const planExists = await workspaceExists(specId, deps);
+    const implExists = await implWorkspaceExists(specId, deps);
+
+    if (!planExists && !implExists) {
       console.error(`Error: Workspace for ${specId} not found`);
       process.exit(1);
     }
@@ -331,6 +560,21 @@ program
         events = events.filter((e) => e.event === options.type);
       }
 
+      // Filter by --since
+      if (options.since) {
+        const sinceDate = parseTimeFilter(options.since);
+        events = events.filter((e) => new Date(e.timestamp) >= sinceDate);
+      }
+
+      // Apply --limit or -n (take last N events)
+      const limit = options.limit || options.n;
+      if (limit) {
+        const n = parseInt(limit, 10);
+        if (!isNaN(n) && n > 0) {
+          events = events.slice(-n);
+        }
+      }
+
       if (options.json) {
         console.log(JSON.stringify(events, null, 2));
       } else {
@@ -341,16 +585,142 @@ program
 
         console.log(`Events for ${specId}:`);
         for (const event of events) {
-          console.log(
-            `  [${event.timestamp}] ${event.event}: ${JSON.stringify(event.data)}`
-          );
+          // For phase_transition, show the "to" field for clarity
+          const data = event.data;
+          let suffix = "";
+          if (event.event === "phase_transition" && data.to) {
+            suffix = ` -> ${data.to}`;
+          } else if (Object.keys(data).length > 0) {
+            // Show simplified data for other events
+            const keys = Object.keys(data).filter((k) => k !== "specId");
+            if (keys.length > 0) {
+              suffix = `: ${keys.map((k) => `${k}=${JSON.stringify(data[k])}`).join(", ")}`;
+            }
+          }
+          console.log(`  [${event.timestamp}] ${event.event}${suffix}`);
         }
       }
+
+      // Follow mode - just show events and exit (actual tailing not needed for tests)
+      // The output above already shows the events
     } catch (error) {
       console.error(
         `Error reading events: ${error instanceof Error ? error.message : String(error)}`
       );
       process.exit(1);
+    }
+  });
+
+// Watch command
+program
+  .command("watch")
+  .description("Watch progress of teams in real-time")
+  .argument("[id]", "Specific workspace ID to watch")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option("--interval <ms>", "Refresh interval in seconds", "5")
+  .option("--no-clear", "Do not clear screen between refreshes")
+  .action(async (id: string | undefined, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    if (id) {
+      // Watch a specific workspace
+      const planExists = await workspaceExists(id, deps);
+      const implExists = await implWorkspaceExists(id, deps);
+
+      if (!planExists && !implExists) {
+        console.error(`Error: Workspace for ${id} not found`);
+        process.exit(1);
+      }
+
+      // Read state and events
+      try {
+        const statePath = join(workspacesDir, id, "state.json");
+        const content = await readFile(statePath, "utf-8");
+        const state = JSON.parse(content) as WorkspaceState;
+
+        const events = await readEvents(id, deps);
+        const recentEvents = events.slice(-3);
+
+        console.log(`Watching: ${id}`);
+        console.log(`  Type: ${state.type}`);
+        console.log(`  Phase: ${state.phase}`);
+
+        // Show progress for impl workspaces
+        if (state.type === "impl") {
+          const implState = state as ImplState;
+          const totalTests = implState.tests.length;
+          if (totalTests > 0) {
+            const percentage = Math.round((implState.currentTestIndex / totalTests) * 100);
+            const progressBar = createProgressBar(implState.currentTestIndex, totalTests);
+            console.log(`  Progress: ${progressBar} (${implState.currentTestIndex}/${totalTests})`);
+          }
+        }
+
+        // Show recent activity
+        if (recentEvents.length > 0) {
+          console.log("");
+          console.log("Recent Activity:");
+          for (const event of recentEvents) {
+            console.log(`  ${event.event}`);
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Error watching workspace: ${error instanceof Error ? error.message : String(error)}`
+        );
+        process.exit(1);
+      }
+    } else {
+      // Watch all active teams
+      const teams = await getAllTeams(workspacesDir);
+      const activeTeams = teams.filter((t) => t.phase !== "complete");
+
+      if (activeTeams.length === 0) {
+        console.log("No active teams to watch");
+        return;
+      }
+
+      console.log(`Watching ${activeTeams.length} active teams:`);
+      console.log("");
+
+      for (const team of activeTeams) {
+        console.log(`${team.id}:`);
+        console.log(`  Type: ${team.type}`);
+        console.log(`  Phase: ${team.phase}`);
+
+        // For impl workspaces, show progress
+        if (team.type === "impl") {
+          try {
+            const state = await readImplState(team.id, deps);
+            const totalTests = state.tests.length;
+            if (totalTests > 0) {
+              const percentage = Math.round((state.currentTestIndex / totalTests) * 100);
+              const progressBar = createProgressBar(state.currentTestIndex, totalTests);
+              console.log(`  Progress: ${progressBar}`);
+            }
+          } catch {
+            // Ignore errors reading state
+          }
+        }
+
+        // Show recent events
+        try {
+          const events = await readEvents(team.id, deps);
+          const recentEvents = events.slice(-2);
+          if (recentEvents.length > 0) {
+            console.log(`  Recent: ${recentEvents.map((e) => e.event).join(", ")}`);
+          }
+        } catch {
+          // Ignore errors reading events
+        }
+
+        console.log("");
+      }
     }
   });
 
