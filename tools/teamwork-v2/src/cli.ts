@@ -2,7 +2,7 @@
 
 import { program } from "commander";
 import { join } from "path";
-import { readdir, readFile, mkdir, access } from "fs/promises";
+import { readdir, readFile, mkdir, access, writeFile } from "fs/promises";
 import {
   createPlanningWorkspace,
   readPlanningState,
@@ -50,6 +50,18 @@ import {
   readSpecRequirements,
   type ValidationResult,
 } from "./validation";
+import {
+  planningWorkspaceExists,
+  slicesExistInPlanWorkspace,
+  isPlanWorkspaceApproved,
+  createParallelWorkspace,
+  createExecutionPlan,
+  runParallelExecution,
+  readParallelState,
+  analyzeParallelSlices,
+  readSlicesFromPlanWorkspace,
+  type ParallelExecutionState,
+} from "./parallel-execution";
 
 /**
  * Generic workspace state (either plan or impl)
@@ -701,9 +713,66 @@ program
   )
   .option("--interval <ms>", "Refresh interval in seconds", "5")
   .option("--no-clear", "Do not clear screen between refreshes")
+  .option("--parallel <spec-id>", "Watch parallel execution progress for a spec")
   .action(async (id: string | undefined, options) => {
     const workspacesDir = options.workspacesDir;
     const deps: WorkspaceDeps = { workspacesDir };
+
+    // Handle --parallel watch mode
+    if (options.parallel) {
+      const specId = options.parallel;
+
+      // Check if parallel execution exists
+      try {
+        const state = await readParallelState(specId, deps);
+
+        console.log("Parallel Execution Progress");
+        console.log(`Spec: ${specId}`);
+        console.log(`Status: ${state.status}`);
+        console.log("");
+
+        // Show progress
+        const totalDone = state.completedSlices + state.failedSlices + state.skippedSlices;
+        const percentage = Math.round((totalDone / state.totalSlices) * 100);
+        console.log(`Progress: ${totalDone}/${state.totalSlices} (${percentage}%)`);
+        console.log(`  Completed: ${state.completedSlices}`);
+        console.log(`  Failed: ${state.failedSlices}`);
+        console.log(`  Skipped: ${state.skippedSlices}`);
+        console.log("");
+
+        // Show per-slice status
+        console.log("Slices:");
+        for (const [sliceId, sliceStatus] of Object.entries(state.sliceStatuses)) {
+          let statusIcon = "";
+          switch (sliceStatus.status) {
+            case "pending":
+              statusIcon = "[pending/waiting]";
+              break;
+            case "running":
+              statusIcon = "[running/in progress]";
+              break;
+            case "complete":
+              statusIcon = "[complete/done/finished]";
+              break;
+            case "failed":
+              statusIcon = "[failed/error]";
+              break;
+            case "skipped":
+              statusIcon = "[skipped]";
+              break;
+          }
+          console.log(`  ${sliceStatus.title}: ${statusIcon}`);
+          if (sliceStatus.error) {
+            console.log(`    Error: ${sliceStatus.error}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Error: Parallel execution state for ${specId} not found`);
+        process.exit(1);
+      }
+
+      return;
+    }
 
     if (id) {
       // Watch a specific workspace
@@ -820,11 +889,120 @@ program
   )
   .option("--spec-id <id>", "Associate with parent spec")
   .option("--all <spec-id>", "Implement all slices for a spec sequentially")
+  .option("--parallel <spec-id>", "Start parallel implementation for a spec")
+  .option("--max-concurrent <n>", "Maximum concurrent teams for parallel execution", "3")
   .option("--skip-validation", "Skip validation before implementation")
   .action(async (sliceId: string | undefined, options) => {
     const workspacesDir = options.workspacesDir;
     const timeoutMinutes = parseInt(options.timeout, 10);
     const deps: WorkspaceDeps = { workspacesDir };
+
+    // Handle --parallel mode
+    if (options.parallel !== undefined) {
+      const specId = options.parallel;
+
+      // Validate that spec-id is provided
+      if (!specId || specId === true || specId.startsWith("-")) {
+        console.error("Error: Missing required argument: spec-id for --parallel option");
+        console.error("Usage: teamwork-v2 impl --parallel <spec-id> [options]");
+        process.exit(1);
+      }
+
+      // Check if planning workspace exists
+      if (!(await planningWorkspaceExists(specId, deps))) {
+        console.error(`Error: Planning workspace for ${specId} not found`);
+        process.exit(1);
+      }
+
+      // Check if slices exist
+      if (!(await slicesExistInPlanWorkspace(specId, deps))) {
+        console.error(`Error: No slices found in planning workspace for ${specId}`);
+        process.exit(1);
+      }
+
+      // Check if workspace is approved
+      if (!(await isPlanWorkspaceApproved(specId, deps))) {
+        console.error(`Error: Planning workspace for ${specId} must be approved before parallel implementation`);
+        process.exit(1);
+      }
+
+      // Read slices
+      const slices = await readSlicesFromPlanWorkspace(specId, deps);
+      const maxConcurrent = parseInt(options.maxConcurrent, 10) || 3;
+
+      // Create parallel workspace
+      await createParallelWorkspace(specId, deps);
+
+      // Analyze slices
+      const { independentSlices, dependentSlices } = analyzeParallelSlices(slices);
+
+      console.log(`Starting parallel implementation for ${specId}`);
+      console.log(`  ${slices.length} slices total`);
+      console.log(`  ${independentSlices.length} independent slices`);
+      console.log(`  ${dependentSlices.length} dependent slices`);
+      console.log(`  Max concurrent: ${maxConcurrent}`);
+      if (maxConcurrent === 1) {
+        console.log("  Running in sequential mode (max concurrent 1)");
+      }
+      console.log("");
+
+      // Create execution plan
+      await createExecutionPlan(specId, slices, maxConcurrent, deps);
+
+      // Show execution order
+      console.log("Execution order:");
+      for (let i = 0; i < slices.length; i++) {
+        const slice = slices[i];
+        const deps_list = slice.dependencies?.length
+          ? ` (depends on: ${slice.dependencies.join(", ")})`
+          : " (independent)";
+        console.log(`  ${i + 1}. ${slice.title}${deps_list}`);
+      }
+      console.log("");
+
+      if (options.dryRun) {
+        // In dry run mode, create results file but don't modify the execution plan
+        const resultsPath = join(getWorkspacePath(specId, deps), "parallel", "results.json");
+        const dryRunResults = {
+          specId,
+          success: true,
+          totalTime: 0,
+          sliceResults: slices.map((s, i) => ({
+            sliceId: `${specId}-${i + 1}`,
+            title: s.title,
+            status: "complete" as const,
+            duration: 0,
+          })),
+          summary: {
+            total: slices.length,
+            completed: slices.length,
+            failed: 0,
+            skipped: 0,
+          },
+        };
+        await writeFile(resultsPath, JSON.stringify(dryRunResults, null, 2));
+
+        console.log("Summary:");
+        console.log(`  Completed: ${slices.length}`);
+        console.log(`  Failed: 0`);
+        console.log(`  Skipped: 0`);
+        console.log(`  Total time: 0ms`);
+        console.log(`  Duration: 0ms`);
+        console.log("");
+        console.log("Dry run: parallel workspace and plan created, execution simulated");
+      } else {
+        // Run parallel execution
+        const results = await runParallelExecution(specId, deps, { maxConcurrent });
+
+        console.log("Summary:");
+        console.log(`  Completed: ${results.summary.completed}`);
+        console.log(`  Failed: ${results.summary.failed}`);
+        console.log(`  Skipped: ${results.summary.skipped}`);
+        console.log(`  Total time: ${results.totalTime}ms`);
+      }
+
+      return;
+    }
 
     // Handle --all mode
     if (options.all) {
