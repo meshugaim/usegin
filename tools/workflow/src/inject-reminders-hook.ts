@@ -23,31 +23,56 @@ import {
 const CONTEXT_THRESHOLD_GENTLE = 75; // Start gentle nudging
 const CONTEXT_THRESHOLD_URGENT = 80; // Become persistent
 
+/** Debug flag - set via WORKFLOW_DEBUG=1 env var */
+const DEBUG = process.env.WORKFLOW_DEBUG === "1";
+
+function debug(msg: string): void {
+  if (DEBUG) {
+    console.error(`[workflow-hook] ${msg}`);
+  }
+}
+
 /**
  * Check context utilization using cctx CLI
  * Returns percentage (0-100) or null if unable to check
  */
-async function getContextUtilization(): Promise<number | null> {
+async function getContextUtilization(sessionId?: string): Promise<number | null> {
   try {
-    const proc = Bun.spawn(["cctx", "--percent"], {
+    // Pass session ID if available, otherwise cctx will find most recent
+    const args = ["cctx", "--percent"];
+    if (sessionId) {
+      args.push(sessionId);
+    }
+
+    debug(`Running: ${args.join(" ")}`);
+
+    const proc = Bun.spawn(args, {
       stdout: "pipe",
       stderr: "pipe",
     });
     const output = await new Response(proc.stdout).text();
+    const stderr = await new Response(proc.stderr).text();
     const exitCode = await proc.exited;
+
+    debug(`cctx output: "${output.trim()}", stderr: "${stderr.trim()}", exit: ${exitCode}`);
 
     if (exitCode !== 0 && exitCode !== 2) {
       // exitCode 2 means critical (>90%) but still valid
+      debug(`cctx failed with exit code ${exitCode}`);
       return null;
     }
 
     // Parse "75.3%" -> 75.3
     const match = output.trim().match(/^([\d.]+)%$/);
     if (match) {
-      return parseFloat(match[1]);
+      const utilization = parseFloat(match[1]);
+      debug(`Context utilization: ${utilization}%`);
+      return utilization;
     }
+    debug(`Failed to parse cctx output: "${output.trim()}"`);
     return null;
-  } catch {
+  } catch (err) {
+    debug(`cctx exception: ${err}`);
     return null;
   }
 }
@@ -55,8 +80,8 @@ async function getContextUtilization(): Promise<number | null> {
 /**
  * Generate context-based handoff reminder if needed
  */
-async function getContextReminder(): Promise<string | null> {
-  const utilization = await getContextUtilization();
+async function getContextReminder(sessionId?: string): Promise<string | null> {
+  const utilization = await getContextUtilization(sessionId);
 
   if (utilization === null) {
     return null;
@@ -114,8 +139,8 @@ export function shouldShowReminder(frequency: number, random: () => number): boo
 export async function injectReminders(deps: HookDeps): Promise<string> {
   const texts: string[] = [];
 
-  // Check context utilization first
-  const contextReminder = await getContextReminder();
+  // Check context utilization first (pass session ID for accurate lookup)
+  const contextReminder = await getContextReminder(deps.sessionId);
   if (contextReminder) {
     texts.push(contextReminder);
   }

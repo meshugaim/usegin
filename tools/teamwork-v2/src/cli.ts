@@ -381,12 +381,18 @@ program
     "Directory to store workspaces",
     getDefaultWorkspacesDir()
   )
+  .option(
+    "--project-root <dir>",
+    "Project root directory for agent execution",
+    process.cwd()
+  )
   .option("--dry-run", "Create workspace only, do not start workflow")
   .option(
     "--timeout <minutes>",
     "Timeout in minutes for the planning workflow",
     String(DEFAULT_TIMEOUT_MINUTES)
   )
+  .option("--model <model>", "Model to use for the agent (e.g., opus, sonnet)")
   .action(async (specId: string, options) => {
     // Validate spec ID format
     if (!isValidSpecId(specId)) {
@@ -396,6 +402,7 @@ program
     }
 
     const workspacesDir = options.workspacesDir;
+    const projectRoot = options.projectRoot;
     const timeoutMinutes = parseInt(options.timeout, 10);
 
     // Check if workspaces directory is writable
@@ -424,8 +431,37 @@ program
       if (options.dryRun) {
         console.log("Dry run: workspace created, workflow not started");
       } else {
-        // TODO: Start the actual workflow
-        console.log("Workflow started...");
+        // Spawn the planning reviewer agent
+        console.log("Spawning planning reviewer agent...");
+
+        const { spawnPlanningReviewer, isCrunAvailable } = await import("./agent-spawning");
+
+        // Check if crun is available
+        if (!(await isCrunAvailable())) {
+          console.error("Error: crun is not available on PATH");
+          console.error("Install crun or use --dry-run to skip agent spawning");
+          process.exit(1);
+        }
+
+        const result = await spawnPlanningReviewer({
+          specId,
+          projectRoot,
+          model: options.model,
+        }, deps);
+
+        if (result.exitCode === 0) {
+          console.log(`Planning workflow completed successfully`);
+          if (result.sessionId) {
+            console.log(`Session ID: ${result.sessionId}`);
+          }
+          console.log(`Duration: ${Math.round(result.duration / 1000)}s`);
+        } else {
+          console.error(`Planning workflow failed with exit code ${result.exitCode}`);
+          if (result.stderr) {
+            console.error(result.stderr);
+          }
+          process.exit(result.exitCode);
+        }
       }
     } catch (error) {
       console.error(
@@ -881,6 +917,11 @@ program
     "Directory to store workspaces",
     getDefaultWorkspacesDir()
   )
+  .option(
+    "--project-root <dir>",
+    "Project root directory for agent execution",
+    process.cwd()
+  )
   .option("--dry-run", "Create workspace only, do not start workflow")
   .option(
     "--timeout <minutes>",
@@ -892,6 +933,7 @@ program
   .option("--parallel <spec-id>", "Start parallel implementation for a spec")
   .option("--max-concurrent <n>", "Maximum concurrent teams for parallel execution", "3")
   .option("--skip-validation", "Skip validation before implementation")
+  .option("--model <model>", "Model to use for the agent (e.g., opus, sonnet)")
   .action(async (sliceId: string | undefined, options) => {
     const workspacesDir = options.workspacesDir;
     const timeoutMinutes = parseInt(options.timeout, 10);
@@ -1139,8 +1181,37 @@ program
           if (options.dryRun) {
             console.log("Dry run: workspace created, workflow not started");
           } else {
-            // TODO: Start the actual workflow
-            console.log("Workflow started...");
+            // Spawn the implementation reviewer agent
+            console.log("Spawning implementation reviewer agent...");
+
+            const { spawnImplReviewer, isCrunAvailable } = await import("./agent-spawning");
+
+            // Check if crun is available
+            if (!(await isCrunAvailable())) {
+              console.error("Error: crun is not available on PATH");
+              console.error("Install crun or use --dry-run to skip agent spawning");
+              process.exit(1);
+            }
+
+            const projectRoot = options.projectRoot || process.cwd();
+            const result = await spawnImplReviewer({
+              sliceId: currentSliceId,
+              specId,
+              projectRoot,
+              model: options.model,
+            }, deps);
+
+            if (result.exitCode === 0) {
+              console.log(`Slice ${currentSliceId} completed successfully`);
+              console.log(`Duration: ${Math.round(result.duration / 1000)}s`);
+            } else {
+              console.error(`Slice ${currentSliceId} failed with exit code ${result.exitCode}`);
+              if (result.stderr) {
+                console.error(result.stderr);
+              }
+              // Continue with next slice instead of exiting
+              console.log("Continuing with next slice...");
+            }
           }
         } catch (error) {
           console.error(
@@ -1196,8 +1267,39 @@ program
       if (options.dryRun) {
         console.log("Dry run: workspace created, workflow not started");
       } else {
-        // TODO: Start the actual workflow
-        console.log("Workflow started...");
+        // Spawn the implementation reviewer agent
+        console.log("Spawning implementation reviewer agent...");
+
+        const { spawnImplReviewer, isCrunAvailable } = await import("./agent-spawning");
+
+        // Check if crun is available
+        if (!(await isCrunAvailable())) {
+          console.error("Error: crun is not available on PATH");
+          console.error("Install crun or use --dry-run to skip agent spawning");
+          process.exit(1);
+        }
+
+        const projectRoot = options.projectRoot;
+        const result = await spawnImplReviewer({
+          sliceId,
+          specId,
+          projectRoot,
+          model: options.model,
+        }, deps);
+
+        if (result.exitCode === 0) {
+          console.log(`Implementation workflow completed successfully`);
+          if (result.sessionId) {
+            console.log(`Session ID: ${result.sessionId}`);
+          }
+          console.log(`Duration: ${Math.round(result.duration / 1000)}s`);
+        } else {
+          console.error(`Implementation workflow failed with exit code ${result.exitCode}`);
+          if (result.stderr) {
+            console.error(result.stderr);
+          }
+          process.exit(result.exitCode);
+        }
       }
     } catch (error) {
       console.error(
