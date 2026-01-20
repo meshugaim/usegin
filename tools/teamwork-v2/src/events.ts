@@ -17,16 +17,16 @@ export interface PlanningEvent {
 export async function emitEvent(
   specId: string,
   eventType: string,
-  data: Record<string, unknown>,
+  data: object,
   deps: WorkspaceDeps
 ): Promise<void> {
   const workspacePath = getWorkspacePath(specId, deps);
   const eventsPath = join(workspacePath, "events.jsonl");
 
-  const event: PlanningEvent = {
+  const event = {
     timestamp: new Date().toISOString(),
     event: eventType,
-    data,
+    data: data as Record<string, unknown>,
   };
 
   await appendFile(eventsPath, JSON.stringify(event) + "\n");

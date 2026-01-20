@@ -628,8 +628,8 @@ describe("complete workflow", () => {
     // Verify events cover all phases
     const events = await readEvents("ENG-600", deps);
     const phases = events
-      .filter((e: { event: string }) => e.event === "phase_transition")
-      .map((e: { data: { to: string } }) => e.data.to);
+      .filter((e) => e.event === "phase_transition")
+      .map((e) => (e.data as { to: string }).to);
 
     expect(phases).toContain("analyzing");
     expect(phases).toContain("proposing");

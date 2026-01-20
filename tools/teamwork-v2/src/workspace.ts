@@ -32,8 +32,16 @@ export interface PlanningState {
   escalated?: boolean;
   escalatedAt?: string;
   revisionCount: number;
+  timeoutMinutes: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Options for creating a planning workspace
+ */
+export interface CreatePlanningWorkspaceOptions {
+  timeoutMinutes?: number;
 }
 
 /**
@@ -53,15 +61,24 @@ export function getWorkspacePath(specId: string, deps: WorkspaceDeps): string {
 }
 
 /**
+ * Default timeout in minutes
+ */
+export const DEFAULT_TIMEOUT_MINUTES = 60;
+
+/**
  * Create initial planning state
  */
-function createInitialState(specId: string): PlanningState {
+function createInitialState(
+  specId: string,
+  options: CreatePlanningWorkspaceOptions = {}
+): PlanningState {
   const now = new Date().toISOString();
   return {
     type: "plan",
     specId,
     phase: "setup",
     revisionCount: 0,
+    timeoutMinutes: options.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES,
     createdAt: now,
     updatedAt: now,
   };
@@ -112,7 +129,8 @@ export async function workspaceExists(
  */
 export async function createPlanningWorkspace(
   specId: string,
-  deps: WorkspaceDeps
+  deps: WorkspaceDeps,
+  options: CreatePlanningWorkspaceOptions = {}
 ): Promise<void> {
   const workspacePath = getWorkspacePath(specId, deps);
 
@@ -128,7 +146,7 @@ export async function createPlanningWorkspace(
   await mkdir(join(workspacePath, "sessions"), { recursive: true });
 
   // Create state.json
-  const state = createInitialState(specId);
+  const state = createInitialState(specId, options);
   await writeFile(
     join(workspacePath, "state.json"),
     JSON.stringify(state, null, 2)
