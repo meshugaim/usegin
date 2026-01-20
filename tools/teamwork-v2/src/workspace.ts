@@ -21,6 +21,16 @@ export type PlanningPhase =
   | "complete";
 
 /**
+ * Validation result structure (imported from validation.ts for type reference)
+ */
+export interface ValidationResult {
+  gaps: string[];
+  overlaps: string[];
+  warnings: string[];
+  isValid: boolean;
+}
+
+/**
  * Planning state stored in state.json
  */
 export interface PlanningState {
@@ -46,6 +56,8 @@ export interface PlanningState {
   lastHealthCheck?: string;
   handoffCount?: number;
   lastHandoffAt?: string;
+  // Validation result (ENG-1273)
+  validationResult?: ValidationResult;
 }
 
 /**

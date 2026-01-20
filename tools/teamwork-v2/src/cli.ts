@@ -43,6 +43,13 @@ import {
   getHealthStatus,
   type HealthInfo,
 } from "./health-monitoring";
+import {
+  validateSliceCoverage,
+  slicesExist,
+  specRequirementsExist,
+  readSpecRequirements,
+  type ValidationResult,
+} from "./validation";
 
 /**
  * Generic workspace state (either plan or impl)
@@ -813,6 +820,7 @@ program
   )
   .option("--spec-id <id>", "Associate with parent spec")
   .option("--all <spec-id>", "Implement all slices for a spec sequentially")
+  .option("--skip-validation", "Skip validation before implementation")
   .action(async (sliceId: string | undefined, options) => {
     const workspacesDir = options.workspacesDir;
     const timeoutMinutes = parseInt(options.timeout, 10);
@@ -852,6 +860,7 @@ program
         testApproach: string;
         dependencies: string[];
         isIndependent: boolean;
+        requirements?: string[];
       }>;
 
       try {
@@ -865,6 +874,58 @@ program
       if (!slices || slices.length === 0) {
         console.error(`Error: No slices found in planning workspace for ${specId}`);
         process.exit(1);
+      }
+
+      // Run validation before implementation (unless skipped)
+      if (!options.skipValidation) {
+        // Check if validation files exist
+        const hasSlices = await slicesExist(specId, deps);
+        const hasRequirements = await specRequirementsExist(specId, deps);
+
+        if (hasSlices && hasRequirements) {
+          console.log("Validating slices against spec requirements...");
+
+          try {
+            const validationResult = await validateSliceCoverage(specId, deps);
+
+            // Show overlaps as warnings
+            if (validationResult.overlaps.length > 0) {
+              console.log("");
+              console.log("Note: Found overlap in requirement coverage:");
+              for (const overlap of validationResult.overlaps) {
+                console.log(`  - ${overlap}`);
+              }
+            }
+
+            // Show warnings
+            if (validationResult.warnings.length > 0) {
+              console.log("");
+              console.log("Warnings:");
+              for (const warning of validationResult.warnings) {
+                console.log(`  - ${warning}`);
+              }
+            }
+
+            // Abort if there are gaps (critical issues)
+            if (!validationResult.isValid) {
+              console.error("");
+              console.error(`Error: validation failed - ${validationResult.gaps.length} gap(s) found`);
+              console.error("Requirements not covered by any slice:");
+              for (const gap of validationResult.gaps) {
+                console.error(`  - ${gap}`);
+              }
+              console.error("");
+              console.error("Use --skip-validation to bypass validation.");
+              process.exit(1);
+            }
+
+            console.log("Validation passed.");
+            console.log("");
+          } catch (error) {
+            // Validation failed but it's not critical if files don't exist
+            console.log("Warning: Could not run validation.");
+          }
+        }
       }
 
       console.log(`Starting implementation for ${slices.length} slices`);
@@ -1400,6 +1461,104 @@ program
     } catch (error) {
       console.error(
         `Error updating context: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Validate command
+program
+  .command("validate")
+  .description("Validate slices against spec requirements")
+  .argument("<spec-id>", "The spec ID to validate")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .option("--json", "Output as JSON")
+  .action(async (specId: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Check if workspace exists
+    if (!(await workspaceExists(specId, deps))) {
+      console.error(`Error: Workspace for ${specId} not found`);
+      process.exit(1);
+    }
+
+    // Check if slices.json exists
+    if (!(await slicesExist(specId, deps))) {
+      console.error(`Error: slices.json not found in workspace for ${specId}`);
+      process.exit(1);
+    }
+
+    // Check if spec-requirements.json exists
+    if (!(await specRequirementsExist(specId, deps))) {
+      console.error(`Error: spec-requirements.json not found in workspace for ${specId}`);
+      process.exit(1);
+    }
+
+    try {
+      // Run validation
+      const result = await validateSliceCoverage(specId, deps);
+
+      // Get requirements for descriptions
+      const requirements = await readSpecRequirements(specId, deps);
+      const reqMap = new Map<string, string>();
+      for (const req of requirements) {
+        reqMap.set(req.id, req.description);
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(`Validation results for ${specId}:`);
+        console.log("");
+
+        // Show gaps (critical)
+        if (result.gaps.length > 0) {
+          console.log("Gaps (requirements not covered):");
+          for (const gap of result.gaps) {
+            const desc = reqMap.get(gap) || "";
+            console.log(`  - ${gap}: ${desc}`);
+          }
+          console.log("");
+        }
+
+        // Show overlaps (warnings)
+        if (result.overlaps.length > 0) {
+          console.log("Overlaps (requirements covered by multiple slices):");
+          for (const overlap of result.overlaps) {
+            console.log(`  - ${overlap}`);
+          }
+          console.log("");
+        }
+
+        // Show warnings
+        if (result.warnings.length > 0) {
+          console.log("Warnings:");
+          for (const warning of result.warnings) {
+            console.log(`  - Warning: ${warning}`);
+          }
+          console.log("");
+        }
+
+        // Summary
+        if (result.isValid) {
+          console.log("Validation passed - all requirements are covered.");
+        } else {
+          console.log(`Validation failed - ${result.gaps.length} gap(s) found.`);
+        }
+      }
+
+      // Exit with non-zero code if validation failed
+      if (!result.isValid) {
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(
+        `Error during validation: ${error instanceof Error ? error.message : String(error)}`
       );
       process.exit(1);
     }
