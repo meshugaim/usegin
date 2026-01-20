@@ -177,7 +177,7 @@ export async function emitEscalation(
   const now = new Date().toISOString();
 
   // Emit the escalation event
-  await appendTeamEvent(issueId, "timeout_escalation", data, deps);
+  await appendTeamEvent(issueId, "timeout_escalation", data as unknown as Record<string, unknown>, deps);
 
   // Update state with escalation info
   await updateTeamState(

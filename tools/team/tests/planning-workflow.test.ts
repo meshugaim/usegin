@@ -369,8 +369,8 @@ describe("phase transition events", () => {
 
       const state = await readPlanningState("ENG-702", { teamsDir: TEST_TEAMS_DIR });
       expect(state.completedAt).toBeDefined();
-      expect(state.completedAt >= before).toBe(true);
-      expect(state.completedAt <= after).toBe(true);
+      expect(state.completedAt! >= before).toBe(true);
+      expect(state.completedAt! <= after).toBe(true);
     });
   });
 });
@@ -392,7 +392,7 @@ describe("timeout and escalation", () => {
 
       const state = await readPlanningState("ENG-800", { teamsDir: TEST_TEAMS_DIR });
       expect(state.startedAt).toBeDefined();
-      expect(new Date(state.startedAt).getTime()).toBeGreaterThan(0);
+      expect(new Date(state.startedAt!).getTime()).toBeGreaterThan(0);
     });
 
     test("startedAt is set when analysis_start event is emitted", async () => {
@@ -410,8 +410,8 @@ describe("timeout and escalation", () => {
 
       const state = await readPlanningState("ENG-801", { teamsDir: TEST_TEAMS_DIR });
       expect(state.startedAt).toBeDefined();
-      expect(state.startedAt >= before).toBe(true);
-      expect(state.startedAt <= after).toBe(true);
+      expect(state.startedAt! >= before).toBe(true);
+      expect(state.startedAt! <= after).toBe(true);
     });
   });
 
@@ -545,8 +545,8 @@ describe("timeout and escalation", () => {
 
       const state = await readPlanningState("ENG-1002", { teamsDir: TEST_TEAMS_DIR });
       expect(state.escalatedAt).toBeDefined();
-      expect(state.escalatedAt >= before).toBe(true);
-      expect(state.escalatedAt <= after).toBe(true);
+      expect(state.escalatedAt! >= before).toBe(true);
+      expect(state.escalatedAt! <= after).toBe(true);
     });
   });
 
