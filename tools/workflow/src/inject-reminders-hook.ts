@@ -5,6 +5,7 @@
  * { "session_id": "..." }
  *
  * Outputs XML-formatted reminders to stdout based on frequency.
+ * Also checks context utilization and nudges for handoff when high.
  */
 
 import { join } from "path";
@@ -15,6 +16,62 @@ import {
   type Reminder,
   type WorkflowDeps,
 } from "./workflow";
+
+/**
+ * Context thresholds for handoff nudging
+ */
+const CONTEXT_THRESHOLD_GENTLE = 75; // Start gentle nudging
+const CONTEXT_THRESHOLD_URGENT = 80; // Become persistent
+
+/**
+ * Check context utilization using cctx CLI
+ * Returns percentage (0-100) or null if unable to check
+ */
+async function getContextUtilization(): Promise<number | null> {
+  try {
+    const proc = Bun.spawn(["cctx", "--percent"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const output = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0 && exitCode !== 2) {
+      // exitCode 2 means critical (>90%) but still valid
+      return null;
+    }
+
+    // Parse "75.3%" -> 75.3
+    const match = output.trim().match(/^([\d.]+)%$/);
+    if (match) {
+      return parseFloat(match[1]);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generate context-based handoff reminder if needed
+ */
+async function getContextReminder(): Promise<string | null> {
+  const utilization = await getContextUtilization();
+
+  if (utilization === null) {
+    return null;
+  }
+
+  if (utilization >= CONTEXT_THRESHOLD_URGENT) {
+    return `⚠️ CONTEXT AT ${utilization.toFixed(0)}% - You should hand off soon. Run /auto-handoff to spawn a continuation agent before context fills up. Wrap up your current thought and hand off.`;
+  }
+
+  if (utilization >= CONTEXT_THRESHOLD_GENTLE) {
+    return `Context at ${utilization.toFixed(0)}%. Consider wrapping up and running /auto-handoff to hand off to a fresh agent.`;
+  }
+
+  return null;
+}
 
 export interface HookInput {
   session_id: string;
@@ -52,31 +109,38 @@ export function shouldShowReminder(frequency: number, random: () => number): boo
 
 /**
  * Read and filter reminders, returning formatted output
+ * Includes context-based handoff reminders when utilization is high
  */
 export async function injectReminders(deps: HookDeps): Promise<string> {
+  const texts: string[] = [];
+
+  // Check context utilization first
+  const contextReminder = await getContextReminder();
+  if (contextReminder) {
+    texts.push(contextReminder);
+  }
+
+  // Then check workflow reminders
   const workflowPath = join(deps.storageDir, `${deps.sessionId}.json`);
 
   try {
     const file = Bun.file(workflowPath);
-    if (!(await file.exists())) {
-      return "";
+    if (await file.exists()) {
+      const content = await file.json();
+
+      if (content.reminders && Array.isArray(content.reminders)) {
+        const reminders = content.reminders as Reminder[];
+        const workflowTexts = reminders
+          .filter((r) => shouldShowReminder(r.frequency, deps.random))
+          .map((r) => r.text);
+        texts.push(...workflowTexts);
+      }
     }
-
-    const content = await file.json();
-
-    if (!content.reminders || !Array.isArray(content.reminders)) {
-      return "";
-    }
-
-    const reminders = content.reminders as Reminder[];
-    const texts = reminders
-      .filter((r) => shouldShowReminder(r.frequency, deps.random))
-      .map((r) => r.text);
-
-    return formatReminders(texts);
   } catch {
-    return "";
+    // Ignore workflow file errors
   }
+
+  return formatReminders(texts);
 }
 
 /**
