@@ -37,6 +37,7 @@ export interface ImplState {
   type: "impl";
   sliceId: string;
   specId: string;
+  linearIssueId?: string; // The actual Linear issue ID (e.g., ENG-1258) for this slice
   phase: ImplPhase;
   startedAt?: string;
   completedAt?: string;
@@ -117,7 +118,70 @@ export function getImplWorkspacePath(sliceId: string, deps: WorkspaceDeps): stri
 }
 
 /**
- * Read implementation state from workspace
+ * Validate that a state object has the required ImplState schema.
+ * Throws descriptive errors if validation fails.
+ */
+export function validateImplState(state: unknown, sliceId: string): ImplState {
+  if (!state || typeof state !== "object") {
+    throw new Error(
+      `Invalid state.json for ${sliceId}: not an object. ` +
+      `Use 'team impl' to create workspaces properly.`
+    );
+  }
+
+  const obj = state as Record<string, unknown>;
+
+  // Check required fields
+  const requiredFields = ["type", "sliceId", "phase", "tests", "commits"];
+  for (const field of requiredFields) {
+    if (!(field in obj)) {
+      throw new Error(
+        `Invalid state.json for ${sliceId}: missing '${field}'. ` +
+        `This file should only be modified via CLI commands (team phase, team commit). ` +
+        `Did an agent write this directly?`
+      );
+    }
+  }
+
+  // Check type field
+  if (obj.type !== "impl") {
+    throw new Error(
+      `Invalid state.json for ${sliceId}: type must be 'impl', got '${obj.type}'. ` +
+      `Use 'team impl' to create implementation workspaces.`
+    );
+  }
+
+  // Check phase is valid
+  const validPhases: ImplPhase[] = [
+    "setup", "writing_tests", "reviewing_tests", "tests_approved",
+    "implementing", "reviewing_impl", "verifying", "complete"
+  ];
+  if (!validPhases.includes(obj.phase as ImplPhase)) {
+    throw new Error(
+      `Invalid state.json for ${sliceId}: invalid phase '${obj.phase}'. ` +
+      `Valid phases: ${validPhases.join(", ")}`
+    );
+  }
+
+  // Check tests is array
+  if (!Array.isArray(obj.tests)) {
+    throw new Error(
+      `Invalid state.json for ${sliceId}: 'tests' must be an array.`
+    );
+  }
+
+  // Check commits is array
+  if (!Array.isArray(obj.commits)) {
+    throw new Error(
+      `Invalid state.json for ${sliceId}: 'commits' must be an array.`
+    );
+  }
+
+  return state as ImplState;
+}
+
+/**
+ * Read implementation state from workspace with schema validation
  */
 export async function readImplState(
   sliceId: string,
@@ -126,7 +190,8 @@ export async function readImplState(
   const workspacePath = getImplWorkspacePath(sliceId, deps);
   const statePath = join(workspacePath, "state.json");
   const content = await readFile(statePath, "utf-8");
-  return JSON.parse(content);
+  const parsed = JSON.parse(content);
+  return validateImplState(parsed, sliceId);
 }
 
 /**
@@ -205,4 +270,39 @@ export async function transitionImplTo(
   }
 
   await updateImplState(sliceId, updates, deps);
+}
+
+/**
+ * Record a commit hash for the slice.
+ * Appends the hash to the commits array and emits an event.
+ */
+export async function recordCommit(
+  sliceId: string,
+  commitHash: string,
+  deps: WorkspaceDeps
+): Promise<void> {
+  const state = await readImplState(sliceId, deps);
+
+  // Check if commit already recorded (idempotent)
+  if (state.commits.includes(commitHash)) {
+    return;
+  }
+
+  // Append commit to array
+  const updatedCommits = [...state.commits, commitHash];
+  await updateImplState(sliceId, { commits: updatedCommits }, deps);
+
+  // Emit event
+  const workspacePath = getImplWorkspacePath(sliceId, deps);
+  const eventsPath = join(workspacePath, "events.jsonl");
+  const event = {
+    timestamp: new Date().toISOString(),
+    event: "commit_recorded",
+    data: {
+      sliceId,
+      commitHash,
+      commitIndex: updatedCommits.length,
+    },
+  };
+  await appendFile(eventsPath, JSON.stringify(event) + "\n");
 }

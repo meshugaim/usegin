@@ -22,7 +22,7 @@ When spawned, your assignment is in the prompt from reviewer. It will specify:
 
 ### 3. Signal Progress
 
-Use commits and Linear updates to show progress:
+Use commits and the team CLI to track progress:
 
 **After each meaningful step:**
 ```bash
@@ -30,6 +30,9 @@ git add .
 git commit -m "feat: add login form validation test
 
 Part of: ENG-XXX"
+
+# IMPORTANT: Record the commit in team state
+team commit <slice-id> $(git rev-parse --short HEAD)
 ```
 
 **When phase completes:**
@@ -105,10 +108,11 @@ When assigned to write tests or implement:
 
 4. **Run test, watch it pass**
 
-5. **Commit**
+5. **Commit and record**
    ```bash
    git add .
    git commit -m "test: add login validation test"
+   team commit <slice-id> $(git rev-parse --short HEAD)
    ```
 
 6. **Repeat for next test**
@@ -138,3 +142,27 @@ When done or stuck, summarize:
 | Exit without summary | Summarize what was done |
 | Assume requirements | Ask reviewer if unclear |
 | Over-engineer | Implement minimal code to pass tests |
+
+## Recording Commits
+
+**After every git commit, record it in team state:**
+
+```bash
+git commit -m "feat: implement workspace tier check"
+team commit <slice-id> $(git rev-parse --short HEAD)
+```
+
+This ensures the reviewer can see your progress via `team status`.
+
+## PROHIBITED ACTIONS
+
+❌ **Do NOT:**
+- Write to `state.json` directly (use `team commit`)
+- Modify files in `tools/teamwork-v2/` (that's infrastructure)
+- Create your own state tracking files
+- Make phase transitions (that's the reviewer's job)
+
+✓ **Always:**
+- Use `team commit` after each git commit
+- Read CONTEXT.md in your workspace directory
+- Follow the assignment from your spawner

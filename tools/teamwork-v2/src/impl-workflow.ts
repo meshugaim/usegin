@@ -73,7 +73,7 @@ export interface AdvanceTestOptions {
 /**
  * Emit an event to the workspace event log.
  */
-async function emitEvent(
+export async function emitEvent(
   sliceId: string,
   eventType: string,
   data: object,
@@ -152,11 +152,89 @@ async function emitEscalation(
 /**
  * Create an implementation workspace with all necessary files and directories.
  */
+/**
+ * Generate CONTEXT.md content for agents.
+ * This file provides rules and commands that agents MUST follow.
+ */
+export function generateContextMd(sliceId: string, specId: string, phase: ImplPhase): string {
+  return `# Workspace: ${sliceId}
+
+## CRITICAL RULES
+
+1. **NEVER write to state.json directly** - Use CLI commands only
+2. **NEVER modify code in tools/teamwork-v2/** - That's infrastructure, not your task
+3. **ALWAYS use these commands:**
+
+### Phase Transitions (Reviewer only)
+\`\`\`bash
+team phase ${sliceId} <phase>
+\`\`\`
+
+Valid phases: setup → writing_tests → reviewing_tests → tests_approved → implementing → reviewing_impl → verifying → complete
+
+### Recording Commits (Worker)
+\`\`\`bash
+git commit -m "..."
+team commit ${sliceId} $(git rev-parse --short HEAD)
+\`\`\`
+
+### Checking Status
+\`\`\`bash
+team status ${sliceId}
+\`\`\`
+
+## Current State
+
+- **Phase:** ${phase}
+- **Slice:** ${sliceId}
+- **Spec:** ${specId}
+
+## Your Task
+
+Read the note-to-self from your spawner. Follow those instructions.
+
+## Skill Files
+
+For detailed workflow guidance, see:
+- \`.claude/skills/teamwork/reviewer.md\` - For reviewers
+- \`.claude/skills/teamwork/worker.md\` - For workers
+- \`.claude/skills/teamwork/impl-team.md\` - Implementation team workflow
+
+## PROHIBITED ACTIONS
+
+❌ Do NOT:
+- Write to \`state.json\` directly (use \`team phase\`, \`team commit\`)
+- Modify files in \`tools/teamwork-v2/\` (that's infrastructure)
+- Create your own state tracking files
+- Invent new JSON formats
+
+✓ Always:
+- Use CLI commands for state changes
+- Follow the note-to-self from your spawner
+- Commit frequently and record with \`team commit\`
+`;
+}
+
+/**
+ * Write CONTEXT.md to the workspace.
+ */
+export async function writeContextMd(
+  sliceId: string,
+  specId: string,
+  phase: ImplPhase,
+  deps: WorkspaceDeps
+): Promise<void> {
+  const workspacePath = getImplWorkspacePath(sliceId, deps);
+  const content = generateContextMd(sliceId, specId, phase);
+  await writeFile(join(workspacePath, "CONTEXT.md"), content);
+}
+
 export async function createImplWorkspace(
   sliceId: string,
   specId: string,
   deps: WorkspaceDeps,
-  timeoutMinutes: number = 30
+  timeoutMinutes: number = 30,
+  linearIssueId?: string
 ): Promise<void> {
   const workspacePath = getImplWorkspacePath(sliceId, deps);
 
@@ -171,11 +249,13 @@ export async function createImplWorkspace(
 
   // Create state.json
   const now = new Date().toISOString();
+  const initialPhase: ImplPhase = "setup";
   const state: ImplState = {
     type: "impl",
     sliceId,
     specId,
-    phase: "setup",
+    linearIssueId, // The actual Linear issue ID for this slice
+    phase: initialPhase,
     tests: [],
     currentTestIndex: 0,
     commits: [],
@@ -188,6 +268,9 @@ export async function createImplWorkspace(
     join(workspacePath, "state.json"),
     JSON.stringify(state, null, 2)
   );
+
+  // Create CONTEXT.md with rules for agents
+  await writeContextMd(sliceId, specId, initialPhase, deps);
 
   // Create events.jsonl with workspace_created event
   const createdEvent = {

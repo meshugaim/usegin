@@ -16,11 +16,18 @@ import { readEvents, type PlanningEvent } from "./events";
 import {
   createImplWorkspace,
   readImplState,
+  emitEvent,
+  writeContextMd,
 } from "./impl-workflow";
 import {
   getImplWorkspacePath,
   updateImplState,
+  transitionImplTo,
+  recordCommit,
+  isValidImplTransition,
+  getNextValidImplPhases,
   type ImplState,
+  type ImplPhase,
 } from "./impl-state-machine";
 import {
   hasExitCodeFailure,
@@ -1081,6 +1088,7 @@ program
         dependencies: string[];
         isIndependent: boolean;
         requirements?: string[];
+        linearIssueId?: string;
       }>;
 
       try {
@@ -1170,8 +1178,8 @@ program
         }
 
         try {
-          // Create the workspace
-          await createImplWorkspace(currentSliceId, specId, deps, timeoutMinutes);
+          // Create the workspace (pass linearIssueId if available from slices.json)
+          await createImplWorkspace(currentSliceId, specId, deps, timeoutMinutes, slice.linearIssueId);
 
           const workspacePath = getImplWorkspacePath(currentSliceId, deps);
 
@@ -1301,6 +1309,130 @@ program
           process.exit(result.exitCode);
         }
       }
+    } catch (error) {
+      console.error(
+        `Error: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Phase command - for agents to transition state machine
+program
+  .command("phase")
+  .description("Transition a workspace to a new phase (for use by agents)")
+  .argument("<slice-id>", "The slice ID (e.g., ENG-123-1)")
+  .argument("<phase>", "The target phase")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .action(async (sliceId: string, phase: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Validate phase is a known phase
+    const validPhases: ImplPhase[] = [
+      "setup", "writing_tests", "reviewing_tests", "tests_approved",
+      "implementing", "reviewing_impl", "verifying", "complete"
+    ];
+    if (!validPhases.includes(phase as ImplPhase)) {
+      console.error(`Error: Invalid phase '${phase}'`);
+      console.error(`Valid phases: ${validPhases.join(", ")}`);
+      process.exit(1);
+    }
+
+    // Check if workspace exists
+    if (!(await implWorkspaceExists(sliceId, deps))) {
+      console.error(`Error: Workspace for ${sliceId} not found`);
+      console.error("Use 'team impl' to create implementation workspaces.");
+      process.exit(1);
+    }
+
+    try {
+      // Read current state to show transition
+      const currentState = await readImplState(sliceId, deps);
+      const currentPhase = currentState.phase;
+      const targetPhase = phase as ImplPhase;
+
+      // Check if already in target phase
+      if (currentPhase === targetPhase) {
+        console.log(`Already in phase '${targetPhase}'`);
+        return;
+      }
+
+      // Validate the transition
+      if (!isValidImplTransition(currentPhase, targetPhase)) {
+        console.error(`Error: Cannot transition from '${currentPhase}' to '${targetPhase}'`);
+        const validNext = getNextValidImplPhases(currentPhase);
+        if (validNext.length > 0) {
+          console.error(`Valid next phases: ${validNext.join(", ")}`);
+        } else {
+          console.error(`'${currentPhase}' is a terminal state.`);
+        }
+        process.exit(1);
+      }
+
+      // Perform the transition
+      await transitionImplTo(sliceId, targetPhase, deps);
+
+      // Update CONTEXT.md with new phase
+      await writeContextMd(sliceId, currentState.specId, targetPhase, deps);
+
+      // Emit phase_transition event
+      await emitEvent(sliceId, "phase_transition", {
+        from: currentPhase,
+        to: targetPhase,
+      }, deps);
+
+      console.log(`Phase: ${currentPhase} → ${targetPhase}`);
+
+      // Show helpful next steps
+      const nextPhases = getNextValidImplPhases(targetPhase);
+      if (nextPhases.length > 0) {
+        console.log(`Next phases available: ${nextPhases.join(", ")}`);
+      } else {
+        console.log("Workflow complete.");
+      }
+    } catch (error) {
+      console.error(
+        `Error: ${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exit(1);
+    }
+  });
+
+// Commit command - for agents to record commits
+program
+  .command("commit")
+  .description("Record a commit hash for a slice (for use by agents)")
+  .argument("<slice-id>", "The slice ID (e.g., ENG-123-1)")
+  .argument("<hash>", "The commit hash to record")
+  .option(
+    "--workspaces-dir <dir>",
+    "Directory where workspaces are stored",
+    getDefaultWorkspacesDir()
+  )
+  .action(async (sliceId: string, hash: string, options) => {
+    const workspacesDir = options.workspacesDir;
+    const deps: WorkspaceDeps = { workspacesDir };
+
+    // Check if workspace exists
+    if (!(await implWorkspaceExists(sliceId, deps))) {
+      console.error(`Error: Workspace for ${sliceId} not found`);
+      console.error("Use 'team impl' to create implementation workspaces.");
+      process.exit(1);
+    }
+
+    try {
+      // Record the commit
+      await recordCommit(sliceId, hash, deps);
+
+      // Read updated state to show commit count
+      const state = await readImplState(sliceId, deps);
+      console.log(`Commit recorded: ${hash}`);
+      console.log(`Total commits: ${state.commits.length}`);
     } catch (error) {
       console.error(
         `Error: ${error instanceof Error ? error.message : String(error)}`

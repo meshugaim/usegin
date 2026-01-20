@@ -254,3 +254,67 @@ Don't rush. Quality over speed.
 | Provide vague feedback | Be specific and actionable |
 | Ignore context usage | Monitor and handoff proactively |
 | Rush to finish | Prioritize quality |
+
+## State Management
+
+**You own phase transitions.** Use CLI commands to update state after each decision point.
+
+### Phase Transition Commands
+
+```bash
+# After spawning worker for tests
+team phase <slice-id> writing_tests
+
+# When reviewing tests
+team phase <slice-id> reviewing_tests
+
+# After approving tests
+team phase <slice-id> tests_approved
+
+# When implementation starts
+team phase <slice-id> implementing
+
+# When reviewing implementation
+team phase <slice-id> reviewing_impl
+
+# Before final verification
+team phase <slice-id> verifying
+
+# When complete
+team phase <slice-id> complete
+```
+
+### Checking State
+
+```bash
+team status <slice-id>
+```
+
+### Crun Pattern with Note-to-Self
+
+Always include CLI commands in both the prompt and note-to-self:
+
+```bash
+crun "Use teamwork skill as worker. Write failing tests for <slice-id>.
+      Acceptance criteria: <list from spec>
+      After each commit, record with: team commit <slice-id> <hash>" \
+  -n "Worker returned from test writing.
+      1. team status <slice-id> - check commits
+      2. Review test quality
+      3. If approved: team phase <slice-id> tests_approved
+      4. If needs revision: spawn worker with specific feedback" \
+  -C .claude/teamwork-v2/<slice-id>
+```
+
+## PROHIBITED ACTIONS
+
+❌ **Do NOT:**
+- Write to `state.json` directly (use `team phase`, `team commit`)
+- Modify files in `tools/teamwork-v2/` (that's infrastructure)
+- Create your own state tracking files
+- Invent new JSON formats
+
+✓ **Always:**
+- Use CLI commands for state changes
+- Include commands in crun prompts and notes-to-self
+- Read CONTEXT.md in your workspace directory

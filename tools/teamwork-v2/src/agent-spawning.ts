@@ -96,11 +96,18 @@ Begin by reading the spec and understanding what needs to be sliced.`;
 
 /**
  * Build the prompt for an implementation team reviewer.
+ * @param sliceId - The internal slice ID (e.g., ENG-1131-1)
+ * @param specId - The parent spec ID (e.g., ENG-1131)
+ * @param linearIssueId - The actual Linear issue ID (e.g., ENG-1258), if available
  */
-export function buildImplReviewerPrompt(sliceId: string, specId: string): string {
+export function buildImplReviewerPrompt(sliceId: string, specId: string, linearIssueId?: string): string {
+  // Use linearIssueId for Linear operations if available, otherwise fall back to sliceId
+  const issueIdForLinear = linearIssueId || sliceId;
+
   return `You are the Reviewer for an Implementation Team in the teamwork system.
 
 Your task is to orchestrate the TDD implementation of slice ${sliceId}.
+${linearIssueId ? `\n**Linear Issue:** ${linearIssueId} (use this ID for \`plan show\` and \`plan close\` commands)` : ''}
 
 ## Your Role
 
@@ -126,7 +133,7 @@ As you work, update the workspace state:
 
 When complete:
 1. Ensure all tests pass
-2. Close the Linear issue: \`plan close ${sliceId}\`
+2. Close the Linear issue: \`plan close ${issueIdForLinear}\`
 3. Update state.json with completedAt timestamp
 
 ## Key Principles
@@ -139,7 +146,7 @@ When complete:
 
 ## Start
 
-1. First, read the slice requirements: \`plan show ${sliceId}\`
+1. First, read the slice requirements: \`plan show ${issueIdForLinear}\`
 2. Spawn a worker to write failing tests covering all acceptance criteria
 3. Review tests for completeness and quality
 4. When tests approved, spawn worker to implement one test at a time
@@ -237,17 +244,29 @@ export async function spawnImplReviewer(
   const { sliceId, specId, projectRoot, model, resumeSessionId } = options;
   const startTime = Date.now();
 
+  // Read linearIssueId from workspace state if available
+  let linearIssueId: string | undefined;
+  try {
+    const statePath = join(getImplWorkspacePath(sliceId, deps), "state.json");
+    const stateContent = await readFile(statePath, "utf-8");
+    const state = JSON.parse(stateContent);
+    linearIssueId = state.linearIssueId;
+  } catch {
+    // Ignore - linearIssueId will be undefined
+  }
+
   // Emit spawn event (use specId for event log path compatibility, but include sliceId in data)
   await emitEvent(sliceId, "reviewer_spawned", {
     sliceId,
     specId,
+    linearIssueId,
     type: "implementation",
     model: model || "default",
     resumed: !!resumeSessionId,
   }, deps);
 
-  // Build the prompt
-  const prompt = buildImplReviewerPrompt(sliceId, specId);
+  // Build the prompt (pass linearIssueId for proper Linear integration)
+  const prompt = buildImplReviewerPrompt(sliceId, specId, linearIssueId);
 
   // Write prompt to temp file
   const workspacePath = getImplWorkspacePath(sliceId, deps);
