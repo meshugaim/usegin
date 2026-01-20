@@ -46,6 +46,7 @@ This creates the workspace structure for a planning team. Future slices will add
 ## See Also
 
 - Spec: ENG-1250 - Full teamwork system specification
+- `team-retro` skill - Analyze completed team work and propose improvements
 - `cell` skill - Simpler spawner/worker pattern
 - `writing-specs` skill - Create specs
 - `implementing-specs` skill - Interactive implementation

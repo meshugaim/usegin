@@ -401,6 +401,16 @@ cctx --percent            # Own context usage
 cctx <session-id>         # Subagent context
 ```
 
+## After Completion: Run Retro
+
+**Mandatory final step.** Whether the feature succeeded or failed, run a retro:
+
+```bash
+crun "Use the team-retro skill. Retro spec <spec-issue-id>"
+```
+
+The retro analyzes the entire execution (planning + all impl teams) and proposes improvements to skills, CLI, or workflow. This is how the teamwork system improves over time.
+
 ## See Also
 
 - [planning-team.md](planning-team.md) - Planning team workflow
@@ -408,3 +418,4 @@ cctx <session-id>         # Subagent context
 - [reviewer.md](reviewer.md) - Reviewer behavior
 - [worker.md](worker.md) - Worker behavior
 - [domain-expert.md](domain-expert.md) - Expert consultation
+- [team-retro](../team-retro/SKILL.md) - Analyze completed team work
