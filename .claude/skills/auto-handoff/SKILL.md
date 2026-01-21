@@ -4,7 +4,7 @@ Performs a clean handoff to a fresh Claude agent when context is running high. T
 
 ## When to Use
 
-- Context utilization is above 75% (you'll be nudged by workflow reminders)
+- Context utilization is above 75% (warning) or 85% (mandatory handoff required)
 - You want to proactively hand off before context fills up
 - You're at a natural stopping point in your current task
 
@@ -16,7 +16,7 @@ Performs a clean handoff to a fresh Claude agent when context is running high. T
 cctx
 ```
 
-Confirm context is high enough to warrant handoff (typically >75%).
+At 85%+ handoff is mandatory. At 75-84% it's recommended.
 
 ### Step 2: Identify What's Being Worked On
 
