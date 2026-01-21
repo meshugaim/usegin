@@ -310,6 +310,165 @@ function createProgressBar(current: number, total: number, width: number = 20): 
   return `[${bar.slice(0, width)}] ${percentage}%`;
 }
 
+/**
+ * Format a duration in milliseconds to a human-readable string
+ */
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
+/**
+ * Format a timestamp to a short time string (HH:MM:SS)
+ */
+function formatTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString("en-US", { hour12: false });
+}
+
+/**
+ * Get elapsed time since a timestamp
+ */
+function getElapsedMs(timestamp: string): number {
+  return Date.now() - new Date(timestamp).getTime();
+}
+
+/**
+ * Phase icons for visual distinction
+ */
+const PHASE_ICONS: Record<string, string> = {
+  setup: "○",
+  writing_tests: "◐",
+  reviewing_tests: "◑",
+  tests_approved: "◒",
+  implementing: "●",
+  reviewing_impl: "◓",
+  verifying: "◔",
+  complete: "✓",
+  // Planning phases
+  analyzing: "◐",
+  reviewing: "◑",
+  creating_issues: "●",
+};
+
+/**
+ * Get phase icon
+ */
+function getPhaseIcon(phase: string): string {
+  return PHASE_ICONS[phase] || "○";
+}
+
+/**
+ * Interface for watch display event
+ */
+interface WatchEvent {
+  timestamp: string;
+  event: string;
+  data?: Record<string, unknown>;
+}
+
+/**
+ * Render a single workspace status for watch display
+ */
+async function renderWorkspaceStatus(
+  id: string,
+  deps: WorkspaceDeps,
+  verbose: boolean = false
+): Promise<string[]> {
+  const lines: string[] = [];
+  const workspacePath = join(deps.workspacesDir, id);
+
+  try {
+    const statePath = join(workspacePath, "state.json");
+    const content = await readFile(statePath, "utf-8");
+    const state = JSON.parse(content);
+
+    const icon = getPhaseIcon(state.phase);
+    const phaseStarted = state.phaseStartedAt || state.updatedAt || state.createdAt;
+    const elapsed = phaseStarted ? formatDuration(getElapsedMs(phaseStarted)) : "?";
+
+    // Main status line
+    let statusLine = `${icon} ${id}`;
+    statusLine += `  phase: ${state.phase}`;
+    statusLine += `  [${elapsed}]`;
+
+    // Add commits count for impl workspaces
+    if (state.type === "impl" && state.commits?.length > 0) {
+      statusLine += `  commits: ${state.commits.length}`;
+    }
+
+    lines.push(statusLine);
+
+    // Show test progress for impl workspaces
+    if (state.type === "impl" && state.tests?.length > 0) {
+      const totalTests = state.tests.length;
+      const currentIndex = state.currentTestIndex || 0;
+      const percentage = Math.round((currentIndex / totalTests) * 100);
+      const progressBar = createProgressBar(currentIndex, totalTests);
+      lines.push(`  Progress: ${progressBar} ${currentIndex}/${totalTests} tests (${percentage}%)`);
+    }
+
+    // Verbose: show recent events
+    if (verbose) {
+      try {
+        const eventsPath = join(workspacePath, "events.jsonl");
+        const eventsContent = await readFile(eventsPath, "utf-8");
+        const events: WatchEvent[] = eventsContent
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line))
+          .slice(-5); // Last 5 events
+
+        if (events.length > 0) {
+          lines.push("  Recent events:");
+          for (const event of events) {
+            const time = formatTime(event.timestamp);
+            let eventDesc = event.event;
+            if (event.data) {
+              if (event.data.from && event.data.to) {
+                eventDesc = `${event.event}: ${event.data.from} → ${event.data.to}`;
+              } else if (event.data.commitHash) {
+                eventDesc = `${event.event}: ${event.data.commitHash}`;
+              }
+            }
+            lines.push(`    ${time}  ${eventDesc}`);
+          }
+        }
+      } catch {
+        // No events file
+      }
+    }
+  } catch (error) {
+    lines.push(`? ${id}  (error reading state)`);
+  }
+
+  return lines;
+}
+
+/**
+ * Render watch dashboard header
+ */
+function renderWatchHeader(title: string, refreshInterval: number): string[] {
+  const now = new Date().toLocaleTimeString("en-US", { hour12: false });
+  return [
+    "─".repeat(60),
+    `${title}`,
+    `Last updated: ${now}  (refreshing every ${refreshInterval}s)`,
+    "─".repeat(60),
+    "",
+  ];
+}
+
 // Setup the program
 program
   .name("teamwork-v2")
@@ -747,34 +906,35 @@ program
 // Watch command
 program
   .command("watch")
-  .description("Watch progress of teams in real-time")
-  .argument("[id]", "Specific workspace ID to watch")
+  .description("Watch progress of teams in real-time with auto-refresh")
+  .argument("[id]", "Specific workspace ID to watch (or spec ID to watch all its slices)")
   .option(
     "--workspaces-dir <dir>",
     "Directory where workspaces are stored",
     getDefaultWorkspacesDir()
   )
-  .option("--interval <ms>", "Refresh interval in seconds", "5")
+  .option("--interval <seconds>", "Refresh interval in seconds", "5")
   .option("--no-clear", "Do not clear screen between refreshes")
+  .option("--once", "Show status once and exit (no refresh loop)")
+  .option("--verbose", "Show detailed event history")
   .option("--parallel <spec-id>", "Watch parallel execution progress for a spec")
   .action(async (id: string | undefined, options) => {
     const workspacesDir = options.workspacesDir;
     const deps: WorkspaceDeps = { workspacesDir };
+    const interval = parseInt(options.interval, 10) * 1000;
+    const shouldClear = options.clear !== false;
+    const verbose = options.verbose === true;
+    const once = options.once === true;
 
-    // Handle --parallel watch mode
+    // Handle --parallel watch mode (legacy, keep for compatibility)
     if (options.parallel) {
       const specId = options.parallel;
-
-      // Check if parallel execution exists
       try {
         const state = await readParallelState(specId, deps);
-
         console.log("Parallel Execution Progress");
         console.log(`Spec: ${specId}`);
         console.log(`Status: ${state.status}`);
         console.log("");
-
-        // Show progress
         const totalDone = state.completedSlices + state.failedSlices + state.skippedSlices;
         const percentage = Math.round((totalDone / state.totalSlices) * 100);
         console.log(`Progress: ${totalDone}/${state.totalSlices} (${percentage}%)`);
@@ -782,136 +942,125 @@ program
         console.log(`  Failed: ${state.failedSlices}`);
         console.log(`  Skipped: ${state.skippedSlices}`);
         console.log("");
-
-        // Show per-slice status
         console.log("Slices:");
-        for (const [sliceId, sliceStatus] of Object.entries(state.sliceStatuses)) {
-          let statusIcon = "";
-          switch (sliceStatus.status) {
-            case "pending":
-              statusIcon = "[pending/waiting]";
-              break;
-            case "running":
-              statusIcon = "[running/in progress]";
-              break;
-            case "complete":
-              statusIcon = "[complete/done/finished]";
-              break;
-            case "failed":
-              statusIcon = "[failed/error]";
-              break;
-            case "skipped":
-              statusIcon = "[skipped]";
-              break;
-          }
-          console.log(`  ${sliceStatus.title}: ${statusIcon}`);
+        for (const [, sliceStatus] of Object.entries(state.sliceStatuses)) {
+          const statusIcon = sliceStatus.status === "complete" ? "✓" :
+            sliceStatus.status === "running" ? "●" :
+            sliceStatus.status === "failed" ? "✗" :
+            sliceStatus.status === "skipped" ? "○" : "○";
+          console.log(`  ${statusIcon} ${sliceStatus.title}: ${sliceStatus.status}`);
           if (sliceStatus.error) {
             console.log(`    Error: ${sliceStatus.error}`);
           }
         }
-      } catch (error) {
+      } catch {
         console.error(`Error: Parallel execution state for ${specId} not found`);
         process.exit(1);
       }
-
       return;
     }
 
-    if (id) {
-      // Watch a specific workspace
-      const planExists = await workspaceExists(id, deps);
-      const implExists = await implWorkspaceExists(id, deps);
+    // Main render function
+    async function render(): Promise<void> {
+      const output: string[] = [];
 
-      if (!planExists && !implExists) {
-        console.error(`Error: Workspace for ${id} not found`);
-        process.exit(1);
-      }
-
-      // Read state and events
-      try {
-        const statePath = join(workspacesDir, id, "state.json");
-        const content = await readFile(statePath, "utf-8");
-        const state = JSON.parse(content) as WorkspaceState;
-
-        const events = await readEvents(id, deps);
-        const recentEvents = events.slice(-3);
-
-        console.log(`Watching: ${id}`);
-        console.log(`  Type: ${state.type}`);
-        console.log(`  Phase: ${state.phase}`);
-
-        // Show progress for impl workspaces
-        if (state.type === "impl") {
-          const implState = state as ImplState;
-          const totalTests = implState.tests.length;
-          if (totalTests > 0) {
-            const percentage = Math.round((implState.currentTestIndex / totalTests) * 100);
-            const progressBar = createProgressBar(implState.currentTestIndex, totalTests);
-            console.log(`  Progress: ${progressBar} (${implState.currentTestIndex}/${totalTests})`);
-          }
-        }
-
-        // Show recent activity
-        if (recentEvents.length > 0) {
-          console.log("");
-          console.log("Recent Activity:");
-          for (const event of recentEvents) {
-            console.log(`  ${event.event}`);
-          }
-        }
-      } catch (error) {
-        console.error(
-          `Error watching workspace: ${error instanceof Error ? error.message : String(error)}`
+      if (id) {
+        // Check if this is a spec ID (has slices) or a single workspace
+        const allWorkspaces = await listWorkspaces(workspacesDir);
+        const relatedWorkspaces = allWorkspaces.filter(
+          (ws) => ws === id || ws.startsWith(`${id}-`)
         );
-        process.exit(1);
-      }
-    } else {
-      // Watch all active teams
-      const teams = await getAllTeams(workspacesDir);
-      const activeTeams = teams.filter((t) => t.phase !== "complete");
 
-      if (activeTeams.length === 0) {
-        console.log("No active teams to watch");
-        return;
-      }
+        if (relatedWorkspaces.length === 0) {
+          console.error(`Error: Workspace for ${id} not found`);
+          process.exit(1);
+        }
 
-      console.log(`Watching ${activeTeams.length} active teams:`);
-      console.log("");
+        // If it's a spec with multiple slices, show all of them
+        if (relatedWorkspaces.length > 1 || relatedWorkspaces[0] !== id) {
+          output.push(...renderWatchHeader(`Watching: ${id}`, interval / 1000));
 
-      for (const team of activeTeams) {
-        console.log(`${team.id}:`);
-        console.log(`  Type: ${team.type}`);
-        console.log(`  Phase: ${team.phase}`);
+          // Find the main spec workspace if it exists
+          if (relatedWorkspaces.includes(id)) {
+            const mainLines = await renderWorkspaceStatus(id, deps, verbose);
+            output.push("Spec:", ...mainLines.map((l) => "  " + l), "");
+          }
 
-        // For impl workspaces, show progress
-        if (team.type === "impl") {
-          try {
-            const state = await readImplState(team.id, deps);
-            const totalTests = state.tests.length;
-            if (totalTests > 0) {
-              const percentage = Math.round((state.currentTestIndex / totalTests) * 100);
-              const progressBar = createProgressBar(state.currentTestIndex, totalTests);
-              console.log(`  Progress: ${progressBar}`);
+          // Show slice workspaces
+          const sliceWorkspaces = relatedWorkspaces.filter((ws) => ws !== id).sort();
+          if (sliceWorkspaces.length > 0) {
+            output.push("Slices:");
+            for (const ws of sliceWorkspaces) {
+              const lines = await renderWorkspaceStatus(ws, deps, verbose);
+              output.push(...lines.map((l) => "  " + l));
             }
-          } catch {
-            // Ignore errors reading state
+          }
+        } else {
+          // Single workspace
+          output.push(...renderWatchHeader(`Watching: ${id}`, interval / 1000));
+          const lines = await renderWorkspaceStatus(id, deps, true); // Always verbose for single
+          output.push(...lines);
+        }
+      } else {
+        // Watch all active teams
+        const teams = await getAllTeams(workspacesDir);
+        const activeTeams = teams.filter((t) => t.phase !== "complete");
+
+        output.push(...renderWatchHeader("All Active Teams", interval / 1000));
+
+        if (activeTeams.length === 0) {
+          output.push("No active teams");
+        } else {
+          output.push(`${activeTeams.length} active team(s):`);
+          output.push("");
+
+          for (const team of activeTeams) {
+            const lines = await renderWorkspaceStatus(team.id, deps, verbose);
+            output.push(...lines);
           }
         }
-
-        // Show recent events
-        try {
-          const events = await readEvents(team.id, deps);
-          const recentEvents = events.slice(-2);
-          if (recentEvents.length > 0) {
-            console.log(`  Recent: ${recentEvents.map((e) => e.event).join(", ")}`);
-          }
-        } catch {
-          // Ignore errors reading events
-        }
-
-        console.log("");
       }
+
+      // Add footer with hints
+      output.push("");
+      output.push("─".repeat(60));
+      if (!once) {
+        output.push("Press Ctrl+C to stop watching");
+      }
+
+      // Clear and print
+      if (shouldClear && !once) {
+        console.clear();
+      }
+      console.log(output.join("\n"));
     }
+
+    // Initial render
+    await render();
+
+    // If --once, exit now
+    if (once) {
+      return;
+    }
+
+    // Set up refresh loop
+    const refreshInterval = setInterval(async () => {
+      try {
+        await render();
+      } catch (error) {
+        console.error(`Error during refresh: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }, interval);
+
+    // Handle Ctrl+C gracefully
+    process.on("SIGINT", () => {
+      clearInterval(refreshInterval);
+      console.log("\nStopped watching.");
+      process.exit(0);
+    });
+
+    // Keep process alive
+    await new Promise(() => {});
   });
 
 // Impl command
