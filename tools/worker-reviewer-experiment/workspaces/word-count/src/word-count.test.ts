@@ -42,4 +42,16 @@ describe("word-count CLI", () => {
     expect(output.trim()).toBe("4 words");
     expect(proc.exitCode).toBe(0);
   });
+
+  test("missing argument exits with error", async () => {
+    const proc = Bun.spawn(["bun", "run", "./src/word-count.ts"], {
+      cwd: import.meta.dir + "/..",
+      stderr: "pipe",
+    });
+    const errorOutput = await new Response(proc.stderr).text();
+    await proc.exited;
+
+    expect(errorOutput).toContain("Error: No file specified");
+    expect(proc.exitCode).toBe(1);
+  });
 });

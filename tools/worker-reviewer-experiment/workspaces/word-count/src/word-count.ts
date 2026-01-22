@@ -6,9 +6,12 @@ if (args[0] === "--help") {
 }
 
 const filePath = args[0];
-if (filePath) {
-  const file = Bun.file(filePath);
-  const content = await file.text();
-  const words = content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
-  process.stdout.write(words + " words\n");
+if (!filePath) {
+  console.error("Error: No file specified");
+  process.exit(1);
 }
+
+const file = Bun.file(filePath);
+const content = await file.text();
+const words = content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
+process.stdout.write(words + " words\n");
