@@ -1,5 +1,10 @@
 const args = Bun.argv.slice(2);
 
+if (args[0] === "--help") {
+  console.log("Usage: word-count <file>");
+  process.exit(0);
+}
+
 if (args.length === 0) {
   console.error("Error: No file specified");
   process.exit(1);

@@ -30,4 +30,18 @@ describe("word-count", () => {
     expect(stderr).toContain("Error");
     expect(stderr).toContain("not found");
   });
+
+  test("help flag shows usage", async () => {
+    const proc = spawn(["bun", "run", "./src/word-count.ts", "--help"], {
+      cwd: import.meta.dir + "/..",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("Usage: word-count <file>");
+  });
 });
