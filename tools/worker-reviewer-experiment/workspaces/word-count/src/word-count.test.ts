@@ -58,4 +58,21 @@ describe("word-count CLI", () => {
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe("0 words");
   });
+
+  test("file with content outputs correct word count", async () => {
+    const contentFile = join(tempDir, "content.txt");
+    writeFileSync(contentFile, "hello world foo bar");
+
+    const proc = spawn({
+      cmd: ["bun", "run", CLI_PATH, contentFile],
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe("4 words");
+  });
 });
