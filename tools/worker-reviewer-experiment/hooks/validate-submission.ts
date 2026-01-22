@@ -5,15 +5,16 @@
  * Intercepts writes to submission.md and test-plan.md, validates YAML frontmatter,
  * updates state, and logs events.
  *
- * Usage: Add to .claude/settings.json PreToolUse hooks
+ * Usage: Used as a skill-specific hook in .claude/skills/worker-reviewer/SKILL.md
+ *
+ * Workspace is determined by:
+ * 1. WR_WORKSPACE env var (if set)
+ * 2. Inferred from file path (looks for parent dir with state.json)
  */
 
 import { parse as parseYaml } from "yaml";
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from "fs";
 import { dirname, basename, join } from "path";
-
-// Workspace path - relative to this hook's location
-const WORKSPACE_DIR = join(dirname(import.meta.path), "..", "workspace");
 
 interface HookInput {
   tool_name: string;
@@ -44,6 +45,28 @@ interface TestPlan {
     description: string;
     acceptanceCriteria?: string[];
   }>;
+}
+
+// --- Workspace Discovery ---
+
+function getWorkspaceDir(filePath: string): string | null {
+  // First, check env var
+  if (process.env.WR_WORKSPACE) {
+    return process.env.WR_WORKSPACE;
+  }
+
+  // Infer from file path - look for a directory containing state.json
+  let dir = dirname(filePath);
+  for (let i = 0; i < 5; i++) {  // Look up to 5 levels
+    if (existsSync(join(dir, "state.json"))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;  // Reached root
+    dir = parent;
+  }
+
+  return null;
 }
 
 // --- YAML Frontmatter Parsing ---
@@ -80,20 +103,20 @@ function extractFrontmatter(content: string): { frontmatter: Record<string, unkn
 
 // --- State Management ---
 
-function getStatePath(): string {
-  return join(WORKSPACE_DIR, "state.json");
+function getStatePath(workspaceDir: string): string {
+  return join(workspaceDir, "state.json");
 }
 
-function getEventsPath(): string {
-  return join(WORKSPACE_DIR, "events.jsonl");
+function getEventsPath(workspaceDir: string): string {
+  return join(workspaceDir, "events.jsonl");
 }
 
-function getTestPlanPath(): string {
-  return join(WORKSPACE_DIR, "test-plan.md");
+function getTestPlanPath(workspaceDir: string): string {
+  return join(workspaceDir, "test-plan.md");
 }
 
-function readState(): State | null {
-  const statePath = getStatePath();
+function readState(workspaceDir: string): State | null {
+  const statePath = getStatePath(workspaceDir);
   if (!existsSync(statePath)) {
     return null;
   }
@@ -104,25 +127,25 @@ function readState(): State | null {
   }
 }
 
-function writeState(state: State): void {
-  ensureWorkspaceExists();
-  writeFileSync(getStatePath(), JSON.stringify(state, null, 2));
+function writeState(workspaceDir: string, state: State): void {
+  ensureWorkspaceExists(workspaceDir);
+  writeFileSync(getStatePath(workspaceDir), JSON.stringify(state, null, 2));
 }
 
-function appendEvent(event: Record<string, unknown>): void {
-  ensureWorkspaceExists();
+function appendEvent(workspaceDir: string, event: Record<string, unknown>): void {
+  ensureWorkspaceExists(workspaceDir);
   const eventWithTs = { ts: new Date().toISOString(), ...event };
-  appendFileSync(getEventsPath(), JSON.stringify(eventWithTs) + "\n");
+  appendFileSync(getEventsPath(workspaceDir), JSON.stringify(eventWithTs) + "\n");
 }
 
-function ensureWorkspaceExists(): void {
-  if (!existsSync(WORKSPACE_DIR)) {
-    mkdirSync(WORKSPACE_DIR, { recursive: true });
+function ensureWorkspaceExists(workspaceDir: string): void {
+  if (!existsSync(workspaceDir)) {
+    mkdirSync(workspaceDir, { recursive: true });
   }
 }
 
-function readTestPlan(): TestPlan | null {
-  const planPath = getTestPlanPath();
+function readTestPlan(workspaceDir: string): TestPlan | null {
+  const planPath = getTestPlanPath(workspaceDir);
   if (!existsSync(planPath)) {
     return null;
   }
@@ -398,13 +421,15 @@ async function main() {
   const content = input.tool_input.content || "";
   const fileName = basename(filePath);
 
-  // Only validate files in our workspace
-  if (!filePath.includes("worker-reviewer-experiment/workspace")) {
+  // Only validate submission.md and test-plan.md
+  if (fileName !== "submission.md" && fileName !== "test-plan.md") {
     process.exit(0);
   }
 
-  // Only validate submission.md and test-plan.md
-  if (fileName !== "submission.md" && fileName !== "test-plan.md") {
+  // Find workspace directory
+  const workspaceDir = getWorkspaceDir(filePath);
+  if (!workspaceDir) {
+    // No workspace found - this file isn't in a worker-reviewer workspace
     process.exit(0);
   }
 
@@ -423,8 +448,8 @@ async function main() {
   }
 
   const { frontmatter } = parsed;
-  const state = readState();
-  const testPlan = readTestPlan();
+  const state = readState(workspaceDir);
+  const testPlan = readTestPlan(workspaceDir);
 
   let errors: ValidationError[] = [];
   let phase: "plan" | "impl" = "plan";
@@ -488,13 +513,13 @@ async function main() {
         totalTests: (frontmatter.testPlan as { tests: unknown[] })?.tests?.length || null,
         startedAt: state?.startedAt || new Date().toISOString()
       };
-      writeState(newState);
-      appendEvent({
+      writeState(workspaceDir, newState);
+      appendEvent(workspaceDir, {
         actor: "worker",
         event: "plan-submitted",
         testCount: newState.totalTests
       });
-      appendEvent({
+      appendEvent(workspaceDir, {
         actor: "hook",
         event: "validation-passed",
         file: "submission.md",
@@ -506,19 +531,19 @@ async function main() {
         ...state!,
         phase: "impl:review"
       };
-      writeState(newState);
+      writeState(workspaceDir, newState);
 
       const testResults = frontmatter.testResults as Array<{ status: string }>;
       const passingCount = testResults.filter(r => r.status === "pass").length;
 
-      appendEvent({
+      appendEvent(workspaceDir, {
         actor: "worker",
         event: "impl-submitted",
         testIndex: (frontmatter.targetTest as { index: number }).index,
         passingTests: passingCount,
         totalTests: state!.totalTests
       });
-      appendEvent({
+      appendEvent(workspaceDir, {
         actor: "hook",
         event: "validation-passed",
         file: "submission.md",

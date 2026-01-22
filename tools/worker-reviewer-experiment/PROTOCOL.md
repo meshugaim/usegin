@@ -468,31 +468,37 @@ Part of: ENG-456
 
 ## Hook Configuration
 
-The validation hook is registered in `.claude/settings.json`:
+The validation hook is **skill-specific**, defined in the skill's YAML frontmatter:
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun tools/worker-reviewer-experiment/hooks/validate-submission.ts"
-          }
-        ]
-      }
-    ]
-  }
-}
+**Skill file:** `.claude/skills/worker-reviewer/SKILL.md`
+
+```yaml
+---
+name: worker-reviewer
+triggers: ["/wr", "/worker-reviewer"]
+hooks:
+  PreToolUse:
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "bun tools/worker-reviewer-experiment/hooks/validate-submission.ts"
+---
 ```
+
+**Why skill-specific?**
+- Hook only fires when the skill is active (not on every Write globally)
+- No hardcoded path filtering needed
+- Automatically scoped to the skill's lifecycle
 
 **Hook location:** `tools/worker-reviewer-experiment/hooks/validate-submission.ts`
 
+**Workspace discovery:**
+1. `WR_WORKSPACE` env var (if set)
+2. Otherwise, infers from file path (looks for parent dir with `state.json`)
+
 **What it does:**
-- Intercepts all Write tool calls
-- Only validates files in `tools/worker-reviewer-experiment/workspace/`
+- Intercepts Write tool calls (only when skill is active)
+- Finds workspace by looking for `state.json` in parent directories
 - Validates `submission.md` and `test-plan.md` YAML frontmatter
 - Blocks invalid writes with verbose error messages
 - Updates `state.json` and appends to `events.jsonl` on valid writes
