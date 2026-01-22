@@ -153,7 +153,8 @@ function readTestPlan(workspaceDir: string): TestPlan | null {
     const content = readFileSync(planPath, "utf-8");
     const parsed = extractFrontmatter(content);
     if (!parsed) return null;
-    return parsed.frontmatter as unknown as TestPlan;
+    const fm = parsed.frontmatter as { testPlan?: TestPlan };
+    return fm.testPlan || null;
   } catch {
     return null;
   }
