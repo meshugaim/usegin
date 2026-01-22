@@ -18,4 +18,18 @@ describe("word-count CLI", () => {
     expect(exitCode).toBe(1);
     expect(stderr.trim()).toBe("Error: No file specified");
   });
+
+  test("nonexistent file exits with error", async () => {
+    const proc = spawn({
+      cmd: ["bun", "run", CLI_PATH, "/nonexistent/file.txt"],
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await proc.exited;
+    const stderr = await new Response(proc.stderr).text();
+
+    expect(exitCode).toBe(1);
+    expect(stderr.trim()).toBe("Error: File not found: /nonexistent/file.txt");
+  });
 });
