@@ -1,6 +1,6 @@
 {
-  "phase": "plan:draft",
-  "currentTestIndex": null,
-  "totalTests": null,
-  "startedAt": null
+  "phase": "complete",
+  "currentTestIndex": 4,
+  "totalTests": 5,
+  "startedAt": "2026-01-22T14:07:05.472Z"
 }
