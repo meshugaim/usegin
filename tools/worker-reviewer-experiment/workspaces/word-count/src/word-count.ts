@@ -12,6 +12,10 @@ if (!filePath) {
 }
 
 const file = Bun.file(filePath);
+if (!(await file.exists())) {
+  console.error(`Error: File not found: ${filePath}`);
+  process.exit(1);
+}
 const content = await file.text();
 const words = content.trim() === "" ? 0 : content.trim().split(/\s+/).length;
 process.stdout.write(words + " words\n");

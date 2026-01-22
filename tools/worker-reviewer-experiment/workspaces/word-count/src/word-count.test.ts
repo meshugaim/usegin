@@ -54,4 +54,21 @@ describe("word-count CLI", () => {
     expect(errorOutput).toContain("Error: No file specified");
     expect(proc.exitCode).toBe(1);
   });
+
+  test("nonexistent file exits with error", async () => {
+    const proc = Bun.spawn(
+      ["bun", "run", "./src/word-count.ts", "/nonexistent/path/file.txt"],
+      {
+        cwd: import.meta.dir + "/..",
+        stderr: "pipe",
+      }
+    );
+    const errorOutput = await new Response(proc.stderr).text();
+    await proc.exited;
+
+    expect(errorOutput).toContain(
+      "Error: File not found: /nonexistent/path/file.txt"
+    );
+    expect(proc.exitCode).toBe(1);
+  });
 });
