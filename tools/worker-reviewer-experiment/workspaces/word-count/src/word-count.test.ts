@@ -15,4 +15,19 @@ describe("word-count", () => {
     expect(exitCode).toBe(1);
     expect(stderr).toContain("Error");
   });
+
+  test("file not found exits with error", async () => {
+    const proc = spawn(["bun", "run", "./src/word-count.ts", "nonexistent-file.txt"], {
+      cwd: import.meta.dir + "/..",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await proc.exited;
+    const stderr = await new Response(proc.stderr).text();
+
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Error");
+    expect(stderr).toContain("not found");
+  });
 });
