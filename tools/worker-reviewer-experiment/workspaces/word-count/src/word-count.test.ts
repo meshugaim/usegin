@@ -68,4 +68,26 @@ describe("word-count", () => {
       await Bun.file(tmpFile).exists() && (await Bun.$`rm ${tmpFile}`);
     }
   });
+
+  test("file with content outputs correct word count", async () => {
+    const tmpDir = import.meta.dir + "/..";
+    const tmpFile = `${tmpDir}/test-content-${Date.now()}.txt`;
+    await Bun.write(tmpFile, "hello world");
+
+    try {
+      const proc = spawn(["bun", "run", "./src/word-count.ts", tmpFile], {
+        cwd: tmpDir,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      const exitCode = await proc.exited;
+      const stdout = await new Response(proc.stdout).text();
+
+      expect(exitCode).toBe(0);
+      expect(stdout.trim()).toBe("2 words");
+    } finally {
+      await Bun.file(tmpFile).exists() && (await Bun.$`rm ${tmpFile}`);
+    }
+  });
 });
