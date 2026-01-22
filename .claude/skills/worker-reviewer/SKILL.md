@@ -12,95 +12,229 @@ hooks:
 
 # Worker-Reviewer TDD Loop
 
-A tight coordination loop for test-driven development where:
-1. Worker proposes failing tests (with order)
-2. Reviewer approves the test plan
-3. Worker implements one test at a time
-4. Reviewer approves each step → commit
-5. Repeat until all tests pass
+You are the **REVIEWER**. You orchestrate a tight TDD loop by spawning worker sub-agents.
 
-## Architecture
+## Your Responsibilities
 
-- **Reviewer**: Main agent that orchestrates the loop
-- **Worker**: Sub-agent spawned via `crun` to do implementation work
-- **Hook**: Validates submissions, updates state, logs events
+1. **Quality gate** - Only approve work that meets the bar
+2. **Orchestration** - Spawn workers, track progress, commit approved work
+3. **Feedback** - Give specific, actionable feedback when work needs revision
 
-## Usage
+## Workspace
 
-### Start a new session
+Default workspace: `tools/worker-reviewer-experiment/workspace/`
 
-```
-/wr start <workspace-path>
-```
+Key files:
+- `spec.md` - The task specification
+- `state.json` - Current phase and test index (hook-managed)
+- `submission.md` - Worker's current submission
+- `test-plan.md` - Approved test plan (written by you after approval)
+- `src/` - Implementation code
 
-This initializes a workspace with:
-- `spec.md` - Your task specification (you provide this)
-- `state.json` - Loop state tracking
-- `events.jsonl` - Event log for visibility
+## Getting Started
 
-### Example
+1. Read `state.json` to see current phase
+2. Read `spec.md` to understand the task
+3. Follow the phase-specific instructions below
 
-```bash
-# Create workspace and spec
-mkdir -p my-project/workspace
-cat > my-project/workspace/spec.md << 'EOF'
-# My Task
+---
 
-Build a CLI that does X.
+## Phase 1: Test Plan
 
-## Acceptance Criteria
-1. Does X
-2. Does Y
-EOF
+**Goal:** Get an approved test plan that covers all acceptance criteria.
 
-# Start the loop
-/wr start my-project/workspace
-```
+### State: `plan:draft`
 
-## Protocol
-
-See `tools/worker-reviewer-experiment/PROTOCOL.md` for full details.
-
-### Two Phases
-
-**Phase 1: Test Plan**
-- Worker reads spec, proposes tests with order
-- Reviewer evaluates and approves (or provides feedback)
-- Approved plan becomes the contract
-
-**Phase 2: Implementation (tight loop)**
-- Worker implements ONE test at a time
-- Runs ALL tests, reports full status
-- Reviewer checks: test passes? minimal code? no regressions?
-- On approval: commit, advance to next test
-- On feedback: worker fixes, resubmits
-
-### Files
-
-| File | Purpose |
-|------|---------|
-| `spec.md` | Task specification (input) |
-| `state.json` | Current phase and test index |
-| `events.jsonl` | Audit log of all events |
-| `test-plan.md` | Approved test plan |
-| `submission.md` | Worker's current submission |
-
-## Commands
-
-When this skill is active, the following are available:
-
-- **Start Phase 1**: Spawn worker to propose test plan
-- **Approve Plan**: Write `test-plan.md`, transition to impl phase
-- **Spawn for Test N**: Use `crun` with note-to-self
-- **Approve & Commit**: Commit the implementation, advance to next test
-
-## Spawning Workers with CRUN
-
-Use `crun` with `--note-to-self` to maintain context:
+Spawn a worker to propose tests:
 
 ```bash
-crun "Implement test[2]: 'converts headings'. Write minimal code." \
-  -n "Check submission.md: test[2] passes? no regressions? If yes: commit, spawn for test[3]."
+WORKSPACE="tools/worker-reviewer-experiment/workspace"
+
+crun -C "$WORKSPACE" "$(cat << 'PROMPT'
+You are a WORKER in a TDD loop. Your task: propose a test plan.
+
+## Your Task
+Read spec.md and propose tests that cover all acceptance criteria.
+
+## Output Format
+Write to submission.md with this YAML frontmatter:
+
+---
+phase: plan
+iteration: 1
+testPlan:
+  tests:
+    - index: 0
+      name: <short test name>
+      description: <what the test verifies>
+      acceptanceCriteria: ["1", "2"]  # which AC items this covers
+    - index: 1
+      ...
+---
+
+## Rationale
+
+<explain your test ordering strategy>
+
+## Questions for Reviewer
+
+<any clarifications needed>
+
+## Guidelines
+- Order tests from simplest to most complex
+- Each test should be independently verifiable
+- Map every acceptance criterion to at least one test
+- Prefer more small tests over fewer large ones
+PROMPT
+)" -n "Worker finished proposing test plan. Read submission.md. Evaluate: comprehensive? logical order? If good: approve by writing test-plan.md and spawning for test[0]. If not: provide feedback and re-spawn worker."
 ```
 
-The note displays when the worker returns, reminding you what to do next.
+### State: `plan:review`
+
+After worker submits, evaluate `submission.md`:
+
+**Checklist:**
+- [ ] All acceptance criteria mapped to tests?
+- [ ] Order is logical (simple → complex, dependencies respected)?
+- [ ] Test names are clear and specific?
+- [ ] No redundant tests?
+
+**If approved:**
+1. Copy the test plan to `test-plan.md` (same format as submission)
+2. Spawn worker for test[0]
+
+**If needs work:**
+Re-spawn worker with specific feedback.
+
+---
+
+## Phase 2: Implementation
+
+**Goal:** Implement one test at a time, commit after each approval.
+
+### State: `impl:working`
+
+Spawn a worker to implement the current test:
+
+```bash
+WORKSPACE="tools/worker-reviewer-experiment/workspace"
+TEST_INDEX=$(jq -r '.currentTestIndex' "$WORKSPACE/state.json")
+TEST_NAME=$(yq ".tests[$TEST_INDEX].name" "$WORKSPACE/test-plan.md")
+
+crun -C "$WORKSPACE" "$(cat << PROMPT
+You are a WORKER in a TDD loop. Your task: implement test[$TEST_INDEX].
+
+## Current Test
+Index: $TEST_INDEX
+Name: $TEST_NAME
+
+## Your Task
+1. Write the test in src/md2html.test.ts
+2. Write minimal implementation in src/md2html.ts to make it pass
+3. Run ALL tests with: bun test src/
+4. Submit results to submission.md
+
+## Output Format
+Write to submission.md with this YAML frontmatter:
+
+---
+phase: impl
+iteration: 1
+targetTest:
+  index: $TEST_INDEX
+  name: "$TEST_NAME"
+testResults:
+  - index: 0
+    name: <test name>
+    status: pass|fail
+  - index: 1
+    ...
+filesChanged:
+  - path: src/md2html.ts
+    action: created|modified
+  - path: src/md2html.test.ts
+    action: created|modified
+---
+
+## Summary
+
+<what you implemented>
+
+## Notes
+
+<any concerns or edge cases>
+
+## Rules
+- Implement ONLY what's needed for this test
+- Do NOT implement future tests
+- ALL previous tests must still pass (no regressions)
+- Be honest about test results
+PROMPT
+)" -n "Worker finished test[$TEST_INDEX]. Check submission.md: (1) target test passes? (2) no regressions? (3) code minimal? If yes: commit with 'test(md2html): $TEST_NAME' and spawn for next test. If no: feedback and re-spawn."
+```
+
+### State: `impl:review`
+
+After worker submits, evaluate `submission.md`:
+
+**Checklist:**
+- [ ] Target test passes?
+- [ ] No regressions (all previous tests still pass)?
+- [ ] Implementation is minimal (no over-engineering)?
+- [ ] Code quality acceptable?
+
+**If approved:**
+1. Stage and commit the changes:
+   ```bash
+   git add tools/worker-reviewer-experiment/workspace/src/
+   git commit -m "test(md2html): <test name>
+
+   Implements: <test description>
+
+   Part of: ENG-1334"
+   ```
+2. If more tests remain, spawn worker for next test
+3. If all tests done, celebrate completion
+
+**If needs work:**
+Re-spawn worker with specific feedback about what to fix.
+
+---
+
+## State Machine Reference
+
+```
+plan:draft  →  plan:review  →  impl:working  →  impl:review  →  (commit)
+     ↑              │                ↑               │              │
+     └──(feedback)──┘                └──(feedback)───┘              │
+                                                                    ↓
+                                     impl:working (next test) ←─────┘
+                                            │
+                                            ↓ (all tests done)
+                                        complete
+```
+
+---
+
+## Quick Reference
+
+| Phase | You Do |
+|-------|--------|
+| `plan:draft` | Spawn worker to propose tests |
+| `plan:review` | Evaluate plan, approve or feedback |
+| `impl:working` | Spawn worker to implement current test |
+| `impl:review` | Check work, commit or feedback |
+| `complete` | Done! |
+
+---
+
+## Troubleshooting
+
+**Hook rejected my write:**
+Read the error message carefully - it tells you exactly what's wrong with the submission format.
+
+**Worker seems stuck:**
+Check if there are issues with the test or implementation. Provide clearer guidance in your next spawn.
+
+**State seems wrong:**
+Check `state.json` and `events.jsonl` for the full history of what happened.
