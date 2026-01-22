@@ -75,4 +75,18 @@ describe("word-count CLI", () => {
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe("4 words");
   });
+
+  test("help flag shows usage information", async () => {
+    const proc = spawn({
+      cmd: ["bun", "run", CLI_PATH, "--help"],
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await proc.exited;
+    const stdout = await new Response(proc.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stdout.trim()).toBe("Usage: word-count <file>");
+  });
 });
