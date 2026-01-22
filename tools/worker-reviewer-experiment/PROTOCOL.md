@@ -63,8 +63,8 @@ Build a CLI tool: `md2html` - converts markdown files to HTML.
 ```
 workspace/
 ├── spec.md                 # The slice spec (input)
-├── state.json              # Machine state (hook-managed)
-├── events.jsonl            # Append-only event log (hook-managed)
+├── state.json              # Machine state (Reviewer-managed)
+├── events.jsonl            # Append-only event log (Reviewer-managed)
 ├── test-plan.md            # Approved test plan (agent-written, YAML frontmatter)
 ├── submission.md           # Worker's current submission (agent-written, YAML frontmatter)
 └── src/                    # Code artifacts
@@ -74,7 +74,7 @@ workspace/
 
 **File format rationale:**
 - **MD + YAML frontmatter** for agent-written files (`submission.md`, `test-plan.md`) - natural for agents, structured data in frontmatter
-- **JSON/JSONL** for machine state (`state.json`, `events.jsonl`) - hooks manage these, not agents
+- **JSON/JSONL** for machine state (`state.json`, `events.jsonl`) - Reviewer manages these explicitly
 
 ---
 
@@ -289,7 +289,12 @@ Full visibility into the loop.
 
 ## Hook Behavior
 
-### On `submission.md` write:
+**Important Limitation:** Hooks only fire for the main Claude session, NOT for crun-spawned workers (which run with `--dangerously-skip-permissions`). Therefore:
+- Hooks validate writes from the Reviewer (when not using crun)
+- Hooks do NOT validate or log events from Workers
+- The Reviewer must explicitly manage state and events (see "Reviewer State & Event Management" section)
+
+### On `submission.md` write (main session only):
 
 **Validates:**
 1. Valid YAML frontmatter (parseable)
@@ -367,26 +372,92 @@ crun "You are a WORKER. Implement test[2]: 'converts headings'. Write minimal co
 
 ---
 
+## Reviewer State & Event Management
+
+**Important:** Hooks do NOT fire for crun workers (due to `--dangerously-skip-permissions`). The Reviewer must explicitly manage state and events.
+
+### After Approving Test Plan
+
+```bash
+# Update state to impl:working
+cat > $WORKSPACE/state.json << EOF
+{
+  "phase": "impl:working",
+  "currentTestIndex": 0,
+  "totalTests": $TOTAL_TESTS,
+  "startedAt": "$(date -Iseconds)"
+}
+EOF
+
+# Log event
+echo '{"ts":"'$(date -Iseconds)'","actor":"reviewer","event":"plan-approved","testCount":'$TOTAL_TESTS'}' >> $WORKSPACE/events.jsonl
+```
+
+### After Approving Each Test Implementation
+
+```bash
+# Update state with next test index (or complete if done)
+NEXT_INDEX=$((CURRENT_INDEX + 1))
+if [ $NEXT_INDEX -ge $TOTAL_TESTS ]; then
+  PHASE="complete"
+else
+  PHASE="impl:working"
+fi
+
+cat > $WORKSPACE/state.json << EOF
+{
+  "phase": "$PHASE",
+  "currentTestIndex": $NEXT_INDEX,
+  "totalTests": $TOTAL_TESTS,
+  "startedAt": "$STARTED_AT"
+}
+EOF
+
+# Log commit event
+echo '{"ts":"'$(date -Iseconds)'","actor":"reviewer","event":"test-committed","testIndex":'$CURRENT_INDEX',"testName":"'$TEST_NAME'"}' >> $WORKSPACE/events.jsonl
+```
+
+### After Completion
+
+```bash
+echo '{"ts":"'$(date -Iseconds)'","actor":"reviewer","event":"session-complete","totalTests":'$TOTAL_TESTS'}' >> $WORKSPACE/events.jsonl
+```
+
+### Why Reviewer Manages State
+
+1. **Hooks don't fire for crun workers** - workers run with `--dangerously-skip-permissions`
+2. **Reviewer has full context** - knows what was approved and when
+3. **More reliable** - doesn't depend on hook behavior across nested processes
+4. **Clear ownership** - Reviewer owns the loop, so it owns the state
+
+---
+
 ## Agent Prompts (Outline)
 
 ### Reviewer Agent
 
 ```markdown
-You are the REVIEWER. You own quality and orchestrate the loop.
+You are the REVIEWER. You own quality, orchestrate the loop, AND manage state/events.
 
 ## Your Role
 - Evaluate worker proposals and implementations
 - Provide specific, actionable feedback
 - Approve when quality bar is met
 - Commit approved work
+- **Update state.json after each approval**
+- **Append events to events.jsonl**
 - Use crun with --note-to-self to track your place in the sequence
 
 ## Phase 1: Test Plan
 1. Spawn worker with crun to propose test plan
 2. When worker returns, read note-to-self
 3. Evaluate: Are tests comprehensive? Is order logical?
-4. Approve → write test-plan.md → spawn for test[0]
-   OR provide feedback → re-spawn worker
+4. If approved:
+   - Write test-plan.md
+   - Update state.json: phase="impl:working", currentTestIndex=0, totalTests=N
+   - Append to events.jsonl: plan-approved event
+   - Spawn for test[0]
+5. If not: provide feedback → re-spawn worker
 
 ## Phase 2: Implementation
 For each test in approved order:
@@ -398,8 +469,18 @@ For each test in approved order:
    - Is implementation minimal (no over-engineering)?
    - Any regressions (other tests still pass)?
    - Code quality acceptable?
-5. Approve → commit → spawn for next test (note-to-self tells you which)
-   OR feedback → re-spawn worker
+5. If approved:
+   - Commit the code
+   - Update state.json: increment currentTestIndex (or set phase="complete" if done)
+   - Append to events.jsonl: test-committed event
+   - Spawn for next test (or report completion)
+6. If not: provide feedback → re-spawn worker
+
+## Important: State Management
+Hooks do NOT fire for crun workers. YOU must:
+- Update state.json after each approval
+- Append to events.jsonl after each significant action
+- This ensures full observability of the TDD loop
 
 ## Spawning Workers
 Use crun command via Bash tool:
