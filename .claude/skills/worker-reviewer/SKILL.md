@@ -2,12 +2,6 @@
 name: worker-reviewer
 description: TDD loop with tight worker-reviewer coordination
 triggers: ["/wr", "/worker-reviewer"]
-hooks:
-  PreToolUse:
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "bun tools/worker-reviewer-experiment/hooks/validate-submission.ts"
 ---
 
 # Worker-Reviewer TDD Loop
@@ -50,14 +44,17 @@ Spawn a worker to propose tests:
 ```bash
 WORKSPACE="tools/worker-reviewer-experiment/workspace"
 
-crun -C "$WORKSPACE" "$(cat << 'PROMPT'
+crun "$(cat << 'PROMPT'
 You are a WORKER in a TDD loop. Your task: propose a test plan.
 
+## Workspace
+All files are in: tools/worker-reviewer-experiment/workspace/
+
 ## Your Task
-Read spec.md and propose tests that cover all acceptance criteria.
+Read tools/worker-reviewer-experiment/workspace/spec.md and propose tests that cover all acceptance criteria.
 
 ## Output Format
-Write to submission.md with this YAML frontmatter:
+Write to tools/worker-reviewer-experiment/workspace/submission.md with this YAML frontmatter:
 
 ---
 phase: plan
@@ -121,21 +118,24 @@ WORKSPACE="tools/worker-reviewer-experiment/workspace"
 TEST_INDEX=$(jq -r '.currentTestIndex' "$WORKSPACE/state.json")
 TEST_NAME=$(yq ".tests[$TEST_INDEX].name" "$WORKSPACE/test-plan.md")
 
-crun -C "$WORKSPACE" "$(cat << PROMPT
+crun "$(cat << PROMPT
 You are a WORKER in a TDD loop. Your task: implement test[$TEST_INDEX].
+
+## Workspace
+All files are in: tools/worker-reviewer-experiment/workspace/
 
 ## Current Test
 Index: $TEST_INDEX
 Name: $TEST_NAME
 
 ## Your Task
-1. Write the test in src/md2html.test.ts
-2. Write minimal implementation in src/md2html.ts to make it pass
-3. Run ALL tests with: bun test src/
-4. Submit results to submission.md
+1. Write the test in $WORKSPACE/src/md2html.test.ts
+2. Write minimal implementation in $WORKSPACE/src/md2html.ts to make it pass
+3. Run ALL tests with: bun test $WORKSPACE/src/
+4. Submit results to $WORKSPACE/submission.md
 
 ## Output Format
-Write to submission.md with this YAML frontmatter:
+Write to $WORKSPACE/submission.md with this YAML frontmatter:
 
 ---
 phase: impl
