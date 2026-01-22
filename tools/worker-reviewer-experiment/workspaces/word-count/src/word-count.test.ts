@@ -44,4 +44,28 @@ describe("word-count", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Usage: word-count <file>");
   });
+
+  test("empty file outputs zero words", async () => {
+    // Create a temporary empty file
+    const tmpDir = import.meta.dir + "/..";
+    const tmpFile = `${tmpDir}/test-empty-${Date.now()}.txt`;
+    await Bun.write(tmpFile, "");
+
+    try {
+      const proc = spawn(["bun", "run", "./src/word-count.ts", tmpFile], {
+        cwd: tmpDir,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      const exitCode = await proc.exited;
+      const stdout = await new Response(proc.stdout).text();
+
+      expect(exitCode).toBe(0);
+      expect(stdout.trim()).toBe("0 words");
+    } finally {
+      // Clean up temp file
+      await Bun.file(tmpFile).exists() && (await Bun.$`rm ${tmpFile}`);
+    }
+  });
 });

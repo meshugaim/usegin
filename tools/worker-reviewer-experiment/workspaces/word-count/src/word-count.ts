@@ -17,3 +17,9 @@ if (!(await file.exists())) {
   console.error(`Error: File not found: ${filePath}`);
   process.exit(1);
 }
+
+const content = await file.text();
+const words = content.trim() === "" ? [] : content.trim().split(/\s+/);
+const wordCount = words.length;
+
+console.log(`${wordCount} words`);
