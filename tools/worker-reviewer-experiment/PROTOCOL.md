@@ -468,33 +468,39 @@ Part of: ENG-456
 
 ## Hook Configuration
 
-The validation hook is **skill-specific**, defined in the skill's YAML frontmatter:
+The validation hook is **global**, defined in `.claude/settings.json`:
 
-**Skill file:** `.claude/skills/worker-reviewer/SKILL.md`
-
-```yaml
----
-name: worker-reviewer
-triggers: ["/wr", "/worker-reviewer"]
-hooks:
-  PreToolUse:
-    - matcher: "Write"
-      hooks:
-        - type: command
-          command: "bun tools/worker-reviewer-experiment/hooks/validate-submission.ts"
----
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun tools/worker-reviewer-experiment/hooks/validate-submission.ts"
+          }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-**Why skill-specific?**
-- Hook only fires when the skill is active (not on every Write globally)
-- No hardcoded path filtering needed
-- Automatically scoped to the skill's lifecycle
+**Why global (not skill-specific)?**
+- Must fire for crun-spawned workers (which don't have skill context)
+- Hook is smart: only validates when `state.json` exists in parent dirs
+- Passes through all other writes with zero overhead
 
 **Hook location:** `tools/worker-reviewer-experiment/hooks/validate-submission.ts`
 
 **Workspace discovery:**
 1. `WR_WORKSPACE` env var (if set)
 2. Otherwise, infers from file path (looks for parent dir with `state.json`)
+
+**Important:** Don't use crun's `-C` flag to change cwd - it breaks settings discovery.
+Use absolute paths in worker prompts instead.
 
 **What it does:**
 - Intercepts Write tool calls (only when skill is active)
@@ -515,6 +521,8 @@ bun tools/worker-reviewer-experiment/hooks/test-hook.ts
 1. [x] Define protocol and schemas
 2. [x] Build the validation hook
 3. [x] Create spec.md for md2html task
-4. [ ] Write full reviewer agent prompt
-5. [ ] Write full worker agent prompt
-6. [ ] Test the full loop
+4. [x] Write full reviewer agent prompt (in SKILL.md)
+5. [x] Write full worker agent prompt (embedded in crun commands)
+6. [x] Fix hook to work for crun workers (global hook, no -C flag)
+7. [x] Test the loop (plan phase verified, impl phase verified for 2 tests)
+8. [ ] Complete full md2html implementation (16 tests)
