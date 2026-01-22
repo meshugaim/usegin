@@ -12,3 +12,11 @@ Options:
   --help, -h   Show this help message`);
   process.exit(0);
 }
+
+// Find input file (first arg that doesn't start with -)
+const inputFile = args.find((arg) => !arg.startsWith("-"));
+
+if (!inputFile) {
+  console.error("Error: No input file specified. Use --help for usage.");
+  process.exit(1);
+}
