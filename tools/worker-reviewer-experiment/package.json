@@ -1,0 +1,15 @@
+{
+  "name": "worker-reviewer-experiment",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "bun test",
+    "test:hook": "bun hooks/test-hook.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.7.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
