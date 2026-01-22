@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 
 const args = process.argv.slice(2);
 
@@ -13,3 +13,10 @@ if (!existsSync(filepath)) {
   process.stderr.write(`Error: File not found: ${filepath}\n`);
   process.exit(1);
 }
+
+const content = readFileSync(filepath, "utf-8");
+const words = content.trim().split(/\s+/).filter((w) => w.length > 0);
+const count = words.length;
+
+process.stdout.write(`${count} words\n`);
+process.exit(0);
