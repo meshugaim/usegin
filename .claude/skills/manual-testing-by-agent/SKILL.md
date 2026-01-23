@@ -313,6 +313,29 @@ rm -rf .ignored/playwright-storage/profile
 | Magic link expired | Use Mailpit API for faster retrieval (see Part 4) |
 | Page shows "loading" forever | Check `browser_console_messages` for JS errors |
 | Hot reload not working | Manually reload with `browser_navigate` to same URL |
+| Magic link redirects to wrong URL | See "Magic Link URL Mismatch" below |
+
+### Magic Link URL Mismatch
+
+**Symptom:** Magic link contains Gitpod external URLs (e.g., `https://54321--xxx.gitpod.dev`) but you're accessing via `localhost`.
+
+**Cause:** The `.env` file has `AUTH_SITE_URL` and `API_EXTERNAL_URL` set to Gitpod URLs (from automation running `set-env --urls gitpod`), but you're accessing the app via localhost port forwarding.
+
+**Fix:**
+```bash
+# 1. Reconfigure for localhost
+bun run set-env --supabase local --urls localhost
+
+# 2. Restart Supabase to pick up new auth URLs
+supabase stop && supabase start
+
+# 3. Restart dev server
+just dev
+```
+
+After this, magic links will use `http://localhost:54321` and `http://localhost:3000`.
+
+**Note:** If you later need Gitpod external URLs, run `bun run set-env --supabase local --urls gitpod` and restart Supabase again.
 
 ### Supabase Startup Issues
 
