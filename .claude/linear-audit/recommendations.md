@@ -62,6 +62,16 @@ Issues that show no evidence of completion in git history.
 | ENG-287 | dev-env: dry run options audit | Backlog - Chore pending |
 | ENG-288 | dev-env: fzf extensions audit | Backlog - Chore pending |
 | ENG-290 | dev-env: VS Code bridge not auto-installed | Backlog - Bug pending |
+| ENG-337 | claude-sessions-ui: slow initial session load | Backlog - Bug pending |
+| ENG-338 | claude-sessions-ui: project path truncated | Backlog - Bug pending |
+| ENG-339 | claude-sessions-ui: sessions lack differentiation | Backlog - Bug pending |
+| ENG-426 | Workspace Model v2 | Core slices Done but many enhancement sub-issues open |
+| ENG-431 | dev-env: test coverage agent | Backlog - Feature pending |
+| ENG-432 | e2e infra improvements | Many Done sub-issues, but still open ones |
+| ENG-434 | skill: adapt implementing-specs to plan mode | Backlog - Feature pending |
+| ENG-437 | skill: playwright-mcp-first test writing | Backlog - Feature pending |
+| ENG-438 | dev-env: Supabase startup fails with missing Docker network | Backlog - Bug pending |
+| ENG-441 | e2e: pre-flight check script | Backlog - Chore pending |
 
 ---
 
@@ -100,3 +110,13 @@ Issues that show no evidence of completion in git history.
 | ENG-287 | 2026-01-26 | 0 direct | OPEN |
 | ENG-288 | 2026-01-26 | 0 direct | OPEN |
 | ENG-290 | 2026-01-26 | 0 direct | OPEN |
+| ENG-337 | 2026-01-26 | 0 direct | OPEN |
+| ENG-338 | 2026-01-26 | 0 direct | OPEN |
+| ENG-339 | 2026-01-26 | 0 direct | OPEN |
+| ENG-426 | 2026-01-26 | Many workspace commits, slices Done | OPEN |
+| ENG-431 | 2026-01-26 | 0 direct | OPEN |
+| ENG-432 | 2026-01-26 | Many e2e commits | OPEN |
+| ENG-434 | 2026-01-26 | 0 direct | OPEN |
+| ENG-437 | 2026-01-26 | 0 direct | OPEN |
+| ENG-438 | 2026-01-26 | 0 direct | OPEN |
+| ENG-441 | 2026-01-26 | 0 direct | OPEN |
