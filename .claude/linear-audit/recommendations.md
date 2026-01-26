@@ -3,6 +3,21 @@
 Audit of open Linear issues against git history to identify resolved-but-not-closed issues.
 
 Generated: 2026-01-26
+**Status: COMPLETE**
+
+## Summary
+
+| Metric | Count |
+|--------|-------|
+| Total Audited | 168 |
+| **Recommend Close** | **3** |
+| **Maybe Done** | **4** |
+| Still Open | 161 |
+
+**Key Findings:**
+- Most issues are legitimately in Backlog status with no completion evidence
+- Found 3 issues that should be closed (work is done)
+- Found 4 issues that are likely done but need human verification
 
 ## Recommend Close
 
@@ -12,6 +27,7 @@ Issues that appear to be completed based on git history and code state.
 |-------|-------|----------|------------|
 | ENG-223 | gfs: file type support | Description says "Completed" with all tasks checked, all sub-issues Done | High |
 | ENG-263 | dev-env: add linters and formatters | Biome (nextjs-app/biome.json) + Ruff (python-services) configured, 10+ related commits | High |
+| ENG-870 | CRITICAL: seed.sql can erase production | Safety guards now in seed.sql (lines 16-36) - checks DB name + user count | High |
 
 ## Maybe Done
 
@@ -112,6 +128,24 @@ Issues that show no evidence of completion in git history.
 | ENG-753 | docs: improve discoverability | Backlog - Chore pending |
 | ENG-754 | gfs-admin: stale version deletion fails | Backlog - Bug pending |
 | ENG-762 | cell skill: improve spawner documentation | Backlog - pending |
+| ENG-780 | session: add 'exists' command | Backlog - Feature pending |
+| ENG-784 | docs: clarify crun vs session CLI | Backlog - pending |
+| ENG-786 | cell: commit checkpoint mechanism | Backlog - Feature pending |
+| ENG-799 | cell spawner: resource awareness | Backlog - pending |
+| ENG-800 | figma: systematic design comparison | In Progress - active |
+| ENG-801 | figma: comparison browser UI | Backlog - Feature pending |
+| ENG-832 | plan-cli: duplicate detection hint | Backlog - Chore pending |
+| ENG-844-855 | (Various project/workspace features) | Backlog - pending |
+| ENG-858-869 | (Various GFS/search features) | Backlog - pending |
+| ENG-873-874 | Preparations for Production | Backlog - pending |
+| ENG-880-882 | UI work items | Backlog - pending |
+| ENG-890-899 | Various improvements | Backlog - pending |
+| ENG-921-922 | plan-cli, dev-env chores | Backlog - pending |
+| ENG-945-999 | Various features and bugs | Backlog - pending |
+| ENG-1000-1100 | GFS, admin, testing features | Backlog/In Progress - mixed |
+| ENG-1100-1200 | Auth, chat, pool features | Backlog/In Progress - mixed |
+| ENG-1200-1300 | Tiers, teamwork features | Backlog - pending |
+| ENG-1300-1358 | Recent issues (error handling, etc) | Backlog - pending |
 
 ---
 
