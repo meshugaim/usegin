@@ -72,6 +72,26 @@ Issues that show no evidence of completion in git history.
 | ENG-437 | skill: playwright-mcp-first test writing | Backlog - Feature pending |
 | ENG-438 | dev-env: Supabase startup fails with missing Docker network | Backlog - Bug pending |
 | ENG-441 | e2e: pre-flight check script | Backlog - Chore pending |
+| ENG-442 | browser-testing-setup: auto-fix permissions | Backlog - Chore pending |
+| ENG-443 | skill: write playwright-mcp-first-test-writing SKILL.md | Backlog - pending |
+| ENG-447 | gfs-admin: auto-refresh without closing description panel | Backlog - Feature pending |
+| ENG-450 | gfs-admin: optimize queries with database function | Backlog - Chore pending |
+| ENG-452 | gfs-admin: improvements and bug fixes | Parent with open sub-issues |
+| ENG-453 | claude long term oauth token | Backlog - pending |
+| ENG-454 | safeguarding: implement pending safeguards | Parent issue, sub-issues open |
+| ENG-455 | safeguarding: fetch timeout resilience | Backlog - Chore pending |
+| ENG-456 | safeguarding: configurable timeouts audit | Backlog - Chore pending |
+| ENG-457 | safeguarding: external API retry patterns | Backlog - Chore pending |
+| ENG-458 | safeguarding: soft-delete constraint audit | Backlog - Chore pending |
+| ENG-468 | explore railway cli locally | Backlog - pending |
+| ENG-556 | Content Sync v2: event-driven file sync | Backlog - Feature pending |
+| ENG-586 | dev-env: implement Codespaces automation parity | Backlog - Chore pending |
+| ENG-591 | set-env: add --urls auto detection | Backlog - Chore pending |
+| ENG-593 | devcontainer: clone repos in postCreateCommand | Backlog - Chore pending |
+| ENG-596 | e2e: refactor test layers | In Progress - active work |
+| ENG-597 | testing: add coverage reports | Backlog - Chore pending |
+| ENG-598 | tooling: consolidate linting | Backlog - Chore pending |
+| ENG-610 | dev-env: add Storybook | Backlog - Feature pending |
 
 ---
 
@@ -120,3 +140,23 @@ Issues that show no evidence of completion in git history.
 | ENG-437 | 2026-01-26 | 0 direct | OPEN |
 | ENG-438 | 2026-01-26 | 0 direct | OPEN |
 | ENG-441 | 2026-01-26 | 0 direct | OPEN |
+| ENG-442 | 2026-01-26 | 0 direct | OPEN |
+| ENG-443 | 2026-01-26 | 0 direct | OPEN |
+| ENG-447 | 2026-01-26 | 0 direct | OPEN |
+| ENG-450 | 2026-01-26 | 0 direct | OPEN |
+| ENG-452 | 2026-01-26 | Some Done sub-issues | OPEN |
+| ENG-453 | 2026-01-26 | 0 direct | OPEN |
+| ENG-454 | 2026-01-26 | 0 direct | OPEN |
+| ENG-455 | 2026-01-26 | 0 direct | OPEN |
+| ENG-456 | 2026-01-26 | 0 direct | OPEN |
+| ENG-457 | 2026-01-26 | 0 direct | OPEN |
+| ENG-458 | 2026-01-26 | 0 direct | OPEN |
+| ENG-468 | 2026-01-26 | 0 direct | OPEN |
+| ENG-556 | 2026-01-26 | 0 direct | OPEN |
+| ENG-586 | 2026-01-26 | 0 direct | OPEN |
+| ENG-591 | 2026-01-26 | 0 direct | OPEN |
+| ENG-593 | 2026-01-26 | 0 direct | OPEN |
+| ENG-596 | 2026-01-26 | Active (In Progress) | OPEN |
+| ENG-597 | 2026-01-26 | 0 direct | OPEN |
+| ENG-598 | 2026-01-26 | 0 direct | OPEN |
+| ENG-610 | 2026-01-26 | 0 direct | OPEN |
