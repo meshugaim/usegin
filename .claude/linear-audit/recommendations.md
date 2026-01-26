@@ -22,6 +22,7 @@ Issues that might be done but need human verification.
 | ENG-137 | dev-env: extend session to identify active sessions | All 3 sub-issues marked Done | Parent might be closable if sub-issues cover scope |
 | ENG-232 | agent: session continuity (persist ClaudeSDKClients) | Git shows extensive client pool work (50a8a1b8, f647507e, 478a98be) | Has sub-issues ENG-983, ENG-996 still open - check if core done |
 | ENG-285 | dev-env: tools inventory/map | Sub-issue ENG-388 Done, `tool` CLI exists and works | Parent may be closable if tool CLI covers scope |
+| ENG-737 | workspace: personalized default names | Description says "Changes Implemented", In Progress status | Likely closable - verify changes are deployed |
 
 ## Needs Deeper Look
 
@@ -92,6 +93,25 @@ Issues that show no evidence of completion in git history.
 | ENG-597 | testing: add coverage reports | Backlog - Chore pending |
 | ENG-598 | tooling: consolidate linting | Backlog - Chore pending |
 | ENG-610 | dev-env: add Storybook | Backlog - Feature pending |
+| ENG-621 | LLM usage monitoring | Backlog - Feature pending |
+| ENG-622 | monitoring: Claude subscription usage limits | Backlog - Feature pending |
+| ENG-642 | ui: migrate pages to new design | Backlog - Feature pending |
+| ENG-665 | chore: fix dotenv verbose output in tests | Backlog - Chore pending |
+| ENG-691 | e2e: testing infrastructure not working smoothly | Backlog - Bug pending |
+| ENG-694 | e2e: enable Office file lifecycle tests | Backlog - Chore pending |
+| ENG-696 | gfs-admin: show File API temp files | Backlog - Feature pending |
+| ENG-702 | analytics: track user login activity | Backlog - Feature pending |
+| ENG-703 | analytics: store and display last login timestamp | Backlog - Feature pending |
+| ENG-707 | signup: minimal registration flow for invited users | Backlog - Feature pending |
+| ENG-727 | monitoring: Sentry integration | Backlog - Feature pending |
+| ENG-732 | dev-env: investigate and fix Gitpod startup flakiness | Backlog - Bug pending |
+| ENG-733 | dev-env: parallelize dependency installation | Backlog - Chore pending |
+| ENG-734 | dev-env: add startup health check | Backlog - Feature pending |
+| ENG-735 | dev-env: fix watcher startup race condition | Backlog - Bug pending |
+| ENG-741 | Move projects between workspaces | Backlog - Feature pending |
+| ENG-753 | docs: improve discoverability | Backlog - Chore pending |
+| ENG-754 | gfs-admin: stale version deletion fails | Backlog - Bug pending |
+| ENG-762 | cell skill: improve spawner documentation | Backlog - pending |
 
 ---
 
@@ -160,3 +180,23 @@ Issues that show no evidence of completion in git history.
 | ENG-597 | 2026-01-26 | 0 direct | OPEN |
 | ENG-598 | 2026-01-26 | 0 direct | OPEN |
 | ENG-610 | 2026-01-26 | 0 direct | OPEN |
+| ENG-621 | 2026-01-26 | 0 direct | OPEN |
+| ENG-622 | 2026-01-26 | 0 direct | OPEN |
+| ENG-642 | 2026-01-26 | 0 direct | OPEN |
+| ENG-665 | 2026-01-26 | 0 direct | OPEN |
+| ENG-691 | 2026-01-26 | 0 direct | OPEN |
+| ENG-694 | 2026-01-26 | 0 direct | OPEN |
+| ENG-696 | 2026-01-26 | 0 direct | OPEN |
+| ENG-702 | 2026-01-26 | 0 direct | OPEN |
+| ENG-703 | 2026-01-26 | 0 direct | OPEN |
+| ENG-707 | 2026-01-26 | 0 direct | OPEN |
+| ENG-727 | 2026-01-26 | 0 direct | OPEN |
+| ENG-732 | 2026-01-26 | 0 direct | OPEN |
+| ENG-733 | 2026-01-26 | 0 direct | OPEN |
+| ENG-734 | 2026-01-26 | 0 direct | OPEN |
+| ENG-735 | 2026-01-26 | 0 direct | OPEN |
+| ENG-737 | 2026-01-26 | Personal workspace commits, desc says implemented | MAYBE |
+| ENG-741 | 2026-01-26 | 0 direct | OPEN |
+| ENG-753 | 2026-01-26 | 0 direct | OPEN |
+| ENG-754 | 2026-01-26 | 0 direct | OPEN |
+| ENG-762 | 2026-01-26 | 0 direct | OPEN |
