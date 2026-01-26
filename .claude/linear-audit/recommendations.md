@@ -21,6 +21,7 @@ Issues that might be done but need human verification.
 |-------|-------|----------|-------|
 | ENG-137 | dev-env: extend session to identify active sessions | All 3 sub-issues marked Done | Parent might be closable if sub-issues cover scope |
 | ENG-232 | agent: session continuity (persist ClaudeSDKClients) | Git shows extensive client pool work (50a8a1b8, f647507e, 478a98be) | Has sub-issues ENG-983, ENG-996 still open - check if core done |
+| ENG-285 | dev-env: tools inventory/map | Sub-issue ENG-388 Done, `tool` CLI exists and works | Parent may be closable if tool CLI covers scope |
 
 ## Needs Deeper Look
 
@@ -52,6 +53,15 @@ Issues that show no evidence of completion in git history.
 | ENG-261 | claude-sessions-ui: support questionnaire tool | Backlog - Feature pending |
 | ENG-262 | claude-sessions-ui: smart auto-scroll | Backlog - Feature pending |
 | ENG-264 | skill: deploying-to-production | Backlog - No skill file found |
+| ENG-279 | safeguarding: incident - Claude pushed directly to production | Backlog - Bug pending |
+| ENG-280 | dev-env: agent workflows | Parent with open sub-issues |
+| ENG-281 | dev-env: standardize tools/CLIs | Parent with open sub-issues |
+| ENG-282 | dev-env: session compacting via session | Backlog - Feature pending |
+| ENG-283 | dev-env: session sidecar concept | Backlog - Design pending |
+| ENG-284 | dev-env: code review workflow | Backlog - Feature pending |
+| ENG-287 | dev-env: dry run options audit | Backlog - Chore pending |
+| ENG-288 | dev-env: fzf extensions audit | Backlog - Chore pending |
+| ENG-290 | dev-env: VS Code bridge not auto-installed | Backlog - Bug pending |
 
 ---
 
@@ -80,3 +90,13 @@ Issues that show no evidence of completion in git history.
 | ENG-262 | 2026-01-26 | 0 direct | OPEN |
 | ENG-263 | 2026-01-26 | 10+ linter commits, biome+ruff configs exist | CLOSE |
 | ENG-264 | 2026-01-26 | 0 direct, no skill file | OPEN |
+| ENG-279 | 2026-01-26 | 0 direct | OPEN |
+| ENG-280 | 2026-01-26 | 1 Done sub-issue | OPEN |
+| ENG-281 | 2026-01-26 | 1 Done sub-issue (ENG-286) | OPEN |
+| ENG-282 | 2026-01-26 | 0 direct | OPEN |
+| ENG-283 | 2026-01-26 | 0 direct | OPEN |
+| ENG-284 | 2026-01-26 | Code review skill exists but feature incomplete | OPEN |
+| ENG-285 | 2026-01-26 | Sub-issue Done, tool CLI exists | MAYBE |
+| ENG-287 | 2026-01-26 | 0 direct | OPEN |
+| ENG-288 | 2026-01-26 | 0 direct | OPEN |
+| ENG-290 | 2026-01-26 | 0 direct | OPEN |
