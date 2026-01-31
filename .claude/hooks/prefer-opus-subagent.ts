@@ -55,8 +55,14 @@ async function main() {
     process.exit(0);
   }
 
-  // Non-Opus model specified - output reminder
-  console.log(`Note: This subagent uses "${model}". Per project guidelines, Opus is preferred for subagents for better reasoning.`);
+  // Non-Opus model specified - output reminder via additionalContext
+  const output = {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext: `Note: This subagent uses "${model}". Per project guidelines, Opus is preferred for subagents for better reasoning.`
+    }
+  };
+  console.log(JSON.stringify(output));
 
   // Exit 0 to allow the call (just a reminder, not a block)
   process.exit(0);
