@@ -32,7 +32,7 @@ export function truncateMessage(text: string, maxLen = 80): string {
 export async function extractSessionMeta(sessionPath: string): Promise<SessionMeta> {
   const file = Bun.file(sessionPath);
   const content = await file.text();
-  const lines = content.split("\n").filter((l) => l.trim());
+  const lines = content.split("\n").filter((line) => line.trim());
 
   const messages: string[] = [];
   let summary: string | null = null;
