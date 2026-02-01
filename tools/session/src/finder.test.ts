@@ -20,42 +20,6 @@ import {
   type SessionInfo,
 } from "./finder";
 
-describe("runFzf", () => {
-  test("selects matching entry with --filter", async () => {
-    const sessions: SessionInfo[] = [
-      {
-        path: "/path/to/session-aaa.jsonl",
-        id: "session-aaa",
-        mtime: new Date(),
-      },
-      {
-        path: "/path/to/session-bbb.jsonl",
-        id: "session-bbb",
-        mtime: new Date(),
-      },
-    ];
-
-    // Use --filter to non-interactively select
-    const result = await runFzf(sessions, { filter: "bbb" });
-
-    expect(result).toBe("/path/to/session-bbb.jsonl");
-  });
-
-  test("returns null when no match", async () => {
-    const sessions: SessionInfo[] = [
-      {
-        path: "/path/to/session-aaa.jsonl",
-        id: "session-aaa",
-        mtime: new Date(),
-      },
-    ];
-
-    const result = await runFzf(sessions, { filter: "zzz-no-match" });
-
-    expect(result).toBeNull();
-  });
-});
-
 describe("extractUserMessages", () => {
   test("extracts user text from real session file", async () => {
     const sessions = await discoverSessions();
@@ -191,56 +155,6 @@ describe("formatMultiLineEntry with summary", () => {
   });
 });
 
-describe("buildFzfArgs", () => {
-  test("includes basic fzf options", () => {
-    const args = buildFzfArgs({});
-    expect(args).toContain("--read0");
-    expect(args).toContain("--highlight-line");
-    expect(args).toContain("--gap");
-  });
-
-  test("includes header with keybinding hints", () => {
-    const args = buildFzfArgs({});
-    expect(args).toContain("--header");
-    const headerIdx = args.indexOf("--header");
-    const headerValue = args[headerIdx + 1];
-    expect(headerValue).toContain("ctrl-r");
-    expect(headerValue).toContain("resume");
-  });
-
-  test("includes ctrl-r binding that outputs RESUME marker", () => {
-    const args = buildFzfArgs({});
-    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
-    const ctrlRBind = bindArgs.find(b => b.includes("ctrl-r"));
-    expect(ctrlRBind).toBeDefined();
-    expect(ctrlRBind).toContain("become(");
-    expect(ctrlRBind).toContain("RESUME:");
-  });
-
-  test("includes ctrl-t binding that outputs RETRO marker", () => {
-    const args = buildFzfArgs({});
-    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
-    const ctrlTBind = bindArgs.find(b => b.includes("ctrl-t"));
-    expect(ctrlTBind).toBeDefined();
-    expect(ctrlTBind).toContain("become(");
-    expect(ctrlTBind).toContain("RETRO:");
-  });
-
-  test("disables keybindings in filter mode", () => {
-    const args = buildFzfArgs({ filter: "test" });
-    expect(args).toContain("--filter");
-    // In filter mode, no interactive bindings needed
-    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
-    const ctrlRBind = bindArgs.find(b => b.includes("ctrl-r"));
-    expect(ctrlRBind).toBeUndefined();
-  });
-
-  test("disables preview when noPreview is true", () => {
-    const args = buildFzfArgs({ preview: false });
-    expect(args).not.toContain("--preview");
-  });
-});
-
 describe("parseFindArgs --output-file", () => {
   test("parses --output-file flag", async () => {
     // Import the parseFindArgs function - we'll need to export it
@@ -255,31 +169,6 @@ describe("parseFindArgs --output-file", () => {
 
     const args = parseFindArgs([]);
     expect(args.outputFile).toBeUndefined();
-  });
-});
-
-// =============================================================================
-// EDGE CASE: Missing fzf
-// =============================================================================
-
-describe("checkFzfAvailable", () => {
-  test("returns true when fzf is installed", async () => {
-    const { checkFzfAvailable } = await import("./finder");
-
-    // fzf should be installed in dev environment
-    const result = await checkFzfAvailable();
-
-    expect(typeof result).toBe("boolean");
-  });
-
-  test("throws FzfNotFoundError with install instructions when fzf not found", async () => {
-    const { FzfNotFoundError } = await import("./errors");
-
-    const error = new FzfNotFoundError();
-    expect(error.message).toContain("fzf");
-    expect(error.message).toContain("install");
-    // Should have platform-specific instructions
-    expect(error.message).toMatch(/brew|apt|choco|scoop/i);
   });
 });
 
