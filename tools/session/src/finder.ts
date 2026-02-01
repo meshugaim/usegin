@@ -7,6 +7,7 @@ import { stat } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname } from "path";
 import { isEntry } from "./validation";
+import { debugLog } from "./debug";
 
 export interface SessionInfo {
   path: string;
@@ -19,6 +20,7 @@ export interface DiscoverOptions {
   project?: string; // Filter to specific project hash
   allProjects?: boolean; // Show sessions from all projects (overrides project)
   since?: string; // Filter to sessions after date (e.g., "1d", "1w", "2024-01-15")
+  debug?: boolean; // Log debug info to stderr
 }
 
 export type OutputFormat = "path" | "id" | "json";
@@ -125,6 +127,7 @@ async function hasUserMessages(filePath: string): Promise<boolean> {
 export async function discoverSessions(
   options: DiscoverOptions = {}
 ): Promise<SessionInfo[]> {
+  const debug = options.debug ?? false;
   const claudeDir = `${homedir()}/.claude/projects`;
 
   // allProjects overrides project filter
@@ -139,6 +142,7 @@ export async function discoverSessions(
   const sinceDate = options.since ? parseSinceFilter(options.since) : null;
 
   const sessions: SessionInfo[] = [];
+  let skippedCount = 0;
 
   for await (const file of glob.scan({ cwd: claudeDir, absolute: true })) {
     const filename = basename(file);
@@ -173,9 +177,14 @@ export async function discoverSessions(
         mtime: stats.mtime,
         project,
       });
-    } catch {
-      // Skip files we can't stat
+    } catch (error) {
+      skippedCount++;
+      debugLog(debug, `Could not stat ${file}: ${(error as Error).message}`);
     }
+  }
+
+  if (skippedCount > 0) {
+    debugLog(debug, `Skipped ${skippedCount} file(s) due to stat errors`);
   }
 
   // Sort by mtime descending (most recent first)

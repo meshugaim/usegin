@@ -475,8 +475,16 @@ describe("debug logging in finder", () => {
   });
 
   describe("discoverSessions", () => {
-    // Note: discoverSessions catches stat() errors silently.
-    // We can't easily test permission errors, but we document the behavior.
+    test("accepts debug option without error", async () => {
+      const { discoverSessions } = await import("./finder");
+
+      // Call with debug option - should not throw
+      const sessions = await discoverSessions({ allProjects: true, debug: true });
+
+      // Should complete without error
+      expect(Array.isArray(sessions)).toBe(true);
+    });
+
     test("gracefully handles stat errors on files", async () => {
       const { discoverSessions } = await import("./finder");
 
