@@ -235,3 +235,60 @@ Run with --method to force a specific method:
     this.name = "NoPickerMethodError";
   }
 }
+
+// =============================================================================
+// FZF NOT FOUND
+// =============================================================================
+
+/**
+ * Detect the current platform for install instructions
+ */
+function detectPlatform(): "macos" | "linux" | "windows" {
+  const platform = process.platform;
+  if (platform === "darwin") return "macos";
+  if (platform === "win32") return "windows";
+  return "linux";
+}
+
+/**
+ * Thrown when fzf is not installed
+ */
+export class FzfNotFoundError extends SessionError {
+  constructor() {
+    const platform = detectPlatform();
+
+    let installInstructions: string;
+    switch (platform) {
+      case "macos":
+        installInstructions = `Install fzf:
+  brew install fzf`;
+        break;
+      case "windows":
+        installInstructions = `Install fzf:
+  choco install fzf
+  # or
+  scoop install fzf`;
+        break;
+      case "linux":
+      default:
+        installInstructions = `Install fzf:
+  apt install fzf        # Debian/Ubuntu
+  dnf install fzf        # Fedora
+  pacman -S fzf          # Arch`;
+        break;
+    }
+
+    const message = `fzf not found
+
+The session finder requires fzf for interactive browsing.
+
+${installInstructions}
+
+Alternatively, use non-interactive commands:
+  session list           # List sessions without fzf
+  session <id>           # Parse a specific session`;
+
+    super(message);
+    this.name = "FzfNotFoundError";
+  }
+}

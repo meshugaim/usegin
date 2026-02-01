@@ -1310,3 +1310,28 @@ describe("writeOutputFile", () => {
     }
   });
 });
+
+// =============================================================================
+// EDGE CASE: Missing fzf
+// =============================================================================
+
+describe("checkFzfAvailable", () => {
+  test("returns true when fzf is installed", async () => {
+    const { checkFzfAvailable } = await import("./finder");
+
+    // fzf should be installed in dev environment
+    const result = await checkFzfAvailable();
+
+    expect(typeof result).toBe("boolean");
+  });
+
+  test("throws FzfNotFoundError with install instructions when fzf not found", async () => {
+    const { FzfNotFoundError } = await import("./errors");
+
+    const error = new FzfNotFoundError();
+    expect(error.message).toContain("fzf");
+    expect(error.message).toContain("install");
+    // Should have platform-specific instructions
+    expect(error.message).toMatch(/brew|apt|choco|scoop/i);
+  });
+});
