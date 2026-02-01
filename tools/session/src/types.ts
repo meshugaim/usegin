@@ -589,6 +589,29 @@ export interface ToolCall {
   input: Record<string, unknown>;
 }
 
+/**
+ * Type guard that returns typed input if the ToolCall's name matches.
+ *
+ * Similar to getToolInput but works with the parsed ToolCall type.
+ *
+ * @example
+ * ```ts
+ * const input = getToolCallInput("Bash", toolCall);
+ * if (input) {
+ *   console.log(input.command);  // Type: string
+ * }
+ * ```
+ */
+export function getToolCallInput<T extends KnownToolName>(
+  expectedName: T,
+  toolCall: ToolCall
+): ToolInputMap[T] | undefined {
+  if (toolCall.name === expectedName) {
+    return toolCall.input as ToolInputMap[T];
+  }
+  return undefined;
+}
+
 export interface ToolResult {
   toolUseId: ToolUseId;
   content: string;

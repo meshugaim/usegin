@@ -26,9 +26,12 @@ import { describe, it, expect } from "bun:test";
 import {
   type ToolInputMap,
   type ToolUseContent,
+  type ToolCall,
   type TypedToolUseContent,
   isKnownToolName,
   getToolInput,
+  getToolCallInput,
+  asToolUseId,
 } from "./types";
 
 describe("ToolInputMap", () => {
@@ -254,6 +257,63 @@ describe("ToolInputMap", () => {
   });
 });
 
+describe("getToolCallInput", () => {
+  it("returns typed input for Read tool call", () => {
+    const toolCall: ToolCall = {
+      id: asToolUseId("toolu_123"),
+      name: "Read",
+      input: { file_path: "/test.ts", offset: 10 },
+    };
+
+    const input = getToolCallInput("Read", toolCall);
+    if (input) {
+      expect(input.file_path).toBe("/test.ts");
+      expect(input.offset).toBe(10);
+    }
+  });
+
+  it("returns undefined if tool name does not match", () => {
+    const toolCall: ToolCall = {
+      id: asToolUseId("toolu_123"),
+      name: "Write",
+      input: { file_path: "/test.ts", content: "hello" },
+    };
+
+    const input = getToolCallInput("Read", toolCall);
+    expect(input).toBeUndefined();
+  });
+
+  it("returns typed input for Bash tool call", () => {
+    const toolCall: ToolCall = {
+      id: asToolUseId("toolu_456"),
+      name: "Bash",
+      input: { command: "ls -la", description: "List files" },
+    };
+
+    const input = getToolCallInput("Bash", toolCall);
+    if (input) {
+      expect(input.command).toBe("ls -la");
+      expect(input.description).toBe("List files");
+    }
+  });
+
+  it("returns typed input for TodoWrite tool call", () => {
+    const toolCall: ToolCall = {
+      id: asToolUseId("toolu_789"),
+      name: "TodoWrite",
+      input: {
+        todos: [{ id: "1", content: "Test", status: "pending" }],
+      },
+    };
+
+    const input = getToolCallInput("TodoWrite", toolCall);
+    if (input) {
+      expect(input.todos).toHaveLength(1);
+      expect(input.todos[0].content).toBe("Test");
+    }
+  });
+});
+
 describe("backward compatibility", () => {
   it("ToolUseContent still accepts Record<string, unknown> input", () => {
     // This ensures existing code doesn't break
@@ -285,6 +345,26 @@ describe("backward compatibility", () => {
     const input = getToolInput("Read", toolUse);
     if (input) {
       expect(input.file_path).toBe("/src/index.ts");
+    }
+  });
+
+  it("ToolCall still works with existing code patterns", () => {
+    const toolCall: ToolCall = {
+      id: asToolUseId("toolu_xyz"),
+      name: "TodoWrite",
+      input: {
+        todos: [{ id: "1", content: "Test", status: "pending" }],
+      },
+    };
+
+    // Old pattern: casting
+    const todos = toolCall.input.todos as Array<{ content: string }>;
+    expect(todos[0].content).toBe("Test");
+
+    // New pattern: type guard
+    const input = getToolCallInput("TodoWrite", toolCall);
+    if (input) {
+      expect(input.todos[0].content).toBe("Test");
     }
   });
 });
