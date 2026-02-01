@@ -20,6 +20,7 @@ import type {
   CommitInfo,
 } from "./types";
 import { debugLog } from "./debug";
+import { isEntry, getSessionId, hasAgentId } from "./validation";
 
 export interface ParseOptions {
   includeSubagents?: boolean;
@@ -72,8 +73,11 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
 
   let sessionId = "";
   try {
-    const entry = JSON.parse(firstLine) as Entry;
-    sessionId = entry.session_id || entry.sessionId || "";
+    const parsed = JSON.parse(firstLine);
+    if (!isEntry(parsed)) {
+      return files;
+    }
+    sessionId = getSessionId(parsed);
   } catch {
     return files;
   }
@@ -105,8 +109,11 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
     const subFirstLine = subContent.split("\n")[0];
 
     try {
-      const subEntry = JSON.parse(subFirstLine) as Entry;
-      const subSessionId = subEntry.session_id || subEntry.sessionId || "";
+      const subParsed = JSON.parse(subFirstLine);
+      if (!isEntry(subParsed)) {
+        continue; // Skip files with invalid first entry
+      }
+      const subSessionId = getSessionId(subParsed);
       if (subSessionId === sessionId) {
         files.push(subagentPath);
       }
@@ -138,15 +145,22 @@ export async function parseSession(
   debugLog(debug, `Parsing ${lines.length} entries...`);
 
   const entries: Entry[] = [];
+  let skippedCount = 0;
   for (const line of lines) {
     try {
-      const entry = JSON.parse(line) as Entry;
-      entries.push(entry);
+      const parsed = JSON.parse(line);
+      if (!isEntry(parsed)) {
+        skippedCount++;
+        debugLog(debug, `Skipping invalid entry: missing or unknown type`);
+        continue;
+      }
+      entries.push(parsed);
     } catch {
-      // Skip malformed lines
+      skippedCount++;
+      debugLog(debug, `Skipping malformed JSON line`);
     }
   }
-  debugLog(debug, `Parsed ${entries.length} valid entries`, stepStart);
+  debugLog(debug, `Parsed ${entries.length} valid entries${skippedCount > 0 ? `, skipped ${skippedCount}` : ""}`, stepStart);
 
   stepStart = Date.now();
   debugLog(debug, "Processing turns...");
@@ -248,26 +262,36 @@ async function parseSubagentFile(
   // Check first entry to see if this subagent belongs to our session
   let firstEntry: Entry | null = null;
   try {
-    firstEntry = JSON.parse(lines[0]) as Entry;
+    const parsed = JSON.parse(lines[0]);
+    if (!isEntry(parsed)) {
+      return null;
+    }
+    firstEntry = parsed;
   } catch {
     return null;
   }
 
   // Check if this subagent belongs to the parent session
-  const entrySessionId = firstEntry.sessionId || firstEntry.session_id;
+  const entrySessionId = getSessionId(firstEntry);
   if (entrySessionId !== parentSessionId) {
     return null;
   }
 
+  // Must have an agentId to be a valid subagent file
+  if (!hasAgentId(firstEntry)) {
+    return null;
+  }
   const agentId = firstEntry.agentId;
-  if (!agentId) return null;
 
   // Parse all entries
   const entries: Entry[] = [];
   for (const line of lines) {
     try {
-      const entry = JSON.parse(line) as Entry;
-      entries.push(entry);
+      const parsed = JSON.parse(line);
+      if (!isEntry(parsed)) {
+        continue; // Skip invalid entries
+      }
+      entries.push(parsed);
     } catch {
       // Skip malformed lines
     }
@@ -622,9 +646,12 @@ export class StreamingParser {
       if (!line.trim()) continue;
 
       try {
-        const entry = JSON.parse(line) as Entry;
-        if (entry.type === "user" || entry.type === "assistant") {
-          const turn = parseTurn(entry as Entry & { type: "user" | "assistant" });
+        const parsed = JSON.parse(line);
+        if (!isEntry(parsed)) {
+          continue; // Skip invalid entries
+        }
+        if (parsed.type === "user" || parsed.type === "assistant") {
+          const turn = parseTurn(parsed as Entry & { type: "user" | "assistant" });
           if (turn) {
             output.push(formatTurn(turn, this.options));
           }
