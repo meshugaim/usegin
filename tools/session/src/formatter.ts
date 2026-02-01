@@ -242,6 +242,7 @@ export function formatTerminal(
   // Tool results come in the next user turn after tool calls
   for (let i = 0; i < session.turns.length; i++) {
     const turn = session.turns[i];
+    if (!turn) continue;
     const nextTurn = session.turns[i + 1];
 
     // Skip rewound branches unless they have meaningful content
@@ -254,9 +255,10 @@ export function formatTerminal(
       if (turn.text) {
         // Indent multi-line user messages
         const userLines = turn.text.split("\n");
-        lines.push(`> ${userLines[0]}`);
+        const firstLine = userLines[0] ?? "";
+        lines.push(`> ${firstLine}`);
         for (let lineIndex = 1; lineIndex < userLines.length; lineIndex++) {
-          lines.push(userLines[lineIndex]);
+          lines.push(userLines[lineIndex] ?? "");
         }
         lines.push("");
       }

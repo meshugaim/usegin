@@ -9,6 +9,7 @@ import {
   toolCall,
   toolResult,
 } from "./testing";
+import { asSessionId } from "./types";
 
 describe("formatNarrative", () => {
   test("formats basic user/assistant turns", () => {
@@ -381,7 +382,7 @@ describe("formatMarkdown", () => {
 
   test("uses session ID as title when no summary", () => {
     const session = makeSession({
-      sessionId: "abc123",
+      sessionId: asSessionId("abc123"),
       turns: [userTurn("u1", "Hello")],
     });
 
@@ -392,7 +393,7 @@ describe("formatMarkdown", () => {
 
   test("includes metadata section", () => {
     const session = makeSession({
-      sessionId: "test-session",
+      sessionId: asSessionId("test-session"),
       cwd: "/test/path",
       model: "claude-opus",
       triggeredSkills: ["writing-specs"],
