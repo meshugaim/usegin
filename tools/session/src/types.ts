@@ -347,6 +347,20 @@ export interface SavedHookContextEntry extends BaseEntry {
   toolUseID?: string;
 }
 
+/**
+ * AI-generated session summary.
+ * Contains a brief summary of what was accomplished in the session.
+ *
+ * Note: Does not extend BaseEntry as it has a minimal structure
+ * (just type, summary, timestamp, and leafUuid).
+ */
+export interface SummaryEntry {
+  type: "summary";
+  summary: string;
+  timestamp?: string;
+  leafUuid?: string;
+}
+
 export type Entry =
   | SystemEntry
   | UserEntry
@@ -355,7 +369,8 @@ export type Entry =
   | FileHistorySnapshotEntry
   | QueueOperationEntry
   | ProgressEntry
-  | SavedHookContextEntry;
+  | SavedHookContextEntry
+  | SummaryEntry;
 
 // Parsed conversation types
 export interface ToolCall {
