@@ -67,6 +67,7 @@ export interface NoSessionsFoundOptions {
   project?: string;
   allProjects?: boolean;
   since?: string;
+  projectsDirExists?: boolean; // Whether ~/.claude/projects exists
 }
 
 /**
@@ -76,11 +77,32 @@ export class NoSessionsFoundError extends SessionError {
   public readonly project?: string;
   public readonly allProjects?: boolean;
   public readonly since?: string;
+  public readonly projectsDirExists?: boolean;
 
   constructor(options: NoSessionsFoundOptions = {}) {
-    const { project, allProjects, since } = options;
+    const { project, allProjects, since, projectsDirExists } = options;
 
     let message = "No sessions found";
+
+    // Special message if the projects directory doesn't exist
+    if (projectsDirExists === false) {
+      message = `No sessions found
+
+The Claude projects directory does not exist:
+  ~/.claude/projects
+
+This usually means Claude Code hasn't been used in this environment yet.
+Run Claude Code to create your first session.`;
+
+      // Early return with special message
+      super(message);
+      this.name = "NoSessionsFoundError";
+      this.project = project;
+      this.allProjects = allProjects;
+      this.since = since;
+      this.projectsDirExists = projectsDirExists;
+      return;
+    }
 
     // Build search context
     const searchContext: string[] = [];
@@ -120,6 +142,7 @@ export class NoSessionsFoundError extends SessionError {
     this.project = project;
     this.allProjects = allProjects;
     this.since = since;
+    this.projectsDirExists = projectsDirExists;
   }
 }
 

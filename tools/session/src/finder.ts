@@ -138,13 +138,32 @@ async function hasUserMessages(filePath: string): Promise<boolean> {
 }
 
 /**
+ * Get the Claude projects directory path
+ */
+export function getClaudeProjectsDir(): string {
+  return `${homedir()}/.claude/projects`;
+}
+
+/**
+ * Check if the Claude projects directory exists
+ */
+export async function claudeProjectsDirExists(): Promise<boolean> {
+  try {
+    const stats = await stat(getClaudeProjectsDir());
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Discover all session files in Claude's projects directory
  */
 export async function discoverSessions(
   options: DiscoverOptions = {}
 ): Promise<SessionInfo[]> {
   const debug = options.debug ?? false;
-  const claudeDir = `${homedir()}/.claude/projects`;
+  const claudeDir = getClaudeProjectsDir();
 
   // allProjects overrides project filter
   const globPattern = options.allProjects

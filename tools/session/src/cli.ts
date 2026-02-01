@@ -20,6 +20,7 @@ import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./
 import { formatNarrative, formatMarkdown, formatTerminal, type FormatOptions } from "./formatter";
 import {
   checkFzfAvailable,
+  claudeProjectsDirExists,
   discoverSessions,
   extractSessionMeta,
   formatMultiLineEntry,
@@ -162,10 +163,13 @@ async function runFind(args: string[]) {
   });
 
   if (sessions.length === 0) {
+    // Check if the projects directory exists for better error message
+    const projectsDirExists = await claudeProjectsDirExists();
     const error = new NoSessionsFoundError({
       project: projectFilter,
       allProjects: findArgs.allProjects,
       since: findArgs.since,
+      projectsDirExists,
     });
     console.error(`Error: ${error.message}`);
     process.exit(1);
@@ -318,10 +322,13 @@ async function runList(args: string[]) {
   });
 
   if (sessions.length === 0) {
+    // Check if the projects directory exists for better error message
+    const projectsDirExists = await claudeProjectsDirExists();
     const error = new NoSessionsFoundError({
       project: projectFilter,
       allProjects: listArgs.allProjects,
       since: listArgs.since,
+      projectsDirExists,
     });
     console.error(`Error: ${error.message}`);
     process.exit(1);
