@@ -289,7 +289,26 @@ export interface ResultEntry extends BaseEntry {
   total_cost_usd?: number;
 }
 
-export type Entry = SystemEntry | UserEntry | AssistantEntry | ResultEntry;
+/**
+ * File history snapshot for undo/redo functionality.
+ * Captures file state at a point in the conversation for reverting changes.
+ *
+ * Note: Does not extend BaseEntry as it has a different structure
+ * (messageId instead of uuid, no timestamp, etc.)
+ */
+export interface FileHistorySnapshotEntry {
+  type: "file-history-snapshot";
+  messageId: string;
+  snapshot: Record<string, unknown>;
+  isSnapshotUpdate?: boolean;
+}
+
+export type Entry =
+  | SystemEntry
+  | UserEntry
+  | AssistantEntry
+  | ResultEntry
+  | FileHistorySnapshotEntry;
 
 // Parsed conversation types
 export interface ToolCall {
