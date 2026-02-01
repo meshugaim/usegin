@@ -10,6 +10,7 @@
 import { test, expect, describe, beforeAll, afterAll, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { asSessionId } from "./types";
 
 // Test directory for file-based tests
 const TEST_DIR = "/tmp/session-debug-logging-test";
@@ -18,7 +19,7 @@ const TEST_DIR = "/tmp/session-debug-logging-test";
  * Helper to get all logged messages from a spy
  */
 function getLoggedMessages(spy: ReturnType<typeof spyOn>): string[] {
-  return spy.mock.calls.map((call) => String(call[0]));
+  return spy.mock.calls.map((call: unknown[]) => String(call[0]));
 }
 
 /**
@@ -221,7 +222,7 @@ describe("debug logging on parse errors", () => {
 
   describe("discoverSubagents", () => {
     const SUBAGENT_DIR = join(TEST_DIR, "subagents");
-    const SESSION_ID = "subagent-discover-test";
+    const SESSION_ID = asSessionId("subagent-discover-test");
 
     beforeAll(async () => {
       await mkdir(SUBAGENT_DIR, { recursive: true });
