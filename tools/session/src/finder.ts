@@ -22,6 +22,7 @@ export {
   TmuxNotAvailableError,
   ParsingTimeoutError,
   NoPickerMethodError,
+  FzfNotFoundError,
 } from "./errors";
 
 export interface SessionInfo {
@@ -771,6 +772,23 @@ export function buildVscCommand(
 export async function isTmuxAvailable(): Promise<boolean> {
   // Check TMUX env var - set when running inside tmux
   return !!process.env.TMUX;
+}
+
+/**
+ * Check if fzf is available on the system
+ * Returns true if fzf is installed and executable
+ */
+export async function checkFzfAvailable(): Promise<boolean> {
+  try {
+    const proc = Bun.spawn(["which", "fzf"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    await proc.exited;
+    return proc.exitCode === 0;
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -19,6 +19,7 @@
 import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./parser";
 import { formatNarrative, formatMarkdown, formatTerminal, type FormatOptions } from "./formatter";
 import {
+  checkFzfAvailable,
   discoverSessions,
   extractSessionMeta,
   formatMultiLineEntry,
@@ -29,7 +30,7 @@ import {
   runFzfMultiLine,
   writeOutputFile,
 } from "./finder";
-import { NoSessionsFoundError } from "./errors";
+import { NoSessionsFoundError, FzfNotFoundError } from "./errors";
 import { parseFindArgs, parsePickArgs, parseListArgs } from "./cli-args";
 import { parseMainArgs, type MainArgs } from "./cli-args-main";
 import { debugLog } from "./debug";
@@ -129,6 +130,13 @@ EXAMPLES:
 }
 
 async function runFind(args: string[]) {
+  // Check fzf availability before doing any work
+  if (!(await checkFzfAvailable())) {
+    const error = new FzfNotFoundError();
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
+
   const findArgs = parseFindArgs(args);
 
   // Project resolution: --all-projects > --project > current project
