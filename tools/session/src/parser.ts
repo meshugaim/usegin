@@ -354,7 +354,7 @@ function detectRewinds(turns: Turn[]): RewindInfo[] {
   if (turns.length === 0) return [];
 
   // Check if we have parentUuid data - if not, assume linear (legacy format)
-  const hasParentData = turns.some((t) => t.parentUuid !== undefined);
+  const hasParentData = turns.some((turn) => turn.parentUuid !== undefined);
   if (!hasParentData) return [];
 
   const rewinds: RewindInfo[] = [];
@@ -427,9 +427,9 @@ function findCurrentBranch(
   if (turns.length === 0) return new Set();
 
   // Check if we have parentUuid data - if not, all turns are on current branch
-  const hasParentData = turns.some((t) => t.parentUuid !== undefined);
+  const hasParentData = turns.some((turn) => turn.parentUuid !== undefined);
   if (!hasParentData) {
-    return new Set(turns.map((t) => t.uuid).filter(Boolean));
+    return new Set(turns.map((turn) => turn.uuid).filter(Boolean));
   }
 
   // Build uuid -> turn map
