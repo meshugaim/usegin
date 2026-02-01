@@ -6,6 +6,7 @@ import { Glob } from "bun";
 import { stat } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname } from "path";
+import { isEntry } from "./validation";
 
 export interface SessionInfo {
   path: string;
@@ -256,18 +257,21 @@ export async function extractSessionMeta(sessionPath: string): Promise<SessionMe
 
   for (const line of lines) {
     try {
-      const entry = JSON.parse(line);
+      const parsed = JSON.parse(line);
+      if (!isEntry(parsed)) {
+        continue; // Skip invalid entries
+      }
 
       // Check for summary line
-      if (entry.type === "summary" && entry.summary) {
-        summary = entry.summary;
+      if (parsed.type === "summary" && parsed.summary) {
+        summary = parsed.summary;
         continue;
       }
 
-      if (entry.type === "user" && entry.message?.content) {
+      if (parsed.type === "user" && parsed.message?.content) {
         hasUserMessages = true;
         // Extract text from message content
-        const msgContent = entry.message.content;
+        const msgContent = parsed.message.content;
         if (typeof msgContent === "string") {
           const text = msgContent.trim();
           if (text && !text.startsWith("<")) {
