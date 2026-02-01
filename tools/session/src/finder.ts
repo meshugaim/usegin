@@ -3,7 +3,7 @@
  */
 
 import { Glob } from "bun";
-import { stat } from "fs/promises";
+import { stat, lstat } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname } from "path";
 import { isEntry } from "./validation";
@@ -157,6 +157,36 @@ export async function claudeProjectsDirExists(): Promise<boolean> {
 }
 
 /**
+ * Check if a path is a broken symlink (symlink pointing to non-existent target).
+ *
+ * @returns true if the path is a symlink that points to a non-existent target
+ */
+export async function isBrokenSymlink(filePath: string): Promise<boolean> {
+  try {
+    // lstat doesn't follow symlinks - it tells us about the link itself
+    const lstats = await lstat(filePath);
+
+    if (!lstats.isSymbolicLink()) {
+      // Not a symlink, can't be a broken symlink
+      return false;
+    }
+
+    // It's a symlink - check if the target exists by using stat (which follows symlinks)
+    try {
+      await stat(filePath);
+      // If stat succeeds, the symlink target exists
+      return false;
+    } catch {
+      // stat failed, meaning the symlink target doesn't exist
+      return true;
+    }
+  } catch {
+    // lstat failed - file doesn't exist at all (not even as a symlink)
+    return false;
+  }
+}
+
+/**
  * Discover all session files in Claude's projects directory
  */
 export async function discoverSessions(
@@ -214,7 +244,13 @@ export async function discoverSessions(
       });
     } catch (error) {
       skippedCount++;
-      debugLog(debug, `Could not stat ${file}: ${(error as Error).message}`);
+      // Check if this is a broken symlink for better debug message
+      const broken = await isBrokenSymlink(file);
+      if (broken) {
+        debugLog(debug, `Skipping broken symlink: ${file}`);
+      } else {
+        debugLog(debug, `Could not stat ${file}: ${(error as Error).message}`);
+      }
     }
   }
 
