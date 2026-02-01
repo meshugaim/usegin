@@ -371,9 +371,12 @@ export function formatMultiLineEntry(
       ? filename
       : `${project}/${filename}`;
 
+  // Check if this is a live session (recently modified)
+  const liveIndicator = isLiveSession(session.mtime) ? " [LIVE]" : "";
+
   const lines: string[] = [];
-  // Line 1: date + line count
-  lines.push(`${date} ${time}  [${lineCount}]`);
+  // Line 1: date + line count + live indicator
+  lines.push(`${date} ${time}  [${lineCount}]${liveIndicator}`);
 
   // Line 2: summary (if present) or short path
   if (summary) {
@@ -764,6 +767,19 @@ export function buildVscCommand(
   const vscPath = new URL("../../vsc-bridge/bin/vsc", import.meta.url).pathname;
   const timestamp = Date.now();
   return `${vscPath} terminal create --shellCmd --name "Session Picker ${timestamp}" "${findCmd}"`;
+}
+
+/**
+ * Check if a session appears to be live (currently being written to).
+ * A session is considered live if it was modified within the last 5 seconds.
+ *
+ * @param mtime The modification time of the session file
+ * @returns true if the session appears to be in progress
+ */
+export function isLiveSession(mtime: Date): boolean {
+  const LIVE_THRESHOLD_MS = 5000; // 5 seconds
+  const ageMs = Date.now() - mtime.getTime();
+  return ageMs <= LIVE_THRESHOLD_MS;
 }
 
 /**
