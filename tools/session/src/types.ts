@@ -318,13 +318,28 @@ export interface QueueOperationEntry {
   content?: unknown;
 }
 
+/**
+ * Progress entry for hook execution updates.
+ * Added in Claude Code 2.1.27+ to track hook progress during execution.
+ *
+ * Extends BaseEntry as it participates in the uuid/parentUuid chain.
+ */
+export interface ProgressEntry extends BaseEntry {
+  type: "progress";
+  message?: Message;
+  data?: Record<string, unknown>;
+  parentToolUseID?: string;
+  toolUseID?: string;
+}
+
 export type Entry =
   | SystemEntry
   | UserEntry
   | AssistantEntry
   | ResultEntry
   | FileHistorySnapshotEntry
-  | QueueOperationEntry;
+  | QueueOperationEntry
+  | ProgressEntry;
 
 // Parsed conversation types
 export interface ToolCall {
