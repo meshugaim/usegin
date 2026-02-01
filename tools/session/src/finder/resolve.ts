@@ -98,7 +98,7 @@ export async function findSessionsByPrefix(prefix: string): Promise<SessionInfo[
       project: currentProject,
     });
 
-    const matches = currentProjectSessions.filter((s) => s.id.startsWith(prefix));
+    const matches = currentProjectSessions.filter((session) => session.id.startsWith(prefix));
     if (matches.length > 0) {
       return matches;
     }
@@ -106,7 +106,7 @@ export async function findSessionsByPrefix(prefix: string): Promise<SessionInfo[
 
   // Fall back to searching all projects
   const allSessions = await discoverSessions({ allProjects: true });
-  return allSessions.filter((s) => s.id.startsWith(prefix));
+  return allSessions.filter((session) => session.id.startsWith(prefix));
 }
 
 /**
@@ -123,7 +123,7 @@ export async function findSessionById(sessionId: string): Promise<SessionInfo | 
       project: currentProject,
     });
 
-    const match = currentProjectSessions.find((s) => s.id === sessionId);
+    const match = currentProjectSessions.find((session) => session.id === sessionId);
     if (match) {
       return match;
     }
@@ -131,7 +131,7 @@ export async function findSessionById(sessionId: string): Promise<SessionInfo | 
 
   // Fall back to searching all projects
   const allSessions = await discoverSessions({ allProjects: true });
-  const match = allSessions.find((s) => s.id === sessionId);
+  const match = allSessions.find((session) => session.id === sessionId);
 
   return match ?? null;
 }
