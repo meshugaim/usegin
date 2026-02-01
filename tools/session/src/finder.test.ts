@@ -1454,3 +1454,41 @@ describe("warnIfConflictingFlags", () => {
     expect(warning).toBeNull();
   });
 });
+
+// =============================================================================
+// EDGE CASE: Claude projects directory doesn't exist
+// =============================================================================
+
+describe("getClaudeProjectsDir", () => {
+  test("returns the expected path", async () => {
+    const { getClaudeProjectsDir } = await import("./finder");
+    const os = await import("node:os");
+
+    const dir = getClaudeProjectsDir();
+    expect(dir).toBe(`${os.homedir()}/.claude/projects`);
+  });
+});
+
+describe("NoSessionsFoundError with missing directory", () => {
+  test("includes hint about missing directory when projectsDirExists is false", async () => {
+    const { NoSessionsFoundError } = await import("./errors");
+
+    const error = new NoSessionsFoundError({
+      projectsDirExists: false,
+    });
+
+    expect(error.message).toContain("~/.claude/projects");
+    expect(error.message).toMatch(/directory.*not.*exist|doesn't exist|does not exist/i);
+  });
+
+  test("does not mention missing directory when projectsDirExists is true", async () => {
+    const { NoSessionsFoundError } = await import("./errors");
+
+    const error = new NoSessionsFoundError({
+      projectsDirExists: true,
+    });
+
+    // Should NOT mention the directory doesn't exist
+    expect(error.message).not.toMatch(/directory.*not.*exist|doesn't exist|does not exist/i);
+  });
+});
