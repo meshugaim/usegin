@@ -50,25 +50,25 @@ describe("branded ID types", () => {
       const id = asSessionId("abc-123");
       // At runtime, it's just a string
       expect(typeof id).toBe("string");
-      expect(id).toBe("abc-123");
+      expect(id).toBe(asSessionId("abc-123"));
     });
 
     it("asEntryUuid creates an EntryUuid from a string", () => {
       const uuid = asEntryUuid("uuid-001");
       expect(typeof uuid).toBe("string");
-      expect(uuid).toBe("uuid-001");
+      expect(uuid).toBe(asEntryUuid("uuid-001"));
     });
 
     it("asAgentId creates an AgentId from a string", () => {
       const agentId = asAgentId("agent-456");
       expect(typeof agentId).toBe("string");
-      expect(agentId).toBe("agent-456");
+      expect(agentId).toBe(asAgentId("agent-456"));
     });
 
     it("asToolUseId creates a ToolUseId from a string", () => {
       const toolUseId = asToolUseId("tool-789");
       expect(typeof toolUseId).toBe("string");
-      expect(toolUseId).toBe("tool-789");
+      expect(toolUseId).toBe(asToolUseId("tool-789"));
     });
   });
 
@@ -160,7 +160,7 @@ describe("branded ID types", () => {
     it("asEntryUuid with null-like values", () => {
       // Empty string is valid (some entries don't have UUIDs)
       const empty: EntryUuid = asEntryUuid("");
-      expect(empty).toBe("");
+      expect(empty).toBe(asEntryUuid(""));
     });
 
     it("branded IDs work with null/undefined in union types", () => {
@@ -170,7 +170,7 @@ describe("branded ID types", () => {
       const withParent: ParentUuid = asEntryUuid("parent-123");
       const withoutParent: ParentUuid = null;
 
-      expect(withParent).toBe("parent-123");
+      expect(withParent).toBe(asEntryUuid("parent-123"));
       expect(withoutParent).toBeNull();
     });
   });
