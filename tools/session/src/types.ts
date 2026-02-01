@@ -1,5 +1,28 @@
 /**
  * Types for Claude session JSONL parsing
+ *
+ * Claude Code stores sessions as JSONL files in ~/.claude/projects/<project-hash>/<session-uuid>.jsonl
+ *
+ * Entry Types (discovered from real session files):
+ *
+ * | Type                  | Description                                           |
+ * |-----------------------|-------------------------------------------------------|
+ * | system                | Session initialization (model, tools, cwd)            |
+ * | user                  | User messages (text, tool results)                    |
+ * | assistant             | Claude responses (text, tool calls, thinking)         |
+ * | result                | Session completion (success/error, duration, cost)    |
+ * | file-history-snapshot | File state snapshots for undo/redo                    |
+ * | queue-operation       | Queue management for async operations                 |
+ * | progress              | Hook progress updates (added in Claude Code 2.1.27+)  |
+ * | saved_hook_context    | Saved hook context for resumption                     |
+ * | summary               | AI-generated session summary                          |
+ *
+ * Parent Chain:
+ * - Entries link via uuid/parentUuid forming a tree (for rewind support)
+ * - CAUTION: Cycles can occur in parent chain - always guard traversal!
+ *
+ * No official schema is published. This was reverse-engineered from session files.
+ * Use schema.test.ts to detect drift when new entry types/fields appear.
  */
 
 // Raw JSONL entry types
