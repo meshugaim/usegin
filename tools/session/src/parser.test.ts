@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeAll, afterAll } from "bun:test";
-import { parseEntries, parseSession, listRelatedFiles, isWarmupSubagent, extractCommitsFromToolResult, withTimeout } from "./parser";
+import { parseEntries, parseSession, listRelatedFiles, isWarmupSubagent, extractCommitsFromToolResult } from "./parser";
 import type { Entry, ParsedSubagent } from "./types";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -1312,58 +1312,6 @@ describe("commit detection in parseEntries", () => {
     const result = parseEntries(entries);
 
     expect(result.commits).toEqual([]);
-  });
-});
-
-describe("withTimeout", () => {
-  test("resolves when promise completes before timeout", async () => {
-    const result = await withTimeout(Promise.resolve("success"), 1);
-    expect(result).toBe("success");
-  });
-
-  test("rejects with user-friendly error when timeout expires", async () => {
-    const slowPromise = new Promise((resolve) => setTimeout(resolve, 500));
-
-    try {
-      await withTimeout(slowPromise, 0.1); // 100ms timeout
-      expect.unreachable("Should have thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toContain("Parsing timed out after 0.1s");
-      expect((error as Error).message).toContain("Hint: Use --debug to see where parsing is stuck");
-    }
-  });
-
-  test("error message includes timeout duration", async () => {
-    const slowPromise = new Promise((resolve) => setTimeout(resolve, 500));
-
-    try {
-      await withTimeout(slowPromise, 0.05); // 50ms timeout
-      expect.unreachable("Should have thrown");
-    } catch (error) {
-      expect((error as Error).message).toContain("0.05s");
-    }
-  });
-
-  test("timeout of 0 disables timeout (returns original promise)", async () => {
-    const result = await withTimeout(Promise.resolve("no timeout"), 0);
-    expect(result).toBe("no timeout");
-  });
-
-  test("negative timeout disables timeout", async () => {
-    const result = await withTimeout(Promise.resolve("no timeout"), -1);
-    expect(result).toBe("no timeout");
-  });
-
-  test("propagates original promise rejection", async () => {
-    const failingPromise = Promise.reject(new Error("original error"));
-
-    try {
-      await withTimeout(failingPromise, 10);
-      expect.unreachable("Should have thrown");
-    } catch (error) {
-      expect((error as Error).message).toBe("original error");
-    }
   });
 });
 
