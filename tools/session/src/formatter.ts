@@ -383,11 +383,11 @@ function formatTerminalToolResult(
     case "Grep":
     case "Search": {
       // Show match count
-      const matchLines = content.split("\n").filter((l) => l.trim());
+      const matchLines = content.split("\n").filter((line) => line.trim());
       return `${indent}Found ${matchLines.length} matches`;
     }
     case "Glob": {
-      const files = content.split("\n").filter((l) => l.trim());
+      const files = content.split("\n").filter((line) => line.trim());
       return `${indent}Found ${files.length} files`;
     }
     case "Bash": {
