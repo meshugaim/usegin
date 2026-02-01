@@ -3,6 +3,7 @@
  */
 
 import type { ParsedSession, ParsedSubagent, Turn, ToolCall } from "./types";
+import { getToolCallInput } from "./types";
 
 export interface FormatOptions {
   toolInput: boolean;
@@ -170,14 +171,16 @@ function getToolSummary(tool: ToolCall): string {
       return `pattern="${input.pattern || ""}"`;
     case "Grep":
       return `pattern="${input.pattern || ""}"`;
-    case "Bash":
+    case "Bash": {
       const cmd = String(input.command || "");
       return cmd.length > 60 ? cmd.slice(0, 60) + "..." : cmd;
+    }
     case "Task":
       return String(input.description || "");
-    case "TodoWrite":
-      const todos = input.todos as Array<{ content: string }> | undefined;
-      return `${todos?.length || 0} todos`;
+    case "TodoWrite": {
+      const todoInput = getToolCallInput("TodoWrite", tool);
+      return `${todoInput?.todos.length ?? 0} todos`;
+    }
     case "Skill":
       return String(input.skill || "");
     default:
@@ -317,22 +320,25 @@ function getTerminalToolParams(tool: ToolCall): string {
     case "Glob":
       return `pattern: "${input.pattern || ""}"`;
     case "Grep":
-    case "Search":
+    case "Search": {
       const pattern = input.pattern || "";
       const path = input.path || "";
       if (path) {
         return `pattern: "${pattern}", path: "${path}"`;
       }
       return `pattern: "${pattern}"`;
-    case "Bash":
+    }
+    case "Bash": {
       const cmd = String(input.command || "");
       // Truncate long commands
       return cmd.length > 70 ? cmd.slice(0, 70) + "..." : cmd;
+    }
     case "Task":
       return String(input.description || "");
-    case "TodoWrite":
-      const todos = input.todos as Array<{ content: string }> | undefined;
-      return `${todos?.length || 0} todos`;
+    case "TodoWrite": {
+      const todoInput = getToolCallInput("TodoWrite", tool);
+      return `${todoInput?.todos.length ?? 0} todos`;
+    }
     case "Skill":
       return String(input.skill || "");
     case "AskUserQuestion":
