@@ -379,12 +379,20 @@ async function main() {
       });
 
       const decoder = new TextDecoder();
-      for await (const chunk of Bun.stdin.stream()) {
-        const output = parser.feed(decoder.decode(chunk));
-        for (const line of output) {
-          console.log(line);
-          console.log("");
+      const stream = Bun.stdin.stream();
+      const reader = stream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const output = parser.feed(decoder.decode(value));
+          for (const line of output) {
+            console.log(line);
+            console.log("");
+          }
         }
+      } finally {
+        reader.releaseLock();
       }
 
       // Flush remaining
