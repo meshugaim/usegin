@@ -184,7 +184,8 @@ export async function parseSession(
     session.subagents = await discoverSubagents(
       jsonlPath,
       session.sessionId,
-      options.includeWarmups ?? false
+      options.includeWarmups ?? false,
+      debug
     );
     debugLog(debug, `Found ${session.subagents.length} subagent(s)`, stepStart);
   }
@@ -215,7 +216,8 @@ export function isWarmupSubagent(subagent: ParsedSubagent): boolean {
 async function discoverSubagents(
   mainSessionPath: string,
   sessionId: string,
-  includeWarmups: boolean
+  includeWarmups: boolean,
+  debug: boolean = false
 ): Promise<ParsedSubagent[]> {
   const dir = dirname(mainSessionPath);
   const mainFilename = basename(mainSessionPath);
@@ -230,7 +232,7 @@ async function discoverSubagents(
 
     for (const subagentFile of subagentFiles) {
       const subagentPath = join(dir, subagentFile);
-      const subagent = await parseSubagentFile(subagentPath, sessionId);
+      const subagent = await parseSubagentFile(subagentPath, sessionId, debug);
       if (subagent) {
         // Filter out warmups unless explicitly requested
         if (includeWarmups || !isWarmupSubagent(subagent)) {
@@ -246,7 +248,8 @@ async function discoverSubagents(
     });
 
     return subagents;
-  } catch {
+  } catch (error) {
+    debugLog(debug, `Could not read subagents directory ${dir}: ${(error as Error).message}`);
     return [];
   }
 }
@@ -256,11 +259,13 @@ async function discoverSubagents(
  */
 async function parseSubagentFile(
   filePath: string,
-  parentSessionId: string
+  parentSessionId: string,
+  debug: boolean = false
 ): Promise<ParsedSubagent | null> {
   const file = Bun.file(filePath);
   const content = await file.text();
   const lines = content.split("\n").filter((line) => line.trim());
+  const filename = basename(filePath);
 
   if (lines.length === 0) return null;
 
@@ -269,10 +274,12 @@ async function parseSubagentFile(
   try {
     const parsed = JSON.parse(lines[0]);
     if (!isEntry(parsed)) {
+      debugLog(debug, `Skipping ${filename}: first line is not a valid entry`);
       return null;
     }
     firstEntry = parsed;
-  } catch {
+  } catch (error) {
+    debugLog(debug, `Skipping ${filename}: could not parse first line - ${(error as Error).message}`);
     return null;
   }
 
@@ -290,16 +297,21 @@ async function parseSubagentFile(
 
   // Parse all entries
   const entries: Entry[] = [];
+  let skippedCount = 0;
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line);
       if (!isEntry(parsed)) {
+        skippedCount++;
         continue; // Skip invalid entries
       }
       entries.push(parsed);
     } catch {
-      // Skip malformed lines
+      skippedCount++;
     }
+  }
+  if (skippedCount > 0) {
+    debugLog(debug, `Subagent ${filename}: skipped ${skippedCount} malformed line(s)`);
   }
 
   const turns: Turn[] = [];
