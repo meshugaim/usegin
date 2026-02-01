@@ -24,6 +24,32 @@ export interface ParseOptions {
   includeSubagents?: boolean;
   includeWarmups?: boolean; // Default: false (exclude warmup subagents)
   debug?: boolean; // Log timing info to stderr
+  timeout?: number; // Timeout in seconds (0 or undefined to disable)
+}
+
+/**
+ * Wrap a promise with a timeout. Rejects with a user-friendly error if it takes too long.
+ */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutSeconds: number
+): Promise<T> {
+  if (timeoutSeconds <= 0) {
+    return promise;
+  }
+
+  const timeoutMs = timeoutSeconds * 1000;
+
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(
+          `Parsing timed out after ${timeoutSeconds}s\nHint: Use --debug to see where parsing is stuck`
+        ));
+      }, timeoutMs);
+    }),
+  ]);
 }
 
 /**
