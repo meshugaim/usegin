@@ -255,8 +255,8 @@ export function formatTerminal(
         // Indent multi-line user messages
         const userLines = turn.text.split("\n");
         lines.push(`> ${userLines[0]}`);
-        for (let j = 1; j < userLines.length; j++) {
-          lines.push(userLines[j]);
+        for (let lineIndex = 1; lineIndex < userLines.length; lineIndex++) {
+          lines.push(userLines[lineIndex]);
         }
         lines.push("");
       }
