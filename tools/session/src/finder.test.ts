@@ -23,19 +23,21 @@ import {
 describe("extractUserMessages", () => {
   test("extracts user text from real session file", async () => {
     const sessions = await discoverSessions();
-    if (sessions.length === 0) {
+    const firstSession = sessions[0];
+    if (!firstSession) {
       // Skip if no sessions available
       return;
     }
 
-    const messages = await extractUserMessages(sessions[0].path);
+    const messages = await extractUserMessages(firstSession.path);
 
     // Should return array of strings
     expect(Array.isArray(messages)).toBe(true);
     // Most sessions have at least one user message
-    if (messages.length > 0) {
-      expect(typeof messages[0]).toBe("string");
-      expect(messages[0].length).toBeGreaterThan(0);
+    const firstMessage = messages[0];
+    if (firstMessage) {
+      expect(typeof firstMessage).toBe("string");
+      expect(firstMessage.length).toBeGreaterThan(0);
     }
   });
 });
@@ -91,10 +93,11 @@ describe("extractSessionMeta", () => {
   test("returns null summary when no summary line present", async () => {
     const { extractSessionMeta } = await import("./finder");
     const sessions = await discoverSessions();
+    const firstSession = sessions[0];
 
     // Test any session - should return meta with summary being string or null
-    if (sessions.length > 0) {
-      const meta = await extractSessionMeta(sessions[0].path);
+    if (firstSession) {
+      const meta = await extractSessionMeta(firstSession.path);
       expect(meta.messages).toBeInstanceOf(Array);
       expect(typeof meta.lineCount).toBe("number");
       // summary can be string or null
@@ -105,9 +108,10 @@ describe("extractSessionMeta", () => {
   test("returns hasUserMessages flag", async () => {
     const { extractSessionMeta } = await import("./finder");
     const sessions = await discoverSessions();
+    const firstSession = sessions[0];
 
-    if (sessions.length > 0) {
-      const meta = await extractSessionMeta(sessions[0].path);
+    if (firstSession) {
+      const meta = await extractSessionMeta(firstSession.path);
       expect(typeof meta.hasUserMessages).toBe("boolean");
     }
   });
