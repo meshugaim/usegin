@@ -1335,3 +1335,72 @@ describe("checkFzfAvailable", () => {
     expect(error.message).toMatch(/brew|apt|choco|scoop/i);
   });
 });
+
+// =============================================================================
+// EDGE CASE: Live session detection
+// =============================================================================
+
+describe("isLiveSession", () => {
+  test("returns false for session modified > 5 seconds ago", async () => {
+    const { isLiveSession } = await import("./finder");
+
+    // A session modified 10 seconds ago is not live
+    const oldMtime = new Date(Date.now() - 10000);
+    expect(isLiveSession(oldMtime)).toBe(false);
+  });
+
+  test("returns true for session modified < 5 seconds ago", async () => {
+    const { isLiveSession } = await import("./finder");
+
+    // A session modified just now is likely live
+    const recentMtime = new Date(Date.now() - 1000);
+    expect(isLiveSession(recentMtime)).toBe(true);
+  });
+
+  test("returns true for session modified exactly 5 seconds ago (boundary)", async () => {
+    const { isLiveSession } = await import("./finder");
+
+    // At exactly 5 seconds, still consider it potentially live
+    const boundaryMtime = new Date(Date.now() - 5000);
+    expect(isLiveSession(boundaryMtime)).toBe(true);
+  });
+
+  test("returns false for session modified 6 seconds ago", async () => {
+    const { isLiveSession } = await import("./finder");
+
+    const oldMtime = new Date(Date.now() - 6000);
+    expect(isLiveSession(oldMtime)).toBe(false);
+  });
+});
+
+describe("formatMultiLineEntry with live session", () => {
+  test("includes [LIVE] indicator for live sessions", () => {
+    const session: SessionInfo = {
+      path: "/home/user/.claude/projects/-workspaces-foo/abc123.jsonl",
+      id: "abc123",
+      mtime: new Date(Date.now() - 2000), // 2 seconds ago = live
+      project: "-workspaces-foo",
+    };
+    const messages = ["Hello"];
+    const lineCount = 10;
+
+    const entry = formatMultiLineEntry(session, messages, lineCount);
+
+    expect(entry).toContain("[LIVE]");
+  });
+
+  test("does not include [LIVE] for old sessions", () => {
+    const session: SessionInfo = {
+      path: "/home/user/.claude/projects/-workspaces-foo/abc123.jsonl",
+      id: "abc123",
+      mtime: new Date(Date.now() - 60000), // 1 minute ago = not live
+      project: "-workspaces-foo",
+    };
+    const messages = ["Hello"];
+    const lineCount = 10;
+
+    const entry = formatMultiLineEntry(session, messages, lineCount);
+
+    expect(entry).not.toContain("[LIVE]");
+  });
+});
