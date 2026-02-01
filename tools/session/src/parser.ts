@@ -483,14 +483,10 @@ export function parseEntries(entries: Entry[]): ParsedSession {
       sessionId = entry.session_id || entry.sessionId || "";
     }
 
-    // Check for summary line (type:"summary" is not in Entry union but exists in raw data)
-    const rawEntry = entry as Entry & { type: string; summary?: string };
-    if (rawEntry.type === "summary" && rawEntry.summary) {
-      summary = rawEntry.summary;
-      continue;
-    }
-
     switch (entry.type) {
+      case "summary":
+        summary = entry.summary;
+        continue;
       case "system":
         if (entry.subtype === "init") {
           sessionId = entry.session_id || sessionId;
