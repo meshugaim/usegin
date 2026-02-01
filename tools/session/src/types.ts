@@ -303,12 +303,28 @@ export interface FileHistorySnapshotEntry {
   isSnapshotUpdate?: boolean;
 }
 
+/**
+ * Queue operation for managing async operations.
+ * Used for background task coordination in the Claude Code CLI.
+ *
+ * Note: Has a minimal structure with timestamp and sessionId but
+ * does not use the same uuid/parentUuid linking as conversation entries.
+ */
+export interface QueueOperationEntry {
+  type: "queue-operation";
+  operation: string;
+  timestamp?: string;
+  sessionId?: string;
+  content?: unknown;
+}
+
 export type Entry =
   | SystemEntry
   | UserEntry
   | AssistantEntry
   | ResultEntry
-  | FileHistorySnapshotEntry;
+  | FileHistorySnapshotEntry
+  | QueueOperationEntry;
 
 // Parsed conversation types
 export interface ToolCall {
