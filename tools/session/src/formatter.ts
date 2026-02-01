@@ -276,7 +276,7 @@ export function formatTerminal(
         // Find matching result in next turn (if it's a user turn with results)
         if (nextTurn && nextTurn.role === "user") {
           const result = nextTurn.toolResults.find(
-            (r) => r.toolUseId === tool.id
+            (toolResult) => toolResult.toolUseId === tool.id
           );
           if (result) {
             const resultLine = formatTerminalToolResult(tool, result, formatOptions);
