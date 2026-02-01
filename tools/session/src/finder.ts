@@ -8,6 +8,21 @@ import { homedir } from "os";
 import { basename, dirname } from "path";
 import { isEntry } from "./validation";
 import { debugLog } from "./debug";
+import {
+  SessionNotFoundError,
+  TmuxNotAvailableError,
+  NoPickerMethodError,
+} from "./errors";
+
+// Re-export error classes for consumers
+export {
+  SessionError,
+  SessionNotFoundError,
+  NoSessionsFoundError,
+  TmuxNotAvailableError,
+  ParsingTimeoutError,
+  NoPickerMethodError,
+} from "./errors";
 
 export interface SessionInfo {
   path: string;
@@ -532,7 +547,12 @@ export async function resolveSessionPath(input: string): Promise<string> {
   if (isSessionId(input)) {
     const session = await findSessionById(input);
     if (!session) {
-      throw new Error(`Session not found: ${input}`);
+      const currentProject = getCurrentProjectHash();
+      throw new SessionNotFoundError(input, {
+        searchedLocation: currentProject
+          ? `~/.claude/projects/${currentProject}/`
+          : "~/.claude/projects/",
+      });
     }
     return session.path;
   }
@@ -541,7 +561,12 @@ export async function resolveSessionPath(input: string): Promise<string> {
   const matches = await findSessionsByPrefix(input);
 
   if (matches.length === 0) {
-    throw new Error(`Session not found: ${input}`);
+    const currentProject = getCurrentProjectHash();
+    throw new SessionNotFoundError(input, {
+      searchedLocation: currentProject
+        ? `~/.claude/projects/${currentProject}/`
+        : "~/.claude/projects/",
+    });
   }
 
   if (matches.length === 1) {
@@ -851,20 +876,6 @@ export interface SessionPickerResult {
   summary: string | null;
 }
 
-const NO_METHOD_ERROR = `No session picker method available.
-
-To use the session picker, you need one of:
-
-  1. tmux - Run Claude inside a tmux session
-     Install: apt install tmux (or brew install tmux)
-     Usage: tmux new-session -s claude
-
-  2. VS Code Bridge - Install the vsc-bridge extension
-     The extension should be auto-installed in this devcontainer.
-     Check: vsc status
-
-Run with --method to force a specific method.`;
-
 /**
  * Open session picker and return selected session
  *
@@ -888,12 +899,12 @@ export async function openSessionPicker(
   if (method === "auto") {
     const detected = await detectPickerMethod();
     if (!detected) {
-      throw new Error(NO_METHOD_ERROR);
+      throw new NoPickerMethodError();
     }
     resolvedMethod = detected;
   } else if (method === "tmux") {
     if (!(await isTmuxAvailable())) {
-      throw new Error("tmux not available. Not running inside a tmux session.");
+      throw new TmuxNotAvailableError();
     }
     resolvedMethod = "tmux";
   } else if (method === "vsc") {

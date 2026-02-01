@@ -29,6 +29,7 @@ import {
   runFzfMultiLine,
   writeOutputFile,
 } from "./finder";
+import { NoSessionsFoundError } from "./errors";
 import { parseFindArgs, parsePickArgs, parseListArgs } from "./cli-args";
 import { parseMainArgs, type MainArgs } from "./cli-args-main";
 import { debugLog } from "./debug";
@@ -143,7 +144,12 @@ async function runFind(args: string[]) {
   });
 
   if (sessions.length === 0) {
-    console.error("No sessions found");
+    const error = new NoSessionsFoundError({
+      project: projectFilter,
+      allProjects: findArgs.allProjects,
+      since: findArgs.since,
+    });
+    console.error(`Error: ${error.message}`);
     process.exit(1);
   }
 
@@ -283,6 +289,16 @@ async function runList(args: string[]) {
     allProjects: listArgs.allProjects,
     since: listArgs.since,
   });
+
+  if (sessions.length === 0) {
+    const error = new NoSessionsFoundError({
+      project: projectFilter,
+      allProjects: listArgs.allProjects,
+      since: listArgs.since,
+    });
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
 
   const limited = sessions.slice(0, listArgs.limit);
 

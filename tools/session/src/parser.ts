@@ -26,6 +26,10 @@ import type {
 import { asSessionId, asEntryUuid, asAgentId, asToolUseId } from "./types";
 import { debugLog } from "./debug";
 import { isEntry, getSessionId, hasAgentId } from "./validation";
+import { ParsingTimeoutError } from "./errors";
+
+// Re-export for consumers
+export { ParsingTimeoutError } from "./errors";
 
 export interface ParseOptions {
   includeSubagents?: boolean;
@@ -33,14 +37,21 @@ export interface ParseOptions {
   debug?: boolean; // Log timing info to stderr
 }
 
+export interface WithTimeoutOptions {
+  fileSizeBytes?: number;
+  filePath?: string;
+}
+
 /**
  * Wrap a promise with a timeout. Rejects with a user-friendly error if it takes too long.
  * @param promise The promise to wrap
  * @param timeoutSeconds Timeout in seconds. 0 or negative disables timeout.
+ * @param options Optional context for better error messages
  */
 export async function withTimeout<T>(
   promise: Promise<T>,
-  timeoutSeconds: number
+  timeoutSeconds: number,
+  options: WithTimeoutOptions = {}
 ): Promise<T> {
   if (timeoutSeconds <= 0) {
     return promise;
@@ -50,11 +61,7 @@ export async function withTimeout<T>(
     promise,
     new Promise<never>((_, reject) => {
       setTimeout(() => {
-        reject(
-          new Error(
-            `Parsing timed out after ${timeoutSeconds}s\nHint: Use --debug to see where parsing is stuck`
-          )
-        );
+        reject(new ParsingTimeoutError(timeoutSeconds, options));
       }, timeoutSeconds * 1000);
     }),
   ]);
