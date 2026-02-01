@@ -91,6 +91,8 @@ export {
   TEST_CWD,
   TEST_TIMESTAMP,
   createUuidGenerator,
+  createAgentIdGenerator,
+  createToolUseIdGenerator,
   createTimestampGenerator,
 } from "./fixtures";
 

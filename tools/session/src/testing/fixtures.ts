@@ -12,8 +12,19 @@
  * ```
  */
 
+import {
+  type SessionId,
+  type EntryUuid,
+  type AgentId,
+  type ToolUseId,
+  asSessionId,
+  asEntryUuid,
+  asAgentId,
+  asToolUseId,
+} from "../types";
+
 /** Default session ID for tests. Short and recognizable. */
-export const TEST_SESSION_ID = "test-session";
+export const TEST_SESSION_ID: SessionId = asSessionId("test-session");
 
 /** Default model name for tests. */
 export const TEST_MODEL = "claude-test";
@@ -35,11 +46,35 @@ export const TEST_TIMESTAMP = "2025-01-15T10:00:00.000Z";
  * gen() // "uuid-002"
  * ```
  */
-export function createUuidGenerator(prefix = "uuid"): () => string {
+export function createUuidGenerator(prefix = "uuid"): () => EntryUuid {
   let counter = 0;
   return () => {
     counter++;
-    return `${prefix}-${String(counter).padStart(3, "0")}`;
+    return asEntryUuid(`${prefix}-${String(counter).padStart(3, "0")}`);
+  };
+}
+
+/**
+ * AgentId generator for tests.
+ * Creates sequential, predictable agent IDs like "agent-001", "agent-002".
+ */
+export function createAgentIdGenerator(prefix = "agent"): () => AgentId {
+  let counter = 0;
+  return () => {
+    counter++;
+    return asAgentId(`${prefix}-${String(counter).padStart(3, "0")}`);
+  };
+}
+
+/**
+ * ToolUseId generator for tests.
+ * Creates sequential, predictable tool use IDs like "toolu_001", "toolu_002".
+ */
+export function createToolUseIdGenerator(prefix = "toolu"): () => ToolUseId {
+  let counter = 0;
+  return () => {
+    counter++;
+    return asToolUseId(`${prefix}_${String(counter).padStart(3, "0")}`);
   };
 }
 

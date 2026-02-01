@@ -427,13 +427,13 @@ export type Entry =
 
 // Parsed conversation types
 export interface ToolCall {
-  id: string;
+  id: ToolUseId;
   name: string;
   input: Record<string, unknown>;
 }
 
 export interface ToolResult {
-  toolUseId: string;
+  toolUseId: ToolUseId;
   content: string;
   isError: boolean;
 }
@@ -443,21 +443,21 @@ export interface Turn {
   text: string;
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
-  uuid: string;
-  parentUuid?: string | null;
+  uuid: EntryUuid;
+  parentUuid?: EntryUuid | null;
   isOnCurrentBranch: boolean;
 }
 
 export interface ParsedSubagent {
-  agentId: string;
-  sessionId: string; // Parent session ID
+  agentId: AgentId;
+  sessionId: SessionId; // Parent session ID
   turns: Turn[];
   startTimestamp?: string;
 }
 
 export interface RewindInfo {
-  fromUuid: string; // The UUID we rewound from
-  abandonedBranchUuids: string[]; // UUIDs of messages on the abandoned branch
+  fromUuid: EntryUuid; // The UUID we rewound from
+  abandonedBranchUuids: EntryUuid[]; // UUIDs of messages on the abandoned branch
 }
 
 export interface CommitInfo {
@@ -466,7 +466,7 @@ export interface CommitInfo {
 }
 
 export interface ParsedSession {
-  sessionId: string;
+  sessionId: SessionId;
   cwd: string;
   model: string;
   tools: string[];

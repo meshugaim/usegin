@@ -17,7 +17,17 @@
  * ```
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, RewindInfo, CommitInfo } from "../types";
+import type {
+  ParsedSession,
+  ParsedSubagent,
+  Turn,
+  RewindInfo,
+  CommitInfo,
+  SessionId,
+  AgentId,
+  EntryUuid,
+} from "../types";
+import { asSessionId, asAgentId, asEntryUuid } from "../types";
 import { TEST_SESSION_ID, TEST_MODEL, TEST_CWD } from "./fixtures";
 
 /**
@@ -40,7 +50,7 @@ import { TEST_SESSION_ID, TEST_MODEL, TEST_CWD } from "./fixtures";
  *
  * // With everything
  * makeSession({
- *   sessionId: "custom-session",
+ *   sessionId: asSessionId("custom-session"),
  *   model: "claude-opus",
  *   turns: [...],
  *   subagents: [...],
@@ -67,7 +77,7 @@ export function makeSession(overrides: Partial<ParsedSession> = {}): ParsedSessi
 /**
  * Creates a ParsedSubagent with sensible defaults.
  *
- * @param agentId - Unique ID for the subagent
+ * @param agentId - Unique ID for the subagent (string or AgentId)
  * @param turns - Turns in the subagent conversation
  * @param options - Additional options
  *
@@ -80,15 +90,15 @@ export function makeSession(overrides: Partial<ParsedSession> = {}): ParsedSessi
  * ```
  */
 export function makeSubagent(
-  agentId: string,
+  agentId: string | AgentId,
   turns: Turn[] = [],
-  options: { sessionId?: string; startTimestamp?: string } = {}
+  options: { sessionId?: string | SessionId; startTimestamp?: string } = {}
 ): ParsedSubagent {
   const { sessionId = TEST_SESSION_ID, startTimestamp } = options;
 
   return {
-    agentId,
-    sessionId,
+    agentId: typeof agentId === "string" ? asAgentId(agentId) : agentId,
+    sessionId: typeof sessionId === "string" ? asSessionId(sessionId) : sessionId,
     turns,
     ...(startTimestamp ? { startTimestamp } : {}),
   };
@@ -97,7 +107,7 @@ export function makeSubagent(
 /**
  * Creates a RewindInfo object.
  *
- * @param fromUuid - The UUID we rewound from
+ * @param fromUuid - The UUID we rewound from (string or EntryUuid)
  * @param abandonedBranchUuids - UUIDs of messages on the abandoned branch
  *
  * @example
@@ -106,10 +116,15 @@ export function makeSubagent(
  * ```
  */
 export function makeRewind(
-  fromUuid: string,
-  abandonedBranchUuids: string[]
+  fromUuid: string | EntryUuid,
+  abandonedBranchUuids: (string | EntryUuid)[]
 ): RewindInfo {
-  return { fromUuid, abandonedBranchUuids };
+  return {
+    fromUuid: typeof fromUuid === "string" ? asEntryUuid(fromUuid) : fromUuid,
+    abandonedBranchUuids: abandonedBranchUuids.map((u) =>
+      typeof u === "string" ? asEntryUuid(u) : u
+    ),
+  };
 }
 
 /**

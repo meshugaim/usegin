@@ -18,7 +18,12 @@ import type {
   ToolResultContent,
   RewindInfo,
   CommitInfo,
+  SessionId,
+  EntryUuid,
+  AgentId,
+  ToolUseId,
 } from "./types";
+import { asSessionId, asEntryUuid, asAgentId, asToolUseId } from "./types";
 import { debugLog } from "./debug";
 import { isEntry, getSessionId, hasAgentId } from "./validation";
 
@@ -281,7 +286,7 @@ async function parseSubagentFile(
   if (!hasAgentId(firstEntry)) {
     return null;
   }
-  const agentId = firstEntry.agentId;
+  const rawAgentId = firstEntry.agentId;
 
   // Parse all entries
   const entries: Entry[] = [];
@@ -314,8 +319,8 @@ async function parseSubagentFile(
   }
 
   return {
-    agentId,
-    sessionId: parentSessionId,
+    agentId: asAgentId(rawAgentId),
+    sessionId: asSessionId(parentSessionId),
     turns,
     startTimestamp,
   };
@@ -336,7 +341,7 @@ function detectRewinds(turns: Turn[]): RewindInfo[] {
   const rewinds: RewindInfo[] = [];
 
   // Build a map of uuid -> children (in order of appearance)
-  const childrenMap = new Map<string | null, string[]>();
+  const childrenMap = new Map<EntryUuid | null, EntryUuid[]>();
 
   for (const turn of turns) {
     const parentKey = turn.parentUuid ?? null;
@@ -372,17 +377,17 @@ function detectRewinds(turns: Turn[]): RewindInfo[] {
  * Uses visited set to prevent infinite recursion on cyclic graphs
  */
 function collectDescendants(
-  uuid: string,
-  childrenMap: Map<string | null, string[]>,
-  visited: Set<string> = new Set()
-): string[] {
+  uuid: EntryUuid,
+  childrenMap: Map<EntryUuid | null, EntryUuid[]>,
+  visited: Set<EntryUuid> = new Set()
+): EntryUuid[] {
   // Cycle detection: if we've already visited this uuid, stop recursing
   if (visited.has(uuid)) {
     return [];
   }
   visited.add(uuid);
 
-  const result: string[] = [uuid];
+  const result: EntryUuid[] = [uuid];
   const children = childrenMap.get(uuid) ?? [];
 
   for (const child of children) {
@@ -399,17 +404,17 @@ function collectDescendants(
 function findCurrentBranch(
   turns: Turn[],
   allEntryParents: Map<string, string | null>
-): Set<string> {
+): Set<EntryUuid> {
   if (turns.length === 0) return new Set();
 
   // Check if we have parentUuid data - if not, all turns are on current branch
   const hasParentData = turns.some((t) => t.parentUuid !== undefined);
   if (!hasParentData) {
-    return new Set(turns.map((t) => t.uuid).filter(Boolean) as string[]);
+    return new Set(turns.map((t) => t.uuid).filter(Boolean));
   }
 
   // Build uuid -> turn map
-  const turnMap = new Map<string, Turn>();
+  const turnMap = new Map<EntryUuid, Turn>();
   for (const turn of turns) {
     if (turn.uuid) {
       turnMap.set(turn.uuid, turn);
@@ -418,7 +423,7 @@ function findCurrentBranch(
 
   // Start from the last turn and walk back via parentUuid
   // Use allEntryParents to jump through system entries
-  const currentBranch = new Set<string>();
+  const currentBranch = new Set<EntryUuid>();
   const visited = new Set<string>(); // Track visited to detect cycles
   let currentUuid: string | null = turns[turns.length - 1]?.uuid ?? null;
 
@@ -430,8 +435,8 @@ function findCurrentBranch(
     visited.add(currentUuid);
 
     // If this is a turn, add it to current branch
-    if (turnMap.has(currentUuid)) {
-      currentBranch.add(currentUuid);
+    if (turnMap.has(asEntryUuid(currentUuid))) {
+      currentBranch.add(asEntryUuid(currentUuid));
     }
     // Walk to parent (could be a turn or system entry)
     const parentUuid = allEntryParents.get(currentUuid);
@@ -473,7 +478,7 @@ export function extractCommitsFromToolResult(content: string): CommitInfo[] {
  * Parse entries into a structured session
  */
 export function parseEntries(entries: Entry[]): ParsedSession {
-  let sessionId = "";
+  let rawSessionId = "";
   let cwd = "";
   let model = "";
   let tools: string[] = [];
@@ -495,8 +500,8 @@ export function parseEntries(entries: Entry[]): ParsedSession {
     }
 
     // Try to extract sessionId from any entry if not yet found
-    if (!sessionId) {
-      sessionId = entry.session_id || entry.sessionId || "";
+    if (!rawSessionId) {
+      rawSessionId = entry.session_id || entry.sessionId || "";
     }
 
     switch (entry.type) {
@@ -505,7 +510,7 @@ export function parseEntries(entries: Entry[]): ParsedSession {
         continue;
       case "system":
         if (entry.subtype === "init") {
-          sessionId = entry.session_id || sessionId;
+          rawSessionId = entry.session_id || rawSessionId;
           cwd = entry.cwd;
           model = entry.model;
           tools = entry.tools;
@@ -558,6 +563,9 @@ export function parseEntries(entries: Entry[]): ParsedSession {
     turn.isOnCurrentBranch = turn.uuid ? currentBranch.has(turn.uuid) : true;
   }
 
+  // Convert raw sessionId to branded type
+  const sessionId: SessionId = asSessionId(rawSessionId);
+
   return { sessionId, cwd, model, tools, turns, subagents: [], rewinds, triggeredSkills, commits, summary, result };
 }
 
@@ -586,7 +594,7 @@ function parseTurn(
         case "tool_use":
           const toolUse = item as ToolUseContent;
           toolCalls.push({
-            id: toolUse.id,
+            id: asToolUseId(toolUse.id),
             name: toolUse.name,
             input: toolUse.input,
           });
@@ -594,7 +602,7 @@ function parseTurn(
         case "tool_result":
           const toolResult = item as ToolResultContent;
           toolResults.push({
-            toolUseId: toolResult.tool_use_id,
+            toolUseId: asToolUseId(toolResult.tool_use_id),
             content: toolResult.content,
             isError: toolResult.is_error ?? false,
           });
@@ -608,8 +616,8 @@ function parseTurn(
     text: text.trim(),
     toolCalls,
     toolResults,
-    uuid: entry.uuid,
-    parentUuid: entry.parentUuid,
+    uuid: asEntryUuid(entry.uuid ?? ""),
+    parentUuid: entry.parentUuid === null ? null : entry.parentUuid ? asEntryUuid(entry.parentUuid) : undefined,
     isOnCurrentBranch: true, // Will be updated by detectRewinds
   };
 }
