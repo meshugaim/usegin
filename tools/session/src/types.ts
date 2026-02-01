@@ -332,6 +332,21 @@ export interface ProgressEntry extends BaseEntry {
   toolUseID?: string;
 }
 
+/**
+ * Saved hook context for session resumption.
+ * Stores hook state so that hooks can resume where they left off.
+ *
+ * Extends BaseEntry as it participates in the uuid/parentUuid chain.
+ */
+export interface SavedHookContextEntry extends BaseEntry {
+  type: "saved_hook_context";
+  hookContext?: Record<string, unknown>;
+  hookName?: string;
+  hookEvent?: string;
+  content?: unknown;
+  toolUseID?: string;
+}
+
 export type Entry =
   | SystemEntry
   | UserEntry
@@ -339,7 +354,8 @@ export type Entry =
   | ResultEntry
   | FileHistorySnapshotEntry
   | QueueOperationEntry
-  | ProgressEntry;
+  | ProgressEntry
+  | SavedHookContextEntry;
 
 // Parsed conversation types
 export interface ToolCall {
