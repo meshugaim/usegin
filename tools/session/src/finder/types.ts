@@ -170,7 +170,7 @@ export class AmbiguousSessionError extends Error {
 
   constructor(prefix: string, matches: SessionInfo[]) {
     const matchList = matches
-      .map((m) => `  ${m.id.slice(0, 8)}`)
+      .map((matchedSession) => `  ${matchedSession.id.slice(0, 8)}`)
       .join("\n");
     super(
       `Ambiguous session ID '${prefix}'. Did you mean:\n${matchList}`
