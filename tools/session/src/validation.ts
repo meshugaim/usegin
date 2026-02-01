@@ -66,9 +66,11 @@ export function isEntry(value: unknown): value is Entry {
 export function hasSessionId(
   entry: Entry
 ): entry is Entry & { session_id: string } | Entry & { sessionId: string } {
+  // Cast to Record to access potentially missing properties
+  const e = entry as Record<string, unknown>;
   return (
-    (typeof entry.session_id === "string" && entry.session_id.length > 0) ||
-    (typeof entry.sessionId === "string" && entry.sessionId.length > 0)
+    (typeof e.session_id === "string" && e.session_id.length > 0) ||
+    (typeof e.sessionId === "string" && e.sessionId.length > 0)
   );
 }
 
@@ -77,12 +79,14 @@ export function hasSessionId(
  * Returns empty string if no session ID is present.
  */
 export function getSessionId(entry: Entry): string {
-  return entry.session_id || entry.sessionId || "";
+  const e = entry as Record<string, unknown>;
+  return (e.session_id as string) || (e.sessionId as string) || "";
 }
 
 /**
  * Type guard for entries with an agentId field (subagent entries).
  */
 export function hasAgentId(entry: Entry): entry is Entry & { agentId: string } {
-  return typeof entry.agentId === "string" && entry.agentId.length > 0;
+  const e = entry as Record<string, unknown>;
+  return typeof e.agentId === "string" && e.agentId.length > 0;
 }

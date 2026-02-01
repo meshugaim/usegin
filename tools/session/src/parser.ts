@@ -81,7 +81,7 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
   // Get sessionId from main file
   const mainFile = Bun.file(absolutePath);
   const content = await mainFile.text();
-  const firstLine = content.split("\n")[0];
+  const firstLine = content.split("\n")[0] ?? "";
 
   let sessionId = "";
   try {
@@ -100,7 +100,7 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
     const uuidMatch = filename.match(
       /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i
     );
-    if (uuidMatch) {
+    if (uuidMatch && uuidMatch[1]) {
       sessionId = uuidMatch[1];
     }
   }
@@ -118,7 +118,7 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
     const subagentPath = join(dir, subagentFile);
     const subFile = Bun.file(subagentPath);
     const subContent = await subFile.text();
-    const subFirstLine = subContent.split("\n")[0];
+    const subFirstLine = subContent.split("\n")[0] ?? "";
 
     try {
       const subParsed = JSON.parse(subFirstLine);
@@ -274,12 +274,13 @@ async function parseSubagentFile(
   const lines = content.split("\n").filter((line) => line.trim());
   const filename = basename(filePath);
 
-  if (lines.length === 0) return null;
+  const firstLine = lines[0];
+  if (!firstLine) return null;
 
   // Check first entry to see if this subagent belongs to our session
   let firstEntry: Entry | null = null;
   try {
-    const parsed = JSON.parse(lines[0]);
+    const parsed = JSON.parse(firstLine);
     if (!isEntry(parsed)) {
       debugLog(debug, `Skipping ${filename}: first line is not a valid entry`);
       return null;
@@ -325,8 +326,10 @@ async function parseSubagentFile(
   let startTimestamp: string | undefined;
 
   for (const entry of entries) {
-    if (!startTimestamp && entry.timestamp) {
-      startTimestamp = entry.timestamp;
+    // Access timestamp from entry (exists on some entry types)
+    const entryTimestamp = (entry as { timestamp?: string }).timestamp;
+    if (!startTimestamp && entryTimestamp) {
+      startTimestamp = entryTimestamp;
     }
 
     if (entry.type === "user" || entry.type === "assistant") {
@@ -487,7 +490,9 @@ export function extractCommitsFromToolResult(content: string): CommitInfo[] {
   while ((match = commitPattern.exec(content)) !== null) {
     const hash = match[1];
     const message = match[2];
-    commits.push({ hash, message });
+    if (hash && message) {
+      commits.push({ hash, message });
+    }
   }
 
   return commits;
@@ -513,14 +518,19 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   const allEntryParents = new Map<string, string | null>();
 
   for (const entry of entries) {
+    // Cast to access common optional fields that may exist on various entry types
+    const e = entry as unknown as Record<string, unknown>;
+
     // Track parent relationships for all entries with uuids
-    if (entry.uuid) {
-      allEntryParents.set(entry.uuid, entry.parentUuid ?? null);
+    const uuid = e.uuid as string | undefined;
+    const parentUuid = e.parentUuid as string | null | undefined;
+    if (uuid) {
+      allEntryParents.set(uuid, parentUuid ?? null);
     }
 
     // Try to extract sessionId from any entry if not yet found
     if (!rawSessionId) {
-      rawSessionId = entry.session_id || entry.sessionId || "";
+      rawSessionId = (e.session_id as string) || (e.sessionId as string) || "";
     }
 
     switch (entry.type) {
