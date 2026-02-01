@@ -26,7 +26,7 @@ export function formatNarrative(
   session: ParsedSession,
   options: Partial<FormatOptions> = {}
 ): string {
-  const opts = { ...defaultOptions, ...options };
+  const formatOptions = { ...defaultOptions, ...options };
   const lines: string[] = [];
 
   // Summary header (separate from other metadata)
@@ -56,12 +56,12 @@ export function formatNarrative(
 
   // Main session turns
   for (const turn of session.turns) {
-    lines.push(formatTurn(turn, opts));
+    lines.push(formatTurn(turn, formatOptions));
     lines.push("");
   }
 
   // Subagent transcripts (appended at end)
-  if (opts.includeSubagents && session.subagents.length > 0) {
+  if (formatOptions.includeSubagents && session.subagents.length > 0) {
     lines.push("");
     lines.push("═".repeat(60));
     lines.push(`SUBAGENTS (${session.subagents.length})`);
@@ -69,7 +69,7 @@ export function formatNarrative(
 
     for (const subagent of session.subagents) {
       lines.push("");
-      lines.push(formatSubagent(subagent, opts));
+      lines.push(formatSubagent(subagent, formatOptions));
     }
   }
 
@@ -79,7 +79,7 @@ export function formatNarrative(
 /**
  * Format a subagent transcript
  */
-function formatSubagent(subagent: ParsedSubagent, opts: FormatOptions): string {
+function formatSubagent(subagent: ParsedSubagent, formatOptions: FormatOptions): string {
   const lines: string[] = [];
 
   // Subagent header
@@ -94,7 +94,7 @@ function formatSubagent(subagent: ParsedSubagent, opts: FormatOptions): string {
 
   // Subagent turns
   for (const turn of subagent.turns) {
-    lines.push(formatTurn(turn, opts));
+    lines.push(formatTurn(turn, formatOptions));
     lines.push("");
   }
 
@@ -104,7 +104,7 @@ function formatSubagent(subagent: ParsedSubagent, opts: FormatOptions): string {
 /**
  * Format a single turn
  */
-export function formatTurn(turn: Turn, opts: FormatOptions): string {
+export function formatTurn(turn: Turn, formatOptions: FormatOptions): string {
   const lines: string[] = [];
 
   // Role header with rewind prefix if not on current branch
@@ -120,13 +120,13 @@ export function formatTurn(turn: Turn, opts: FormatOptions): string {
 
   // Tool calls (for assistant turns)
   for (const tool of turn.toolCalls) {
-    lines.push(formatToolCall(tool, opts));
+    lines.push(formatToolCall(tool, formatOptions));
   }
 
   // Tool results (for user turns - these are tool responses)
-  if (opts.toolOutput) {
+  if (formatOptions.toolOutput) {
     for (const result of turn.toolResults) {
-      const content = truncate(result.content, opts.truncate);
+      const content = truncate(result.content, formatOptions.truncate);
       const prefix = result.isError ? "    error:" : "    output:";
       lines.push(`${prefix} ${content}`);
     }
@@ -138,7 +138,7 @@ export function formatTurn(turn: Turn, opts: FormatOptions): string {
 /**
  * Format a tool call
  */
-function formatToolCall(tool: ToolCall, opts: FormatOptions): string {
+function formatToolCall(tool: ToolCall, formatOptions: FormatOptions): string {
   const lines: string[] = [];
 
   // Tool name with key input summary
@@ -146,8 +146,8 @@ function formatToolCall(tool: ToolCall, opts: FormatOptions): string {
   lines.push(`  → ${tool.name}: ${summary}`);
 
   // Full input if requested
-  if (opts.toolInput) {
-    const inputStr = truncate(JSON.stringify(tool.input, null, 2), opts.truncate);
+  if (formatOptions.toolInput) {
+    const inputStr = truncate(JSON.stringify(tool.input, null, 2), formatOptions.truncate);
     lines.push(`    input: ${inputStr}`);
   }
 
@@ -235,7 +235,7 @@ export function formatTerminal(
   session: ParsedSession,
   options: Partial<FormatOptions> = {}
 ): string {
-  const opts = { ...defaultOptions, ...options };
+  const formatOptions = { ...defaultOptions, ...options };
   const lines: string[] = [];
 
   // Process turns - we need to pair tool calls with their results
@@ -279,7 +279,7 @@ export function formatTerminal(
             (r) => r.toolUseId === tool.id
           );
           if (result) {
-            const resultLine = formatTerminalToolResult(tool, result, opts);
+            const resultLine = formatTerminalToolResult(tool, result, formatOptions);
             if (resultLine) {
               lines.push(resultLine);
             }
@@ -360,7 +360,7 @@ function getTerminalToolParams(tool: ToolCall): string {
 function formatTerminalToolResult(
   tool: ToolCall,
   result: { content: string; isError: boolean },
-  opts: FormatOptions
+  _formatOptions: FormatOptions
 ): string {
   const indent = "  ⎿ ";
 
