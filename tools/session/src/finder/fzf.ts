@@ -112,12 +112,12 @@ export function formatMultiLineEntry(
  */
 export async function checkFzfAvailable(): Promise<boolean> {
   try {
-    const proc = Bun.spawn(["which", "fzf"], {
+    const childProcess = Bun.spawn(["which", "fzf"], {
       stdout: "pipe",
       stderr: "pipe",
     });
-    await proc.exited;
-    return proc.exitCode === 0;
+    await childProcess.exited;
+    return childProcess.exitCode === 0;
   } catch {
     return false;
   }
@@ -202,14 +202,14 @@ export async function runFzf(
     args.push("--filter", options.filter);
   }
 
-  const proc = Bun.spawn(args, {
+  const childProcess = Bun.spawn(args, {
     stdin: new Response(lines),
     stdout: "pipe",
     stderr: "inherit",
   });
 
-  const output = await new Response(proc.stdout).text();
-  await proc.exited;
+  const output = await new Response(childProcess.stdout).text();
+  await childProcess.exited;
 
   const selected = output.trim();
   if (!selected) {
@@ -233,14 +233,14 @@ export async function runFzfMultiLine(
 
   const args = buildFzfArgs(options);
 
-  const proc = Bun.spawn(args, {
+  const childProcess = Bun.spawn(args, {
     stdin: new Response(input),
     stdout: "pipe",
     stderr: "inherit",
   });
 
-  const output = await new Response(proc.stdout).text();
-  await proc.exited;
+  const output = await new Response(childProcess.stdout).text();
+  await childProcess.exited;
 
   const selected = output.trim();
   if (!selected) {
