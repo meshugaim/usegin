@@ -352,16 +352,24 @@ function detectRewinds(turns: Turn[]): RewindInfo[] {
 
 /**
  * Collect all descendants of a given uuid (including the uuid itself)
+ * Uses visited set to prevent infinite recursion on cyclic graphs
  */
 function collectDescendants(
   uuid: string,
-  childrenMap: Map<string | null, string[]>
+  childrenMap: Map<string | null, string[]>,
+  visited: Set<string> = new Set()
 ): string[] {
+  // Cycle detection: if we've already visited this uuid, stop recursing
+  if (visited.has(uuid)) {
+    return [];
+  }
+  visited.add(uuid);
+
   const result: string[] = [uuid];
   const children = childrenMap.get(uuid) ?? [];
 
   for (const child of children) {
-    result.push(...collectDescendants(child, childrenMap));
+    result.push(...collectDescendants(child, childrenMap, visited));
   }
 
   return result;
