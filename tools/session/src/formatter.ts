@@ -185,9 +185,9 @@ function getToolSummary(tool: ToolCall): string {
       return String(input.skill || "");
     default:
       // Return first string value found
-      for (const val of Object.values(input)) {
-        if (typeof val === "string" && val.length > 0) {
-          return val.length > 60 ? val.slice(0, 60) + "..." : val;
+      for (const inputValue of Object.values(input)) {
+        if (typeof inputValue === "string" && inputValue.length > 0) {
+          return inputValue.length > 60 ? inputValue.slice(0, 60) + "..." : inputValue;
         }
       }
       return "";
@@ -345,9 +345,9 @@ function getTerminalToolParams(tool: ToolCall): string {
       return "";
     default:
       // Return first short string value found
-      for (const val of Object.values(input)) {
-        if (typeof val === "string" && val.length > 0 && val.length < 100) {
-          return val;
+      for (const inputValue of Object.values(input)) {
+        if (typeof inputValue === "string" && inputValue.length > 0 && inputValue.length < 100) {
+          return inputValue;
         }
       }
       return "";
