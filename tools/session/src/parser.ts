@@ -111,7 +111,7 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
   const dir = dirname(absolutePath);
   const dirFiles = await readdir(dir);
   const subagentFiles = dirFiles.filter(
-    (f) => f.startsWith("agent-") && f.endsWith(".jsonl")
+    (filename) => filename.startsWith("agent-") && filename.endsWith(".jsonl")
   );
 
   for (const subagentFile of subagentFiles) {
@@ -232,7 +232,7 @@ async function discoverSubagents(
   try {
     const files = await readdir(dir);
     const subagentFiles = files.filter(
-      (f) => f.startsWith("agent-") && f.endsWith(".jsonl") && f !== mainFilename
+      (filename) => filename.startsWith("agent-") && filename.endsWith(".jsonl") && filename !== mainFilename
     );
 
     const subagents: ParsedSubagent[] = [];
