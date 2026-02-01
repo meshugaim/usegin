@@ -25,6 +25,59 @@
  * Use schema.test.ts to detect drift when new entry types/fields appear.
  */
 
+// ============================================================================
+// BRANDED ID TYPES
+// ============================================================================
+//
+// These provide compile-time safety to prevent mixing different ID types.
+// At runtime, they are just strings - the brand exists only in the type system.
+//
+// Usage:
+//   const sessionId = asSessionId("abc-123");
+//   const entryUuid = asEntryUuid("uuid-001");
+//
+// The compiler will catch errors like:
+//   const turn: Turn = { uuid: sessionId, ... }; // Error! SessionId not assignable to EntryUuid
+//
+
+/** Session identifier (from session_id or sessionId fields) */
+export type SessionId = string & { readonly __brand: "SessionId" };
+
+/** Entry UUID (uuid field in entries, used for parent-child linking) */
+export type EntryUuid = string & { readonly __brand: "EntryUuid" };
+
+/** Agent identifier (agentId field in subagent entries) */
+export type AgentId = string & { readonly __brand: "AgentId" };
+
+/** Tool use identifier (id field in tool_use blocks) */
+export type ToolUseId = string & { readonly __brand: "ToolUseId" };
+
+// Helper functions to create branded IDs from strings
+
+/** Create a SessionId from a string */
+export function asSessionId(id: string): SessionId {
+  return id as SessionId;
+}
+
+/** Create an EntryUuid from a string */
+export function asEntryUuid(uuid: string): EntryUuid {
+  return uuid as EntryUuid;
+}
+
+/** Create an AgentId from a string */
+export function asAgentId(id: string): AgentId {
+  return id as AgentId;
+}
+
+/** Create a ToolUseId from a string */
+export function asToolUseId(id: string): ToolUseId {
+  return id as ToolUseId;
+}
+
+// ============================================================================
+// ENTRY TYPES
+// ============================================================================
+
 // Raw JSONL entry types
 export type EntryType =
   | "system"
