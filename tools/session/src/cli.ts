@@ -16,7 +16,7 @@
  *   --help           Show this help
  */
 
-import { parseSession, listRelatedFiles, StreamingParser } from "./parser";
+import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./parser";
 import { formatNarrative, formatMarkdown, formatTerminal, type FormatOptions } from "./formatter";
 import {
   discoverSessions,
@@ -44,6 +44,7 @@ interface CliArgs {
   stream: boolean;
   format: OutputFormat;
   debug: boolean;
+  timeout: number;
   help: boolean;
 }
 
@@ -75,6 +76,7 @@ function parseArgs(args: string[]): CliArgs {
     stream: false,
     format: "narrative",
     debug: false,
+    timeout: 30,
     help: false,
   };
 
@@ -105,6 +107,9 @@ function parseArgs(args: string[]): CliArgs {
       }
     } else if (arg === "--debug") {
       result.debug = true;
+    } else if (arg === "--timeout") {
+      const val = args[++i];
+      result.timeout = parseInt(val || "30", 10);
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";
     }
@@ -161,6 +166,7 @@ OPTIONS:
   --include-warmups  Include warmup subagents (excluded by default)
   --list-files       List all related files (main + subagents), one per line
   --debug            Show timing and progress info (also: DEBUG=session env var)
+  --timeout <secs>   Timeout in seconds (default: 30, 0 to disable)
   --help, -h         Show this help
 
 REWIND DETECTION:
@@ -432,14 +438,17 @@ async function main() {
       return;
     }
 
-    // Parse session with debug timing
+    // Parse session with debug timing and timeout
     let stepStart = Date.now();
     debugLog(debug, "Parsing session...");
-    const session = await parseSession(filePath, {
-      includeSubagents: args.subagents,
-      includeWarmups: args.includeWarmups,
-      debug,
-    });
+    const session = await withTimeout(
+      parseSession(filePath, {
+        includeSubagents: args.subagents,
+        includeWarmups: args.includeWarmups,
+        debug,
+      }),
+      args.timeout
+    );
     debugLog(debug, `Parsed ${session.turns.length} turns`, stepStart);
 
     if (args.subagents && session.subagents.length > 0) {

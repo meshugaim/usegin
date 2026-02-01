@@ -27,6 +27,33 @@ export interface ParseOptions {
 }
 
 /**
+ * Wrap a promise with a timeout. Rejects with a user-friendly error if it takes too long.
+ * @param promise The promise to wrap
+ * @param timeoutSeconds Timeout in seconds. 0 or negative disables timeout.
+ */
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutSeconds: number
+): Promise<T> {
+  if (timeoutSeconds <= 0) {
+    return promise;
+  }
+
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(
+          new Error(
+            `Parsing timed out after ${timeoutSeconds}s\nHint: Use --debug to see where parsing is stuck`
+          )
+        );
+      }, timeoutSeconds * 1000);
+    }),
+  ]);
+}
+
+/**
  * Log debug message to stderr
  */
 function debugLog(enabled: boolean, message: string, startTime?: number): void {
