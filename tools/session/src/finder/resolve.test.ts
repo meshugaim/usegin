@@ -81,9 +81,9 @@ describe("findSessionById", () => {
     if (!currentProject) return; // Skip if not in a project
 
     const sessions = await discoverSessions({ project: currentProject });
-    if (sessions.length === 0) return; // Skip if no sessions
-
     const targetSession = sessions[0];
+    if (!targetSession) return; // Skip if no sessions
+
     const result = await findSessionById(targetSession.id);
 
     expect(result).not.toBeNull();
@@ -94,9 +94,9 @@ describe("findSessionById", () => {
   test("finds session by ID across all projects", async () => {
     // Get any session from any project
     const sessions = await discoverSessions({ allProjects: true });
-    if (sessions.length === 0) return; // Skip if no sessions
-
     const targetSession = sessions[0];
+    if (!targetSession) return; // Skip if no sessions
+
     const result = await findSessionById(targetSession.id);
 
     expect(result).not.toBeNull();
@@ -117,9 +117,9 @@ describe("findSessionById", () => {
     if (!currentProject) return;
 
     const sessions = await discoverSessions({ project: currentProject });
-    if (sessions.length === 0) return;
-
     const targetSession = sessions[0];
+    if (!targetSession) return;
+
     const result = await findSessionById(targetSession.id);
 
     // Result should be from current project
@@ -129,9 +129,9 @@ describe("findSessionById", () => {
 
   test("returns SessionInfo with all required fields", async () => {
     const sessions = await discoverSessions({ allProjects: true });
-    if (sessions.length === 0) return;
-
     const targetSession = sessions[0];
+    if (!targetSession) return;
+
     const result = await findSessionById(targetSession.id);
 
     expect(result).not.toBeNull();
@@ -173,9 +173,9 @@ describe("resolveSessionPath", () => {
 
   test("resolves valid session ID to full path", async () => {
     const sessions = await discoverSessions({ allProjects: true });
-    if (sessions.length === 0) return;
-
     const targetSession = sessions[0];
+    if (!targetSession) return;
+
     const result = await resolveSessionPath(targetSession.id);
 
     expect(result).toBe(targetSession.path);
@@ -273,9 +273,9 @@ describe("findSessionsByPrefix", () => {
 
     // Get a real session to test with
     const sessions = await discoverSessions({ allProjects: true });
-    if (sessions.length === 0) return; // Skip if no sessions
-
     const targetSession = sessions[0];
+    if (!targetSession) return; // Skip if no sessions
+
     // Use first 8 characters as prefix
     const prefix = targetSession.id.slice(0, 8);
 
@@ -292,12 +292,13 @@ describe("findSessionsByPrefix", () => {
 
     // Get real sessions
     const sessions = await discoverSessions({ allProjects: true });
-    if (sessions.length < 2) return; // Need multiple sessions
+    const firstSession = sessions[0];
+    if (!firstSession || sessions.length < 2) return; // Need multiple sessions
 
     // Use a very short prefix that might match multiple
     // In practice, we'd need sessions that share a prefix
     // For now, just verify the function returns an array
-    const matches = await findSessionsByPrefix(sessions[0].id.slice(0, 4));
+    const matches = await findSessionsByPrefix(firstSession.id.slice(0, 4));
 
     expect(Array.isArray(matches)).toBe(true);
   });
@@ -316,13 +317,15 @@ describe("findSessionsByPrefix", () => {
     const { findSessionsByPrefix, discoverSessions } = await import("../finder");
 
     const sessions = await discoverSessions({ allProjects: true });
-    if (sessions.length === 0) return;
-
     const targetSession = sessions[0];
+    if (!targetSession) return;
+
     const matches = await findSessionsByPrefix(targetSession.id);
+    const firstMatch = matches[0];
 
     expect(matches.length).toBe(1);
-    expect(matches[0].id).toBe(targetSession.id);
+    expect(firstMatch).toBeDefined();
+    expect(firstMatch!.id).toBe(targetSession.id);
   });
 });
 
@@ -331,10 +334,10 @@ describe("resolveSessionPath with short ID prefixes", () => {
     const { resolveSessionPath, discoverSessions } = await import("../finder");
 
     const sessions = await discoverSessions({ allProjects: true });
-    if (sessions.length === 0) return;
+    const targetSession = sessions[0];
+    if (!targetSession) return;
 
     // Find a session with a unique-ish prefix (use more chars for uniqueness)
-    const targetSession = sessions[0];
     const prefix = targetSession.id.slice(0, 12);
 
     // Check if this prefix is unique

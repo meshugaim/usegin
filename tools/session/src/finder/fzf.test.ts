@@ -16,11 +16,13 @@ describe("runFzf", () => {
         path: "/path/to/session-aaa.jsonl",
         id: "session-aaa",
         mtime: new Date(),
+        project: "to",
       },
       {
         path: "/path/to/session-bbb.jsonl",
         id: "session-bbb",
         mtime: new Date(),
+        project: "to",
       },
     ];
 
@@ -36,6 +38,7 @@ describe("runFzf", () => {
         path: "/path/to/session-aaa.jsonl",
         id: "session-aaa",
         mtime: new Date(),
+        project: "to",
       },
     ];
 

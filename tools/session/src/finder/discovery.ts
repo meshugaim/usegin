@@ -58,7 +58,7 @@ export function parseSinceFilter(since: string, now: Date = new Date()): Date | 
 
   // Try relative format: Nd or Nw
   const relativeMatch = since.match(/^(\d+)([dw])$/);
-  if (relativeMatch) {
+  if (relativeMatch && relativeMatch[1] && relativeMatch[2]) {
     const amount = parseInt(relativeMatch[1], 10);
     const unit = relativeMatch[2];
     const result = new Date(now);

@@ -28,9 +28,13 @@ describe("discoverSessions", () => {
 
     if (sessions.length >= 2) {
       for (let i = 1; i < sessions.length; i++) {
-        expect(sessions[i - 1].mtime.getTime()).toBeGreaterThanOrEqual(
-          sessions[i].mtime.getTime()
-        );
+        const prev = sessions[i - 1];
+        const curr = sessions[i];
+        if (prev && curr) {
+          expect(prev.mtime.getTime()).toBeGreaterThanOrEqual(
+            curr.mtime.getTime()
+          );
+        }
       }
     }
   });

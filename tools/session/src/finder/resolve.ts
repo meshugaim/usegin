@@ -180,7 +180,8 @@ export async function resolveSessionPath(input: string): Promise<string> {
   }
 
   if (matches.length === 1) {
-    return matches[0].path;
+    const match = matches[0];
+    if (match) return match.path;
   }
 
   // Multiple matches - throw ambiguous error

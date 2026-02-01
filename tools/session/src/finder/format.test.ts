@@ -16,6 +16,7 @@ describe("formatSessionLine", () => {
       path: "/home/user/.claude/projects/foo/abc123.jsonl",
       id: "abc123",
       mtime: new Date("2024-11-29T14:32:00Z"),
+      project: "foo",
     };
 
     const line = formatSessionLine(session);
