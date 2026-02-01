@@ -1492,3 +1492,73 @@ describe("NoSessionsFoundError with missing directory", () => {
     expect(error.message).not.toMatch(/directory.*not.*exist|doesn't exist|does not exist/i);
   });
 });
+
+// =============================================================================
+// EDGE CASE: Broken symlinks in debug mode
+// =============================================================================
+
+describe("isBrokenSymlink", () => {
+  test("returns false for regular files", async () => {
+    const { isBrokenSymlink } = await import("./finder");
+    const fs = await import("node:fs/promises");
+    const os = await import("node:os");
+    const path = await import("node:path");
+
+    // Create a real file
+    const tempFile = path.join(os.tmpdir(), `test-regular-${Date.now()}.txt`);
+    await fs.writeFile(tempFile, "test content");
+
+    try {
+      const result = await isBrokenSymlink(tempFile);
+      expect(result).toBe(false);
+    } finally {
+      await fs.unlink(tempFile).catch(() => {});
+    }
+  });
+
+  test("returns false for working symlinks", async () => {
+    const { isBrokenSymlink } = await import("./finder");
+    const fs = await import("node:fs/promises");
+    const os = await import("node:os");
+    const path = await import("node:path");
+
+    // Create a real file and a symlink to it
+    const tempFile = path.join(os.tmpdir(), `test-target-${Date.now()}.txt`);
+    const symlink = path.join(os.tmpdir(), `test-symlink-${Date.now()}.txt`);
+    await fs.writeFile(tempFile, "test content");
+    await fs.symlink(tempFile, symlink);
+
+    try {
+      const result = await isBrokenSymlink(symlink);
+      expect(result).toBe(false);
+    } finally {
+      await fs.unlink(symlink).catch(() => {});
+      await fs.unlink(tempFile).catch(() => {});
+    }
+  });
+
+  test("returns true for broken symlinks", async () => {
+    const { isBrokenSymlink } = await import("./finder");
+    const fs = await import("node:fs/promises");
+    const os = await import("node:os");
+    const path = await import("node:path");
+
+    // Create a symlink to a non-existent file
+    const symlink = path.join(os.tmpdir(), `test-broken-symlink-${Date.now()}.txt`);
+    await fs.symlink("/nonexistent/target/file", symlink);
+
+    try {
+      const result = await isBrokenSymlink(symlink);
+      expect(result).toBe(true);
+    } finally {
+      await fs.unlink(symlink).catch(() => {});
+    }
+  });
+
+  test("returns false for non-existent paths (not symlinks)", async () => {
+    const { isBrokenSymlink } = await import("./finder");
+
+    const result = await isBrokenSymlink("/nonexistent/path/file.txt");
+    expect(result).toBe(false);
+  });
+});
