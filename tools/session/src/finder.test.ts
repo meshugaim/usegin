@@ -1404,3 +1404,53 @@ describe("formatMultiLineEntry with live session", () => {
     expect(entry).not.toContain("[LIVE]");
   });
 });
+
+// =============================================================================
+// EDGE CASE: Conflicting flags
+// =============================================================================
+
+describe("warnIfConflictingFlags", () => {
+  test("returns warning when both --project and --all-projects specified", async () => {
+    const { warnIfConflictingFlags } = await import("./finder");
+
+    const warning = warnIfConflictingFlags({
+      project: "-workspaces-test",
+      allProjects: true,
+    });
+
+    expect(warning).toBe("Ignoring --project because --all-projects specified");
+  });
+
+  test("returns null when only --project specified", async () => {
+    const { warnIfConflictingFlags } = await import("./finder");
+
+    const warning = warnIfConflictingFlags({
+      project: "-workspaces-test",
+      allProjects: false,
+    });
+
+    expect(warning).toBeNull();
+  });
+
+  test("returns null when only --all-projects specified", async () => {
+    const { warnIfConflictingFlags } = await import("./finder");
+
+    const warning = warnIfConflictingFlags({
+      project: undefined,
+      allProjects: true,
+    });
+
+    expect(warning).toBeNull();
+  });
+
+  test("returns null when neither specified", async () => {
+    const { warnIfConflictingFlags } = await import("./finder");
+
+    const warning = warnIfConflictingFlags({
+      project: undefined,
+      allProjects: false,
+    });
+
+    expect(warning).toBeNull();
+  });
+});
