@@ -830,6 +830,65 @@ describe("rewind detection", () => {
     expect(result.rewinds).toEqual([]);
     expect(result.turns.every((t) => t.isOnCurrentBranch)).toBe(true);
   });
+
+  test("handles cycles in parent chain without hanging", () => {
+    // This reproduces a bug found in Claude Code 2.1.27+ where new entry types
+    // (progress, saved_hook_context) can form cycles in the parent chain.
+    // The parser must detect cycles and break instead of looping forever.
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        parentUuid: null,
+        session_id: "s1",
+        message: { role: "user", content: "Hello" },
+      },
+      {
+        type: "assistant",
+        uuid: "a1",
+        parentUuid: "u1",
+        session_id: "s1",
+        message: { role: "assistant", model: "claude", content: "Hi" },
+      },
+      // Simulate a progress entry that creates a cycle: a1 -> hook1 -> a1
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "hook1",
+        parentUuid: "a1",
+        session_id: "s1",
+        cwd: "/test",
+        tools: [],
+        model: "claude",
+      } as Entry,
+      {
+        type: "user",
+        uuid: "u2",
+        parentUuid: "hook1",
+        session_id: "s1",
+        message: { role: "user", content: "Continue" },
+      },
+      {
+        type: "assistant",
+        uuid: "a2",
+        parentUuid: "u2",
+        session_id: "s1",
+        message: { role: "assistant", model: "claude", content: "Ok" },
+      },
+    ];
+
+    // Add a cycle: make hook1's parent point to a2 (which descends from hook1)
+    // This creates: a2 -> u2 -> hook1 -> a2 (cycle!)
+    (entries[2] as any).parentUuid = "a2";
+
+    // This should complete without hanging (timeout would indicate failure)
+    const result = parseEntries(entries);
+
+    // Basic sanity check - we parsed the turns
+    expect(result.turns).toHaveLength(4);
+    // The parser should handle the cycle gracefully
+    expect(result.sessionId).toBe("s1");
+  });
 });
 
 describe("parseSession warmup filtering", () => {
