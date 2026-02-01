@@ -1,28 +1,21 @@
 import { test, expect, describe } from "bun:test";
 import { formatNarrative, formatMarkdown } from "./formatter";
-import type { ParsedSession } from "./types";
-
-// Helper to create a basic session with required fields
-function makeSession(overrides: Partial<ParsedSession> = {}): ParsedSession {
-  return {
-    sessionId: "s1",
-    cwd: "/test",
-    model: "claude",
-    tools: [],
-    turns: [],
-    subagents: [],
-    rewinds: [],
-    triggeredSkills: [],
-    ...overrides,
-  };
-}
+import {
+  makeSession,
+  makeSubagent,
+  makeRewind,
+  userTurn,
+  assistantTurn,
+  toolCall,
+  toolResult,
+} from "./testing";
 
 describe("formatNarrative", () => {
   test("formats basic user/assistant turns", () => {
     const session = makeSession({
       turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-        { role: "assistant", text: "Hi there!", toolCalls: [], toolResults: [], uuid: "a1", isOnCurrentBranch: true },
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi there!"),
       ],
     });
 
@@ -35,15 +28,9 @@ describe("formatNarrative", () => {
   test("formats tool calls with summary", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "assistant",
-          text: "Let me check",
-          toolCalls: [
-            { id: "t1", name: "Read", input: { file_path: "/src/index.ts" } },
-          ],
-          toolResults: [],
-          uuid: "a1",
-        },
+        assistantTurn("a1", "Let me check", {
+          toolCalls: [toolCall("t1", "Read", { file_path: "/src/index.ts" })],
+        }),
       ],
     });
 
@@ -55,15 +42,9 @@ describe("formatNarrative", () => {
   test("includes tool input when flag set", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "assistant",
-          text: "",
-          toolCalls: [
-            { id: "t1", name: "Grep", input: { pattern: "TODO", path: "src/" } },
-          ],
-          toolResults: [],
-          uuid: "a1",
-        },
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Grep", { pattern: "TODO", path: "src/" })],
+        }),
       ],
     });
 
@@ -76,15 +57,9 @@ describe("formatNarrative", () => {
   test("includes tool output when flag set", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "user",
-          text: "",
-          toolCalls: [],
-          toolResults: [
-            { toolUseId: "t1", content: "Found 3 matches", isError: false },
-          ],
-          uuid: "u1",
-        },
+        userTurn("u1", "", {
+          toolResults: [toolResult("t1", "Found 3 matches")],
+        }),
       ],
     });
 
@@ -96,15 +71,9 @@ describe("formatNarrative", () => {
   test("shows error prefix for failed tool results", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "user",
-          text: "",
-          toolCalls: [],
-          toolResults: [
-            { toolUseId: "t1", content: "File not found", isError: true },
-          ],
-          uuid: "u1",
-        },
+        userTurn("u1", "", {
+          toolResults: [toolResult("t1", "File not found", true)],
+        }),
       ],
     });
 
@@ -116,15 +85,9 @@ describe("formatNarrative", () => {
   test("truncates long output", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "user",
-          text: "",
-          toolCalls: [],
-          toolResults: [
-            { toolUseId: "t1", content: "x".repeat(1000), isError: false },
-          ],
-          uuid: "u1",
-        },
+        userTurn("u1", "", {
+          toolResults: [toolResult("t1", "x".repeat(1000))],
+        }),
       ],
     });
 
@@ -137,15 +100,9 @@ describe("formatNarrative", () => {
   test("formats Bash command summary", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "assistant",
-          text: "",
-          toolCalls: [
-            { id: "t1", name: "Bash", input: { command: "ls -la" } },
-          ],
-          toolResults: [],
-          uuid: "a1",
-        },
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "ls -la" })],
+        }),
       ],
     });
 
@@ -157,15 +114,9 @@ describe("formatNarrative", () => {
   test("formats Grep pattern summary", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "assistant",
-          text: "",
-          toolCalls: [
-            { id: "t1", name: "Grep", input: { pattern: "handleLogin" } },
-          ],
-          toolResults: [],
-          uuid: "a1",
-        },
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Grep", { pattern: "handleLogin" })],
+        }),
       ],
     });
 
@@ -178,18 +129,11 @@ describe("formatNarrative", () => {
 describe("formatNarrative with subagents", () => {
   test("does not show subagents section by default", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
       subagents: [
-        {
-          agentId: "agent-123",
-          sessionId: "s1",
-          turns: [
-            { role: "assistant", text: "Subagent work", toolCalls: [], toolResults: [], uuid: "sa1", isOnCurrentBranch: true },
-          ],
+        makeSubagent("agent-123", [assistantTurn("sa1", "Subagent work")], {
           startTimestamp: "2025-01-01T10:00:00.000Z",
-        },
+        }),
       ],
     });
 
@@ -201,18 +145,11 @@ describe("formatNarrative with subagents", () => {
 
   test("shows subagents section when includeSubagents is true", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
       subagents: [
-        {
-          agentId: "agent-123",
-          sessionId: "s1",
-          turns: [
-            { role: "assistant", text: "Subagent work", toolCalls: [], toolResults: [], uuid: "sa1", isOnCurrentBranch: true },
-          ],
+        makeSubagent("agent-123", [assistantTurn("sa1", "Subagent work")], {
           startTimestamp: "2025-01-01T10:00:00.000Z",
-        },
+        }),
       ],
     });
 
@@ -228,20 +165,8 @@ describe("formatNarrative with subagents", () => {
   test("shows multiple subagents", () => {
     const session = makeSession({
       subagents: [
-        {
-          agentId: "agent-aaa",
-          sessionId: "s1",
-          turns: [
-            { role: "assistant", text: "First agent", toolCalls: [], toolResults: [], uuid: "a1", isOnCurrentBranch: true },
-          ],
-        },
-        {
-          agentId: "agent-bbb",
-          sessionId: "s1",
-          turns: [
-            { role: "assistant", text: "Second agent", toolCalls: [], toolResults: [], uuid: "a2", isOnCurrentBranch: true },
-          ],
-        },
+        makeSubagent("agent-aaa", [assistantTurn("a1", "First agent")]),
+        makeSubagent("agent-bbb", [assistantTurn("a2", "Second agent")]),
       ],
     });
 
@@ -256,9 +181,7 @@ describe("formatNarrative with subagents", () => {
 
   test("does not show subagents section when empty", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
       subagents: [],
     });
 
@@ -272,16 +195,16 @@ describe("formatNarrative with rewinds", () => {
   test("marks rewound branch turns with prefix", () => {
     const session = makeSession({
       turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-        { role: "assistant", text: "Hi!", toolCalls: [], toolResults: [], uuid: "a1", isOnCurrentBranch: true },
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
         // Rewound branch
-        { role: "user", text: "What is 2+2?", toolCalls: [], toolResults: [], uuid: "u2", isOnCurrentBranch: false },
-        { role: "assistant", text: "4", toolCalls: [], toolResults: [], uuid: "a2", isOnCurrentBranch: false },
+        userTurn("u2", "What is 2+2?", { isOnCurrentBranch: false }),
+        assistantTurn("a2", "4", { isOnCurrentBranch: false }),
         // Current branch (after rewind)
-        { role: "user", text: "What is 3+3?", toolCalls: [], toolResults: [], uuid: "u3", isOnCurrentBranch: true },
-        { role: "assistant", text: "6", toolCalls: [], toolResults: [], uuid: "a3", isOnCurrentBranch: true },
+        userTurn("u3", "What is 3+3?"),
+        assistantTurn("a3", "6"),
       ],
-      rewinds: [{ fromUuid: "a1", abandonedBranchUuids: ["u2", "a2"] }],
+      rewinds: [makeRewind("a1", ["u2", "a2"])],
     });
 
     const output = formatNarrative(session);
@@ -300,12 +223,12 @@ describe("formatNarrative with rewinds", () => {
   test("shows rewind summary in header section", () => {
     const session = makeSession({
       turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-        { role: "assistant", text: "Hi!", toolCalls: [], toolResults: [], uuid: "a1", isOnCurrentBranch: true },
-        { role: "user", text: "Abandoned", toolCalls: [], toolResults: [], uuid: "u2", isOnCurrentBranch: false },
-        { role: "user", text: "Current", toolCalls: [], toolResults: [], uuid: "u3", isOnCurrentBranch: true },
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", "Abandoned", { isOnCurrentBranch: false }),
+        userTurn("u3", "Current"),
       ],
-      rewinds: [{ fromUuid: "a1", abandonedBranchUuids: ["u2"] }],
+      rewinds: [makeRewind("a1", ["u2"])],
     });
 
     const output = formatNarrative(session);
@@ -317,9 +240,7 @@ describe("formatNarrative with rewinds", () => {
 
   test("does not show rewind info when no rewinds", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
       rewinds: [],
     });
 
@@ -334,9 +255,7 @@ describe("formatNarrative with summary", () => {
   test("shows summary header when present", () => {
     const session = makeSession({
       summary: "Claude Code CLI Implementation",
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
     });
 
     const output = formatNarrative(session);
@@ -347,9 +266,7 @@ describe("formatNarrative with summary", () => {
 
   test("does not show summary section when no summary", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
     });
 
     const output = formatNarrative(session);
@@ -362,9 +279,7 @@ describe("formatNarrative with summary", () => {
     const session = makeSession({
       summary: "Test Summary",
       triggeredSkills: ["writing-specs"],
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
     });
 
     const output = formatNarrative(session);
@@ -381,9 +296,7 @@ describe("formatNarrative with summary", () => {
 describe("formatNarrative with skills", () => {
   test("shows skills summary in header section", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
       triggeredSkills: ["writing-specs"],
     });
 
@@ -396,9 +309,7 @@ describe("formatNarrative with skills", () => {
 
   test("shows multiple skills comma-separated", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
       triggeredSkills: ["writing-specs", "implementing-specs", "session-retro"],
     });
 
@@ -409,9 +320,7 @@ describe("formatNarrative with skills", () => {
 
   test("does not show header section when no skills or rewinds", () => {
     const session = makeSession({
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
       triggeredSkills: [],
       rewinds: [],
     });
@@ -425,16 +334,9 @@ describe("formatNarrative with skills", () => {
   test("formats Skill tool call with skill name summary", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "assistant",
-          text: "",
-          toolCalls: [
-            { id: "t1", name: "Skill", input: { skill: "writing-specs" } },
-          ],
-          toolResults: [],
-          uuid: "a1",
-          isOnCurrentBranch: true,
-        },
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Skill", { skill: "writing-specs" })],
+        }),
       ],
       triggeredSkills: ["writing-specs"],
     });
@@ -447,11 +349,11 @@ describe("formatNarrative with skills", () => {
   test("shows skills before rewinds in header", () => {
     const session = makeSession({
       turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-        { role: "user", text: "Abandoned", toolCalls: [], toolResults: [], uuid: "u2", isOnCurrentBranch: false },
+        userTurn("u1", "Hello"),
+        userTurn("u2", "Abandoned", { isOnCurrentBranch: false }),
       ],
       triggeredSkills: ["writing-specs"],
-      rewinds: [{ fromUuid: "u1", abandonedBranchUuids: ["u2"] }],
+      rewinds: [makeRewind("u1", ["u2"])],
     });
 
     const output = formatNarrative(session);
@@ -469,9 +371,7 @@ describe("formatMarkdown", () => {
   test("uses summary as title when present", () => {
     const session = makeSession({
       summary: "CLI Tool Implementation",
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
     });
 
     const output = formatMarkdown(session);
@@ -482,9 +382,7 @@ describe("formatMarkdown", () => {
   test("uses session ID as title when no summary", () => {
     const session = makeSession({
       sessionId: "abc123",
-      turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-      ],
+      turns: [userTurn("u1", "Hello")],
     });
 
     const output = formatMarkdown(session);
@@ -512,8 +410,8 @@ describe("formatMarkdown", () => {
   test("formats conversation with user and assistant turns", () => {
     const session = makeSession({
       turns: [
-        { role: "user", text: "Hello", toolCalls: [], toolResults: [], uuid: "u1", isOnCurrentBranch: true },
-        { role: "assistant", text: "Hi there!", toolCalls: [], toolResults: [], uuid: "a1", isOnCurrentBranch: true },
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi there!"),
       ],
     });
 
@@ -529,14 +427,9 @@ describe("formatMarkdown", () => {
   test("formats tool calls as blockquotes", () => {
     const session = makeSession({
       turns: [
-        {
-          role: "assistant",
-          text: "Let me check",
-          toolCalls: [{ id: "t1", name: "Read", input: { file_path: "/src/index.ts" } }],
-          toolResults: [],
-          uuid: "a1",
-          isOnCurrentBranch: true,
-        },
+        assistantTurn("a1", "Let me check", {
+          toolCalls: [toolCall("t1", "Read", { file_path: "/src/index.ts" })],
+        }),
       ],
     });
 
