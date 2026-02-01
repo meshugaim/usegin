@@ -1,8 +1,10 @@
 import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { parseEntries, parseSession, listRelatedFiles, isWarmupSubagent, extractCommitsFromToolResult } from "./parser";
 import type { Entry, ParsedSubagent } from "./types";
+import { asSessionId, asAgentId, asEntryUuid, asToolUseId } from "./types";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { makeSubagent, userTurn, assistantTurn, toolCall, toolResult } from "./testing";
 
 describe("parseEntries", () => {
   test("parses system init entry", () => {
@@ -530,79 +532,44 @@ describe("listRelatedFiles", () => {
 
 describe("isWarmupSubagent", () => {
   test("detects warmup subagent (single message, no tool results)", () => {
-    const warmup: ParsedSubagent = {
-      agentId: "warmup-agent",
-      sessionId: "test-session",
-      turns: [
-        {
-          role: "assistant",
-          text: "I'll start by exploring the codebase to understand its structure.",
-          toolCalls: [],
-          toolResults: [],
-        },
-      ],
-    };
+    const warmup = makeSubagent("warmup-agent", [
+      assistantTurn("a1", "I'll start by exploring the codebase to understand its structure."),
+    ]);
 
     expect(isWarmupSubagent(warmup)).toBe(true);
   });
 
   test("detects warmup with tool_use in text but no results", () => {
     // Some warmups have <function_calls> in their text but never got results
-    const warmup: ParsedSubagent = {
-      agentId: "warmup-agent",
-      sessionId: "test-session",
-      turns: [
-        {
-          role: "assistant",
-          text: "I'll start exploring.\n<function_calls>\n...",
-          toolCalls: [{ id: "t1", name: "Glob", input: {} }],
-          toolResults: [],
-        },
-      ],
-    };
+    const warmup = makeSubagent("warmup-agent", [
+      assistantTurn("a1", "I'll start exploring.\n<function_calls>\n...", {
+        toolCalls: [toolCall("t1", "Glob", {})],
+      }),
+    ]);
 
     expect(isWarmupSubagent(warmup)).toBe(true);
   });
 
   test("real subagent with tool results is not a warmup", () => {
-    const realSubagent: ParsedSubagent = {
-      agentId: "real-agent",
-      sessionId: "test-session",
-      turns: [
-        {
-          role: "assistant",
-          text: "Let me search for that.",
-          toolCalls: [{ id: "t1", name: "Grep", input: { pattern: "test" } }],
-          toolResults: [],
-        },
-        {
-          role: "user",
-          text: "",
-          toolCalls: [],
-          toolResults: [{ toolUseId: "t1", content: "found results", isError: false }],
-        },
-        {
-          role: "assistant",
-          text: "I found the results.",
-          toolCalls: [],
-          toolResults: [],
-        },
-      ],
-    };
+    const realSubagent = makeSubagent("real-agent", [
+      assistantTurn("a1", "Let me search for that.", {
+        toolCalls: [toolCall("t1", "Grep", { pattern: "test" })],
+      }),
+      userTurn("u1", "", {
+        toolResults: [toolResult("t1", "found results")],
+      }),
+      assistantTurn("a2", "I found the results."),
+    ]);
 
     expect(isWarmupSubagent(realSubagent)).toBe(false);
   });
 
   test("subagent with many turns is not a warmup", () => {
-    const manyTurns: ParsedSubagent = {
-      agentId: "many-turns-agent",
-      sessionId: "test-session",
-      turns: [
-        { role: "assistant", text: "Turn 1", toolCalls: [], toolResults: [] },
-        { role: "user", text: "Turn 2", toolCalls: [], toolResults: [] },
-        { role: "assistant", text: "Turn 3", toolCalls: [], toolResults: [] },
-      ],
-    };
+    const manyTurns = makeSubagent("many-turns-agent", [
+      assistantTurn("a1", "Turn 1"),
+      userTurn("u1", "Turn 2"),
+      assistantTurn("a2", "Turn 3"),
+    ]);
 
     expect(isWarmupSubagent(manyTurns)).toBe(false);
   });
