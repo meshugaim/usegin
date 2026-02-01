@@ -30,6 +30,7 @@ import {
   writeOutputFile,
 } from "./finder";
 import { parseFindArgs, parsePickArgs, parseListArgs } from "./cli-args";
+import { debugLog } from "./debug";
 
 type OutputFormat = "narrative" | "terminal" | "markdown";
 
@@ -53,15 +54,6 @@ interface CliArgs {
  */
 function isDebugEnabled(args: CliArgs): boolean {
   return args.debug || process.env.DEBUG === "session";
-}
-
-/**
- * Log debug message to stderr (preserves stdout for actual output)
- */
-function debugLog(enabled: boolean, message: string, startTime?: number): void {
-  if (!enabled) return;
-  const timing = startTime !== undefined ? ` (${Date.now() - startTime}ms)` : "";
-  console.error(`[session] ${message}${timing}`);
 }
 
 function parseArgs(args: string[]): CliArgs {
