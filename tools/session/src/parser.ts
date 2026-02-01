@@ -338,9 +338,16 @@ function findCurrentBranch(
   // Start from the last turn and walk back via parentUuid
   // Use allEntryParents to jump through system entries
   const currentBranch = new Set<string>();
+  const visited = new Set<string>(); // Track visited to detect cycles
   let currentUuid: string | null = turns[turns.length - 1]?.uuid ?? null;
 
   while (currentUuid) {
+    // Detect cycles - break if we've visited this UUID before
+    if (visited.has(currentUuid)) {
+      break;
+    }
+    visited.add(currentUuid);
+
     // If this is a turn, add it to current branch
     if (turnMap.has(currentUuid)) {
       currentBranch.add(currentUuid);

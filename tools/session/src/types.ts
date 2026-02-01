@@ -9,7 +9,10 @@ export type EntryType =
   | "assistant"
   | "result"
   | "file-history-snapshot"
-  | "queue-operation";
+  | "queue-operation"
+  | "progress" // Hook progress updates (added in Claude Code 2.1.27+)
+  | "saved_hook_context" // Saved hook context
+  | "summary"; // Session summary line
 
 export interface BaseEntry {
   type: EntryType;
