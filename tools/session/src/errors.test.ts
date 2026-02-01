@@ -203,7 +203,7 @@ describe("Error messages in context", () => {
       expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(SessionNotFoundError);
-      expect((error as SessionNotFoundError).message).toContain("session list");
+      expect((error as InstanceType<typeof SessionNotFoundError>).message).toContain("session list");
     }
   });
 
@@ -218,8 +218,8 @@ describe("Error messages in context", () => {
       expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(ParsingTimeoutError);
-      expect((error as ParsingTimeoutError).message).toContain("--debug");
-      expect((error as ParsingTimeoutError).message).toContain("--timeout 0");
+      expect((error as InstanceType<typeof ParsingTimeoutError>).message).toContain("--debug");
+      expect((error as InstanceType<typeof ParsingTimeoutError>).message).toContain("--timeout 0");
     }
   });
 
@@ -235,7 +235,7 @@ describe("Error messages in context", () => {
       expect(true).toBe(false); // Should not reach here
     } catch (error) {
       expect(error).toBeInstanceOf(TmuxNotAvailableError);
-      expect((error as TmuxNotAvailableError).message).toContain("tmux new-session");
+      expect((error as InstanceType<typeof TmuxNotAvailableError>).message).toContain("tmux new-session");
     } finally {
       if (originalTmux) {
         process.env.TMUX = originalTmux;
