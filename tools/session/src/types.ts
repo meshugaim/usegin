@@ -297,6 +297,163 @@ export interface TextContent {
   text: string;
 }
 
+// ============================================================================
+// TOOL INPUT TYPES
+// ============================================================================
+//
+// ToolInputMap provides typed definitions for known tool inputs.
+// This enables type-safe access to tool parameters without unsafe casts.
+//
+// Usage:
+//   // Type guard approach (recommended)
+//   const input = getToolInput("Read", toolUse);
+//   if (input) {
+//     console.log(input.file_path);  // Type: string
+//   }
+//
+//   // Generic type approach
+//   const typed: TypedToolUseContent<"Bash"> = { ... };
+//   console.log(typed.input.command);  // Type: string
+//
+// Unknown tools fall back to Record<string, unknown> for backward compatibility.
+//
+
+/**
+ * Map of known tool names to their input types.
+ *
+ * This enables compile-time type checking for tool inputs.
+ * Add new tools here as they're discovered or needed.
+ */
+export interface ToolInputMap {
+  Read: {
+    file_path: string;
+    offset?: number;
+    limit?: number;
+  };
+
+  Write: {
+    file_path: string;
+    content: string;
+  };
+
+  Edit: {
+    file_path: string;
+    old_string: string;
+    new_string: string;
+    replace_all?: boolean;
+  };
+
+  Bash: {
+    command: string;
+    description?: string;
+    timeout?: number;
+  };
+
+  Glob: {
+    pattern: string;
+    path?: string;
+  };
+
+  Grep: {
+    pattern: string;
+    path?: string;
+    glob?: string;
+  };
+
+  Task: {
+    prompt: string;
+    description: string;
+  };
+
+  Skill: {
+    skill: string;
+    args?: string;
+  };
+
+  TodoWrite: {
+    todos: Array<{
+      id: string;
+      content: string;
+      status: string;
+    }>;
+  };
+}
+
+/** Names of known tools with typed inputs */
+export type KnownToolName = keyof ToolInputMap;
+
+/** Array of known tool names for runtime checks */
+export const KNOWN_TOOL_NAMES: KnownToolName[] = [
+  "Read",
+  "Write",
+  "Edit",
+  "Bash",
+  "Glob",
+  "Grep",
+  "Task",
+  "Skill",
+  "TodoWrite",
+];
+
+/**
+ * Type guard to check if a string is a known tool name.
+ *
+ * @example
+ * ```ts
+ * if (isKnownToolName(toolName)) {
+ *   // toolName is now typed as KnownToolName
+ * }
+ * ```
+ */
+export function isKnownToolName(name: string): name is KnownToolName {
+  return KNOWN_TOOL_NAMES.includes(name as KnownToolName);
+}
+
+/**
+ * Generic ToolUseContent with typed input based on tool name.
+ *
+ * @example
+ * ```ts
+ * const readTool: TypedToolUseContent<"Read"> = {
+ *   type: "tool_use",
+ *   id: "toolu_123",
+ *   name: "Read",
+ *   input: { file_path: "/test.ts" },  // Typed!
+ * };
+ * ```
+ */
+export interface TypedToolUseContent<T extends KnownToolName> {
+  type: "tool_use";
+  id: string;
+  name: T;
+  input: ToolInputMap[T];
+}
+
+/**
+ * Type guard that returns typed input if the tool name matches.
+ *
+ * Returns undefined if the tool name doesn't match, allowing for
+ * safe narrowing without unsafe casts.
+ *
+ * @example
+ * ```ts
+ * const input = getToolInput("Read", toolUse);
+ * if (input) {
+ *   // input is typed as ToolInputMap["Read"]
+ *   console.log(input.file_path);
+ * }
+ * ```
+ */
+export function getToolInput<T extends KnownToolName>(
+  expectedName: T,
+  toolUse: ToolUseContent
+): ToolInputMap[T] | undefined {
+  if (toolUse.name === expectedName) {
+    return toolUse.input as ToolInputMap[T];
+  }
+  return undefined;
+}
+
 export interface ToolUseContent {
   type: "tool_use";
   id: string;
