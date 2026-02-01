@@ -30,84 +30,14 @@ import {
   writeOutputFile,
 } from "./finder";
 import { parseFindArgs, parsePickArgs, parseListArgs } from "./cli-args";
+import { parseMainArgs, type MainArgs } from "./cli-args-main";
 import { debugLog } from "./debug";
-
-type OutputFormat = "narrative" | "terminal" | "markdown";
-
-interface CliArgs {
-  file: string;
-  toolInput: boolean;
-  toolOutput: boolean;
-  truncate: number;
-  subagents: boolean;
-  includeWarmups: boolean;
-  listFiles: boolean;
-  stream: boolean;
-  format: OutputFormat;
-  debug: boolean;
-  timeout: number;
-  help: boolean;
-}
 
 /**
  * Check if debug mode is enabled via --debug flag or DEBUG=session env var
  */
-function isDebugEnabled(args: CliArgs): boolean {
+function isDebugEnabled(args: MainArgs): boolean {
   return args.debug || process.env.DEBUG === "session";
-}
-
-function parseArgs(args: string[]): CliArgs {
-  const result: CliArgs = {
-    file: "",
-    toolInput: false,
-    toolOutput: false,
-    truncate: 500,
-    subagents: false,
-    includeWarmups: false,
-    listFiles: false,
-    stream: false,
-    format: "narrative",
-    debug: false,
-    timeout: 30,
-    help: false,
-  };
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg === "--help" || arg === "-h") {
-      result.help = true;
-    } else if (arg === "--tool-input") {
-      result.toolInput = true;
-    } else if (arg === "--tool-output") {
-      result.toolOutput = true;
-    } else if (arg === "--truncate") {
-      const val = args[++i];
-      result.truncate = parseInt(val || "500", 10);
-    } else if (arg === "--subagents") {
-      result.subagents = true;
-    } else if (arg === "--include-warmups") {
-      result.includeWarmups = true;
-    } else if (arg === "--list-files") {
-      result.listFiles = true;
-    } else if (arg === "--stream") {
-      result.stream = true;
-    } else if (arg === "--format") {
-      const val = args[++i] as OutputFormat;
-      if (val === "narrative" || val === "terminal" || val === "markdown") {
-        result.format = val;
-      }
-    } else if (arg === "--debug") {
-      result.debug = true;
-    } else if (arg === "--timeout") {
-      const val = args[++i];
-      result.timeout = parseInt(val || "30", 10);
-    } else if (!arg?.startsWith("-")) {
-      result.file = arg || "";
-    }
-  }
-
-  return result;
 }
 
 function printHelp() {
@@ -382,7 +312,7 @@ async function main() {
     return;
   }
 
-  const args = parseArgs(rawArgs);
+  const args = parseMainArgs(rawArgs);
 
   if (args.help || (!args.file && !args.stream)) {
     printHelp();

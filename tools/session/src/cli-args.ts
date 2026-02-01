@@ -5,6 +5,78 @@
 
 import type { OutputFormat } from "./finder";
 
+// Type definitions (moved to top so they can be used in constants)
+export type PickerMethod = "tmux" | "vsc" | "auto";
+
+// Valid values for enum-like arguments
+const VALID_OUTPUT_FORMATS: readonly OutputFormat[] = ["path", "id", "json"] as const;
+const VALID_PICKER_METHODS: readonly PickerMethod[] = ["auto", "tmux", "vsc"] as const;
+
+// Regex for validating --since argument
+// Accepts: "Nd" (days), "Nw" (weeks), or "YYYY-MM-DD" (ISO date)
+const SINCE_PATTERN = /^(\d+[dw]|\d{4}-\d{2}-\d{2})$/;
+
+/**
+ * Require that a flag has a value (not missing, not another flag)
+ */
+function requireArgValue(args: string[], i: number, flag: string): string {
+  const value = args[i + 1];
+  if (value === undefined || value.startsWith("-")) {
+    throw new Error(`Missing value for ${flag}`);
+  }
+  return value;
+}
+
+/**
+ * Validate that a value is one of the allowed options
+ */
+function validateEnum<T extends string>(
+  value: string,
+  validValues: readonly T[],
+  flag: string
+): T {
+  if (!validValues.includes(value as T)) {
+    throw new Error(
+      `Invalid ${flag}: expected one of [${validValues.join(", ")}], got "${value}"`
+    );
+  }
+  return value as T;
+}
+
+/**
+ * Validate that a value is a positive integer
+ */
+function validatePositiveInteger(value: string, flag: string): number {
+  const num = Number(value);
+  if (!Number.isInteger(num) || num <= 0) {
+    throw new Error(`Invalid ${flag}: expected positive integer, got "${value}"`);
+  }
+  return num;
+}
+
+/**
+ * Validate that a value is a non-negative integer
+ */
+export function validateNonNegativeInteger(value: string, flag: string): number {
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 0) {
+    throw new Error(`Invalid ${flag}: expected non-negative integer, got "${value}"`);
+  }
+  return num;
+}
+
+/**
+ * Validate --since format: "Nd", "Nw", or "YYYY-MM-DD"
+ */
+function validateSince(value: string, flag: string): string {
+  if (!SINCE_PATTERN.test(value)) {
+    throw new Error(
+      `Invalid ${flag}: expected format like "1d", "2w", or "YYYY-MM-DD", got "${value}"`
+    );
+  }
+  return value;
+}
+
 export interface FindArgs {
   allProjects: boolean;
   project?: string;
@@ -26,25 +98,28 @@ export function parseFindArgs(args: string[]): FindArgs {
     if (arg === "--all-projects") {
       result.allProjects = true;
     } else if (arg === "--project") {
-      result.project = args[++i];
+      const value = requireArgValue(args, i, "--project");
+      result.project = value;
+      i++;
     } else if (arg === "--output") {
-      const val = args[++i] as OutputFormat;
-      if (val === "path" || val === "id" || val === "json") {
-        result.output = val;
-      }
+      const value = requireArgValue(args, i, "--output");
+      result.output = validateEnum(value, VALID_OUTPUT_FORMATS, "--output");
+      i++;
     } else if (arg === "--since") {
-      result.since = args[++i];
+      const value = requireArgValue(args, i, "--since");
+      result.since = validateSince(value, "--since");
+      i++;
     } else if (arg === "--no-preview") {
       result.noPreview = true;
     } else if (arg === "--output-file") {
-      result.outputFile = args[++i];
+      const value = requireArgValue(args, i, "--output-file");
+      result.outputFile = value;
+      i++;
     }
   }
 
   return result;
 }
-
-export type PickerMethod = "tmux" | "vsc" | "auto";
 
 export interface PickArgs {
   allProjects: boolean;
@@ -72,16 +147,21 @@ export function parseListArgs(args: string[]): ListArgs {
     if (arg === "--all-projects") {
       result.allProjects = true;
     } else if (arg === "--project") {
-      result.project = args[++i];
+      const value = requireArgValue(args, i, "--project");
+      result.project = value;
+      i++;
     } else if (arg === "--output") {
-      const val = args[++i] as OutputFormat;
-      if (val === "path" || val === "id" || val === "json") {
-        result.output = val;
-      }
+      const value = requireArgValue(args, i, "--output");
+      result.output = validateEnum(value, VALID_OUTPUT_FORMATS, "--output");
+      i++;
     } else if (arg === "--since") {
-      result.since = args[++i];
+      const value = requireArgValue(args, i, "--since");
+      result.since = validateSince(value, "--since");
+      i++;
     } else if (arg === "--limit" || arg === "-n") {
-      result.limit = parseInt(args[++i] || "10", 10);
+      const value = requireArgValue(args, i, arg);
+      result.limit = validatePositiveInteger(value, arg);
+      i++;
     }
   }
 
@@ -99,12 +179,13 @@ export function parsePickArgs(args: string[]): PickArgs {
     if (arg === "--all-projects") {
       result.allProjects = true;
     } else if (arg === "--since") {
-      result.since = args[++i];
+      const value = requireArgValue(args, i, "--since");
+      result.since = validateSince(value, "--since");
+      i++;
     } else if (arg === "--method") {
-      const val = args[++i] as PickerMethod;
-      if (val === "tmux" || val === "vsc" || val === "auto") {
-        result.method = val;
-      }
+      const value = requireArgValue(args, i, "--method");
+      result.method = validateEnum(value, VALID_PICKER_METHODS, "--method");
+      i++;
     }
   }
 
