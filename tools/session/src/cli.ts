@@ -211,13 +211,13 @@ async function runFind(args: string[]) {
 
     // Spawn claude --resume, inheriting stdio for interactive use
     // Use "bun run c" which runs claude with --dangerously-skip-permissions
-    const proc = Bun.spawn(["bun", "run", "c", "--resume", sessionId], {
+    const resumeProcess = Bun.spawn(["bun", "run", "c", "--resume", sessionId], {
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
     });
-    await proc.exited;
-    process.exit(proc.exitCode ?? 0);
+    await resumeProcess.exited;
+    process.exit(resumeProcess.exitCode ?? 0);
   }
 
   // Check for RETRO: action marker
@@ -226,13 +226,13 @@ async function runFind(args: string[]) {
 
     // Spawn push-session script, inheriting stdio
     const retroScript = new URL("../../retro/src/push-session.ts", import.meta.url).pathname;
-    const proc = Bun.spawn(["bun", retroScript, path], {
+    const retroProcess = Bun.spawn(["bun", retroScript, path], {
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
     });
-    await proc.exited;
-    process.exit(proc.exitCode ?? 0);
+    await retroProcess.exited;
+    process.exit(retroProcess.exitCode ?? 0);
   }
 
   // Check for EXPORT: action marker

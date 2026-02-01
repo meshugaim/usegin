@@ -253,23 +253,23 @@ export async function openSessionPicker(
     const popupCmd = buildTmuxPopupCommand(outputFile, { allProjects, since });
 
     // Run the popup (this returns immediately, popup runs in background)
-    const proc = Bun.spawn(["sh", "-c", popupCmd], {
+    const popupProcess = Bun.spawn(["sh", "-c", popupCmd], {
       stdout: "inherit",
       stderr: "inherit",
     });
 
-    await proc.exited;
+    await popupProcess.exited;
   } else {
     // vsc method - create terminal with session finder
     const vscCmd = buildVscCommand(outputFile, { allProjects, since });
 
     // Run vsc command to create terminal
-    const proc = Bun.spawn(["sh", "-c", vscCmd], {
+    const vscProcess = Bun.spawn(["sh", "-c", vscCmd], {
       stdout: "inherit",
       stderr: "inherit",
     });
 
-    await proc.exited;
+    await vscProcess.exited;
   }
 
   // Poll for result file
