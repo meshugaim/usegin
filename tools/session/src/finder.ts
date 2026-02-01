@@ -782,6 +782,23 @@ export function isLiveSession(mtime: Date): boolean {
   return ageMs <= LIVE_THRESHOLD_MS;
 }
 
+export interface ConflictingFlagsOptions {
+  project?: string;
+  allProjects?: boolean;
+}
+
+/**
+ * Check for conflicting command line flags and return a warning message if found.
+ *
+ * @returns Warning message string, or null if no conflict
+ */
+export function warnIfConflictingFlags(options: ConflictingFlagsOptions): string | null {
+  if (options.project && options.allProjects) {
+    return "Ignoring --project because --all-projects specified";
+  }
+  return null;
+}
+
 /**
  * Check if we're running inside tmux
  */

@@ -28,6 +28,7 @@ import {
   openSessionPicker,
   resolveSessionPath,
   runFzfMultiLine,
+  warnIfConflictingFlags,
   writeOutputFile,
 } from "./finder";
 import { NoSessionsFoundError, FzfNotFoundError } from "./errors";
@@ -138,6 +139,15 @@ async function runFind(args: string[]) {
   }
 
   const findArgs = parseFindArgs(args);
+
+  // Warn if conflicting flags are specified
+  const conflictWarning = warnIfConflictingFlags({
+    project: findArgs.project,
+    allProjects: findArgs.allProjects,
+  });
+  if (conflictWarning) {
+    console.error(`Warning: ${conflictWarning}`);
+  }
 
   // Project resolution: --all-projects > --project > current project
   const currentProject = getCurrentProjectHash();
@@ -286,6 +296,15 @@ async function runPick(args: string[]) {
 
 async function runList(args: string[]) {
   const listArgs = parseListArgs(args);
+
+  // Warn if conflicting flags are specified
+  const conflictWarning = warnIfConflictingFlags({
+    project: listArgs.project,
+    allProjects: listArgs.allProjects,
+  });
+  if (conflictWarning) {
+    console.error(`Warning: ${conflictWarning}`);
+  }
 
   const currentProject = getCurrentProjectHash();
   const projectFilter = listArgs.allProjects
