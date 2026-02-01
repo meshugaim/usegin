@@ -14,6 +14,189 @@ export type EntryType =
   | "saved_hook_context" // Saved hook context
   | "summary"; // Session summary line
 
+/**
+ * Array of known entry types for schema drift detection.
+ * Keep this in sync with the EntryType union above.
+ */
+export const KNOWN_ENTRY_TYPES: string[] = [
+  "system",
+  "user",
+  "assistant",
+  "result",
+  "file-history-snapshot",
+  "queue-operation",
+  "progress",
+  "saved_hook_context",
+  "summary",
+];
+
+/**
+ * Known fields for each entry type, used for schema drift detection.
+ * This helps identify when new fields are added to existing types.
+ *
+ * Note: This list is intentionally comprehensive to reduce noise from
+ * the schema drift detector. Add new fields here as they're discovered.
+ */
+export const KNOWN_FIELDS_BY_TYPE: Record<string, string[]> = {
+  system: [
+    "type",
+    "subtype",
+    "uuid",
+    "parentUuid",
+    "session_id",
+    "sessionId",
+    "agentId",
+    "timestamp",
+    "parent_tool_use_id",
+    "cwd",
+    "tools",
+    "model",
+    // Metadata fields
+    "isSidechain",
+    "userType",
+    "version",
+    "gitBranch",
+    "slug",
+    // Hook-related fields
+    "hookCount",
+    "hookInfos",
+    "hookErrors",
+    "preventedContinuation",
+    // Status fields
+    "stopReason",
+    "hasOutput",
+    "level",
+    "toolUseID",
+    "durationMs",
+    "isMeta",
+    "cause",
+    "error",
+    "retryInMs",
+    "retryAttempt",
+    "maxRetries",
+  ],
+  user: [
+    "type",
+    "uuid",
+    "parentUuid",
+    "session_id",
+    "sessionId",
+    "agentId",
+    "timestamp",
+    "parent_tool_use_id",
+    "message",
+    // Metadata fields
+    "isSidechain",
+    "userType",
+    "cwd",
+    "version",
+    "gitBranch",
+    "slug",
+    // Tool-related fields
+    "toolUseResult",
+    "sourceToolAssistantUUID",
+    "sourceToolUseID",
+    // Other fields
+    "thinkingMetadata",
+    "todos",
+    "permissionMode",
+    "isMeta",
+  ],
+  assistant: [
+    "type",
+    "uuid",
+    "parentUuid",
+    "session_id",
+    "sessionId",
+    "agentId",
+    "timestamp",
+    "parent_tool_use_id",
+    "message",
+    // Metadata fields
+    "isSidechain",
+    "userType",
+    "cwd",
+    "version",
+    "gitBranch",
+    "slug",
+    "requestId",
+    // Error fields
+    "isApiErrorMessage",
+    "error",
+  ],
+  result: [
+    "type",
+    "subtype",
+    "uuid",
+    "parentUuid",
+    "session_id",
+    "sessionId",
+    "agentId",
+    "timestamp",
+    "parent_tool_use_id",
+    "result",
+    "duration_ms",
+    "total_cost_usd",
+  ],
+  "file-history-snapshot": [
+    "type",
+    "messageId",
+    "snapshot",
+    "isSnapshotUpdate",
+  ],
+  "queue-operation": [
+    "type",
+    "operation",
+    "timestamp",
+    "sessionId",
+    "content",
+  ],
+  progress: [
+    "type",
+    "uuid",
+    "parentUuid",
+    "timestamp",
+    "sessionId",
+    "agentId",
+    "message",
+    "data",
+    // Metadata fields
+    "isSidechain",
+    "userType",
+    "cwd",
+    "version",
+    "gitBranch",
+    "slug",
+    // Tool-related fields
+    "parentToolUseID",
+    "toolUseID",
+  ],
+  saved_hook_context: [
+    "type",
+    "uuid",
+    "parentUuid",
+    "timestamp",
+    "sessionId",
+    "hookContext",
+    "hookName",
+    "hookEvent",
+    "content",
+    "toolUseID",
+    // Metadata fields
+    "cwd",
+    "userType",
+    "version",
+    "isSidechain",
+    "gitBranch",
+  ],
+  summary: [
+    "type",
+    "summary",
+    "timestamp",
+    "leafUuid",
+  ],
+};
+
 export interface BaseEntry {
   type: EntryType;
   uuid?: string;
