@@ -19,6 +19,7 @@ import type {
   RewindInfo,
   CommitInfo,
 } from "./types";
+import { debugLog } from "./debug";
 
 export interface ParseOptions {
   includeSubagents?: boolean;
@@ -51,15 +52,6 @@ export async function withTimeout<T>(
       }, timeoutSeconds * 1000);
     }),
   ]);
-}
-
-/**
- * Log debug message to stderr
- */
-function debugLog(enabled: boolean, message: string, startTime?: number): void {
-  if (!enabled) return;
-  const timing = startTime !== undefined ? ` (${Date.now() - startTime}ms)` : "";
-  console.error(`[session] ${message}${timing}`);
 }
 
 /**
