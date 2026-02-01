@@ -43,7 +43,24 @@ interface CliArgs {
   listFiles: boolean;
   stream: boolean;
   format: OutputFormat;
+  debug: boolean;
   help: boolean;
+}
+
+/**
+ * Check if debug mode is enabled via --debug flag or DEBUG=session env var
+ */
+function isDebugEnabled(args: CliArgs): boolean {
+  return args.debug || process.env.DEBUG === "session";
+}
+
+/**
+ * Log debug message to stderr (preserves stdout for actual output)
+ */
+function debugLog(enabled: boolean, message: string, startTime?: number): void {
+  if (!enabled) return;
+  const timing = startTime !== undefined ? ` (${Date.now() - startTime}ms)` : "";
+  console.error(`[session] ${message}${timing}`);
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -57,6 +74,7 @@ function parseArgs(args: string[]): CliArgs {
     listFiles: false,
     stream: false,
     format: "narrative",
+    debug: false,
     help: false,
   };
 
@@ -85,6 +103,8 @@ function parseArgs(args: string[]): CliArgs {
       if (val === "narrative" || val === "terminal" || val === "markdown") {
         result.format = val;
       }
+    } else if (arg === "--debug") {
+      result.debug = true;
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";
     }
@@ -140,6 +160,7 @@ OPTIONS:
   --subagents        Include subagent transcripts (appended at end)
   --include-warmups  Include warmup subagents (excluded by default)
   --list-files       List all related files (main + subagents), one per line
+  --debug            Show timing and progress info (also: DEBUG=session env var)
   --help, -h         Show this help
 
 REWIND DETECTION:
@@ -396,6 +417,9 @@ async function main() {
       return;
     }
 
+    const debug = isDebugEnabled(args);
+    const totalStart = Date.now();
+
     // Resolve session ID to path if needed
     const filePath = await resolveSessionPath(args.file);
 
@@ -408,11 +432,23 @@ async function main() {
       return;
     }
 
+    // Parse session with debug timing
+    let stepStart = Date.now();
+    debugLog(debug, "Parsing session...");
     const session = await parseSession(filePath, {
       includeSubagents: args.subagents,
       includeWarmups: args.includeWarmups,
+      debug,
     });
+    debugLog(debug, `Parsed ${session.turns.length} turns`, stepStart);
 
+    if (args.subagents && session.subagents.length > 0) {
+      debugLog(debug, `Found ${session.subagents.length} subagent(s)`);
+    }
+
+    // Format output with debug timing
+    stepStart = Date.now();
+    debugLog(debug, `Formatting as ${args.format}...`);
     const options: Partial<FormatOptions> = {
       toolInput: args.toolInput,
       toolOutput: args.toolOutput,
@@ -433,6 +469,8 @@ async function main() {
         output = formatNarrative(session, options);
         break;
     }
+    debugLog(debug, "Formatting complete", stepStart);
+    debugLog(debug, "Total parse time", totalStart);
     console.log(output);
   } catch (error) {
     if (error instanceof Error) {

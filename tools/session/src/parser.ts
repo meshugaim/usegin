@@ -23,6 +23,16 @@ import type {
 export interface ParseOptions {
   includeSubagents?: boolean;
   includeWarmups?: boolean; // Default: false (exclude warmup subagents)
+  debug?: boolean; // Log timing info to stderr
+}
+
+/**
+ * Log debug message to stderr
+ */
+function debugLog(enabled: boolean, message: string, startTime?: number): void {
+  if (!enabled) return;
+  const timing = startTime !== undefined ? ` (${Date.now() - startTime}ms)` : "";
+  console.error(`[session] ${message}${timing}`);
 }
 
 /**
@@ -96,9 +106,17 @@ export async function parseSession(
   jsonlPath: string,
   options: ParseOptions = {}
 ): Promise<ParsedSession> {
+  const debug = options.debug ?? false;
+
+  let stepStart = Date.now();
+  debugLog(debug, "Reading file...");
   const file = Bun.file(jsonlPath);
   const content = await file.text();
+  debugLog(debug, `Read ${content.length} bytes`, stepStart);
+
+  stepStart = Date.now();
   const lines = content.split("\n").filter((line) => line.trim());
+  debugLog(debug, `Parsing ${lines.length} entries...`);
 
   const entries: Entry[] = [];
   for (const line of lines) {
@@ -109,16 +127,28 @@ export async function parseSession(
       // Skip malformed lines
     }
   }
+  debugLog(debug, `Parsed ${entries.length} valid entries`, stepStart);
 
+  stepStart = Date.now();
+  debugLog(debug, "Processing turns...");
   const session = parseEntries(entries);
+  debugLog(debug, `Processed ${session.turns.length} turns`, stepStart);
+
+  stepStart = Date.now();
+  debugLog(debug, "Detecting rewinds...");
+  // Rewinds are detected in parseEntries, just report the count
+  debugLog(debug, `Found ${session.rewinds.length} rewind(s)`, stepStart);
 
   // Discover and parse subagents if requested
   if (options.includeSubagents && session.sessionId) {
+    stepStart = Date.now();
+    debugLog(debug, "Discovering subagents...");
     session.subagents = await discoverSubagents(
       jsonlPath,
       session.sessionId,
       options.includeWarmups ?? false
     );
+    debugLog(debug, `Found ${session.subagents.length} subagent(s)`, stepStart);
   }
 
   return session;

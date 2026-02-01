@@ -1314,3 +1314,53 @@ describe("commit detection in parseEntries", () => {
     expect(result.commits).toEqual([]);
   });
 });
+
+describe("parseSession with debug option", () => {
+  const DEBUG_TEST_DIR = "/tmp/session-parser-debug-test";
+  const DEBUG_SESSION_ID = "debug-test-session";
+
+  beforeAll(async () => {
+    await mkdir(DEBUG_TEST_DIR, { recursive: true });
+
+    const mainSession = [
+      JSON.stringify({
+        type: "system",
+        subtype: "init",
+        uuid: "sys1",
+        session_id: DEBUG_SESSION_ID,
+        cwd: "/test",
+        tools: ["Read"],
+        model: "claude",
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        session_id: DEBUG_SESSION_ID,
+        message: { role: "user", content: "Hello" },
+      }),
+    ].join("\n");
+
+    await writeFile(join(DEBUG_TEST_DIR, `${DEBUG_SESSION_ID}.jsonl`), mainSession);
+  });
+
+  afterAll(async () => {
+    await rm(DEBUG_TEST_DIR, { recursive: true, force: true });
+  });
+
+  test("accepts debug option without error", async () => {
+    const session = await parseSession(join(DEBUG_TEST_DIR, `${DEBUG_SESSION_ID}.jsonl`), {
+      debug: true,
+    });
+
+    expect(session.sessionId).toBe(DEBUG_SESSION_ID);
+    expect(session.turns).toHaveLength(1);
+  });
+
+  test("works normally with debug disabled", async () => {
+    const session = await parseSession(join(DEBUG_TEST_DIR, `${DEBUG_SESSION_ID}.jsonl`), {
+      debug: false,
+    });
+
+    expect(session.sessionId).toBe(DEBUG_SESSION_ID);
+  });
+});
