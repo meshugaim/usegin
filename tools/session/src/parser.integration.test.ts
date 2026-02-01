@@ -2,10 +2,11 @@ import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { parseSession } from "./parser";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { asSessionId } from "./types";
 
 describe("parseSession with debug option", () => {
   const DEBUG_TEST_DIR = "/tmp/session-parser-debug-test";
-  const DEBUG_SESSION_ID = "debug-test-session";
+  const DEBUG_SESSION_ID = asSessionId("debug-test-session");
 
   beforeAll(async () => {
     await mkdir(DEBUG_TEST_DIR, { recursive: true });
@@ -88,7 +89,7 @@ describe("parseSession malformed JSONL handling", () => {
 
     const session = await parseSession(join(MALFORMED_TEST_DIR, "invalid-json.jsonl"));
 
-    expect(session.sessionId).toBe("malformed-test");
+    expect(session.sessionId).toBe(asSessionId("malformed-test"));
     expect(session.turns).toHaveLength(1);
     expect(session.turns[0]?.text).toBe("Hello");
   });
@@ -121,7 +122,7 @@ describe("parseSession malformed JSONL handling", () => {
 
     const session = await parseSession(join(MALFORMED_TEST_DIR, "unknown-type.jsonl"));
 
-    expect(session.sessionId).toBe("unknown-type-test");
+    expect(session.sessionId).toBe(asSessionId("unknown-type-test"));
     expect(session.turns).toHaveLength(1);
     expect(session.turns[0]?.text).toBe("Valid message");
   });
@@ -154,7 +155,7 @@ describe("parseSession malformed JSONL handling", () => {
 
     const session = await parseSession(join(MALFORMED_TEST_DIR, "missing-type.jsonl"));
 
-    expect(session.sessionId).toBe("missing-type-test");
+    expect(session.sessionId).toBe(asSessionId("missing-type-test"));
     expect(session.turns).toHaveLength(1);
     expect(session.turns[0]?.text).toBe("Has type field");
   });
@@ -170,7 +171,7 @@ describe("parseSession malformed JSONL handling", () => {
 
     const session = await parseSession(join(MALFORMED_TEST_DIR, "all-invalid.jsonl"));
 
-    expect(session.sessionId).toBe("");
+    expect(session.sessionId).toBe(asSessionId(""));
     expect(session.turns).toHaveLength(0);
   });
 
@@ -179,7 +180,7 @@ describe("parseSession malformed JSONL handling", () => {
 
     const session = await parseSession(join(MALFORMED_TEST_DIR, "empty.jsonl"));
 
-    expect(session.sessionId).toBe("");
+    expect(session.sessionId).toBe(asSessionId(""));
     expect(session.turns).toHaveLength(0);
   });
 });

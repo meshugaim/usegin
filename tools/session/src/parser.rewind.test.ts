@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { parseEntries } from "./parser";
-import type { Entry } from "./types";
+import { asSessionId, asEntryUuid, type Entry } from "./types";
 
 describe("rewind detection", () => {
   test("detects linear conversation with no rewinds", () => {
@@ -94,8 +94,8 @@ describe("rewind detection", () => {
     // Should detect one rewind
     expect(result.rewinds).toHaveLength(1);
     expect(result.rewinds[0]).toEqual({
-      fromUuid: "a1",
-      abandonedBranchUuids: ["u2", "a2"],
+      fromUuid: asEntryUuid("a1"),
+      abandonedBranchUuids: [asEntryUuid("u2"), asEntryUuid("a2")],
     });
 
     // Abandoned branch messages should be marked
@@ -281,6 +281,6 @@ describe("rewind detection", () => {
     // Basic sanity check - we parsed the turns
     expect(result.turns).toHaveLength(4);
     // The parser should handle the cycle gracefully
-    expect(result.sessionId).toBe("s1");
+    expect(result.sessionId).toBe(asSessionId("s1"));
   });
 });

@@ -150,7 +150,7 @@ describe("ToolInputMap", () => {
       };
 
       expect(todoInput.todos).toHaveLength(2);
-      expect(todoInput.todos[0].content).toBe("First task");
+      expect(todoInput.todos[0]?.content).toBe("First task");
     });
   });
 
@@ -309,7 +309,7 @@ describe("getToolCallInput", () => {
     const input = getToolCallInput("TodoWrite", toolCall);
     if (input) {
       expect(input.todos).toHaveLength(1);
-      expect(input.todos[0].content).toBe("Test");
+      expect(input.todos[0]?.content).toBe("Test");
     }
   });
 });
@@ -359,12 +359,12 @@ describe("backward compatibility", () => {
 
     // Old pattern: casting
     const todos = toolCall.input.todos as Array<{ content: string }>;
-    expect(todos[0].content).toBe("Test");
+    expect(todos[0]?.content).toBe("Test");
 
     // New pattern: type guard
     const input = getToolCallInput("TodoWrite", toolCall);
     if (input) {
-      expect(input.todos[0].content).toBe("Test");
+      expect(input.todos[0]?.content).toBe("Test");
     }
   });
 });

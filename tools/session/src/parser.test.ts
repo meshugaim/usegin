@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { parseEntries } from "./parser";
-import type { Entry } from "./types";
+import { asSessionId, type Entry } from "./types";
 
 describe("parseEntries", () => {
   test("parses system init entry", () => {
@@ -18,7 +18,7 @@ describe("parseEntries", () => {
 
     const result = parseEntries(entries);
 
-    expect(result.sessionId).toBe("session-1");
+    expect(result.sessionId).toBe(asSessionId("session-1"));
     expect(result.cwd).toBe("/workspaces/test");
     expect(result.model).toBe("claude-sonnet");
     expect(result.tools).toEqual(["Read", "Write"]);
@@ -156,7 +156,7 @@ describe("parseEntries", () => {
 
     const result = parseEntries(entries);
 
-    expect(result.sessionId).toBe("session-from-entry");
+    expect(result.sessionId).toBe(asSessionId("session-from-entry"));
   });
 
   test("initializes empty subagents array", () => {

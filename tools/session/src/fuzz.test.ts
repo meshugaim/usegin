@@ -12,7 +12,7 @@
 import { test, expect, describe } from "bun:test";
 import * as fc from "fast-check";
 import { parseEntries } from "./parser";
-import type { Entry, UserEntry, AssistantEntry, SystemEntry } from "./types";
+import { asSessionId, type Entry, type UserEntry, type AssistantEntry, type SystemEntry } from "./types";
 
 // =============================================================================
 // PROPERTY 1: TERMINATION
@@ -272,7 +272,7 @@ describe("parseEntries robustness properties", () => {
         uuid: "u2",
         session_id: "s1",
       },
-    ] as Entry[];
+    ] as unknown as Entry[];
 
     const result = parseEntries(entries);
     expect(result).toBeDefined();
@@ -374,7 +374,7 @@ describe("parseEntries robustness properties", () => {
     const result = parseEntries([]);
     expect(result).toBeDefined();
     expect(result.turns).toEqual([]);
-    expect(result.sessionId).toBe("");
+    expect(result.sessionId).toBe(asSessionId(""));
     expect(result.subagents).toEqual([]);
   });
 
@@ -555,7 +555,7 @@ describe("parseEntries correctness invariants", () => {
     ];
 
     const result = parseEntries(entries);
-    expect(result.sessionId).toBe("test-session-123");
+    expect(result.sessionId).toBe(asSessionId("test-session-123"));
   });
 
   test("invariant: sessionId extracted from sessionId field (alternate format)", () => {
@@ -569,7 +569,7 @@ describe("parseEntries correctness invariants", () => {
     ];
 
     const result = parseEntries(entries);
-    expect(result.sessionId).toBe("alt-session-456");
+    expect(result.sessionId).toBe(asSessionId("alt-session-456"));
   });
 
   // Property-based test: turns count never exceeds entry count

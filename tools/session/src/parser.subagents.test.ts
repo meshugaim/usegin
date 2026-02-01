@@ -3,10 +3,11 @@ import { parseSession, listRelatedFiles, isWarmupSubagent } from "./parser";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { makeSubagent, userTurn, assistantTurn, toolCall, toolResult } from "./testing";
+import { asSessionId, asAgentId } from "./types";
 
 // Test fixtures for file-based tests
 const TEST_DIR = "/tmp/session-parser-test";
-const SESSION_ID = "test-session-12345678";
+const SESSION_ID = asSessionId("test-session-12345678");
 
 describe("parseSession with subagents", () => {
   beforeAll(async () => {
@@ -97,7 +98,7 @@ describe("parseSession with subagents", () => {
 
     expect(session.sessionId).toBe(SESSION_ID);
     expect(session.subagents).toHaveLength(1);
-    expect(session.subagents[0]?.agentId).toBe("agent-abc123");
+    expect(session.subagents[0]?.agentId).toBe(asAgentId("agent-abc123"));
     expect(session.subagents[0]?.turns).toHaveLength(2);
     expect(session.subagents[0]?.startTimestamp).toBe("2025-01-01T10:00:00.000Z");
   });
@@ -109,7 +110,7 @@ describe("parseSession with subagents", () => {
 
     // Should only have agent-abc123, not agent-other
     expect(session.subagents).toHaveLength(1);
-    expect(session.subagents[0]?.agentId).toBe("agent-abc123");
+    expect(session.subagents[0]?.agentId).toBe(asAgentId("agent-abc123"));
   });
 });
 
@@ -316,7 +317,7 @@ describe("parseSession warmup filtering", () => {
     });
 
     expect(session.subagents).toHaveLength(1);
-    expect(session.subagents[0]?.agentId).toBe("agent-real");
+    expect(session.subagents[0]?.agentId).toBe(asAgentId("agent-real"));
   });
 
   test("includes warmup subagents when includeWarmups is true", async () => {
@@ -327,7 +328,7 @@ describe("parseSession warmup filtering", () => {
 
     expect(session.subagents).toHaveLength(2);
     const agentIds = session.subagents.map((s) => s.agentId);
-    expect(agentIds).toContain("agent-warmup");
-    expect(agentIds).toContain("agent-real");
+    expect(agentIds).toContain(asAgentId("agent-warmup"));
+    expect(agentIds).toContain(asAgentId("agent-real"));
   });
 });
