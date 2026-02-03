@@ -353,24 +353,65 @@ async function parseSubagentFile(
  * A rewind occurs when a turn's parentUuid points to a message that already
  * has a different child in the recorded sequence.
  */
-function detectRewinds(turns: Turn[]): RewindInfo[] {
+function detectRewinds(
+  turns: Turn[],
+  allEntryParents: Map<string, string | null>
+): RewindInfo[] {
   if (turns.length === 0) return [];
 
   // Check if we have parentUuid data - if not, assume linear (legacy format)
   const hasParentData = turns.some((turn) => turn.parentUuid !== undefined);
   if (!hasParentData) return [];
 
+  // Build a set of turn uuids for quick lookup
+  const turnUuids = new Set<string>(
+    turns.map((t) => t.uuid).filter((uuid): uuid is EntryUuid => Boolean(uuid))
+  );
+
+  /**
+   * Find the logical turn parent for a given turn.
+   * Walks up through intermediate non-turn entries (progress, hooks, etc.)
+   * until it finds a turn or reaches the root.
+   */
+  function findLogicalTurnParent(turn: Turn): EntryUuid | null {
+    const visited = new Set<string>();
+    let currentUuid: string | null = turn.parentUuid ?? null;
+
+    while (currentUuid !== null) {
+      // Cycle detection
+      if (visited.has(currentUuid)) {
+        break;
+      }
+      visited.add(currentUuid);
+
+      // If this is a turn, we found the logical parent
+      if (turnUuids.has(currentUuid)) {
+        return asEntryUuid(currentUuid);
+      }
+
+      // Walk to the parent of this non-turn entry
+      const parentOfCurrent = allEntryParents.get(currentUuid);
+      if (parentOfCurrent === undefined) {
+        // Not in our map, stop
+        break;
+      }
+      currentUuid = parentOfCurrent;
+    }
+
+    return null;
+  }
+
   const rewinds: RewindInfo[] = [];
 
-  // Build a map of uuid -> children (in order of appearance)
+  // Build a map of logical turn parent -> children (in order of appearance)
   const childrenMap = new Map<EntryUuid | null, EntryUuid[]>();
 
   for (const turn of turns) {
-    const parentKey = turn.parentUuid ?? null;
-    if (!childrenMap.has(parentKey)) {
-      childrenMap.set(parentKey, []);
+    const logicalParent = findLogicalTurnParent(turn);
+    if (!childrenMap.has(logicalParent)) {
+      childrenMap.set(logicalParent, []);
     }
-    childrenMap.get(parentKey)!.push(turn.uuid);
+    childrenMap.get(logicalParent)!.push(turn.uuid);
   }
 
   // Find rewind points: nodes with multiple children
@@ -584,7 +625,7 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   }
 
   // Detect rewinds and mark current branch
-  const rewinds = detectRewinds(turns);
+  const rewinds = detectRewinds(turns, allEntryParents);
   const currentBranch = findCurrentBranch(turns, allEntryParents);
 
   // Update isOnCurrentBranch for each turn
