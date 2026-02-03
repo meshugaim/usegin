@@ -350,8 +350,14 @@ async function parseSubagentFile(
 
 /**
  * Detect rewinds by analyzing the parent-child relationships in turns.
+ *
  * A rewind occurs when a turn's parentUuid points to a message that already
- * has a different child in the recorded sequence.
+ * has a different child in the recorded sequence. This creates a branching
+ * tree structure where earlier branches are abandoned in favor of newer ones.
+ *
+ * @param turns - All turns parsed from the session
+ * @param allEntryParents - Map of every entry's uuid to its parentUuid (includes non-turn entries)
+ * @returns Array of RewindInfo describing each branch point and abandoned turns
  */
 function detectRewinds(
   turns: Turn[],
@@ -369,16 +375,25 @@ function detectRewinds(
   );
 
   /**
-   * Find the logical turn parent for a given turn.
-   * Walks up through intermediate non-turn entries (progress, hooks, etc.)
-   * until it finds a turn or reaches the root.
+   * Find the nearest turn ancestor for a given turn.
+   *
+   * The session JSONL may have intermediate non-turn entries (progress, hooks,
+   * saved_hook_context) between turns in the parent chain. This function walks
+   * up through those intermediates to find the actual turn that logically
+   * precedes the given turn.
+   *
+   * Example: If turn U2 has parentUuid pointing to a progress entry P1,
+   * and P1 has parentUuid pointing to assistant turn A1, this returns A1.
+   *
+   * @param turn - The turn to find the ancestor for
+   * @returns The uuid of the nearest turn ancestor, or null if none found
    */
-  function findLogicalTurnParent(turn: Turn): EntryUuid | null {
+  function findNearestTurnAncestor(turn: Turn): EntryUuid | null {
     const visited = new Set<string>();
     let currentUuid: string | null = turn.parentUuid ?? null;
 
     while (currentUuid !== null) {
-      // Cycle detection
+      // Cycle detection - parent chains can form cycles in edge cases
       if (visited.has(currentUuid)) {
         break;
       }
@@ -403,29 +418,30 @@ function detectRewinds(
 
   const rewinds: RewindInfo[] = [];
 
-  // Build a map of logical turn parent -> children (in order of appearance)
-  const childrenMap = new Map<EntryUuid | null, EntryUuid[]>();
+  // Build a map of turn ancestor -> descendant turns (in order of appearance)
+  // This groups turns by their logical parent, ignoring intermediate non-turn entries
+  const childrenByAncestor = new Map<EntryUuid | null, EntryUuid[]>();
 
   for (const turn of turns) {
-    const logicalParent = findLogicalTurnParent(turn);
-    if (!childrenMap.has(logicalParent)) {
-      childrenMap.set(logicalParent, []);
+    const ancestor = findNearestTurnAncestor(turn);
+    if (!childrenByAncestor.has(ancestor)) {
+      childrenByAncestor.set(ancestor, []);
     }
-    childrenMap.get(logicalParent)!.push(turn.uuid);
+    childrenByAncestor.get(ancestor)!.push(turn.uuid);
   }
 
-  // Find rewind points: nodes with multiple children
-  for (const [parentUuid, children] of childrenMap) {
-    if (children.length > 1 && parentUuid !== null) {
-      // Multiple children from same parent = rewinds happened
+  // Find rewind points: ancestors with multiple children indicate a branch
+  for (const [ancestorUuid, children] of childrenByAncestor) {
+    if (children.length > 1 && ancestorUuid !== null) {
+      // Multiple children from same ancestor = rewinds happened
       // The last child is on the current branch, others are abandoned
       const abandonedChildren = children.slice(0, -1);
 
       for (const abandonedChild of abandonedChildren) {
         // Collect all descendants of this abandoned child
-        const abandonedBranch = collectDescendants(abandonedChild, childrenMap);
+        const abandonedBranch = collectDescendants(abandonedChild, childrenByAncestor);
         rewinds.push({
-          fromUuid: parentUuid,
+          fromUuid: ancestorUuid,
           abandonedBranchUuids: abandonedBranch,
         });
       }
@@ -436,12 +452,19 @@ function detectRewinds(
 }
 
 /**
- * Collect all descendants of a given uuid (including the uuid itself)
- * Uses visited set to prevent infinite recursion on cyclic graphs
+ * Collect all descendants of a given uuid in the turn tree (including the uuid itself).
+ *
+ * Used to identify all turns on an abandoned branch when detecting rewinds.
+ * Includes cycle detection to handle malformed parent chains gracefully.
+ *
+ * @param uuid - The root uuid to collect descendants from
+ * @param childrenByAncestor - Map of ancestor uuid to child turn uuids
+ * @param visited - Set of already-visited uuids (for cycle detection)
+ * @returns Array of all descendant uuids including the root
  */
 function collectDescendants(
   uuid: EntryUuid,
-  childrenMap: Map<EntryUuid | null, EntryUuid[]>,
+  childrenByAncestor: Map<EntryUuid | null, EntryUuid[]>,
   visited: Set<EntryUuid> = new Set()
 ): EntryUuid[] {
   // Cycle detection: if we've already visited this uuid, stop recursing
@@ -451,18 +474,28 @@ function collectDescendants(
   visited.add(uuid);
 
   const result: EntryUuid[] = [uuid];
-  const children = childrenMap.get(uuid) ?? [];
+  const children = childrenByAncestor.get(uuid) ?? [];
 
   for (const child of children) {
-    result.push(...collectDescendants(child, childrenMap, visited));
+    result.push(...collectDescendants(child, childrenByAncestor, visited));
   }
 
   return result;
 }
 
 /**
- * Determine the current branch by walking from the last turn back to root.
- * Returns a set of uuids that are on the current branch.
+ * Determine the current branch by walking from the last turn back to the root.
+ *
+ * The "current branch" is the path from the most recent turn back through its
+ * ancestors to the root. Turns not on this path were part of abandoned branches
+ * (created when the user rewound and continued from an earlier point).
+ *
+ * Like `findNearestTurnAncestor`, this function walks through intermediate
+ * non-turn entries (progress, hooks, etc.) to trace the logical ancestry.
+ *
+ * @param turns - All turns parsed from the session
+ * @param allEntryParents - Map of every entry's uuid to its parentUuid
+ * @returns Set of turn uuids that are on the current (non-abandoned) branch
  */
 function findCurrentBranch(
   turns: Turn[],
@@ -476,32 +509,33 @@ function findCurrentBranch(
     return new Set(turns.map((turn) => turn.uuid).filter(Boolean));
   }
 
-  // Build uuid -> turn map
-  const turnMap = new Map<EntryUuid, Turn>();
+  // Build uuid -> turn lookup for quick "is this a turn?" checks
+  const turnsByUuid = new Map<EntryUuid, Turn>();
   for (const turn of turns) {
     if (turn.uuid) {
-      turnMap.set(turn.uuid, turn);
+      turnsByUuid.set(turn.uuid, turn);
     }
   }
 
   // Start from the last turn and walk back via parentUuid
-  // Use allEntryParents to jump through system entries
+  // Use allEntryParents to traverse through non-turn entries
   const currentBranch = new Set<EntryUuid>();
   const visited = new Set<string>(); // Track visited to detect cycles
   let currentUuid: string | null = turns[turns.length - 1]?.uuid ?? null;
 
   while (currentUuid) {
-    // Detect cycles - break if we've visited this UUID before
+    // Cycle detection - parent chains can form cycles in edge cases
     if (visited.has(currentUuid)) {
       break;
     }
     visited.add(currentUuid);
 
-    // If this is a turn, add it to current branch
-    if (turnMap.has(asEntryUuid(currentUuid))) {
+    // If this is a turn, add it to the current branch
+    if (turnsByUuid.has(asEntryUuid(currentUuid))) {
       currentBranch.add(asEntryUuid(currentUuid));
     }
-    // Walk to parent (could be a turn or system entry)
+
+    // Walk to parent (could be a turn or intermediate non-turn entry)
     const parentUuid = allEntryParents.get(currentUuid);
     if (parentUuid) {
       currentUuid = parentUuid;
@@ -540,7 +574,17 @@ export function extractCommitsFromToolResult(content: string): CommitInfo[] {
 }
 
 /**
- * Parse entries into a structured session
+ * Parse an array of JSONL entries into a structured session.
+ *
+ * This is the core parsing function that:
+ * 1. Extracts session metadata (id, cwd, model, tools)
+ * 2. Converts user/assistant entries into Turn objects
+ * 3. Extracts skills invoked via the Skill tool
+ * 4. Extracts git commits from tool results
+ * 5. Detects rewinds (branch points) and marks which turns are on the current branch
+ *
+ * @param entries - Array of validated Entry objects from the JSONL file
+ * @returns ParsedSession containing all extracted data
  */
 export function parseEntries(entries: Entry[]): ParsedSession {
   let rawSessionId = "";
@@ -640,7 +684,13 @@ export function parseEntries(entries: Entry[]): ParsedSession {
 }
 
 /**
- * Parse a user or assistant entry into a Turn
+ * Parse a user or assistant entry into a Turn.
+ *
+ * Extracts text content, tool calls (from assistant messages), and tool results
+ * (from user messages that contain tool responses).
+ *
+ * @param entry - A user or assistant entry from the JSONL
+ * @returns Turn object, or null if the entry has no message content
  */
 function parseTurn(
   entry: Entry & { type: "user" | "assistant" }
