@@ -43,7 +43,7 @@ Linear issues are the shared state. Sub-agents read from and write to Linear.
 
 **Reviewer agent:** After implementation, spawn a reviewer. Focus: *"Would future Claude find this delightful?"*
 
-**Retros:** After meaningful phases complete (use judgment), spawn session-retro agent. Don't forget.
+**Retros:** After meaningful phases complete (use judgment), spawn session-retro agent. See [retro-tips.md](retro-tips.md) for session ID handling and CLI usage.
 
 **Parallel agents:** When multiple agents might work in same codebase, be aware. Check git status. Consider worktrees for isolation.
 
