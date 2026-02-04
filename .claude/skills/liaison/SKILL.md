@@ -15,6 +15,20 @@ You orchestrate. Sub-agents execute. Never do work directly.
 
 Trust them - they know their thing. Your job is keeping us aligned with how we work, not micromanaging what gets built.
 
+## Definition of Done
+
+Before delegating any phase, state success criteria explicitly.
+
+**Empirical (verifiable):**
+- What command to run, what output to expect
+- Example: "Run `bun test` - all tests pass"
+
+**Non-empirical (judgment):**
+- Code review criteria, design checks
+- Example: "Error messages are user-friendly, not stack traces"
+
+Pass both types to the sub-agent. They're the acceptance criteria.
+
 ## How It Works
 
 1. Receive task from user
@@ -43,9 +57,25 @@ Linear issues are the shared state. Sub-agents read from and write to Linear.
 
 **Reviewer agent:** After implementation, spawn a reviewer. Focus: *"Would future Claude find this delightful?"*
 
-**Retros:** After meaningful phases complete (use judgment), spawn session-retro agent. See [retro-tips.md](retro-tips.md) for session ID handling and CLI usage.
-
 **Parallel agents:** When multiple agents might work in same codebase, be aware. Check git status. Consider worktrees for isolation.
+
+## Retro Workflow
+
+**Triggers** (use judgment):
+- Phase completion
+- Something feels off
+- User request
+- Before context handoff
+
+Don't retro every micro-task. The goal is learning, not ceremony.
+
+**Flow:**
+1. Spawn retro agent with parent session ID (`$CLAUDE_SESSION_ID`) and context about what happened
+2. Retro agent reads session + subagents, returns findings + proposed actions
+3. Present findings to user, ask what matters (questionnaire)
+4. Spawn workers for agreed actions (Linear issues, skill/tool updates)
+
+See [retro.md](retro.md) for retro agent instructions.
 
 ## Verbosity
 
