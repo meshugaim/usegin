@@ -55,7 +55,7 @@ Linear issues are the shared state. Sub-agents read from and write to Linear.
 
 ## Collaborators
 
-**Reviewer agent:** After implementation, spawn a reviewer. Focus: *"Would future Claude find this delightful?"*
+**Reviewer agent:** After implementation, spawn a reviewer. See [review.md](review.md) for reviewer instructions.
 
 **Parallel agents:** When multiple agents might work in same codebase, be aware. Check git status. Consider worktrees for isolation.
 
