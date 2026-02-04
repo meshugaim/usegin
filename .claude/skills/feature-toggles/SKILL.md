@@ -101,8 +101,23 @@ if "my_feature" in request.feature_flags:
 SSR-friendly flags available on both server and client. No hydration mismatch.
 
 ### Files
-- `nextjs-app/lib/feature-flags-cookie.ts` - Cookie utilities
+- `nextjs-app/lib/feature-flags-cookie.ts` - Cookie utilities (read/write/toggle)
 - `nextjs-app/lib/feature-flags-server.ts` - Server-side readers
+- `nextjs-app/app/toggles/toggles-client.tsx` - **UI registration** (`BROWSER_FLAGS` array)
+
+### Adding a New Cookie Toggle
+
+Three steps — all required:
+
+1. **Plumbing** — Add cookie constant + helper functions to `feature-flags-cookie.ts` and `feature-flags-server.ts`
+2. **UI** — Register in `toggles-client.tsx`:
+   - Add entry to `BROWSER_FLAGS` array (label + description)
+   - Add branch to `handleBrowserToggle`
+   - Add reset call to `handleClearBrowserFlags`
+   - Add state variable + wire to `initialXxx` prop from server
+3. **Consumer** — Use the server-side reader where the feature is gated
+
+⚠️ **The UI is not auto-discovered.** If you skip step 2, the toggle will work but users can only set it via browser devtools.
 
 ### Usage
 
