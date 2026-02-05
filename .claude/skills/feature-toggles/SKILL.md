@@ -5,14 +5,13 @@ description: Guide for implementing feature toggles. Triggered by "add feature t
 
 # Feature Toggles
 
-Three types of feature toggles for different use cases.
+Two types of feature toggles for different use cases.
 
 ## Toggle Types
 
 | Type | Storage | Scope | SSR | Use Case |
 |------|---------|-------|-----|----------|
-| **localStorage** | Browser `feature_flags` key | Per-browser, client-only | No | API request flags, user opt-in |
-| **Cookie** | Individual cookies | Per-browser | Yes | UI toggles (avoids hydration flash) |
+| **Browser Flags** | Individual cookies | Per-browser | Yes | UI toggles (avoids hydration flash) |
 | **Database** | `feature_toggles` table | System-wide | Yes | Instant rollback, admin-controlled |
 
 ## ⚠️ CRITICAL: Hydration Safety
@@ -57,101 +56,110 @@ const script = `
 
 | Scenario | Type |
 |----------|------|
-| User opts into experimental feature | localStorage |
-| UI change that needs SSR (no flash) | Cookie |
+| UI change that needs SSR (no flash) | Browser Flag |
+| Feature passed to Python backend | Browser Flag (with `backendFlag`) |
 | System-wide rollout controlled by admins | Database |
-| Middleware/server-side gating | Database or Cookie |
-| Feature passed to Python backend | localStorage (via request) |
+| Middleware/server-side gating | Database or Browser Flag |
 
-## 1. localStorage Toggles
+## 1. Browser Flags
 
-Per-user flags stored in browser, passed to backend in API requests.
+SSR-friendly flags stored in cookies, available on both server and client. No hydration mismatch.
 
-### Files
-- `nextjs-app/lib/feature-flags.ts` - Client utilities
-- `nextjs-app/app/toggles/toggles-client.tsx` - UI component
+### Single File: The Registry
+
+All browser flags are defined in **one file**: `nextjs-app/lib/browser-flags/registry.ts`
+
+```typescript
+export const BROWSER_FLAGS = {
+  clientPool: {
+    cookie: "effi-clientPool",
+    label: "Client Pool",
+    description: "Enable client pool for conversation management",
+    backendFlag: "clientPool",  // Optional: pass to Python backend
+  },
+  preciseTime: {
+    cookie: "effi-precise-time",
+    label: "Precise Time",
+    description: "Show precise timestamps instead of relative time",
+  },
+  emailIntegration: {
+    cookie: "effi-email-integration",
+    label: "Email Integration",
+    description: "Enable email integration features",
+  },
+} as const satisfies Record<string, BrowserFlagConfig>;
+```
+
+### Adding a New Browser Flag
+
+**One step** - add an entry to `BROWSER_FLAGS` in the registry:
+
+```typescript
+// In nextjs-app/lib/browser-flags/registry.ts
+export const BROWSER_FLAGS = {
+  // ... existing flags ...
+  myNewFlag: {
+    cookie: "effi-my-new-flag",
+    label: "My New Flag",
+    description: "What this flag does",
+    backendFlag: "myNewFlag",  // Optional: if backend needs it
+  },
+} as const satisfies Record<string, BrowserFlagConfig>;
+```
+
+That's it! The flag is automatically:
+- Available in the `/toggles` UI
+- Testable via `globalThis.__mockBrowserFlags.myNewFlag`
+- Usable via the generic or named functions
 
 ### Usage
 
 ```typescript
-// nextjs-app/lib/feature-flags.ts
-import { getEnabledFlags, toggleFeature, isFeatureEnabled } from "@/lib/feature-flags"
+// Client-side - generic API
+import { isFlagEnabled, toggleFlag } from "@/lib/browser-flags";
 
-// Check if enabled
-if (isFeatureEnabled("my_feature")) { ... }
+if (isFlagEnabled("preciseTime")) { ... }
+toggleFlag("preciseTime", true);
 
-// Get all enabled flags (for API requests)
-const flags = getEnabledFlags()  // string[]
+// Client-side - named wrappers (for common flags)
+import { isPreciseTimeEnabled, togglePreciseTime } from "@/lib/browser-flags";
 
-// Toggle on/off
-toggleFeature("my_feature", true)
-toggleFeature("my_feature", false)
+if (isPreciseTimeEnabled()) { ... }
+togglePreciseTime(true);
+
+// Server-side (Server Components, Server Actions)
+import { isFlagEnabledServer, getAllFlagsServer } from "@/lib/browser-flags";
+
+const isEnabled = await isFlagEnabledServer("emailIntegration");
+const allFlags = await getAllFlagsServer();
+
+// Server-side - named wrappers
+import { isEmailIntegrationEnabledServer } from "@/lib/browser-flags";
+
+if (await isEmailIntegrationEnabledServer()) { ... }
 ```
 
-### Backend Check
+### Backend Flags
 
-```python
-# Flags passed in request body
-if "my_feature" in request.feature_flags:
-    # New behavior
-```
-
-## 2. Cookie Toggles
-
-SSR-friendly flags available on both server and client. No hydration mismatch.
-
-### Files
-- `nextjs-app/lib/feature-flags-cookie.ts` - Cookie utilities (read/write/toggle)
-- `nextjs-app/lib/feature-flags-server.ts` - Server-side readers
-- `nextjs-app/app/toggles/toggles-client.tsx` - **UI registration** (`BROWSER_FLAGS` array)
-
-### Adding a New Cookie Toggle
-
-Three steps — all required:
-
-1. **Plumbing** — Add cookie constant + helper functions to `feature-flags-cookie.ts` and `feature-flags-server.ts`
-2. **UI** — Register in `toggles-client.tsx`:
-   - Add entry to `BROWSER_FLAGS` array (label + description)
-   - Add branch to `handleBrowserToggle`
-   - Add reset call to `handleClearBrowserFlags`
-   - Add state variable + wire to `initialXxx` prop from server
-3. **Consumer** — Use the server-side reader where the feature is gated
-
-⚠️ **The UI is not auto-discovered.** If you skip step 2, the toggle will work but users can only set it via browser devtools.
-
-### Usage
+Flags with `backendFlag` configured are automatically passed to the Python backend:
 
 ```typescript
-// Client-side
-import { getFeatureFlagFromCookie, setFeatureFlagCookie } from "@/lib/feature-flags-cookie"
+import { getBackendFlags } from "@/lib/browser-flags";
 
-setFeatureFlagCookie("my-flag", true)
-const enabled = getFeatureFlagFromCookie("my-flag")
-
-// Server-side (Server Components, middleware)
-import { cookies } from "next/headers"
-
-const cookieStore = await cookies()
-const enabled = cookieStore.get("my-flag")?.value === "true"
+const flags = getBackendFlags();  // ["clientPool"] if clientPool is enabled
+// These are sent in the request body to Python services
 ```
 
-### Example: newUI Toggle
+### Module Structure
 
-```typescript
-// newUI toggle (effi-new-ui cookie)
-import { isNewUIEnabled, toggleNewUI } from "@/lib/feature-flags-cookie"
-import { isNewUIEnabledServer } from "@/lib/feature-flags-server"
+- `nextjs-app/lib/browser-flags/registry.ts` - Flag definitions (single source of truth)
+- `nextjs-app/lib/browser-flags/client.ts` - Client-side functions
+- `nextjs-app/lib/browser-flags/server.ts` - Server-side functions
+- `nextjs-app/lib/browser-flags/index.ts` - Re-exports everything
 
-// Client-side
-const newUI = isNewUIEnabled();
-toggleNewUI(true);
+Import from `@/lib/browser-flags` for the cleanest API.
 
-// Server-side
-const newUI = await isNewUIEnabledServer();
-className={newUI ? "newui-style" : "old-style"}
-```
-
-## 3. Database Toggles
+## 2. Database Toggles
 
 System-wide toggles stored in `feature_toggles` table. Admin-controlled via `/toggles` page.
 
@@ -225,7 +233,22 @@ async def process_message(msg):
 | Easy rollback required | Refactoring (same behavior) |
 | A/B testing | Database migration (use migration strategy) |
 
+## Testing
+
+Browser flags are automatically mocked in unit tests via `tests/setup.ts`:
+
+```typescript
+// In your test file, override specific flags:
+beforeEach(() => {
+  globalThis.__mockBrowserFlags.emailIntegration = true;
+});
+
+// All flags default to false
+// No need to add per-flag mock setup when adding new flags
+```
+
 ## Related
 
 - `/toggles` page for toggle management
+- Current browser flags: `clientPool`, `preciseTime`, `emailIntegration`
 - Current DB toggles: `terms_acceptance_required`
