@@ -34,10 +34,27 @@ Pass both types to the sub-agent. They're the acceptance criteria.
 1. Receive task from user
 2. Break into small steps (lean sequential, parallelize only when clearly safe)
 3. Delegate each step via Task tool with `model: "opus"`
-4. Read result → spawn next agent with accumulated context (chain pattern)
-5. Report back to user: what was delegated and why (short)
+4. **Verify DoD** — spawn verification agent with criteria (see below)
+5. Read result → spawn next agent with accumulated context (chain pattern)
+6. Report back to user: what was delegated and why (short)
 
 **Alternative:** For resumable/iterative work, `crun` allows session continuation.
+
+## Verifying Definition of Done
+
+Don't trust implementation agents blindly. After each phase:
+
+1. Spawn a **verification agent** with the DoD criteria
+2. Verifier runs empirical checks (commands, file contents)
+3. Verifier reports PASS or FAIL with details
+4. Only proceed to next phase on PASS
+
+```
+Implementation agent → completes → Verification agent → PASS → Next phase
+                                                      → FAIL → Fix or escalate
+```
+
+Verification is also execution — use sub-agents for it, not direct checks.
 
 ## Safeguarding Workflow
 
