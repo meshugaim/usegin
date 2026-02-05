@@ -32,6 +32,8 @@ Toggles and flags mean the same thing. Two storage options:
 | **Browser flags** | Per-user | Cookies (`nextjs-app/lib/browser-flags/`) |
 | **DB toggles** | System-wide | `feature_toggles` table |
 
+**Prefer browser flags.** They're simpler, don't require migrations, and let developers test features individually before global rollout. Use DB toggles only when you need system-wide control independent of user sessions.
+
 Browser flags can be passed to Python backend via REST headers using `backendFlag` configuration.
 
 ## Adding a Toggle
