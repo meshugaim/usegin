@@ -461,10 +461,24 @@ export interface ToolUseContent {
   input: Record<string, unknown>;
 }
 
+/**
+ * Content block type used in Task tool results.
+ * Task tool returns an array of these instead of a plain string.
+ */
+export interface ToolResultContentBlock {
+  type: "text";
+  text: string;
+}
+
 export interface ToolResultContent {
   type: "tool_result";
   tool_use_id: string;
-  content: string;
+  /**
+   * Content can be:
+   * - A plain string (most tools)
+   * - An array of content blocks (Task tool returns [{type: "text", text: "..."}])
+   */
+  content: string | ToolResultContentBlock[];
   is_error?: boolean;
 }
 
@@ -610,6 +624,43 @@ export function getToolCallInput<T extends KnownToolName>(
     return toolCall.input as ToolInputMap[T];
   }
   return undefined;
+}
+
+/**
+ * Normalize tool result content to a string.
+ *
+ * Tool results can be either:
+ * - A plain string (most tools like Read, Bash, Grep)
+ * - An array of content blocks (Task tool: [{type: "text", text: "..."}])
+ *
+ * This function extracts the text content and returns a single string.
+ *
+ * @param content - The raw content from ToolResultContent
+ * @returns A plain string representation of the content
+ */
+export function normalizeToolResultContent(
+  content: string | ToolResultContentBlock[] | unknown
+): string {
+  // Already a string - return as-is
+  if (typeof content === "string") {
+    return content;
+  }
+
+  // Array of content blocks (Task tool format)
+  if (Array.isArray(content)) {
+    return content
+      .map((block) => {
+        if (typeof block === "object" && block !== null && "text" in block) {
+          return String((block as ToolResultContentBlock).text);
+        }
+        // Fallback for unknown array items
+        return JSON.stringify(block);
+      })
+      .join("\n");
+  }
+
+  // Fallback for any other type - serialize to JSON
+  return JSON.stringify(content);
 }
 
 export interface ToolResult {

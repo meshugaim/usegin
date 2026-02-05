@@ -32,6 +32,7 @@ import {
   getToolInput,
   getToolCallInput,
   asToolUseId,
+  normalizeToolResultContent,
 } from "./types";
 
 describe("ToolInputMap", () => {
@@ -311,6 +312,53 @@ describe("getToolCallInput", () => {
       expect(input.todos).toHaveLength(1);
       expect(input.todos[0]?.content).toBe("Test");
     }
+  });
+});
+
+describe("normalizeToolResultContent", () => {
+  it("returns string content unchanged", () => {
+    expect(normalizeToolResultContent("hello world")).toBe("hello world");
+    expect(normalizeToolResultContent("")).toBe("");
+  });
+
+  it("extracts text from Task tool array format", () => {
+    const content = [
+      { type: "text", text: "First paragraph." },
+      { type: "text", text: "Second paragraph." },
+    ];
+    expect(normalizeToolResultContent(content)).toBe(
+      "First paragraph.\nSecond paragraph."
+    );
+  });
+
+  it("handles single-item array", () => {
+    const content = [{ type: "text", text: "Only one block." }];
+    expect(normalizeToolResultContent(content)).toBe("Only one block.");
+  });
+
+  it("handles empty array", () => {
+    expect(normalizeToolResultContent([])).toBe("");
+  });
+
+  it("handles array with non-text items gracefully", () => {
+    const content = [
+      { type: "text", text: "Normal text." },
+      { type: "image", data: "base64..." }, // Unknown type
+    ];
+    // Non-text items are JSON stringified as fallback
+    expect(normalizeToolResultContent(content)).toBe(
+      'Normal text.\n{"type":"image","data":"base64..."}'
+    );
+  });
+
+  it("handles null/undefined by JSON stringifying", () => {
+    expect(normalizeToolResultContent(null)).toBe("null");
+    expect(normalizeToolResultContent(undefined)).toBe(undefined);
+  });
+
+  it("handles plain objects by JSON stringifying", () => {
+    const content = { foo: "bar" };
+    expect(normalizeToolResultContent(content)).toBe('{"foo":"bar"}');
   });
 });
 

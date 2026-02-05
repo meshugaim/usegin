@@ -23,7 +23,7 @@ import type {
   AgentId,
   ToolUseId,
 } from "./types";
-import { asSessionId, asEntryUuid, asAgentId, asToolUseId } from "./types";
+import { asSessionId, asEntryUuid, asAgentId, asToolUseId, normalizeToolResultContent } from "./types";
 import { debugLog } from "./debug";
 import { isEntry, getSessionId, hasAgentId } from "./validation";
 import { ParsingTimeoutError } from "./errors";
@@ -723,7 +723,9 @@ function parseTurn(
           const toolResult = item as ToolResultContent;
           toolResults.push({
             toolUseId: asToolUseId(toolResult.tool_use_id),
-            content: toolResult.content,
+            // Normalize content: Task tool returns array [{type:"text",text:"..."}]
+            // while most tools return plain strings
+            content: normalizeToolResultContent(toolResult.content),
             isError: toolResult.is_error ?? false,
           });
           break;

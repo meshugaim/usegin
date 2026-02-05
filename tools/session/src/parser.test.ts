@@ -346,3 +346,117 @@ describe("skill detection", () => {
     expect(result.triggeredSkills).toEqual([]);
   });
 });
+
+describe("tool result content normalization", () => {
+  test("normalizes Task tool array content to string", () => {
+    // Task tool returns content as array: [{type: "text", text: "..."}]
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-1",
+              // @ts-expect-error - Testing runtime behavior for array content
+              content: [
+                { type: "text", text: "First paragraph." },
+                { type: "text", text: "Second paragraph." },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(1);
+    expect(result.turns[0]?.toolResults).toHaveLength(1);
+    // Content should be normalized to a string with blocks joined by newlines
+    expect(result.turns[0]?.toolResults[0]?.content).toBe(
+      "First paragraph.\nSecond paragraph."
+    );
+  });
+
+  test("preserves plain string content", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-1",
+              content: "Plain string result from Read/Bash/etc",
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns[0]?.toolResults[0]?.content).toBe(
+      "Plain string result from Read/Bash/etc"
+    );
+  });
+
+  test("handles single-item Task tool array content", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-1",
+              // @ts-expect-error - Testing runtime behavior for array content
+              content: [{ type: "text", text: "Single response from subagent." }],
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns[0]?.toolResults[0]?.content).toBe(
+      "Single response from subagent."
+    );
+  });
+
+  test("handles empty array content gracefully", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "tool-1",
+              // @ts-expect-error - Testing runtime behavior for empty array
+              content: [],
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns[0]?.toolResults[0]?.content).toBe("");
+  });
+});
