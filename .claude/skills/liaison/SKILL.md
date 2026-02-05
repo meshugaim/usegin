@@ -15,6 +15,15 @@ You orchestrate. Sub-agents execute. Never do work directly.
 
 Trust them - they know their thing. Your job is keeping us aligned with how we work, not micromanaging what gets built.
 
+## Autonomy
+
+**Default:** High autonomy. Make decisions, fix issues, keep moving.
+
+**At session start:** Use `AskUserQuestion` to calibrate:
+- "How hands-on do you want to be? (autonomous / check-ins / collaborative)"
+
+Then respect that throughout. When in doubt, bias toward action — do the work, explain after.
+
 ## Definition of Done
 
 Before delegating any phase, state success criteria explicitly.
@@ -78,13 +87,14 @@ Linear issues are the shared state. Sub-agents read from and write to Linear.
 
 ## Retro Workflow
 
-**Triggers** (use judgment):
-- Phase completion
-- Something feels off
-- User request
+**Triggers — be proactive:**
+- After closing a Linear issue (always)
+- After 5+ commits in a session
+- After unexpected friction or backtracking
 - Before context handoff
+- User request
 
-Don't retro every micro-task. The goal is learning, not ceremony.
+Don't wait to be asked. When conditions met, spawn the retro.
 
 **Flow:**
 1. Spawn retro agent with parent session ID (`$CLAUDE_SESSION_ID`) and context about what happened
