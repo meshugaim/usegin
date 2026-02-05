@@ -26,26 +26,19 @@ Then respect that throughout. When in doubt, bias toward action — do the work,
 
 ## Definition of Done
 
-Before delegating any phase, state success criteria explicitly.
+Before delegating any phase/slice, list success criteria explicitly. Empirical (verifiable) and Non-empirical (judgment).
 
-**Empirical (verifiable):**
-- What command to run, what output to expect
-- Example: "Run `bun test` - all tests pass"
-
-**Non-empirical (judgment):**
-- Code review criteria, design checks
-- Example: "Error messages are user-friendly, not stack traces"
-
-Pass both types to the sub-agent. They're the acceptance criteria.
+After a phase is "done" - verify (also sub agents, everything sub agents).
 
 ## How It Works
 
 1. Receive task from user
 2. Break into small steps (lean sequential, parallelize only when clearly safe)
-3. Delegate each step via Task tool with `model: "opus"`
+3. Delegate each step via Task tool with `model: "opus"` - mention the Future Claudes mindset, we're building a wonderful code garden for future Claudes
 4. **Verify DoD** — spawn verification agent with criteria (see below)
 5. Read result → spawn next agent with accumulated context (chain pattern)
 6. Report back to user: what was delegated and why (short)
+7. After phase / slice / feature - review / retro.
 
 **Alternative:** For resumable/iterative work, `crun` allows session continuation.
 
@@ -71,19 +64,16 @@ Ensure sub-agents follow project patterns:
 
 - **Linear flow**: `plan list` → `plan start` → work → `plan close`
 - **Small commits**: frequent, focused, mention Linear issue
-- **Push often**: keep main moving, trunk-based
-- **TDD**: for complex work, prompt sub-agent to write test first
-- **Project norms**: whatever's in CLAUDE.md
+- **Push often**: keep main moving, trunk-based, feature toggle
+- **TDD**: Always attempt to TDD
 
 You're safeguarding *how* we work, not *what* gets built. Content decisions belong to sub-agents.
 
-Linear issues are the shared state. Sub-agents read from and write to Linear.
+Linear issues are the shared state. Sub-agents read from and write to Linear - tell them to.
 
 ## Collaborators
 
-**Reviewer agent:** After implementation, spawn a reviewer. See [review.md](review.md) for reviewer instructions.
-
-**Parallel agents:** When multiple agents might work in same codebase, be aware. Check git status. Consider worktrees for isolation.
+**Reviewer agent:** After implementation, spawn a reviewer. Tell it to use [review.md](review.md) for reviewer instructions.
 
 ## Retro Workflow
 
@@ -97,12 +87,12 @@ Linear issues are the shared state. Sub-agents read from and write to Linear.
 Don't wait to be asked. When conditions met, spawn the retro.
 
 **Flow:**
-1. Spawn retro agent with parent session ID (`$CLAUDE_SESSION_ID`) and context about what happened
+1. Spawn retro agent with parent session ID (`$CLAUDE_SESSION_ID` - pass this not as a variable but the value itself to avoid confusion with sub agent session id) and context about what happened
 2. Retro agent reads session + subagents, returns findings + proposed actions
 3. Present findings to user, ask what matters (questionnaire)
 4. Spawn workers for agreed actions (Linear issues, skill/tool updates)
 
-See [retro.md](retro.md) for retro agent instructions.
+Tell the retro agent to use [retro.md](retro.md) for retro agent instructions.
 
 ## Verbosity
 
