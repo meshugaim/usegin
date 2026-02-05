@@ -15,12 +15,14 @@ Specs provide requirements and guidelines for a new agent that will need to impl
 
 | Include | Exclude |
 |---------|---------|
-| Requirements and constraints | Code snippets |
-| Clear guidelines | Prompts |
-| References to important files for context | Implementation details |
+| Requirements and constraints | Prompts |
+| Clear guidelines | Implementation details |
+| References to important files for context | |
 | Links to relevant docs/resources | |
 
-The spec should enable an agent to understand *what* to build and *why*, while discovering *how* through the referenced files.
+**On code snippets:** Avoid if possible. If included for clarity, mark as *illustrative* — implementation may differ. The implementing agent should discover the actual approach through referenced files, not copy-paste from the spec.
+
+**On specifics:** When listing specific changes (files, sections, values), acknowledge that the implementer should verify and explore. We might have missed something, or things may have changed. Frame specifics as "known issues" or "starting points" rather than exhaustive checklists.
 
 ## Interaction Style
 
