@@ -697,6 +697,7 @@ export interface Turn {
   toolResults: ToolResult[];
   uuid: EntryUuid;
   parentUuid?: EntryUuid | null;
+  timestamp?: string;
   isOnCurrentBranch: boolean;
 }
 

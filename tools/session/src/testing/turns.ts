@@ -28,6 +28,8 @@ import { asEntryUuid, asToolUseId } from "../types";
 export interface TurnOptions {
   /** Parent UUID for conversation linking */
   parentUuid?: string | EntryUuid | null;
+  /** ISO timestamp from the entry */
+  timestamp?: string;
   /** Whether this turn is on the current branch (defaults to true) */
   isOnCurrentBranch?: boolean;
   /** Tool calls made by the assistant */
@@ -56,6 +58,7 @@ export function userTurn(
 ): Turn {
   const {
     parentUuid,
+    timestamp,
     isOnCurrentBranch = true,
     toolCalls = [],
     toolResults = [],
@@ -79,6 +82,7 @@ export function userTurn(
     toolResults,
     isOnCurrentBranch,
     ...(brandedParentUuid !== undefined ? { parentUuid: brandedParentUuid } : {}),
+    ...(timestamp !== undefined ? { timestamp } : {}),
   };
 }
 
@@ -104,6 +108,7 @@ export function assistantTurn(
 ): Turn {
   const {
     parentUuid,
+    timestamp,
     isOnCurrentBranch = true,
     toolCalls = [],
     toolResults = [],
@@ -127,6 +132,7 @@ export function assistantTurn(
     toolResults,
     isOnCurrentBranch,
     ...(brandedParentUuid !== undefined ? { parentUuid: brandedParentUuid } : {}),
+    ...(timestamp !== undefined ? { timestamp } : {}),
   };
 }
 

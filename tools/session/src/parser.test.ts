@@ -159,6 +159,66 @@ describe("parseEntries", () => {
     expect(result.sessionId).toBe(asSessionId("session-from-entry"));
   });
 
+  test("propagates timestamp from user entry to turn", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:30:00.000Z",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(1);
+    expect(result.turns[0]?.timestamp).toBe("2025-01-15T10:30:00.000Z");
+  });
+
+  test("propagates timestamp from assistant entry to turn", () => {
+    const entries: Entry[] = [
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:30:05.000Z",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: [{ type: "text", text: "Hi there" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(1);
+    expect(result.turns[0]?.timestamp).toBe("2025-01-15T10:30:05.000Z");
+  });
+
+  test("turn timestamp is undefined when entry has no timestamp", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(1);
+    expect(result.turns[0]?.timestamp).toBeUndefined();
+  });
+
   test("initializes empty subagents array", () => {
     const entries: Entry[] = [];
     const result = parseEntries(entries);

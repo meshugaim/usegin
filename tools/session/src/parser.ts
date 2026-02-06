@@ -803,6 +803,7 @@ function parseTurn(
     toolResults,
     uuid: asEntryUuid(entry.uuid ?? ""),
     parentUuid: entry.parentUuid === null ? null : entry.parentUuid ? asEntryUuid(entry.parentUuid) : undefined,
+    timestamp: entry.timestamp,
     isOnCurrentBranch: true, // Will be updated by detectRewinds
   };
 }
