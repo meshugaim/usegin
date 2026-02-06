@@ -133,5 +133,7 @@ export {
 
 export {
   formatOutput,
+  formatRelativeTime,
+  formatListLine,
   warnIfConflictingFlags,
 } from "./output";

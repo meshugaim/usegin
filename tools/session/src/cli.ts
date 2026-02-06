@@ -27,6 +27,7 @@ import {
   extractSessionMeta,
   formatMultiLineEntry,
   formatOutput,
+  formatListLine,
   getCurrentProjectHash,
   openSessionPicker,
   resolveSessionPath,
@@ -349,8 +350,17 @@ async function runList(args: string[]) {
 
   const limited = sessions.slice(0, listArgs.limit);
 
-  for (const session of limited) {
-    console.log(formatOutput(session, listArgs.output));
+  // For path (default) output, show rich one-line summaries with metadata.
+  // JSON and ID formats remain unchanged for programmatic consumption.
+  if (listArgs.output === "path") {
+    for (const session of limited) {
+      const meta = await extractSessionMeta(session.path);
+      console.log(formatListLine(session, meta));
+    }
+  } else {
+    for (const session of limited) {
+      console.log(formatOutput(session, listArgs.output));
+    }
   }
 }
 

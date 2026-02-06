@@ -52,6 +52,7 @@ export interface SessionSummary {
 export interface SessionMeta {
   messages: string[];
   lineCount: number;
+  turnCount: number; // Number of user+assistant conversation turns
   summary: string | null;
   hasUserMessages: boolean;
 }

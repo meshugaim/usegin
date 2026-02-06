@@ -37,12 +37,18 @@ export async function extractSessionMeta(sessionPath: string): Promise<SessionMe
   const messages: string[] = [];
   let summary: string | null = null;
   let hasUserMessages = false;
+  let turnCount = 0;
 
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line);
       if (!isEntry(parsed)) {
         continue; // Skip invalid entries
+      }
+
+      // Count conversation turns (user and assistant messages)
+      if (parsed.type === "user" || parsed.type === "assistant") {
+        turnCount++;
       }
 
       // Check for summary line
@@ -77,7 +83,7 @@ export async function extractSessionMeta(sessionPath: string): Promise<SessionMe
     }
   }
 
-  return { messages, lineCount: lines.length, summary, hasUserMessages };
+  return { messages, lineCount: lines.length, turnCount, summary, hasUserMessages };
 }
 
 /**
