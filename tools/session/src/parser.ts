@@ -18,6 +18,7 @@ import type {
   ToolResultContent,
   RewindInfo,
   CommitInfo,
+  TokenUsage,
   SessionId,
   EntryUuid,
   AgentId,
@@ -609,8 +610,18 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   const triggeredSkills: string[] = [];
   const commits: CommitInfo[] = [];
   const seenHashes = new Set<string>(); // Dedupe by hash
+  // Map tool_use_id -> tool name, so we can filter which tool results to scan for commits.
+  // Assistant turns (with tool_use blocks) always precede user turns (with tool_result blocks),
+  // so this map is populated before we need to look up a result's originating tool.
+  const toolUseIdToName = new Map<ToolUseId, string>();
   let summary: string | undefined;
   let result: ParsedSession["result"];
+  // Aggregate token usage across all assistant turns
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCacheCreationInputTokens = 0;
+  let totalCacheReadInputTokens = 0;
+  let hasUsageData = false;
 
   // Build a map of all entry uuid -> parentUuid for branch tracking
   // This includes system entries which can be part of the parent chain
@@ -650,8 +661,10 @@ export function parseEntries(entries: Entry[]): ParsedSession {
         const turn = parseTurn(entry);
         if (turn) {
           turns.push(turn);
-          // Extract triggered skills from Skill tool calls
+          // Index tool calls by id so we can match results to their originating tool.
+          // Also extract triggered skills from Skill tool calls.
           for (const toolCall of turn.toolCalls) {
+            toolUseIdToName.set(toolCall.id, toolCall.name);
             if (toolCall.name === "Skill" && toolCall.input.skill) {
               const skillName = toolCall.input.skill as string;
               if (!triggeredSkills.includes(skillName)) {
@@ -659,14 +672,30 @@ export function parseEntries(entries: Entry[]): ParsedSession {
               }
             }
           }
-          // Extract commits from tool results (git commit output)
+          // Extract commits from Bash tool results only.
+          // Git commit output ("[branch hash] message") can appear in any text,
+          // so we limit scanning to Bash results to avoid false positives from
+          // Read, Grep, or other tools that might contain matching patterns.
           for (const toolResult of turn.toolResults) {
+            const toolName = toolUseIdToName.get(toolResult.toolUseId);
+            if (toolName !== "Bash") continue;
             const foundCommits = extractCommitsFromToolResult(toolResult.content);
             for (const commit of foundCommits) {
               if (!seenHashes.has(commit.hash)) {
                 seenHashes.add(commit.hash);
                 commits.push(commit);
               }
+            }
+          }
+          // Aggregate token usage from assistant entries
+          if (entry.type === "assistant") {
+            const usage = entry.message?.usage;
+            if (usage) {
+              hasUsageData = true;
+              totalInputTokens += usage.input_tokens ?? 0;
+              totalOutputTokens += usage.output_tokens ?? 0;
+              totalCacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0;
+              totalCacheReadInputTokens += usage.cache_read_input_tokens ?? 0;
             }
           }
         }
