@@ -1,6 +1,6 @@
 ---
 name: referencing-previous-sessions
-description: This skill allows Claude to reference previous sessions during conversation. Triggered by phrases like "remember that session where", "that conversation about", "what did we do when", or "find the session where". Auto-detects tmux or VS Code for interactive session selection.
+description: Reference, browse, or search previous Claude sessions and past conversations. Triggered by phrases like "look at previous sessions", "browse sessions", "what did we do yesterday", "what did we do last time", "check last session", "find the session where", "previous conversation", "remember that session where", "that conversation about", "what did we do when", "continue from last session", "what approach did we use", "that thing we built last week", "show me past sessions", "search session history". Auto-detects tmux or VS Code for interactive session selection.
 ---
 
 # Referencing Previous Sessions

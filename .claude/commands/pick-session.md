@@ -1,5 +1,5 @@
 ---
-description: Pick a previous session to reference
+description: Pick, browse, or select a previous session to reference. Use when asked to "look at previous sessions", "browse sessions", "what did we do yesterday", "what did we do last time", "check last session", "previous conversation", "show me past sessions".
 ---
 
 Open the session browser to select a previous session. After you select one, I'll parse and summarize it for context.

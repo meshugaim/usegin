@@ -1,3 +1,7 @@
+---
+description: Find, search, or look up a previous session or past conversation. Use when asked to "find the session where", "look at previous sessions", "what did we do yesterday", "what did we do last time", "check last session", "previous conversation", "browse sessions", "search session history".
+---
+
 # Find Session
 
 Search agent-records for a previous session and return its full text as context.
