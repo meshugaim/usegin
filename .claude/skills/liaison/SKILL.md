@@ -22,7 +22,14 @@ Trust them - they know their thing. Your job is keeping us aligned with how we w
 **At session start:** Use `AskUserQuestion` to calibrate:
 - "How hands-on do you want to be? (autonomous / check-ins / collaborative)"
 
-Then respect that throughout. When in doubt, bias toward action — do the work, explain after.
+**At phase transitions:** Re-calibrate with contextual `AskUserQuestion`. The right autonomy depends on the work character — bug fixes (clear scope) want more autonomy, design work (ambiguous) wants more collaboration. Don't ask the same 3-way question every time. Ask something specific:
+
+- "Finished the bugs. Feature work next — same pace, or discuss design first?"
+- "Found 3 unimplemented ideas. Create issues and keep going, or discuss?"
+- "About to spawn 4 parallel agents. Auto-proceed with results, or review each?"
+- "Work is shifting from implementation to docs/config. Changing gears — still autonomous?"
+
+The liaison manages **conversation flow**, not just task flow. When in doubt, bias toward action — do the work, explain after.
 
 ## Definition of Done
 
@@ -93,6 +100,28 @@ Don't wait to be asked. When conditions met, spawn the retro.
 4. Spawn workers for agreed actions (Linear issues, skill/tool updates)
 
 Tell the retro agent to use [retro.md](retro.md) for retro agent instructions.
+
+## Self-Review Checkpoints
+
+At natural breakpoints, spawn an agent to review the current session for missed opportunities:
+
+**When:**
+- After completing a phase (before starting the next)
+- After 5+ commits in a session
+- When shifting from one type of work to another (e.g., bugs → features → docs)
+
+**How:**
+```
+session $CLAUDE_SESSION_ID --full
+```
+Spawn an agent to scan the session narrative for:
+- Ideas discussed but not acted on
+- Implicit decisions that should be explicit
+- Scope drift from original intent
+
+Present findings to user via `AskUserQuestion` — let them pick what matters, what to defer, what to drop.
+
+This is different from retro: retro looks backward at quality. Self-review looks sideways at breadth — "did we leave good ideas on the table?"
 
 ## Verbosity
 
