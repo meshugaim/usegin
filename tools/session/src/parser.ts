@@ -489,6 +489,14 @@ function detectRewinds(
     childrenByAncestor.get(ancestor)!.push(turn.uuid);
   }
 
+  // Build a lookup from uuid to turn role for filtering hook-injected forks
+  const turnByUuid = new Map<string, Turn>();
+  for (const turn of turns) {
+    if (turn.uuid) {
+      turnByUuid.set(turn.uuid, turn);
+    }
+  }
+
   // Find rewind points: ancestors with multiple children indicate a branch
   for (const [ancestorUuid, children] of childrenByAncestor) {
     if (children.length > 1 && ancestorUuid !== null) {
@@ -497,6 +505,16 @@ function detectRewinds(
       const abandonedChildren = children.slice(0, -1);
 
       for (const abandonedChild of abandonedChildren) {
+        // Skip hook-injected assistant forks: when a PreToolUse hook fires,
+        // it injects an assistant entry between the original assistant's tool
+        // dispatch and the user's tool result. This creates a structural fork
+        // that looks like a rewind but isn't. Real rewinds are always initiated
+        // by users, so the abandoned child of a real rewind is always a user turn.
+        const abandonedTurn = turnByUuid.get(abandonedChild);
+        if (abandonedTurn?.role === "assistant") {
+          continue;
+        }
+
         // Collect all descendants of this abandoned child
         const abandonedBranch = collectDescendants(abandonedChild, childrenByAncestor);
         rewinds.push({
@@ -542,69 +560,6 @@ function collectDescendants(
   return result;
 }
 
-/**
- * Determine the current branch by walking from the last turn back to the root.
- *
- * The "current branch" is the path from the most recent turn back through its
- * ancestors to the root. Turns not on this path were part of abandoned branches
- * (created when the user rewound and continued from an earlier point).
- *
- * Like `findNearestTurnAncestor`, this function walks through intermediate
- * non-turn entries (progress, hooks, etc.) to trace the logical ancestry.
- *
- * @param turns - All turns parsed from the session
- * @param allEntryParents - Map of every entry's uuid to its parentUuid
- * @returns Set of turn uuids that are on the current (non-abandoned) branch
- */
-function findCurrentBranch(
-  turns: Turn[],
-  allEntryParents: Map<string, string | null>
-): Set<EntryUuid> {
-  if (turns.length === 0) return new Set();
-
-  // Check if we have parentUuid data - if not, all turns are on current branch
-  const hasParentData = turns.some((turn) => turn.parentUuid !== undefined);
-  if (!hasParentData) {
-    return new Set(turns.map((turn) => turn.uuid).filter(Boolean));
-  }
-
-  // Build uuid -> turn lookup for quick "is this a turn?" checks
-  const turnsByUuid = new Map<EntryUuid, Turn>();
-  for (const turn of turns) {
-    if (turn.uuid) {
-      turnsByUuid.set(turn.uuid, turn);
-    }
-  }
-
-  // Start from the last turn and walk back via parentUuid
-  // Use allEntryParents to traverse through non-turn entries
-  const currentBranch = new Set<EntryUuid>();
-  const visited = new Set<string>(); // Track visited to detect cycles
-  let currentUuid: string | null = turns[turns.length - 1]?.uuid ?? null;
-
-  while (currentUuid) {
-    // Cycle detection - parent chains can form cycles in edge cases
-    if (visited.has(currentUuid)) {
-      break;
-    }
-    visited.add(currentUuid);
-
-    // If this is a turn, add it to the current branch
-    if (turnsByUuid.has(asEntryUuid(currentUuid))) {
-      currentBranch.add(asEntryUuid(currentUuid));
-    }
-
-    // Walk to parent (could be a turn or intermediate non-turn entry)
-    const parentUuid = allEntryParents.get(currentUuid);
-    if (parentUuid) {
-      currentUuid = parentUuid;
-    } else {
-      break;
-    }
-  }
-
-  return currentBranch;
-}
 
 /**
  * Extract commit hashes from git commit output in a tool result
@@ -729,11 +684,21 @@ export function parseEntries(entries: Entry[]): ParsedSession {
 
   // Detect rewinds and mark current branch
   const rewinds = detectRewinds(turns, allEntryParents);
-  const currentBranch = findCurrentBranch(turns, allEntryParents);
+
+  // Build the set of abandoned turn UUIDs from rewind detection.
+  // A turn is on the current branch if it is NOT on any abandoned rewind branch.
+  // This is consistent with detectRewinds: if a fork isn't counted as a rewind
+  // (e.g., hook-injected assistant forks), its turns remain on the current branch.
+  const abandonedUuids = new Set<string>();
+  for (const rewind of rewinds) {
+    for (const uuid of rewind.abandonedBranchUuids) {
+      abandonedUuids.add(uuid);
+    }
+  }
 
   // Update isOnCurrentBranch for each turn
   for (const turn of turns) {
-    turn.isOnCurrentBranch = turn.uuid ? currentBranch.has(turn.uuid) : true;
+    turn.isOnCurrentBranch = turn.uuid ? !abandonedUuids.has(turn.uuid) : true;
   }
 
   // Convert raw sessionId to branded type

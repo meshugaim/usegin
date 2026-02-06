@@ -324,6 +324,153 @@ describe("rewind detection", () => {
     expect(result.rewinds[0]?.abandonedBranchUuids).toContain(asEntryUuid("a2"));
   });
 
+  test("does not flag hook-injected assistant between tool dispatch and result as rewind", () => {
+    // When a hook fires between an assistant's tool dispatch and the tool result
+    // coming back, a progress entry and a hook-injected assistant appear in the
+    // parent chain. This is normal linear flow, not a rewind.
+    //
+    // The entry tree looks like:
+    //
+    //   u0 → a1 (tool_use T1)
+    //           ├─ p1 (progress, hook_progress, parent=a1)
+    //           │    └─ a2 (hook-injected assistant, tool_use T2, parent=p1)
+    //           │         └─ u2 (tool_result for T2, parent=a2)
+    //           └─ u1 (tool_result for T1, parent=a1)
+    //                └─ a3 (next real assistant turn, parent=u1)
+    //
+    // The algorithm resolves nearest turn ancestors:
+    //   - a2's ancestor: p1 (non-turn) → a1 (turn) = a1
+    //   - u1's ancestor: a1 (turn) = a1
+    //
+    // So a1 gets two turn children (a2 and u1), which looks like a rewind
+    // but is actually normal hook-injected flow.
+
+    const entries: Entry[] = [
+      // Initial user message
+      {
+        type: "user",
+        uuid: "u0",
+        parentUuid: null,
+        session_id: "s1",
+        message: { role: "user", content: "Read a file for me" },
+      },
+      // Assistant dispatches a tool call
+      {
+        type: "assistant",
+        uuid: "a1",
+        parentUuid: "u0",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: [
+            { type: "text", text: "Let me read that file" },
+            {
+              type: "tool_use",
+              id: "t1",
+              name: "Read",
+              input: { file_path: "/src/main.ts" },
+            },
+          ],
+        },
+      },
+      // Hook fires, producing a progress entry
+      {
+        type: "progress",
+        uuid: "p1",
+        parentUuid: "a1",
+        sessionId: "s1",
+        data: { type: "hook_progress" },
+        message: { role: "assistant", content: "Hook running..." },
+      } as Entry,
+      // Hook-injected assistant entry (e.g., a pre-tool hook running its own tool)
+      {
+        type: "assistant",
+        uuid: "a2",
+        parentUuid: "p1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: [
+            {
+              type: "tool_use",
+              id: "t2",
+              name: "Bash",
+              input: { command: "echo hook" },
+            },
+          ],
+        },
+      },
+      // Tool result for the hook-injected assistant's tool
+      {
+        type: "user",
+        uuid: "u2",
+        parentUuid: "a2",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "t2",
+              content: "hook",
+              is_error: false,
+            },
+          ],
+        },
+      },
+      // Real tool result for the original assistant's tool (parent is a1, not a2)
+      {
+        type: "user",
+        uuid: "u1",
+        parentUuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "t1",
+              content: "file contents here",
+              is_error: false,
+            },
+          ],
+        },
+      },
+      // Conversation continues normally from the real tool result
+      {
+        type: "assistant",
+        uuid: "a3",
+        parentUuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: "Here is what I found in the file.",
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    // This is NOT a rewind - it's normal hook-injected flow.
+    // The algorithm should recognize that the hook subtree (p1 → a2 → u2)
+    // is not an abandoned branch, just a hook insertion.
+    expect(result.rewinds).toHaveLength(0);
+
+    // All turns on the main conversation path should be on the current branch
+    expect(result.turns.find((t) => t.uuid === "u0")?.isOnCurrentBranch).toBe(true);
+    expect(result.turns.find((t) => t.uuid === "a1")?.isOnCurrentBranch).toBe(true);
+    expect(result.turns.find((t) => t.uuid === "u1")?.isOnCurrentBranch).toBe(true);
+    expect(result.turns.find((t) => t.uuid === "a3")?.isOnCurrentBranch).toBe(true);
+
+    // Hook-injected turns should also be on the current branch (they're part
+    // of normal flow, not an abandoned rewind branch)
+    expect(result.turns.find((t) => t.uuid === "a2")?.isOnCurrentBranch).toBe(true);
+    expect(result.turns.find((t) => t.uuid === "u2")?.isOnCurrentBranch).toBe(true);
+  });
+
   test("handles cycles in parent chain without hanging", () => {
     // This reproduces a bug found in Claude Code 2.1.27+ where new entry types
     // (progress, saved_hook_context) can form cycles in the parent chain.
