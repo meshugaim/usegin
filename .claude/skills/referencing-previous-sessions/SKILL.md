@@ -30,7 +30,7 @@ The picker auto-detects which is available (prefers tmux if both available).
 ### 1. Open session picker (single command!)
 
 ```bash
-bun /workspaces/test-mvp/tools/session/src/cli.ts pick
+session pick
 ```
 
 Options:
@@ -86,7 +86,7 @@ Share the summary with the user and offer to:
 User: "Remember that session where we implemented the auth flow? I want to do something similar."
 
 Claude: I'll open the session browser for you to find that session.
-[Runs: bun /workspaces/test-mvp/tools/session/src/cli.ts pick]
+[Runs: session pick]
 
 Claude: Please select the session in the popup and press Enter.
 
@@ -123,5 +123,5 @@ If neither tmux nor vsc-bridge available (command will error with helpful messag
 Manual alternative:
 ```bash
 # List recent sessions
-bun /workspaces/test-mvp/tools/session/src/cli.ts find --output path
+session list
 ```
