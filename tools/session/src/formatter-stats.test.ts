@@ -1,5 +1,6 @@
 import { test, expect, describe } from "bun:test";
 import { formatStats, formatDuration, formatCost } from "./formatter-stats";
+import { computeStats } from "./stats";
 import {
   makeSession,
   makeSubagent,
@@ -616,5 +617,138 @@ describe("formatStats full session", () => {
     // No hints
     expect(output).not.toContain("(--");
     expect(output).not.toContain("(session");
+  });
+});
+
+// ============================================================================
+// JSON FORMAT OUTPUT (--format json)
+// ============================================================================
+
+/**
+ * The JSON format combines session metadata with computeStats output.
+ * This mirrors the logic in cli.ts for --format json.
+ * We test the shape here to ensure contract stability for agent consumers.
+ */
+function buildJsonOutput(session: ReturnType<typeof makeSession>) {
+  const stats = computeStats(session);
+  return {
+    sessionId: session.sessionId,
+    model: session.model,
+    cwd: session.cwd,
+    summary: session.summary ?? null,
+    ...stats,
+  };
+}
+
+describe("JSON format output shape", () => {
+  test("includes session metadata fields", () => {
+    const session = makeSession({
+      sessionId: asSessionId("abc12345-6789-0000-1111-222233334444"),
+      model: "claude-sonnet-4-20250514",
+      summary: "Implemented the JSON format",
+    });
+
+    const json = buildJsonOutput(session);
+
+    expect(json.sessionId).toBe("abc12345-6789-0000-1111-222233334444");
+    expect(json.model).toBe("claude-sonnet-4-20250514");
+    expect(json.cwd).toBe("/test/workspace");
+    expect(json.summary).toBe("Implemented the JSON format");
+  });
+
+  test("summary is null when not present on session", () => {
+    const session = makeSession();
+    const json = buildJsonOutput(session);
+
+    expect(json.summary).toBeNull();
+  });
+
+  test("includes all stats fields", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!", {
+          toolCalls: [
+            toolCall("t1", "Read", { file_path: "/a" }),
+            toolCall("t2", "Bash", { command: "ls" }),
+          ],
+        }),
+      ],
+      subagents: [
+        makeSubagent("agent-001", [
+          assistantTurn("sa1", "Working on it"),
+        ]),
+      ],
+      commits: [makeCommit("abc1234", "fix: bug")],
+      rewinds: [makeRewind("u1", ["u2"])],
+      result: {
+        success: true,
+        durationMs: 120_000,
+        costUsd: 0.50,
+      },
+    });
+
+    const json = buildJsonOutput(session);
+
+    // Turn counts
+    expect(json.turnCount).toEqual({
+      total: 2,
+      user: 1,
+      assistant: 1,
+    });
+
+    // Tool counts (sorted by frequency desc)
+    expect(json.toolCounts).toEqual({
+      Read: 1,
+      Bash: 1,
+    });
+
+    // Subagent summaries
+    expect(json.subagentSummaries).toHaveLength(1);
+    expect(json.subagentSummaries[0]!.agentId).toBe("agent-001");
+    expect(json.subagentSummaries[0]!.turns).toBe(1);
+    expect(json.subagentSummaries[0]!.toolCalls).toBe(0);
+
+    // Scalar stats
+    expect(json.commitCount).toBe(1);
+    expect(json.rewindCount).toBe(1);
+    expect(json.durationMs).toBe(120_000);
+    expect(json.costUsd).toBe(0.50);
+  });
+
+  test("omits optional fields when not present", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+    });
+
+    const json = buildJsonOutput(session);
+
+    expect(json.durationMs).toBeUndefined();
+    expect(json.costUsd).toBeUndefined();
+  });
+
+  test("round-trips through JSON.stringify/parse cleanly", () => {
+    const session = makeSession({
+      sessionId: asSessionId("roundtrip-test-id"),
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!", {
+          toolCalls: [toolCall("t1", "Read", { file_path: "/file.ts" })],
+        }),
+      ],
+      commits: [makeCommit("abc", "feat: add feature")],
+      result: { success: true, durationMs: 60_000, costUsd: 0.25 },
+    });
+
+    const json = buildJsonOutput(session);
+    const serialized = JSON.stringify(json, null, 2);
+    const parsed = JSON.parse(serialized);
+
+    expect(parsed.sessionId).toBe("roundtrip-test-id");
+    expect(parsed.turnCount.total).toBe(2);
+    expect(parsed.toolCounts.Read).toBe(1);
+    expect(parsed.commitCount).toBe(1);
+    expect(parsed.durationMs).toBe(60_000);
+    expect(parsed.costUsd).toBe(0.25);
   });
 });

@@ -5,10 +5,10 @@
 
 import { validateNonNegativeInteger } from "./cli-args";
 
-export type OutputFormat = "narrative" | "terminal" | "markdown" | "stats";
+export type OutputFormat = "narrative" | "terminal" | "markdown" | "stats" | "json";
 
 // Valid values for --format
-const VALID_FORMATS: readonly OutputFormat[] = ["narrative", "terminal", "markdown", "stats"] as const;
+const VALID_FORMATS: readonly OutputFormat[] = ["narrative", "terminal", "markdown", "stats", "json"] as const;
 
 /**
  * Require that a flag has a value (not missing, not another flag)

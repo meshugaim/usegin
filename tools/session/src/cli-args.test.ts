@@ -302,7 +302,7 @@ describe("parseMainArgs", () => {
 
     it("throws when --format has invalid value", () => {
       expect(() => parseMainArgs(["--format", "html"])).toThrow(
-        'Invalid --format: expected one of [narrative, terminal, markdown, stats], got "html"'
+        'Invalid --format: expected one of [narrative, terminal, markdown, stats, json], got "html"'
       );
     });
 
@@ -311,6 +311,7 @@ describe("parseMainArgs", () => {
       expect(parseMainArgs(["--format", "terminal"]).format).toBe("terminal");
       expect(parseMainArgs(["--format", "markdown"]).format).toBe("markdown");
       expect(parseMainArgs(["--format", "stats"]).format).toBe("stats");
+      expect(parseMainArgs(["--format", "json"]).format).toBe("json");
     });
   });
 

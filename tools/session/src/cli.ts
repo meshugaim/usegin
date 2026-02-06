@@ -19,6 +19,7 @@
 import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./parser";
 import { formatNarrative, formatMarkdown, formatTerminal, formatToolFilter, type FormatOptions } from "./formatter";
 import { formatStats } from "./formatter-stats";
+import { computeStats } from "./stats";
 import {
   checkFzfAvailable,
   claudeProjectsDirExists,
@@ -84,7 +85,7 @@ FIND OPTIONS:
 
 OPTIONS:
   --full             Full narrative output (default: compact stats card)
-  --format <fmt>     Output format: stats (default), narrative, terminal, markdown
+  --format <fmt>     Output format: stats (default), narrative, terminal, markdown, json
                      Overrides --full when specified explicitly
   --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
                      Case-sensitive. Replaces normal output with focused list.
@@ -108,7 +109,6 @@ NOT YET IMPLEMENTED:
   --subagents-inline   Inline subagent content at Task call site
   --timestamps         Show timestamps
   --costs              Show token/cost per turn
-  --json               Output as JSON
 
 EXAMPLES:
   # Quick stats card (default)
@@ -122,6 +122,9 @@ EXAMPLES:
 
   # Terminal format (replicates /export)
   session session.jsonl --format terminal
+
+  # JSON output for programmatic consumption
+  session session.jsonl --format json
 
   # Show only Bash commands
   session session.jsonl --tool Bash
@@ -428,8 +431,8 @@ async function main() {
       return;
     }
 
-    // Stats format needs subagent data for the summaries section
-    const includeSubagents = args.subagents || args.format === "stats";
+    // Stats and JSON formats need subagent data for the summaries section
+    const includeSubagents = args.subagents || args.format === "stats" || args.format === "json";
 
     // Parse session with debug timing and timeout
     let stepStart = Date.now();
@@ -468,6 +471,18 @@ async function main() {
 
     let output: string;
     switch (args.format) {
+      case "json": {
+        const stats = computeStats(session);
+        const jsonOutput = {
+          sessionId: session.sessionId,
+          model: session.model,
+          cwd: session.cwd,
+          summary: session.summary ?? null,
+          ...stats,
+        };
+        output = JSON.stringify(jsonOutput, null, 2);
+        break;
+      }
       case "stats": {
         const showHints = process.stdout.isTTY !== false;
         output = formatStats(session, { showHints });
