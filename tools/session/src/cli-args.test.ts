@@ -251,6 +251,44 @@ describe("parsePickArgs", () => {
 });
 
 describe("parseMainArgs", () => {
+  describe("default format", () => {
+    it("defaults to stats format when no flags provided", () => {
+      expect(parseMainArgs(["session.jsonl"]).format).toBe("stats");
+    });
+
+    it("defaults to stats even with other flags", () => {
+      expect(parseMainArgs(["session.jsonl", "--debug"]).format).toBe("stats");
+    });
+  });
+
+  describe("--full flag", () => {
+    it("sets format to narrative when --full is specified", () => {
+      const result = parseMainArgs(["session.jsonl", "--full"]);
+      expect(result.full).toBe(true);
+      expect(result.format).toBe("narrative");
+    });
+
+    it("defaults full to false", () => {
+      expect(parseMainArgs(["session.jsonl"]).full).toBe(false);
+    });
+
+    it("is overridden by explicit --format", () => {
+      const result = parseMainArgs(["session.jsonl", "--full", "--format", "terminal"]);
+      expect(result.full).toBe(true);
+      expect(result.format).toBe("terminal");
+    });
+
+    it("is overridden by explicit --format regardless of argument order", () => {
+      const result = parseMainArgs(["session.jsonl", "--format", "markdown", "--full"]);
+      expect(result.full).toBe(true);
+      expect(result.format).toBe("markdown");
+    });
+
+    it("--format stats works explicitly", () => {
+      expect(parseMainArgs(["--format", "stats"]).format).toBe("stats");
+    });
+  });
+
   describe("--format validation", () => {
     it("throws when --format is last argument with no value", () => {
       expect(() => parseMainArgs(["--format"])).toThrow("Missing value for --format");
@@ -264,7 +302,7 @@ describe("parseMainArgs", () => {
 
     it("throws when --format has invalid value", () => {
       expect(() => parseMainArgs(["--format", "html"])).toThrow(
-        'Invalid --format: expected one of [narrative, terminal, markdown], got "html"'
+        'Invalid --format: expected one of [narrative, terminal, markdown, stats], got "html"'
       );
     });
 
@@ -272,6 +310,7 @@ describe("parseMainArgs", () => {
       expect(parseMainArgs(["--format", "narrative"]).format).toBe("narrative");
       expect(parseMainArgs(["--format", "terminal"]).format).toBe("terminal");
       expect(parseMainArgs(["--format", "markdown"]).format).toBe("markdown");
+      expect(parseMainArgs(["--format", "stats"]).format).toBe("stats");
     });
   });
 

@@ -5,10 +5,10 @@
 
 import { validateNonNegativeInteger } from "./cli-args";
 
-export type OutputFormat = "narrative" | "terminal" | "markdown";
+export type OutputFormat = "narrative" | "terminal" | "markdown" | "stats";
 
 // Valid values for --format
-const VALID_FORMATS: readonly OutputFormat[] = ["narrative", "terminal", "markdown"] as const;
+const VALID_FORMATS: readonly OutputFormat[] = ["narrative", "terminal", "markdown", "stats"] as const;
 
 /**
  * Require that a flag has a value (not missing, not another flag)
@@ -47,6 +47,7 @@ export interface MainArgs {
   listFiles: boolean;
   stream: boolean;
   format: OutputFormat;
+  full: boolean;
   debug: boolean;
   timeout: number;
   help: boolean;
@@ -62,11 +63,15 @@ export function parseMainArgs(args: string[]): MainArgs {
     includeWarmups: false,
     listFiles: false,
     stream: false,
-    format: "narrative",
+    format: "stats",
+    full: false,
     debug: false,
     timeout: 30,
     help: false,
   };
+
+  // Track whether --format was explicitly provided (takes precedence over --full)
+  let formatExplicit = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -92,7 +97,10 @@ export function parseMainArgs(args: string[]): MainArgs {
     } else if (arg === "--format") {
       const value = requireArgValue(args, i, "--format");
       result.format = validateEnum(value, VALID_FORMATS, "--format");
+      formatExplicit = true;
       i++;
+    } else if (arg === "--full") {
+      result.full = true;
     } else if (arg === "--debug") {
       result.debug = true;
     } else if (arg === "--timeout") {
@@ -102,6 +110,11 @@ export function parseMainArgs(args: string[]): MainArgs {
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";
     }
+  }
+
+  // --full sets format to narrative, unless --format was explicitly provided
+  if (result.full && !formatExplicit) {
+    result.format = "narrative";
   }
 
   return result;

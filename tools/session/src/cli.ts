@@ -18,6 +18,7 @@
 
 import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./parser";
 import { formatNarrative, formatMarkdown, formatTerminal, type FormatOptions } from "./formatter";
+import { formatStats } from "./formatter-stats";
 import {
   checkFzfAvailable,
   claudeProjectsDirExists,
@@ -82,8 +83,9 @@ FIND OPTIONS:
   --output-file <path>  Write selection to JSON file (for tmux integration)
 
 OPTIONS:
-  --format <fmt>     Output format: narrative (default), terminal, markdown
-                     terminal format replicates /export output
+  --full             Full narrative output (default: compact stats card)
+  --format <fmt>     Output format: stats (default), narrative, terminal, markdown
+                     Overrides --full when specified explicitly
   --stream           Stream mode: read from stdin, output in real-time
   --tool-input       Include tool call inputs
   --tool-output      Include tool results
@@ -107,11 +109,14 @@ NOT YET IMPLEMENTED:
   --json               Output as JSON
 
 EXAMPLES:
-  # Basic narrative output
+  # Quick stats card (default)
   session session.jsonl
 
   # Use short session ID prefix
   session 502de9c7
+
+  # Full narrative output
+  session session.jsonl --full
 
   # Terminal format (replicates /export)
   session session.jsonl --format terminal
@@ -120,7 +125,7 @@ EXAMPLES:
   session session.jsonl --tool-input
 
   # Full verbosity with subagents
-  session session.jsonl --tool-input --tool-output --subagents
+  session session.jsonl --full --tool-input --tool-output --subagents
 
   # Custom truncation
   session session.jsonl --tool-output --truncate 1000
@@ -418,12 +423,15 @@ async function main() {
       return;
     }
 
+    // Stats format needs subagent data for the summaries section
+    const includeSubagents = args.subagents || args.format === "stats";
+
     // Parse session with debug timing and timeout
     let stepStart = Date.now();
     debugLog(debug, "Parsing session...");
     const session = await withTimeout(
       parseSession(filePath, {
-        includeSubagents: args.subagents,
+        includeSubagents,
         includeWarmups: args.includeWarmups,
         debug,
       }),
@@ -431,7 +439,7 @@ async function main() {
     );
     debugLog(debug, `Parsed ${session.turns.length} turns`, stepStart);
 
-    if (args.subagents && session.subagents.length > 0) {
+    if (includeSubagents && session.subagents.length > 0) {
       debugLog(debug, `Found ${session.subagents.length} subagent(s)`);
     }
 
@@ -447,6 +455,11 @@ async function main() {
 
     let output: string;
     switch (args.format) {
+      case "stats": {
+        const showHints = process.stdout.isTTY !== false;
+        output = formatStats(session, { showHints });
+        break;
+      }
       case "terminal":
         output = formatTerminal(session, options);
         break;
