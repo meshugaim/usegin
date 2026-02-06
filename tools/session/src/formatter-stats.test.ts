@@ -5,6 +5,7 @@ import {
   makeSession,
   makeSubagent,
   makeCommit,
+  makeGitCommit,
   makeRewind,
   userTurn,
   assistantTurn,
@@ -452,6 +453,55 @@ describe("formatStats empty section omission", () => {
     expect(output).toContain("1 commit");
     // Should NOT say "1 commits"
     expect(output).not.toContain("1 commits");
+  });
+
+  test("shows diffstat summary when gitCommits available", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      gitCommits: [
+        makeGitCommit("abc1234", "fix: login bug", { insertions: 42, deletions: 7 }),
+        makeGitCommit("def5678", "feat: add search", { insertions: 100, deletions: 30 }),
+        makeGitCommit("ghi9012", "chore: deps", { insertions: 0, deletions: 0 }),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Git");
+    expect(output).toContain("3 commits (+142/-37 lines)");
+  });
+
+  test("shows plain commit count when gitCommits have no diffstats", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      gitCommits: [
+        makeGitCommit("abc1234", "merge commit"),
+        makeGitCommit("def5678", "another merge"),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Git");
+    expect(output).toContain("2 commits");
+    // No diffstat suffix when all zeros
+    expect(output).not.toContain("lines");
+  });
+
+  test("falls back to simple count when only regex commits available", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      commits: [
+        makeCommit("abc1234", "fix: login bug"),
+        makeCommit("def5678", "feat: add search"),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Git");
+    expect(output).toContain("2 commits");
+    expect(output).not.toContain("lines");
   });
 });
 

@@ -123,4 +123,5 @@ export {
   makeSubagent,
   makeRewind,
   makeCommit,
+  makeGitCommit,
 } from "./sessions";

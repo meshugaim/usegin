@@ -20,6 +20,7 @@ import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./
 import { formatNarrative, formatMarkdown, formatTerminal, formatToolFilter, type FormatOptions } from "./formatter";
 import { formatStats } from "./formatter-stats";
 import { computeStats } from "./stats";
+import { getCommitsFromGitHistory } from "./git-commits";
 import {
   checkFzfAvailable,
   claudeProjectsDirExists,
@@ -462,6 +463,29 @@ async function main() {
 
     if (includeSubagents && session.subagents.length > 0) {
       debugLog(debug, `Found ${session.subagents.length} subagent(s)`);
+    }
+
+    // Enrich session with git history commits when timestamps and cwd are available
+    if (session.startTimestamp && session.endTimestamp && session.cwd) {
+      stepStart = Date.now();
+      debugLog(debug, "Querying git history for commits...");
+      try {
+        const gitCommits = await getCommitsFromGitHistory({
+          cwd: session.cwd,
+          startTime: session.startTimestamp,
+          endTime: session.endTimestamp,
+        });
+        if (gitCommits.length > 0) {
+          session.gitCommits = gitCommits;
+          debugLog(debug, `Found ${gitCommits.length} git commit(s)`, stepStart);
+        } else {
+          debugLog(debug, "No git commits in session time window", stepStart);
+        }
+      } catch {
+        // Graceful degradation: git history is best-effort enrichment.
+        // Fall back to regex-extracted commits if this fails.
+        debugLog(debug, "Git history query failed, using regex commits", stepStart);
+      }
     }
 
     // --tool filter: standalone output mode that replaces normal formatting

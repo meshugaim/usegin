@@ -5,6 +5,7 @@ import {
   makeSubagent,
   makeRewind,
   makeCommit,
+  makeGitCommit,
   userTurn,
   assistantTurn,
   toolCall,
@@ -408,6 +409,74 @@ describe("formatNarrative with commits", () => {
 
     expect(output).toContain("abc1234  Update seed data");
     expect(output).not.toContain(fullHash);
+  });
+
+  test("shows richer git-history commits when gitCommits available", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      gitCommits: [
+        makeGitCommit("abc1234", "fix: login bug", {
+          insertions: 42,
+          deletions: 7,
+        }),
+        makeGitCommit("def5678", "feat: add search", {
+          insertions: 100,
+          deletions: 30,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).toContain("─── Commits ");
+    expect(output).toContain("abc1234  fix: login bug  (+42/-7)");
+    expect(output).toContain("def5678  feat: add search  (+100/-30)");
+  });
+
+  test("prefers gitCommits over regex commits when both present", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      commits: [makeCommit("old1234", "old regex commit")],
+      gitCommits: [
+        makeGitCommit("new1234", "new git commit", {
+          insertions: 10,
+          deletions: 5,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).toContain("new1234  new git commit  (+10/-5)");
+    expect(output).not.toContain("old1234");
+  });
+
+  test("falls back to regex commits when gitCommits is empty", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      commits: [makeCommit("abc1234", "Fix auth callback token validation")],
+      gitCommits: [],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).toContain("abc1234  Fix auth callback token validation");
+  });
+
+  test("shows gitCommits without diffstats when insertions/deletions undefined", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      gitCommits: [
+        makeGitCommit("abc1234", "merge commit"),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should still show the commit but without diffstat suffix
+    expect(output).toContain("abc1234  merge commit");
+    // No (+/-) suffix when no diffstats
+    expect(output).not.toContain("(+");
   });
 });
 

@@ -27,6 +27,7 @@ import type {
   AgentId,
   EntryUuid,
 } from "../types";
+import type { GitCommit } from "../git-commits";
 import { asSessionId, asAgentId, asEntryUuid } from "../types";
 import { TEST_SESSION_ID, TEST_MODEL, TEST_CWD } from "./fixtures";
 
@@ -140,4 +141,40 @@ export function makeRewind(
  */
 export function makeCommit(hash: string, message?: string): CommitInfo {
   return { hash, ...(message ? { message } : {}) };
+}
+
+/**
+ * Creates a GitCommit object (from git history) with sensible defaults.
+ *
+ * @param shortHash - 7-character abbreviated hash
+ * @param subject - First line of commit message
+ * @param options - Override any field (insertions, deletions, filesChanged, etc.)
+ *
+ * @example
+ * ```ts
+ * makeGitCommit("abc1234", "fix: login bug", { insertions: 42, deletions: 7 })
+ * ```
+ */
+export function makeGitCommit(
+  shortHash: string,
+  subject: string,
+  options: Partial<Omit<GitCommit, "shortHash" | "subject">> = {}
+): GitCommit {
+  const {
+    hash = shortHash.padEnd(40, "0"),
+    authorName = "Test Author",
+    authorEmail = "test@example.com",
+    timestamp = "2025-01-15T10:00:00+00:00",
+    ...rest
+  } = options;
+
+  return {
+    hash,
+    shortHash,
+    subject,
+    authorName,
+    authorEmail,
+    timestamp,
+    ...rest,
+  };
 }

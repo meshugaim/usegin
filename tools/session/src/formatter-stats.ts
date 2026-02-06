@@ -233,9 +233,29 @@ function formatGitSection(stats: SessionStats, showHints: boolean): string[] {
   lines.push(sectionHeader("Git"));
 
   const noun = stats.commitCount === 1 ? "commit" : "commits";
-  const text = `${stats.commitCount} ${noun}`;
-  const hint = showHints ? padHint("(--full to see messages)") : "";
-  lines.push(` ${text}${hint}`);
+
+  // When git-history data is available, show diffstat summary
+  if (stats.gitCommits && stats.gitCommits.length > 0) {
+    const totalInsertions = stats.gitCommits.reduce(
+      (sum, c) => sum + (c.insertions ?? 0),
+      0
+    );
+    const totalDeletions = stats.gitCommits.reduce(
+      (sum, c) => sum + (c.deletions ?? 0),
+      0
+    );
+    const hasDiffStats = totalInsertions > 0 || totalDeletions > 0;
+    const diffSummary = hasDiffStats
+      ? ` (+${totalInsertions}/-${totalDeletions} lines)`
+      : "";
+    const text = `${stats.commitCount} ${noun}${diffSummary}`;
+    const hint = showHints ? padHint("(--full to see messages)") : "";
+    lines.push(` ${text}${hint}`);
+  } else {
+    const text = `${stats.commitCount} ${noun}`;
+    const hint = showHints ? padHint("(--full to see messages)") : "";
+    lines.push(` ${text}${hint}`);
+  }
 
   return lines;
 }

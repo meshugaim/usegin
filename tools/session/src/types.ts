@@ -1,3 +1,5 @@
+import type { GitCommit } from "./git-commits";
+
 /**
  * Types for Claude session JSONL parsing
  *
@@ -727,7 +729,8 @@ export interface ParsedSession {
   subagents: ParsedSubagent[];
   rewinds: RewindInfo[];
   triggeredSkills: string[]; // Skills invoked via the Skill tool
-  commits: CommitInfo[]; // Commits made during this session
+  commits: CommitInfo[]; // Commits made during this session (regex-extracted from Bash output)
+  gitCommits?: GitCommit[]; // Commits from git history (richer data, preferred when available)
   summary?: string; // Session summary from type:"summary" line
   /** Timestamp of the first entry in the session (ISO 8601) */
   startTimestamp?: string;

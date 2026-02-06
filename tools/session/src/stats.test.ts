@@ -5,6 +5,7 @@ import {
   makeSession,
   makeSubagent,
   makeCommit,
+  makeGitCommit,
   makeRewind,
   userTurn,
   assistantTurn,
@@ -416,6 +417,61 @@ describe("computeStats", () => {
 
       expect(stats.commitCount).toBe(0);
       expect(stats.rewindCount).toBe(0);
+    });
+
+    test("prefers gitCommits over regex commits for commitCount", () => {
+      const session = makeSession({
+        commits: [
+          makeCommit("abc1234", "fix: login bug"),
+        ],
+        gitCommits: [
+          makeGitCommit("abc1234", "fix: login bug", { insertions: 10, deletions: 3 }),
+          makeGitCommit("def5678", "feat: add search", { insertions: 50, deletions: 0 }),
+          makeGitCommit("ghi9012", "chore: update deps", { insertions: 5, deletions: 20 }),
+        ],
+      });
+
+      const stats = computeStats(session);
+
+      // Should use gitCommits count (3), not regex commits count (1)
+      expect(stats.commitCount).toBe(3);
+    });
+
+    test("passes gitCommits through to stats when available", () => {
+      const gitCommits = [
+        makeGitCommit("abc1234", "fix: login bug", { insertions: 10, deletions: 3 }),
+        makeGitCommit("def5678", "feat: add search", { insertions: 50, deletions: 0 }),
+      ];
+
+      const session = makeSession({ gitCommits });
+      const stats = computeStats(session);
+
+      expect(stats.gitCommits).toEqual(gitCommits);
+    });
+
+    test("omits gitCommits from stats when not available", () => {
+      const session = makeSession({
+        commits: [makeCommit("abc1234", "fix: bug")],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.gitCommits).toBeUndefined();
+    });
+
+    test("falls back to regex commits when gitCommits is empty array", () => {
+      const session = makeSession({
+        commits: [
+          makeCommit("abc1234", "fix: login bug"),
+          makeCommit("def5678", "feat: search"),
+        ],
+        gitCommits: [],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.commitCount).toBe(2);
+      expect(stats.gitCommits).toBeUndefined();
     });
   });
 

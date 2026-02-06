@@ -7,6 +7,7 @@
 
 import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage } from "./types";
 import { getToolCallInput } from "./types";
+import type { GitCommit } from "./git-commits";
 
 // ============================================================================
 // TYPES
@@ -17,6 +18,8 @@ export interface SessionStats {
   toolCounts: Record<string, number>; // tool name -> call count, sorted by count desc
   subagentSummaries: SubagentSummary[];
   commitCount: number;
+  /** Rich commit data from git history, when available */
+  gitCommits?: GitCommit[];
   rewindCount: number;
   /** Total session duration from result entry, if available */
   durationMs?: number;
@@ -226,6 +229,12 @@ export function computeStats(session: ParsedSession): SessionStats {
     summarizeSubagent(sub, session.turns)
   );
 
+  // Prefer git-history commits over regex-extracted commits when available
+  const hasGitCommits = session.gitCommits && session.gitCommits.length > 0;
+  const commitCount = hasGitCommits
+    ? session.gitCommits!.length
+    : session.commits.length;
+
   return {
     turnCount: {
       total: session.turns.length,
@@ -234,7 +243,8 @@ export function computeStats(session: ParsedSession): SessionStats {
     },
     toolCounts,
     subagentSummaries,
-    commitCount: session.commits.length,
+    commitCount,
+    ...(hasGitCommits ? { gitCommits: session.gitCommits } : {}),
     rewindCount: session.rewinds.length,
     ...(session.result
       ? {

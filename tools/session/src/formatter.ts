@@ -60,8 +60,18 @@ export function formatNarrative(
     lines.push("");
   }
 
-  // Commits section
-  if (session.commits.length > 0) {
+  // Commits section — prefer git-history commits when available
+  if (session.gitCommits && session.gitCommits.length > 0) {
+    lines.push("─── Commits " + "─".repeat(28));
+    for (const commit of session.gitCommits) {
+      const diffStats =
+        commit.insertions !== undefined || commit.deletions !== undefined
+          ? `  (+${commit.insertions ?? 0}/-${commit.deletions ?? 0})`
+          : "";
+      lines.push(`  ${commit.shortHash}  ${commit.subject}${diffStats}`);
+    }
+    lines.push("");
+  } else if (session.commits.length > 0) {
     lines.push("─── Commits " + "─".repeat(28));
     for (const commit of session.commits) {
       const shortHash = commit.hash.slice(0, 7);
