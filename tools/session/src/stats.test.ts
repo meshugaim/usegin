@@ -296,6 +296,86 @@ describe("computeStats", () => {
       expect(stats.subagentSummaries[1]!.toolCalls).toBe(1);
       expect(stats.subagentSummaries[2]!.turns).toBe(0);
     });
+
+    test("computes duration from first to last turn timestamps", () => {
+      const agentId = asAgentId("agent-dur");
+      const subagent = makeSubagent(agentId, [
+        assistantTurn("sa1", "Starting work", {
+          timestamp: "2025-01-15T10:00:00.000Z",
+        }),
+        userTurn("su1", "", {
+          timestamp: "2025-01-15T10:00:30.000Z",
+        }),
+        assistantTurn("sa2", "Done", {
+          timestamp: "2025-01-15T10:01:00.000Z",
+        }),
+      ]);
+
+      const session = makeSession({ subagents: [subagent] });
+      const stats = computeStats(session);
+
+      expect(stats.subagentSummaries[0]!.durationMs).toBe(60000);
+    });
+
+    test("prefers startTimestamp over first turn timestamp for duration", () => {
+      const agentId = asAgentId("agent-start-ts");
+      const subagent = makeSubagent(
+        agentId,
+        [
+          assistantTurn("sa1", "Working", {
+            timestamp: "2025-01-15T10:00:10.000Z",
+          }),
+          assistantTurn("sa2", "Done", {
+            timestamp: "2025-01-15T10:01:00.000Z",
+          }),
+        ],
+        { startTimestamp: "2025-01-15T10:00:00.000Z" }
+      );
+
+      const session = makeSession({ subagents: [subagent] });
+      const stats = computeStats(session);
+
+      // 60s from startTimestamp, not 50s from first turn
+      expect(stats.subagentSummaries[0]!.durationMs).toBe(60000);
+    });
+
+    test("returns undefined duration when turns lack timestamps", () => {
+      const agentId = asAgentId("agent-no-ts");
+      const subagent = makeSubagent(agentId, [
+        assistantTurn("sa1", "No timestamps here"),
+        assistantTurn("sa2", "Still none"),
+      ]);
+
+      const session = makeSession({ subagents: [subagent] });
+      const stats = computeStats(session);
+
+      expect(stats.subagentSummaries[0]!.durationMs).toBeUndefined();
+    });
+
+    test("returns undefined duration for single-turn subagent", () => {
+      const agentId = asAgentId("agent-single");
+      const subagent = makeSubagent(agentId, [
+        assistantTurn("sa1", "Just one turn", {
+          timestamp: "2025-01-15T10:00:00.000Z",
+        }),
+      ]);
+
+      const session = makeSession({ subagents: [subagent] });
+      const stats = computeStats(session);
+
+      // first and last are the same turn, so duration is 0
+      expect(stats.subagentSummaries[0]!.durationMs).toBe(0);
+    });
+
+    test("returns undefined duration for empty subagent without startTimestamp", () => {
+      const agentId = asAgentId("agent-empty-dur");
+      const subagent = makeSubagent(agentId, []);
+
+      const session = makeSession({ subagents: [subagent] });
+      const stats = computeStats(session);
+
+      expect(stats.subagentSummaries[0]!.durationMs).toBeUndefined();
+    });
   });
 
   // ========================================================================

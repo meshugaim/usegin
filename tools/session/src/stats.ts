@@ -183,12 +183,9 @@ function summarizeSubagent(
   const description = buildSubagentDescription(subagent, mainTurns);
   const toolCallCount = totalToolCalls(subagent.turns);
 
-  // Duration: from subagent's startTimestamp to the timestamp we'd need from
-  // the last turn. Since turns don't carry timestamps, we approximate using
-  // the startTimestamp only if there are turns. A future enhancement could
-  // pull timestamps from the raw entries.
-  // For now, we don't compute duration for subagents without raw timestamp data.
-  const durationMs = undefined;
+  const firstTs = subagent.startTimestamp ?? subagent.turns[0]?.timestamp;
+  const lastTs = subagent.turns[subagent.turns.length - 1]?.timestamp;
+  const durationMs = computeDurationMs(firstTs, lastTs);
 
   return {
     agentId: subagent.agentId,
