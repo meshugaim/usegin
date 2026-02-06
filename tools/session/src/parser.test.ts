@@ -459,4 +459,129 @@ describe("tool result content normalization", () => {
 
     expect(result.turns[0]?.toolResults[0]?.content).toBe("");
   });
+
+  // ==========================================================================
+  // TOKEN USAGE AGGREGATION
+  // ==========================================================================
+
+  describe("token usage aggregation", () => {
+    test("aggregates token usage from assistant entries", () => {
+      const entries: Entry[] = [
+        {
+          type: "system",
+          subtype: "init",
+          uuid: "sys",
+          session_id: "s1",
+          cwd: "/test",
+          tools: [],
+          model: "claude-sonnet",
+        },
+        {
+          type: "assistant",
+          uuid: "a1",
+          session_id: "s1",
+          message: {
+            role: "assistant",
+            model: "claude-sonnet",
+            content: [{ type: "text", text: "Hello" }],
+            usage: {
+              input_tokens: 10,
+              output_tokens: 50,
+              cache_creation_input_tokens: 1000,
+              cache_read_input_tokens: 5000,
+            },
+          },
+        },
+        {
+          type: "assistant",
+          uuid: "a2",
+          session_id: "s1",
+          message: {
+            role: "assistant",
+            model: "claude-sonnet",
+            content: [{ type: "text", text: "World" }],
+            usage: {
+              input_tokens: 20,
+              output_tokens: 100,
+              cache_creation_input_tokens: 2000,
+              cache_read_input_tokens: 8000,
+            },
+          },
+        },
+      ];
+
+      const result = parseEntries(entries);
+
+      expect(result.tokenUsage).toBeDefined();
+      expect(result.tokenUsage!.inputTokens).toBe(30);
+      expect(result.tokenUsage!.outputTokens).toBe(150);
+      expect(result.tokenUsage!.cacheCreationInputTokens).toBe(3000);
+      expect(result.tokenUsage!.cacheReadInputTokens).toBe(13000);
+    });
+
+    test("returns undefined tokenUsage when no usage data exists", () => {
+      const entries: Entry[] = [
+        {
+          type: "system",
+          subtype: "init",
+          uuid: "sys",
+          session_id: "s1",
+          cwd: "/test",
+          tools: [],
+          model: "claude-sonnet",
+        },
+        {
+          type: "assistant",
+          uuid: "a1",
+          session_id: "s1",
+          message: {
+            role: "assistant",
+            model: "claude-sonnet",
+            content: [{ type: "text", text: "Hello" }],
+          },
+        },
+      ];
+
+      const result = parseEntries(entries);
+
+      expect(result.tokenUsage).toBeUndefined();
+    });
+
+    test("handles missing cache fields gracefully", () => {
+      const entries: Entry[] = [
+        {
+          type: "system",
+          subtype: "init",
+          uuid: "sys",
+          session_id: "s1",
+          cwd: "/test",
+          tools: [],
+          model: "claude-sonnet",
+        },
+        {
+          type: "assistant",
+          uuid: "a1",
+          session_id: "s1",
+          message: {
+            role: "assistant",
+            model: "claude-sonnet",
+            content: [{ type: "text", text: "Hello" }],
+            usage: {
+              input_tokens: 50,
+              output_tokens: 200,
+              // No cache fields — older API responses may omit these
+            },
+          },
+        },
+      ];
+
+      const result = parseEntries(entries);
+
+      expect(result.tokenUsage).toBeDefined();
+      expect(result.tokenUsage!.inputTokens).toBe(50);
+      expect(result.tokenUsage!.outputTokens).toBe(200);
+      expect(result.tokenUsage!.cacheCreationInputTokens).toBe(0);
+      expect(result.tokenUsage!.cacheReadInputTokens).toBe(0);
+    });
+  });
 });

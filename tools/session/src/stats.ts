@@ -5,7 +5,7 @@
  * Feed the result into a formatter for display.
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId } from "./types";
+import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage } from "./types";
 import { getToolCallInput } from "./types";
 
 // ============================================================================
@@ -22,6 +22,8 @@ export interface SessionStats {
   durationMs?: number;
   /** Total session cost from result entry, if available */
   costUsd?: number;
+  /** Aggregated token usage across all assistant turns, if available */
+  tokenUsage?: TokenUsage;
 }
 
 export interface SubagentSummary {
@@ -245,5 +247,6 @@ export function computeStats(session: ParsedSession): SessionStats {
             : {}),
         }
       : {}),
+    ...(session.tokenUsage ? { tokenUsage: session.tokenUsage } : {}),
   };
 }

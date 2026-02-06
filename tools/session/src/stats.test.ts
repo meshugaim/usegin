@@ -30,6 +30,7 @@ describe("computeStats", () => {
       expect(stats.rewindCount).toBe(0);
       expect(stats.durationMs).toBeUndefined();
       expect(stats.costUsd).toBeUndefined();
+      expect(stats.tokenUsage).toBeUndefined();
     });
   });
 
@@ -397,6 +398,62 @@ describe("computeStats", () => {
   });
 
   // ========================================================================
+  // TOKEN USAGE
+  // ========================================================================
+
+  describe("token usage", () => {
+    test("passes through token usage from session", () => {
+      const session = makeSession({
+        tokenUsage: {
+          inputTokens: 500,
+          outputTokens: 1200,
+          cacheCreationInputTokens: 10000,
+          cacheReadInputTokens: 50000,
+        },
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.tokenUsage).toEqual({
+        inputTokens: 500,
+        outputTokens: 1200,
+        cacheCreationInputTokens: 10000,
+        cacheReadInputTokens: 50000,
+      });
+    });
+
+    test("omits token usage when not present on session", () => {
+      const session = makeSession();
+      const stats = computeStats(session);
+
+      expect(stats.tokenUsage).toBeUndefined();
+    });
+
+    test("includes token usage alongside duration and cost", () => {
+      const session = makeSession({
+        result: {
+          success: true,
+          durationMs: 60000,
+          costUsd: 0.50,
+        },
+        tokenUsage: {
+          inputTokens: 100,
+          outputTokens: 2000,
+          cacheCreationInputTokens: 5000,
+          cacheReadInputTokens: 30000,
+        },
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.durationMs).toBe(60000);
+      expect(stats.costUsd).toBe(0.50);
+      expect(stats.tokenUsage).toBeDefined();
+      expect(stats.tokenUsage!.outputTokens).toBe(2000);
+    });
+  });
+
+  // ========================================================================
   // INTEGRATION: FULL SESSION
   // ========================================================================
 
@@ -446,6 +503,12 @@ describe("computeStats", () => {
         ],
         commits: [makeCommit("abc1234", "fix: login bug")],
         rewinds: [makeRewind("a1", ["u2-old"])],
+        tokenUsage: {
+          inputTokens: 150,
+          outputTokens: 800,
+          cacheCreationInputTokens: 5000,
+          cacheReadInputTokens: 25000,
+        },
         result: {
           success: true,
           durationMs: 120000,
@@ -468,6 +531,12 @@ describe("computeStats", () => {
       expect(stats.rewindCount).toBe(1);
       expect(stats.durationMs).toBe(120000);
       expect(stats.costUsd).toBe(0.35);
+      expect(stats.tokenUsage).toEqual({
+        inputTokens: 150,
+        outputTokens: 800,
+        cacheCreationInputTokens: 5000,
+        cacheReadInputTokens: 25000,
+      });
     });
   });
 });

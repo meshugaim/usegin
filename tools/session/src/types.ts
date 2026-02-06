@@ -501,8 +501,29 @@ export interface AssistantEntry extends BaseEntry {
     usage?: {
       input_tokens: number;
       output_tokens: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
     };
   };
+}
+
+/**
+ * Aggregated token usage across all assistant turns in a session.
+ *
+ * Token counts come from the Anthropic API usage object on each assistant message.
+ * - `inputTokens`: Non-cached input tokens (the `input_tokens` field)
+ * - `outputTokens`: Output tokens generated
+ * - `cacheCreationInputTokens`: Tokens written to cache
+ * - `cacheReadInputTokens`: Tokens read from cache
+ *
+ * For display purposes, use `inputTokens + cacheCreationInputTokens + cacheReadInputTokens`
+ * as the total input context, and `outputTokens` as the generation cost.
+ */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
 }
 
 export interface ResultEntry extends BaseEntry {
@@ -707,6 +728,8 @@ export interface ParsedSession {
   triggeredSkills: string[]; // Skills invoked via the Skill tool
   commits: CommitInfo[]; // Commits made during this session
   summary?: string; // Session summary from type:"summary" line
+  /** Aggregated token usage across all assistant turns */
+  tokenUsage?: TokenUsage;
   result?: {
     success: boolean;
     durationMs: number;

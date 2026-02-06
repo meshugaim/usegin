@@ -733,7 +733,17 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   // Convert raw sessionId to branded type
   const sessionId: SessionId = asSessionId(rawSessionId);
 
-  return { sessionId, cwd, model, tools, turns, subagents: [], rewinds, triggeredSkills, commits, summary, result };
+  // Build token usage if any usage data was found
+  const tokenUsage: TokenUsage | undefined = hasUsageData
+    ? {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cacheCreationInputTokens: totalCacheCreationInputTokens,
+        cacheReadInputTokens: totalCacheReadInputTokens,
+      }
+    : undefined;
+
+  return { sessionId, cwd, model, tools, turns, subagents: [], rewinds, triggeredSkills, commits, summary, tokenUsage, result };
 }
 
 /**

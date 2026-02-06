@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { formatStats, formatDuration, formatCost } from "./formatter-stats";
+import { formatStats, formatDuration, formatCost, formatTokenCount } from "./formatter-stats";
 import { computeStats } from "./stats";
 import {
   makeSession,
@@ -67,6 +67,43 @@ describe("formatCost", () => {
 });
 
 // ============================================================================
+// TOKEN COUNT FORMATTING
+// ============================================================================
+
+describe("formatTokenCount", () => {
+  test("formats counts under 1,000 as plain numbers", () => {
+    expect(formatTokenCount(0)).toBe("0");
+    expect(formatTokenCount(1)).toBe("1");
+    expect(formatTokenCount(999)).toBe("999");
+  });
+
+  test("formats thousands with k suffix", () => {
+    expect(formatTokenCount(1000)).toBe("1.0k");
+    expect(formatTokenCount(1234)).toBe("1.2k");
+    expect(formatTokenCount(45200)).toBe("45.2k");
+    expect(formatTokenCount(99900)).toBe("99.9k");
+  });
+
+  test("drops decimal for 100k+ values", () => {
+    expect(formatTokenCount(100_000)).toBe("100k");
+    expect(formatTokenCount(123_456)).toBe("123k");
+    expect(formatTokenCount(999_999)).toBe("1000k");
+  });
+
+  test("formats millions with M suffix", () => {
+    expect(formatTokenCount(1_000_000)).toBe("1.0M");
+    expect(formatTokenCount(1_234_567)).toBe("1.2M");
+    expect(formatTokenCount(12_345_678)).toBe("12.3M");
+    expect(formatTokenCount(99_900_000)).toBe("99.9M");
+  });
+
+  test("drops decimal for 100M+ values", () => {
+    expect(formatTokenCount(100_000_000)).toBe("100M");
+    expect(formatTokenCount(234_000_000)).toBe("234M");
+  });
+});
+
+// ============================================================================
 // MINIMAL SESSION (turns only, no tools)
 // ============================================================================
 
@@ -99,6 +136,38 @@ describe("formatStats with minimal session", () => {
 
     expect(output).toContain("Duration  14m 32s");
     expect(output).toContain("Cost  $1.24");
+  });
+
+  test("renders token count in header when token usage present", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello"), assistantTurn("a1", "Hi!")],
+      tokenUsage: {
+        inputTokens: 200,
+        outputTokens: 1000,
+        cacheCreationInputTokens: 10000,
+        cacheReadInputTokens: 34000,
+      },
+      result: {
+        success: true,
+        durationMs: 60_000,
+        costUsd: 0.50,
+      },
+    });
+
+    const output = formatStats(session);
+
+    // Total = 200 + 1000 + 10000 + 34000 = 45200
+    expect(output).toContain("Tokens  45.2k");
+  });
+
+  test("omits token count when token usage is absent", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).not.toContain("Tokens");
   });
 
   test("omits duration and cost when result is absent", () => {
@@ -550,6 +619,12 @@ describe("formatStats full session", () => {
         makeCommit("ghi9012", "test: add formatter-stats tests"),
       ],
       rewinds: [makeRewind("a1", ["u2"])],
+      tokenUsage: {
+        inputTokens: 500,
+        outputTokens: 4500,
+        cacheCreationInputTokens: 15000,
+        cacheReadInputTokens: 125200,
+      },
       result: {
         success: true,
         durationMs: 872_000,
@@ -563,6 +638,8 @@ describe("formatStats full session", () => {
     expect(output).toContain("Session   4a7ffc84");
     expect(output).toContain("Duration  14m 32s");
     expect(output).toContain("Cost  $1.24");
+    // Total tokens = 500 + 4500 + 15000 + 125200 = 145200
+    expect(output).toContain("Tokens  145k");
 
     // Conversation
     expect(output).toContain("Conversation");
@@ -725,6 +802,28 @@ describe("JSON format output shape", () => {
 
     expect(json.durationMs).toBeUndefined();
     expect(json.costUsd).toBeUndefined();
+    expect(json.tokenUsage).toBeUndefined();
+  });
+
+  test("includes token usage in JSON output", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      tokenUsage: {
+        inputTokens: 300,
+        outputTokens: 1500,
+        cacheCreationInputTokens: 8000,
+        cacheReadInputTokens: 40000,
+      },
+    });
+
+    const json = buildJsonOutput(session);
+
+    expect(json.tokenUsage).toEqual({
+      inputTokens: 300,
+      outputTokens: 1500,
+      cacheCreationInputTokens: 8000,
+      cacheReadInputTokens: 40000,
+    });
   });
 
   test("round-trips through JSON.stringify/parse cleanly", () => {
@@ -737,6 +836,12 @@ describe("JSON format output shape", () => {
         }),
       ],
       commits: [makeCommit("abc", "feat: add feature")],
+      tokenUsage: {
+        inputTokens: 100,
+        outputTokens: 500,
+        cacheCreationInputTokens: 2000,
+        cacheReadInputTokens: 10000,
+      },
       result: { success: true, durationMs: 60_000, costUsd: 0.25 },
     });
 
@@ -750,5 +855,11 @@ describe("JSON format output shape", () => {
     expect(parsed.commitCount).toBe(1);
     expect(parsed.durationMs).toBe(60_000);
     expect(parsed.costUsd).toBe(0.25);
+    expect(parsed.tokenUsage).toEqual({
+      inputTokens: 100,
+      outputTokens: 500,
+      cacheCreationInputTokens: 2000,
+      cacheReadInputTokens: 10000,
+    });
   });
 });

@@ -143,6 +143,13 @@ export interface AssistantEntryOptions {
     name: string;
     input: Record<string, unknown>;
   }>;
+  /** Token usage data from the API response */
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
 }
 
 /**
@@ -176,6 +183,7 @@ export function assistantEntry(
     agentId,
     timestamp,
     toolCalls = [],
+    usage,
   } = options;
 
   // Build message content
@@ -202,6 +210,7 @@ export function assistantEntry(
       role: "assistant",
       model,
       content: messageContent.length > 0 ? messageContent : content,
+      ...(usage ? { usage } : {}),
     },
   };
 
