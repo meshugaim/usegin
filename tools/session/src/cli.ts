@@ -19,6 +19,8 @@
 import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./parser";
 import { formatNarrative, formatMarkdown, formatTerminal, formatToolFilter, type FormatOptions } from "./formatter";
 import { formatStats } from "./formatter-stats";
+import { buildTimeline } from "./timeline";
+import { formatTimeline } from "./formatter-timeline";
 import { computeStats } from "./stats";
 import { getCommitsFromGitHistory } from "./git-commits";
 import {
@@ -87,6 +89,7 @@ FIND OPTIONS:
 
 OPTIONS:
   --full             Full narrative output (default: compact stats card)
+  --timeline         Chronological flow of events (messages, tools, subagents, commits)
   --format <fmt>     Output format: stats (default), narrative, terminal, markdown, json
                      Overrides --full when specified explicitly
   --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
@@ -121,6 +124,9 @@ EXAMPLES:
 
   # Full narrative output
   session session.jsonl --full
+
+  # Chronological timeline
+  session session.jsonl --timeline
 
   # Terminal format (replicates /export)
   session session.jsonl --format terminal
@@ -359,7 +365,7 @@ async function runList(args: string[]) {
       console.log(formatListLine(session, meta));
     }
     if (process.stdout.isTTY) {
-      console.log("\n  Expand: session <id>    Full: session <id> --full");
+      console.log("\n  Expand: session <id>    Timeline: --timeline    Full: --full");
     }
   } else {
     for (const session of limited) {
@@ -445,8 +451,8 @@ async function main() {
       return;
     }
 
-    // Stats and JSON formats need subagent data for the summaries section
-    const includeSubagents = args.subagents || args.format === "stats" || args.format === "json";
+    // Stats, JSON, and timeline formats need subagent data for the summaries section
+    const includeSubagents = args.subagents || args.timeline || args.format === "stats" || args.format === "json";
 
     // Parse session with debug timing and timeout
     let stepStart = Date.now();
@@ -486,6 +492,16 @@ async function main() {
         // Fall back to regex-extracted commits if this fails.
         debugLog(debug, "Git history query failed, using regex commits", stepStart);
       }
+    }
+
+    // --timeline: standalone output mode showing chronological event flow
+    if (args.timeline) {
+      const events = buildTimeline(session);
+      const isTTY = process.stdout.isTTY !== false;
+      const lines = formatTimeline(events, { showHints: isTTY });
+      debugLog(debug, "Total parse time", totalStart);
+      console.log(lines.join("\n"));
+      return;
     }
 
     // --tool filter: standalone output mode that replaces normal formatting

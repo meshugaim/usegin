@@ -551,7 +551,7 @@ describe("formatStats hint suppression", () => {
     expect(output).not.toContain("(--tool-input to see commands)");
     expect(output).not.toContain("(--full to see context)");
     expect(output).not.toContain("(--full to see messages)");
-    expect(output).not.toContain("(session <path> to expand)");
+    expect(output).not.toContain("(--timeline to see flow)");
   });
 });
 

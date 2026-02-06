@@ -48,6 +48,7 @@ export interface MainArgs {
   stream: boolean;
   format: OutputFormat;
   full: boolean;
+  timeline: boolean;
   debug: boolean;
   timeout: number;
   help: boolean;
@@ -67,6 +68,7 @@ export function parseMainArgs(args: string[]): MainArgs {
     stream: false,
     format: "stats",
     full: false,
+    timeline: false,
     debug: false,
     timeout: 30,
     help: false,
@@ -103,6 +105,8 @@ export function parseMainArgs(args: string[]): MainArgs {
       i++;
     } else if (arg === "--full") {
       result.full = true;
+    } else if (arg === "--timeline") {
+      result.timeline = true;
     } else if (arg === "--debug") {
       result.debug = true;
     } else if (arg === "--timeout") {

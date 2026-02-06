@@ -289,6 +289,30 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--timeline flag", () => {
+    it("defaults timeline to false", () => {
+      expect(parseMainArgs(["session.jsonl"]).timeline).toBe(false);
+    });
+
+    it("sets timeline to true when --timeline is specified", () => {
+      const result = parseMainArgs(["session.jsonl", "--timeline"]);
+      expect(result.timeline).toBe(true);
+    });
+
+    it("works alongside --subagents", () => {
+      const result = parseMainArgs(["session.jsonl", "--timeline", "--subagents"]);
+      expect(result.timeline).toBe(true);
+      expect(result.subagents).toBe(true);
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs(["session.jsonl", "--timeline", "--debug"]);
+      expect(result.timeline).toBe(true);
+      expect(result.debug).toBe(true);
+      expect(result.file).toBe("session.jsonl");
+    });
+  });
+
   describe("--format validation", () => {
     it("throws when --format is last argument with no value", () => {
       expect(() => parseMainArgs(["--format"])).toThrow("Missing value for --format");

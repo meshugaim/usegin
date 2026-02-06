@@ -181,7 +181,7 @@ function formatSubagentsSection(
 
   if (showHints) {
     const lastIndex = lines.length - 1;
-    lines[lastIndex] = lines[lastIndex]! + padHint("(session <path> to expand)");
+    lines[lastIndex] = lines[lastIndex]! + padHint("(--timeline to see flow)");
   }
 
   return lines;
