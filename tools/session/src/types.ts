@@ -729,6 +729,10 @@ export interface ParsedSession {
   triggeredSkills: string[]; // Skills invoked via the Skill tool
   commits: CommitInfo[]; // Commits made during this session
   summary?: string; // Session summary from type:"summary" line
+  /** Timestamp of the first entry in the session (ISO 8601) */
+  startTimestamp?: string;
+  /** Timestamp of the last entry in the session (ISO 8601) */
+  endTimestamp?: string;
   /** Aggregated token usage across all assistant turns */
   tokenUsage?: TokenUsage;
   result?: {

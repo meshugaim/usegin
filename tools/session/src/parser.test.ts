@@ -234,6 +234,156 @@ describe("parseEntries", () => {
   });
 });
 
+describe("session timestamps", () => {
+  test("captures startTimestamp from first entry and endTimestamp from last entry", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:00.000Z",
+        cwd: "/test",
+        tools: [],
+        model: "claude-sonnet",
+      },
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:05.000Z",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:10.000Z",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet",
+          content: [{ type: "text", text: "Hi!" }],
+        },
+      },
+      {
+        type: "result",
+        subtype: "success",
+        uuid: "r1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:05:00.000Z",
+        result: "Done",
+        duration_ms: 5000,
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.startTimestamp).toBe("2025-01-15T10:00:00.000Z");
+    expect(result.endTimestamp).toBe("2025-01-15T10:05:00.000Z");
+  });
+
+  test("returns undefined timestamps when no entries have timestamps", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        cwd: "/test",
+        tools: [],
+        model: "claude-sonnet",
+      },
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.startTimestamp).toBeUndefined();
+    expect(result.endTimestamp).toBeUndefined();
+  });
+
+  test("handles single entry with timestamp", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:00.000Z",
+        cwd: "/test",
+        tools: [],
+        model: "claude-sonnet",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.startTimestamp).toBe("2025-01-15T10:00:00.000Z");
+    expect(result.endTimestamp).toBe("2025-01-15T10:00:00.000Z");
+  });
+
+  test("skips entries without timestamps for start but tracks last seen", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        // No timestamp on system entry
+        cwd: "/test",
+        tools: [],
+        model: "claude-sonnet",
+      },
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:05.000Z",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:10.000Z",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet",
+          content: [{ type: "text", text: "Hi!" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.startTimestamp).toBe("2025-01-15T10:00:05.000Z");
+    expect(result.endTimestamp).toBe("2025-01-15T10:00:10.000Z");
+  });
+
+  test("returns undefined timestamps for empty entries", () => {
+    const entries: Entry[] = [];
+
+    const result = parseEntries(entries);
+
+    expect(result.startTimestamp).toBeUndefined();
+    expect(result.endTimestamp).toBeUndefined();
+  });
+});
+
 describe("skill detection", () => {
   test("extracts skill name from Skill tool call", () => {
     const entries: Entry[] = [

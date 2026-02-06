@@ -616,6 +616,8 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   const toolUseIdToName = new Map<ToolUseId, string>();
   let summary: string | undefined;
   let result: ParsedSession["result"];
+  let startTimestamp: string | undefined;
+  let endTimestamp: string | undefined;
   // Aggregate token usage across all assistant turns
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -636,6 +638,15 @@ export function parseEntries(entries: Entry[]): ParsedSession {
     const parentUuid = e.parentUuid as string | null | undefined;
     if (uuid) {
       allEntryParents.set(uuid, parentUuid ?? null);
+    }
+
+    // Capture first and last timestamps across all entries
+    const entryTimestamp = e.timestamp as string | undefined;
+    if (entryTimestamp) {
+      if (!startTimestamp) {
+        startTimestamp = entryTimestamp;
+      }
+      endTimestamp = entryTimestamp;
     }
 
     // Try to extract sessionId from any entry if not yet found
@@ -743,7 +754,7 @@ export function parseEntries(entries: Entry[]): ParsedSession {
       }
     : undefined;
 
-  return { sessionId, cwd, model, tools, turns, subagents: [], rewinds, triggeredSkills, commits, summary, tokenUsage, result };
+  return { sessionId, cwd, model, tools, turns, subagents: [], rewinds, triggeredSkills, commits, summary, startTimestamp, endTimestamp, tokenUsage, result };
 }
 
 /**
