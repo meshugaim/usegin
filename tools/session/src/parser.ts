@@ -114,7 +114,10 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
     (filename) => filename.startsWith("agent-") && filename.endsWith(".jsonl")
   );
 
+  const seenFiles = new Set<string>();
+
   for (const subagentFile of subagentFiles) {
+    seenFiles.add(subagentFile);
     const subagentPath = join(dir, subagentFile);
     const subFile = Bun.file(subagentPath);
     const subContent = await subFile.text();
@@ -132,6 +135,38 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
     } catch {
       // Skip malformed files
     }
+  }
+
+  // Also check the new layout: <sessionId>/subagents/ directory
+  const sessionFilename = basename(absolutePath, ".jsonl");
+  const nestedSubagentsDir = join(dir, sessionFilename, "subagents");
+  try {
+    const nestedDirFiles = await readdir(nestedSubagentsDir);
+    const nestedSubagentFiles = nestedDirFiles.filter(
+      (filename) => filename.startsWith("agent-") && filename.endsWith(".jsonl") && !seenFiles.has(filename)
+    );
+
+    for (const subagentFile of nestedSubagentFiles) {
+      const subagentPath = join(nestedSubagentsDir, subagentFile);
+      const subFile = Bun.file(subagentPath);
+      const subContent = await subFile.text();
+      const subFirstLine = subContent.split("\n")[0] ?? "";
+
+      try {
+        const subParsed = JSON.parse(subFirstLine);
+        if (!isEntry(subParsed)) {
+          continue;
+        }
+        const subSessionId = getSessionId(subParsed);
+        if (subSessionId === sessionId) {
+          files.push(subagentPath);
+        }
+      } catch {
+        // Skip malformed files
+      }
+    }
+  } catch {
+    // Nested subagents directory doesn't exist — that's fine
   }
 
   return files;
@@ -236,8 +271,10 @@ async function discoverSubagents(
     );
 
     const subagents: ParsedSubagent[] = [];
+    const seenFiles = new Set<string>();
 
     for (const subagentFile of subagentFiles) {
+      seenFiles.add(subagentFile);
       const subagentPath = join(dir, subagentFile);
       const subagent = await parseSubagentFile(subagentPath, sessionId, debug);
       if (subagent) {
@@ -246,6 +283,28 @@ async function discoverSubagents(
           subagents.push(subagent);
         }
       }
+    }
+
+    // Also check the new layout: <sessionId>/subagents/ directory
+    const sessionFilename = basename(mainSessionPath, ".jsonl");
+    const nestedSubagentsDir = join(dir, sessionFilename, "subagents");
+    try {
+      const nestedFiles = await readdir(nestedSubagentsDir);
+      const nestedSubagentFiles = nestedFiles.filter(
+        (filename) => filename.startsWith("agent-") && filename.endsWith(".jsonl") && !seenFiles.has(filename)
+      );
+
+      for (const subagentFile of nestedSubagentFiles) {
+        const subagentPath = join(nestedSubagentsDir, subagentFile);
+        const subagent = await parseSubagentFile(subagentPath, sessionId, debug);
+        if (subagent) {
+          if (includeWarmups || !isWarmupSubagent(subagent)) {
+            subagents.push(subagent);
+          }
+        }
+      }
+    } catch {
+      // Nested subagents directory doesn't exist — that's fine
     }
 
     // Sort by start timestamp

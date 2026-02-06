@@ -332,3 +332,146 @@ describe("parseSession warmup filtering", () => {
     expect(agentIds).toContain(asAgentId("agent-real"));
   });
 });
+
+describe("discoverSubagents with nested subagents directory", () => {
+  const NESTED_TEST_DIR = "/tmp/session-parser-nested-subagents-test";
+  const NESTED_SESSION_ID = asSessionId("nested-test-session-abcd1234");
+
+  beforeAll(async () => {
+    // Create the directory structure matching the NEW Claude Code layout:
+    //   tmpdir/
+    //     nested-test-session-abcd1234.jsonl        <- main session
+    //     nested-test-session-abcd1234/              <- directory named after session
+    //       subagents/                               <- subagents subdirectory
+    //         agent-abc1234.jsonl                    <- subagent file
+    //         agent-def5678.jsonl                    <- another subagent
+    const subagentsDir = join(NESTED_TEST_DIR, NESTED_SESSION_ID, "subagents");
+    await mkdir(subagentsDir, { recursive: true });
+
+    // Create main session file
+    const mainSession = [
+      JSON.stringify({
+        type: "system",
+        subtype: "init",
+        uuid: "sys1",
+        session_id: NESTED_SESSION_ID,
+        cwd: "/test",
+        tools: ["Read"],
+        model: "claude",
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        session_id: NESTED_SESSION_ID,
+        message: { role: "user", content: "Hello" },
+      }),
+    ].join("\n");
+
+    await writeFile(join(NESTED_TEST_DIR, `${NESTED_SESSION_ID}.jsonl`), mainSession);
+
+    // Create first subagent in the nested subagents directory
+    const subagent1 = [
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        sessionId: NESTED_SESSION_ID,
+        agentId: "agent-abc1234",
+        timestamp: "2025-01-01T10:00:00.000Z",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: [
+            { type: "text", text: "Let me search for that." },
+            { type: "tool_use", id: "t1", name: "Grep", input: { pattern: "test" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u2",
+        sessionId: NESTED_SESSION_ID,
+        agentId: "agent-abc1234",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "t1", content: "found results" }],
+        },
+      }),
+    ].join("\n");
+
+    await writeFile(join(subagentsDir, "agent-abc1234.jsonl"), subagent1);
+
+    // Create second subagent in the nested subagents directory
+    const subagent2 = [
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a3",
+        sessionId: NESTED_SESSION_ID,
+        agentId: "agent-def5678",
+        timestamp: "2025-01-01T11:00:00.000Z",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: [
+            { type: "text", text: "Reading the file now." },
+            { type: "tool_use", id: "t2", name: "Read", input: { file_path: "/foo.ts" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u3",
+        sessionId: NESTED_SESSION_ID,
+        agentId: "agent-def5678",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "t2", content: "file contents here" }],
+        },
+      }),
+    ].join("\n");
+
+    await writeFile(join(subagentsDir, "agent-def5678.jsonl"), subagent2);
+  });
+
+  afterAll(async () => {
+    await rm(NESTED_TEST_DIR, { recursive: true, force: true });
+  });
+
+  test("discovers subagents in <sessionId>/subagents/ directory", async () => {
+    const session = await parseSession(join(NESTED_TEST_DIR, `${NESTED_SESSION_ID}.jsonl`), {
+      includeSubagents: true,
+    });
+
+    expect(session.sessionId).toBe(NESTED_SESSION_ID);
+    expect(session.subagents).toHaveLength(2);
+
+    const agentIds = session.subagents.map((s) => s.agentId).sort();
+    expect(agentIds).toContain(asAgentId("agent-abc1234"));
+    expect(agentIds).toContain(asAgentId("agent-def5678"));
+  });
+
+  test("subagents from nested directory have correct timestamps", async () => {
+    const session = await parseSession(join(NESTED_TEST_DIR, `${NESTED_SESSION_ID}.jsonl`), {
+      includeSubagents: true,
+    });
+
+    // Sorted by startTimestamp, so abc1234 (10:00) comes before def5678 (11:00)
+    expect(session.subagents[0]?.agentId).toBe(asAgentId("agent-abc1234"));
+    expect(session.subagents[0]?.startTimestamp).toBe("2025-01-01T10:00:00.000Z");
+    expect(session.subagents[1]?.agentId).toBe(asAgentId("agent-def5678"));
+    expect(session.subagents[1]?.startTimestamp).toBe("2025-01-01T11:00:00.000Z");
+  });
+
+  test("listRelatedFiles finds files in nested subagents directory", async () => {
+    const files = await listRelatedFiles(join(NESTED_TEST_DIR, `${NESTED_SESSION_ID}.jsonl`));
+
+    // Should include the main file plus both subagent files from the nested directory
+    expect(files).toContain(join(NESTED_TEST_DIR, `${NESTED_SESSION_ID}.jsonl`));
+    expect(files).toContain(
+      join(NESTED_TEST_DIR, NESTED_SESSION_ID, "subagents", "agent-abc1234.jsonl")
+    );
+    expect(files).toContain(
+      join(NESTED_TEST_DIR, NESTED_SESSION_ID, "subagents", "agent-def5678.jsonl")
+    );
+    expect(files).toHaveLength(3);
+  });
+});
