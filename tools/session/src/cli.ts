@@ -357,6 +357,9 @@ async function runList(args: string[]) {
       const meta = await extractSessionMeta(session.path);
       console.log(formatListLine(session, meta));
     }
+    if (process.stdout.isTTY) {
+      console.log("\n  Expand: session <id>    Full: session <id> --full");
+    }
   } else {
     for (const session of limited) {
       console.log(formatOutput(session, listArgs.output));
