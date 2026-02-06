@@ -157,7 +157,7 @@ function formatToolCall(tool: ToolCall, formatOptions: FormatOptions): string {
 /**
  * Get a brief summary of a tool call's key input
  */
-function getToolSummary(tool: ToolCall): string {
+export function getToolSummary(tool: ToolCall): string {
   const input = tool.input;
 
   switch (tool.name) {
@@ -491,6 +491,49 @@ export function formatMarkdown(session: ParsedSession): string {
         }
       }
     }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Format a filtered view showing only calls for a specific tool type.
+ *
+ * This is a standalone output mode — when a future Claude sees "39x Bash"
+ * in the stats card and wants to drill in, they run:
+ *
+ *   session <id> --tool Bash
+ *
+ * Output:
+ *   --- Bash (39 calls) ---...
+ *     -> Bash: bun install -g agent-browser 2>&1
+ *     -> Bash: export PATH=...
+ *     ...
+ */
+export function formatToolFilter(session: ParsedSession, toolName: string): string {
+  const matchingCalls: ToolCall[] = [];
+
+  for (const turn of session.turns) {
+    if (turn.role !== "assistant") continue;
+    for (const tc of turn.toolCalls) {
+      if (tc.name === toolName) {
+        matchingCalls.push(tc);
+      }
+    }
+  }
+
+  if (matchingCalls.length === 0) {
+    return `No ${toolName} calls found in this session.`;
+  }
+
+  const noun = matchingCalls.length === 1 ? "call" : "calls";
+  const header = `${"─".repeat(3)} ${toolName} (${matchingCalls.length} ${noun}) ${"─".repeat(Math.max(0, 38 - toolName.length - String(matchingCalls.length).length - noun.length - 8))}`;
+
+  const lines: string[] = [header];
+
+  for (const tc of matchingCalls) {
+    const summary = getToolSummary(tc);
+    lines.push(`  → ${tc.name}: ${summary}`);
   }
 
   return lines.join("\n");

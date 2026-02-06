@@ -51,6 +51,8 @@ export interface MainArgs {
   debug: boolean;
   timeout: number;
   help: boolean;
+  /** Filter output to show only calls for a specific tool type (case-sensitive) */
+  tool?: string;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -106,6 +108,10 @@ export function parseMainArgs(args: string[]): MainArgs {
     } else if (arg === "--timeout") {
       const value = requireArgValue(args, i, "--timeout");
       result.timeout = validateNonNegativeInteger(value, "--timeout");
+      i++;
+    } else if (arg === "--tool") {
+      const value = requireArgValue(args, i, "--tool");
+      result.tool = value;
       i++;
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";

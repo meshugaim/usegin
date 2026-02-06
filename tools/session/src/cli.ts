@@ -17,7 +17,7 @@
  */
 
 import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./parser";
-import { formatNarrative, formatMarkdown, formatTerminal, type FormatOptions } from "./formatter";
+import { formatNarrative, formatMarkdown, formatTerminal, formatToolFilter, type FormatOptions } from "./formatter";
 import { formatStats } from "./formatter-stats";
 import {
   checkFzfAvailable,
@@ -86,6 +86,8 @@ OPTIONS:
   --full             Full narrative output (default: compact stats card)
   --format <fmt>     Output format: stats (default), narrative, terminal, markdown
                      Overrides --full when specified explicitly
+  --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
+                     Case-sensitive. Replaces normal output with focused list.
   --stream           Stream mode: read from stdin, output in real-time
   --tool-input       Include tool call inputs
   --tool-output      Include tool results
@@ -120,6 +122,9 @@ EXAMPLES:
 
   # Terminal format (replicates /export)
   session session.jsonl --format terminal
+
+  # Show only Bash commands
+  session session.jsonl --tool Bash
 
   # Include tool inputs
   session session.jsonl --tool-input
@@ -441,6 +446,14 @@ async function main() {
 
     if (includeSubagents && session.subagents.length > 0) {
       debugLog(debug, `Found ${session.subagents.length} subagent(s)`);
+    }
+
+    // --tool filter: standalone output mode that replaces normal formatting
+    if (args.tool) {
+      const toolOutput = formatToolFilter(session, args.tool);
+      debugLog(debug, "Total parse time", totalStart);
+      console.log(toolOutput);
+      return;
     }
 
     // Format output with debug timing

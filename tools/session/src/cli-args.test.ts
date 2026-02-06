@@ -380,6 +380,38 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--tool validation", () => {
+    it("defaults tool to undefined", () => {
+      expect(parseMainArgs(["session.jsonl"]).tool).toBeUndefined();
+    });
+
+    it("sets tool when --tool is provided", () => {
+      expect(parseMainArgs(["session.jsonl", "--tool", "Bash"]).tool).toBe("Bash");
+    });
+
+    it("preserves case sensitivity", () => {
+      expect(parseMainArgs(["--tool", "Read"]).tool).toBe("Read");
+      expect(parseMainArgs(["--tool", "Grep"]).tool).toBe("Grep");
+    });
+
+    it("throws when --tool is last argument with no value", () => {
+      expect(() => parseMainArgs(["--tool"])).toThrow("Missing value for --tool");
+    });
+
+    it("throws when --tool is followed by another flag", () => {
+      expect(() => parseMainArgs(["--tool", "--debug"])).toThrow(
+        "Missing value for --tool"
+      );
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs(["session.jsonl", "--tool", "Bash", "--debug"]);
+      expect(result.tool).toBe("Bash");
+      expect(result.debug).toBe(true);
+      expect(result.file).toBe("session.jsonl");
+    });
+  });
+
   describe("file argument", () => {
     it("accepts file path as positional argument", () => {
       expect(parseMainArgs(["session.jsonl"]).file).toBe("session.jsonl");

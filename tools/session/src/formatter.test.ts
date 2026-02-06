@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { formatNarrative, formatMarkdown } from "./formatter";
+import { formatNarrative, formatMarkdown, formatToolFilter } from "./formatter";
 import {
   makeSession,
   makeSubagent,
@@ -437,5 +437,106 @@ describe("formatMarkdown", () => {
     const output = formatMarkdown(session);
 
     expect(output).toContain("> 🔧 **Read**: /src/index.ts");
+  });
+});
+
+describe("formatToolFilter", () => {
+  test("shows matching tool calls with count header", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "Let me run some commands", {
+          toolCalls: [
+            toolCall("t1", "Bash", { command: "ls -la" }),
+            toolCall("t2", "Read", { file_path: "/src/index.ts" }),
+            toolCall("t3", "Bash", { command: "bun test" }),
+          ],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Bash");
+
+    expect(output).toContain("Bash (2 calls)");
+    expect(output).toContain("→ Bash: ls -la");
+    expect(output).toContain("→ Bash: bun test");
+    expect(output).not.toContain("Read");
+  });
+
+  test("shows singular 'call' for single match", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Grep", { pattern: "TODO" })],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Grep");
+
+    expect(output).toContain("Grep (1 call)");
+    expect(output).toContain('→ Grep: pattern="TODO"');
+  });
+
+  test("returns not-found message for missing tool", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "echo hi" })],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Write");
+
+    expect(output).toBe("No Write calls found in this session.");
+  });
+
+  test("is case-sensitive", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "echo hi" })],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "bash");
+
+    expect(output).toBe("No bash calls found in this session.");
+  });
+
+  test("collects calls across multiple turns", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "First", {
+          toolCalls: [toolCall("t1", "Read", { file_path: "/a.ts" })],
+        }),
+        userTurn("u1", "continue"),
+        assistantTurn("a2", "Second", {
+          toolCalls: [toolCall("t2", "Read", { file_path: "/b.ts" })],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Read");
+
+    expect(output).toContain("Read (2 calls)");
+    expect(output).toContain("→ Read: /a.ts");
+    expect(output).toContain("→ Read: /b.ts");
+  });
+
+  test("ignores user turns (only assistant turns have tool calls)", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "do something"),
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "echo test" })],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Bash");
+
+    expect(output).toContain("Bash (1 call)");
   });
 });
