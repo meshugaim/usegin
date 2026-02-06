@@ -60,6 +60,16 @@ export function formatNarrative(
     lines.push("");
   }
 
+  // Commits section
+  if (session.commits.length > 0) {
+    lines.push("─── Commits " + "─".repeat(28));
+    for (const commit of session.commits) {
+      const shortHash = commit.hash.slice(0, 7);
+      lines.push(`  ${shortHash}  ${commit.message ?? ""}`);
+    }
+    lines.push("");
+  }
+
   // Subagent transcripts (appended at end)
   if (formatOptions.includeSubagents && session.subagents.length > 0) {
     lines.push("");

@@ -4,6 +4,7 @@ import {
   makeSession,
   makeSubagent,
   makeRewind,
+  makeCommit,
   userTurn,
   assistantTurn,
   toolCall,
@@ -365,6 +366,48 @@ describe("formatNarrative with skills", () => {
     expect(skillsIndex).toBeGreaterThan(-1);
     expect(rewindsIndex).toBeGreaterThan(-1);
     expect(skillsIndex).toBeLessThan(rewindsIndex);
+  });
+});
+
+describe("formatNarrative with commits", () => {
+  test("shows commits section when commits exist", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      commits: [
+        makeCommit("abc1234", "Fix auth callback token validation"),
+        makeCommit("def5678", "Add privacy policy page"),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).toContain("─── Commits ");
+    expect(output).toContain("abc1234  Fix auth callback token validation");
+    expect(output).toContain("def5678  Add privacy policy page");
+  });
+
+  test("does not show commits section when no commits", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      commits: [],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).not.toContain("Commits");
+  });
+
+  test("truncates long hashes to 7 characters", () => {
+    const fullHash = "abc1234def5678901234567890abcdef12345678";
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      commits: [makeCommit(fullHash, "Update seed data")],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).toContain("abc1234  Update seed data");
+    expect(output).not.toContain(fullHash);
   });
 });
 
