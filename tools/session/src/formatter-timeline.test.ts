@@ -661,3 +661,144 @@ describe("formatTimeline full session", () => {
     expect(lines[7]).toContain("End (3m 15s)");
   });
 });
+
+// ============================================================================
+// SUBAGENT REPORT RENDERING
+// ============================================================================
+
+describe("formatTimeline subagent report", () => {
+  const start: TimelineEvent = { kind: "session_start", timestamp: at(0) };
+
+  test("renders report text on an indented line below the return", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(45)),
+        agentId: asAgentId("agent-d4e2"),
+        turns: 12,
+        durationMs: 33_000,
+        report: "Found the bug: auth token was not being refreshed on 401 responses",
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines).toHaveLength(3); // header + return line + report line
+    expect(lines[1]).toBe("  00:45  \u2190 agent-d4e2 returned (12 turns, 33s)");
+    expect(lines[2]).toBe('          "Found the bug: auth token was not being refreshed on 401 responses"');
+  });
+
+  test("does not render report line when report is undefined", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(45)),
+        agentId: asAgentId("agent-d4e2"),
+        turns: 8,
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines).toHaveLength(2); // header + return line only
+    expect(lines[1]).toContain("returned");
+  });
+
+  test("does not render report line when report is empty string", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(45)),
+        agentId: asAgentId("agent-d4e2"),
+        turns: 8,
+        report: "",
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines).toHaveLength(2); // header + return line only
+  });
+
+  test("truncates long report text to 120 characters", () => {
+    const longReport = "X".repeat(200);
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(45)),
+        agentId: asAgentId("agent-d4e2"),
+        turns: 5,
+        report: longReport,
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines).toHaveLength(3);
+    // The report line: 10 spaces indent + quote + 120 chars truncated + quote
+    const reportLine = lines[2]!;
+    expect(reportLine.startsWith("          \"")).toBe(true);
+    // Extract text between quotes
+    const match = reportLine.match(/"(.+)"/);
+    expect(match).not.toBeNull();
+    expect(match![1]!.length).toBe(120);
+    expect(match![1]!.endsWith("...")).toBe(true);
+  });
+
+  test("report line has correct indentation (10 spaces)", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(10)),
+        agentId: asAgentId("agent-x"),
+        turns: 3,
+        report: "Quick summary",
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines).toHaveLength(3);
+    // Report line should start with exactly 10 spaces
+    expect(lines[2]).toMatch(/^ {10}"/);
+    expect(lines[2]).toBe('          "Quick summary"');
+  });
+
+  test("integrates report in full timeline with other events", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(0), text: "Fix the auth bug" },
+      {
+        kind: "subagent_spawn",
+        timestamp: at(secs(5)),
+        agentId: asAgentId("agent-abc"),
+        description: "Investigate auth module",
+      },
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(30)),
+        agentId: asAgentId("agent-abc"),
+        turns: 10,
+        durationMs: 25_000,
+        report: "Found stale token cache in auth.ts line 42",
+      },
+      { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    // header + user + spawn + return + report + footer = 6 lines
+    expect(lines).toHaveLength(6);
+    expect(lines[0]).toContain("Timeline");
+    expect(lines[1]).toContain("User:");
+    expect(lines[2]).toContain("Task:");
+    expect(lines[3]).toContain("returned");
+    expect(lines[4]).toBe('          "Found stale token cache in auth.ts line 42"');
+    expect(lines[5]).toContain("End");
+  });
+});

@@ -3,6 +3,7 @@ import {
   buildTimeline,
   summarizeToolCall,
   classifyUserMessage,
+  cleanReportText,
   type TimelineEvent,
 } from "./timeline";
 import {
@@ -1006,5 +1007,347 @@ describe("buildTimeline", () => {
       expect(spawn).toBeDefined();
       expect(spawn!.description).toBe("security-checker: Security audit");
     });
+  });
+
+  // ========================================================================
+  // SUBAGENT REPORT IN RETURN EVENTS
+  // ========================================================================
+
+  describe("subagent report text in return events", () => {
+    test("captures report text from Task tool result", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts(); // 10:00
+      const t2 = ts(); // 10:01
+      const t3 = ts(); // 10:02
+      const t4 = ts(); // 10:03
+
+      const agentId = asAgentId("agent-report");
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t4,
+        turns: [
+          userTurn("u1", "Search for TODOs", { timestamp: t1 }),
+          assistantTurn("a1", "Spawning subagent", {
+            timestamp: t2,
+            toolCalls: [
+              toolCall("task1", "Task", {
+                prompt: "Find all TODO comments",
+                description: "Search TODOs",
+              }),
+            ],
+          }),
+          userTurn("u2", "", {
+            timestamp: t4,
+            toolResults: [
+              toolResult(
+                "task1",
+                `Found 5 TODO comments across 3 files. The most critical one is in auth.ts line 42. agentId: ${String(agentId)}`,
+              ),
+            ],
+          }),
+        ],
+        subagents: [
+          makeSubagent(
+            agentId,
+            [
+              assistantTurn("sa1", "Searching", {
+                timestamp: t2,
+                toolCalls: [toolCall("st1", "Grep", { pattern: "TODO" })],
+              }),
+              userTurn("su1", "", {
+                timestamp: t3,
+                toolResults: [toolResult("st1", "5 matches")],
+              }),
+            ],
+            { startTimestamp: t2 },
+          ),
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const ret = events.find((e) => e.kind === "subagent_return") as
+        | (TimelineEvent & { kind: "subagent_return" })
+        | undefined;
+
+      expect(ret).toBeDefined();
+      expect(ret!.report).toBe(
+        "Found 5 TODO comments across 3 files. The most critical one is in auth.ts line 42.",
+      );
+    });
+
+    test("strips markdown headings from report text", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+      const t2 = ts();
+      const t3 = ts();
+
+      const agentId = asAgentId("agent-md");
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t3,
+        turns: [
+          assistantTurn("a1", "Spawning", {
+            timestamp: t1,
+            toolCalls: [
+              toolCall("task1", "Task", {
+                prompt: "Analyze",
+                description: "Analyze code",
+              }),
+            ],
+          }),
+          userTurn("u1", "", {
+            timestamp: t3,
+            toolResults: [
+              toolResult(
+                "task1",
+                `## Summary\nFound the bug in auth.ts. agentId: ${String(agentId)}`,
+              ),
+            ],
+          }),
+        ],
+        subagents: [
+          makeSubagent(
+            agentId,
+            [assistantTurn("sa1", "Working", { timestamp: t1 })],
+            { startTimestamp: t1 },
+          ),
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const ret = events.find((e) => e.kind === "subagent_return") as
+        | (TimelineEvent & { kind: "subagent_return" })
+        | undefined;
+
+      expect(ret).toBeDefined();
+      // "## Summary" should be stripped to "Summary"
+      expect(ret!.report).toBe("Summary");
+    });
+
+    test("skips agentId-only lines and finds the real content", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+      const t2 = ts();
+      const t3 = ts();
+
+      const agentId = asAgentId("agent-skip-meta");
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t3,
+        turns: [
+          assistantTurn("a1", "Spawning", {
+            timestamp: t1,
+            toolCalls: [
+              toolCall("task1", "Task", {
+                prompt: "Do work",
+                description: "Work",
+              }),
+            ],
+          }),
+          userTurn("u1", "", {
+            timestamp: t3,
+            toolResults: [
+              toolResult(
+                "task1",
+                `Done. agentId: ${String(agentId)}\nCompleted the refactoring of the auth module.`,
+              ),
+            ],
+          }),
+        ],
+        subagents: [
+          makeSubagent(
+            agentId,
+            [assistantTurn("sa1", "Working", { timestamp: t1 })],
+            { startTimestamp: t1 },
+          ),
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const ret = events.find((e) => e.kind === "subagent_return") as
+        | (TimelineEvent & { kind: "subagent_return" })
+        | undefined;
+
+      expect(ret).toBeDefined();
+      expect(ret!.report).toBe("Completed the refactoring of the auth module.");
+    });
+
+    test("omits report when tool result has no meaningful content", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+      const t2 = ts();
+      const t3 = ts();
+
+      const agentId = asAgentId("agent-no-report");
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t3,
+        turns: [
+          assistantTurn("a1", "Spawning", {
+            timestamp: t1,
+            toolCalls: [
+              toolCall("task1", "Task", {
+                prompt: "Do work",
+                description: "Work",
+              }),
+            ],
+          }),
+          userTurn("u1", "", {
+            timestamp: t3,
+            toolResults: [
+              toolResult("task1", `Done. agentId: ${String(agentId)}`),
+            ],
+          }),
+        ],
+        subagents: [
+          makeSubagent(
+            agentId,
+            [assistantTurn("sa1", "Working", { timestamp: t1 })],
+            { startTimestamp: t1 },
+          ),
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const ret = events.find((e) => e.kind === "subagent_return") as
+        | (TimelineEvent & { kind: "subagent_return" })
+        | undefined;
+
+      expect(ret).toBeDefined();
+      expect(ret!.report).toBeUndefined();
+    });
+
+    test("truncates very long report text to 120 chars", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+      const t2 = ts();
+
+      const agentId = asAgentId("agent-long-report");
+      const longReport = "A".repeat(200);
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t2,
+        turns: [
+          assistantTurn("a1", "Spawning", {
+            timestamp: t1,
+            toolCalls: [
+              toolCall("task1", "Task", { prompt: "Work", description: "Work" }),
+            ],
+          }),
+          userTurn("u1", "", {
+            timestamp: t2,
+            toolResults: [
+              toolResult(
+                "task1",
+                `${longReport}\nagentId: ${String(agentId)}`,
+              ),
+            ],
+          }),
+        ],
+        subagents: [
+          makeSubagent(
+            agentId,
+            [assistantTurn("sa1", "Working", { timestamp: t1 })],
+            { startTimestamp: t1 },
+          ),
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const ret = events.find((e) => e.kind === "subagent_return") as
+        | (TimelineEvent & { kind: "subagent_return" })
+        | undefined;
+
+      expect(ret).toBeDefined();
+      expect(ret!.report).toBeDefined();
+      expect(ret!.report!.length).toBe(120);
+      expect(ret!.report!.endsWith("...")).toBe(true);
+    });
+
+    test("omits report when no matching Task tool result exists", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+      const t2 = ts();
+
+      const agentId = asAgentId("agent-no-result");
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t2,
+        turns: [],
+        subagents: [
+          makeSubagent(
+            agentId,
+            [assistantTurn("sa1", "Working", { timestamp: t1 })],
+            { startTimestamp: t1 },
+          ),
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const ret = events.find((e) => e.kind === "subagent_return") as
+        | (TimelineEvent & { kind: "subagent_return" })
+        | undefined;
+
+      expect(ret).toBeDefined();
+      expect(ret!.report).toBeUndefined();
+    });
+  });
+});
+
+// ============================================================================
+// cleanReportText
+// ============================================================================
+
+describe("cleanReportText", () => {
+  test("returns first meaningful line", () => {
+    expect(cleanReportText("Hello world")).toBe("Hello world");
+  });
+
+  test("strips markdown headings", () => {
+    expect(cleanReportText("## Summary\nThe details here")).toBe("Summary");
+  });
+
+  test("strips multiple heading levels", () => {
+    expect(cleanReportText("### Deep Heading")).toBe("Deep Heading");
+    expect(cleanReportText("# Top Level")).toBe("Top Level");
+  });
+
+  test("skips agentId metadata lines", () => {
+    expect(
+      cleanReportText("Done. agentId: agent-abc\nActual report content"),
+    ).toBe("Actual report content");
+  });
+
+  test("skips agentId= format metadata", () => {
+    expect(
+      cleanReportText("agentId = agent-abc\nReport here"),
+    ).toBe("Report here");
+  });
+
+  test("skips empty lines", () => {
+    expect(
+      cleanReportText("\n\n\nContent after blanks"),
+    ).toBe("Content after blanks");
+  });
+
+  test("returns empty string when only metadata", () => {
+    expect(cleanReportText("Done. agentId: agent-abc")).toBe("");
+  });
+
+  test("returns empty string for empty input", () => {
+    expect(cleanReportText("")).toBe("");
+  });
+
+  test("truncates to 120 characters", () => {
+    const long = "B".repeat(200);
+    const result = cleanReportText(long);
+    expect(result.length).toBe(120);
+    expect(result.endsWith("...")).toBe(true);
   });
 });

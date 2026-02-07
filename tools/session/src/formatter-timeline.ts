@@ -63,9 +63,13 @@ export function formatTimeline(
   const sessionStartMs = startEvent?.timestamp.getTime();
 
   for (const event of filtered) {
-    const line = formatEvent(event, sessionStartMs);
-    if (line !== null) {
-      lines.push(line);
+    const result = formatEvent(event, sessionStartMs);
+    if (result !== null) {
+      if (Array.isArray(result)) {
+        lines.push(...result);
+      } else {
+        lines.push(result);
+      }
     }
   }
 
@@ -88,14 +92,15 @@ const LIGHT_RULE_CHAR = "\u2500";
 // ============================================================================
 
 /**
- * Format a single timeline event into a display line.
- * Returns null for session_start (which becomes the header) and session_end
- * (which becomes the footer) — those are handled specially.
+ * Format a single timeline event into one or more display lines.
+ *
+ * Returns a string (single line), string[] (multiple lines, e.g. subagent_return
+ * with report), or null for events that produce no output.
  */
 function formatEvent(
   event: TimelineEvent,
   sessionStartMs: number | undefined,
-): string | null {
+): string | string[] | null {
   switch (event.kind) {
     case "session_start":
       return formatHeader();
@@ -137,7 +142,16 @@ function formatEvent(
       if (event.durationMs !== undefined) {
         parts.push(formatDuration(event.durationMs));
       }
-      return `  ${ts}  \u2190 ${shortId} returned (${parts.join(", ")})`;
+      const mainLine = `  ${ts}  \u2190 ${shortId} returned (${parts.join(", ")})`;
+      if (event.report) {
+        // Indent the report preview to align under the return line.
+        // The timestamp field is 5 chars (MM:SS) + surrounding spaces = "  MM:SS  " = 9 chars.
+        // We use a fixed indent that visually nests the report under the event.
+        const indent = " ".repeat(10);
+        const reportLine = `${indent}"${truncate(event.report, 120)}"`;
+        return [mainLine, reportLine];
+      }
+      return mainLine;
     }
 
     case "commit": {

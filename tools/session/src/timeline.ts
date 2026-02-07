@@ -29,7 +29,7 @@ export type TimelineEvent =
   | { kind: "assistant_message"; timestamp: Date; text: string }
   | { kind: "tool_call"; timestamp: Date; toolName: string; summary: string }
   | { kind: "subagent_spawn"; timestamp: Date; agentId: AgentId; description: string }
-  | { kind: "subagent_return"; timestamp: Date; agentId: AgentId; turns: number; durationMs?: number }
+  | { kind: "subagent_return"; timestamp: Date; agentId: AgentId; turns: number; durationMs?: number; report?: string }
   | { kind: "commit"; timestamp: Date; hash: string; subject: string }
   | { kind: "idle_gap"; timestamp: Date; durationMs: number }
   | { kind: "session_end"; timestamp: Date; totalDurationMs?: number };
@@ -223,6 +223,95 @@ function buildSpawnDescription(
 }
 
 // ============================================================================
+// SUBAGENT REPORT EXTRACTION
+// ============================================================================
+
+/**
+ * Build a map of agentId -> report text from Task tool results in the main session.
+ *
+ * When a Task tool call completes, its tool_result content contains the subagent's
+ * final output. This function scans main session turns to find those results and
+ * extracts a cleaned, truncated preview of the report.
+ *
+ * The matching uses the same pattern as buildSpawnDescription: scan user turns
+ * for tool results whose content mentions the agentId, then extract the report.
+ */
+function buildSubagentReportMap(
+  mainTurns: Turn[],
+  subagents: ParsedSubagent[],
+): Map<AgentId, string> {
+  const reports = new Map<AgentId, string>();
+
+  // Build a set of Task tool use IDs for quick lookup
+  const taskToolUseIds = new Set<string>();
+  for (const turn of mainTurns) {
+    for (const tc of turn.toolCalls) {
+      if (tc.name === "Task") {
+        taskToolUseIds.add(tc.id);
+      }
+    }
+  }
+
+  for (const sub of subagents) {
+    // Find the tool result that references this agent
+    for (const turn of mainTurns) {
+      for (const tr of turn.toolResults) {
+        if (
+          tr.content.includes(String(sub.agentId)) &&
+          taskToolUseIds.has(tr.toolUseId)
+        ) {
+          const cleaned = cleanReportText(tr.content);
+          if (cleaned) {
+            reports.set(sub.agentId, cleaned);
+          }
+          break;
+        }
+      }
+      if (reports.has(sub.agentId)) break;
+    }
+  }
+
+  return reports;
+}
+
+/**
+ * Clean and truncate a subagent report for timeline display.
+ *
+ * The raw tool result content can be very long (the subagent's entire final message).
+ * This function:
+ * 1. Strips markdown heading markers (## , ### , etc.)
+ * 2. Strips trailing agentId metadata from lines
+ * 3. Skips empty lines and metadata-only lines
+ * 4. Takes the first meaningful line of content
+ * 5. Truncates to ~120 characters
+ */
+export function cleanReportText(raw: string): string {
+  const lines = raw.split("\n");
+
+  for (const line of lines) {
+    let cleaned = line.trim();
+    if (!cleaned) continue;
+
+    // Strip markdown heading markers
+    cleaned = cleaned.replace(/^#{1,6}\s+/, "");
+    if (!cleaned) continue;
+
+    // Skip lines that are purely agentId metadata
+    if (/^(Done\.?\s*)?agentId:/i.test(cleaned)) continue;
+    if (/^agentId\s*=/i.test(cleaned)) continue;
+
+    // Strip trailing agentId metadata (e.g. "... agentId: agent-abc")
+    cleaned = cleaned.replace(/\s+agentId:\s*\S+\s*$/, "");
+    cleaned = cleaned.trim();
+    if (!cleaned) continue;
+
+    return truncate(cleaned, 120);
+  }
+
+  return "";
+}
+
+// ============================================================================
 // BUILD TIMELINE
 // ============================================================================
 
@@ -292,6 +381,8 @@ export function buildTimeline(session: ParsedSession): TimelineEvent[] {
   }
 
   // --- Subagent spawn and return events ---
+  const reportMap = buildSubagentReportMap(session.turns, session.subagents);
+
   for (const sub of session.subagents) {
     const spawnTs = subagentStartTimestamp(sub);
     if (spawnTs) {
@@ -306,12 +397,14 @@ export function buildTimeline(session: ParsedSession): TimelineEvent[] {
     const endTs = subagentEndTimestamp(sub);
     if (endTs) {
       const startTs = subagentStartTimestamp(sub);
+      const report = reportMap.get(sub.agentId);
       events.push({
         kind: "subagent_return",
         timestamp: endTs,
         agentId: sub.agentId,
         turns: sub.turns.length,
         ...(startTs ? { durationMs: durationMs(startTs, endTs) } : {}),
+        ...(report ? { report } : {}),
       });
     }
   }
