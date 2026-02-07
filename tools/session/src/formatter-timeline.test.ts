@@ -294,6 +294,29 @@ describe("formatTimeline event kinds", () => {
     expect(lines[1]).toContain("abc1234 msg");
     expect(lines[1]).not.toContain("abc1234d");
   });
+
+  test("assistant_message shows quoted text with Claude label", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "assistant_message", timestamp: at(secs(10)), text: "I've fixed the auth bug." },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines[1]).toBe('  00:10  Claude: "I\'ve fixed the auth bug."');
+  });
+
+  test("idle_gap shows ellipsis and duration", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "idle_gap", timestamp: at(mins(2)), durationMs: mins(8) },
+      { kind: "user_message", timestamp: at(mins(10)), text: "Back" },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines[1]).toBe("  02:00  \u22ef idle 8m 00s");
+  });
 });
 
 // ============================================================================

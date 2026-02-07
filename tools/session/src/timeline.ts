@@ -26,15 +26,58 @@ import { getToolCallInput } from "./types";
 export type TimelineEvent =
   | { kind: "session_start"; timestamp: Date }
   | { kind: "user_message"; timestamp: Date; text: string }
+  | { kind: "assistant_message"; timestamp: Date; text: string }
   | { kind: "tool_call"; timestamp: Date; toolName: string; summary: string }
   | { kind: "subagent_spawn"; timestamp: Date; agentId: AgentId; description: string }
   | { kind: "subagent_return"; timestamp: Date; agentId: AgentId; turns: number; durationMs?: number }
   | { kind: "commit"; timestamp: Date; hash: string; subject: string }
+  | { kind: "idle_gap"; timestamp: Date; durationMs: number }
   | { kind: "session_end"; timestamp: Date; totalDurationMs?: number };
 
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+// ============================================================================
+// USER MESSAGE CLASSIFICATION
+// ============================================================================
+
+/**
+ * Classification of user-turn text to separate human input from system noise.
+ *
+ * - "human": Real user input — show in timeline
+ * - "notification": Task/agent notification (<task-notification>) — skip
+ * - "skill_injection": Skill SKILL.md injection — skip
+ * - "command": Slash command (<command-message>) — skip (tool call appears separately)
+ * - "interrupted": User interrupted the agent — show (useful context)
+ * - "tool_result_only": No text, just tool results — skip
+ */
+export type UserMessageKind =
+  | "human"
+  | "notification"
+  | "skill_injection"
+  | "command"
+  | "interrupted"
+  | "tool_result_only";
+
+/**
+ * Classify a user turn's text to determine whether it represents real human
+ * input or system-generated noise.
+ *
+ * System messages like task notifications, skill injections, and command
+ * wrappers are filtered out so the timeline shows only the narrative —
+ * what the human actually said.
+ */
+export function classifyUserMessage(text: string): UserMessageKind {
+  if (!text || text.trim() === "") return "tool_result_only";
+  if (text.startsWith("<task-notification>")) return "notification";
+  if (text.startsWith("<command-message>")) return "command";
+  if (text.startsWith("Base directory for this skill:")) return "skill_injection";
+  // Skill loaded as prompt: typically has "# <SkillName>" header and "Triggered by" marker
+  if (text.includes("# ") && text.includes("Triggered by")) return "skill_injection";
+  if (text === "[Request interrupted by user]") return "interrupted";
+  return "human";
+}
 
 /**
  * Truncate a string to maxLen characters, appending "..." if truncated.
@@ -157,7 +200,12 @@ function buildSpawnDescription(
           if (taskCall) {
             const taskInput = getToolCallInput("Task", taskCall);
             if (taskInput) {
-              return truncate(taskInput.prompt || taskInput.description, 80);
+              // Prefer description (short summary) over prompt (full instruction text)
+              const desc = taskInput.description || taskInput.prompt;
+              const name = taskInput.name;
+              return name
+                ? `${name}: ${truncate(desc, 70)}`
+                : truncate(desc, 80);
             }
           }
         }
@@ -203,14 +251,27 @@ export function buildTimeline(session: ParsedSession): TimelineEvent[] {
     if (!ts) continue;
 
     if (turn.role === "user") {
-      // Only emit user_message for turns with actual text (not bare tool results)
-      if (turn.text) {
+      const classification = classifyUserMessage(turn.text);
+      // Only emit user_message for real human input and interruptions.
+      // System noise (notifications, skill injections, commands, bare tool results)
+      // is filtered out to keep the timeline readable.
+      if (classification === "human" || classification === "interrupted") {
         events.push({
           kind: "user_message",
           timestamp: ts,
           text: truncate(turn.text, 80),
         });
       }
+    }
+
+    // Assistant text without tool calls — the agent speaking to the user.
+    // These are the narrative glue that explains what happened between actions.
+    if (turn.role === "assistant" && turn.text && turn.toolCalls.length === 0) {
+      events.push({
+        kind: "assistant_message",
+        timestamp: ts,
+        text: truncate(turn.text, 80),
+      });
     }
 
     // Tool calls (from assistant turns)
@@ -290,5 +351,27 @@ export function buildTimeline(session: ParsedSession): TimelineEvent[] {
   // --- Sort chronologically ---
   events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
-  return events;
+  // --- Detect idle gaps ---
+  // Insert idle_gap events when consecutive events are more than 5 minutes apart.
+  // This makes dead time visible in the timeline — waiting for CI, thinking,
+  // context switches, etc.
+  const IDLE_GAP_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+  const enrichedEvents: TimelineEvent[] = [];
+  for (let i = 0; i < events.length; i++) {
+    if (i > 0) {
+      const gap =
+        events[i]!.timestamp.getTime() - events[i - 1]!.timestamp.getTime();
+      if (gap > IDLE_GAP_THRESHOLD_MS) {
+        enrichedEvents.push({
+          kind: "idle_gap",
+          timestamp: events[i - 1]!.timestamp,
+          durationMs: gap,
+        });
+      }
+    }
+    enrichedEvents.push(events[i]!);
+  }
+
+  return enrichedEvents;
 }

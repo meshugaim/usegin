@@ -365,6 +365,8 @@ export interface ToolInputMap {
   Task: {
     prompt: string;
     description: string;
+    name?: string;
+    subagent_type?: string;
   };
 
   Skill: {

@@ -109,6 +109,12 @@ function formatEvent(
       return `  ${ts}  User: "${text}"`;
     }
 
+    case "assistant_message": {
+      const ts = formatTimestamp(event.timestamp, sessionStartMs);
+      const text = truncate(event.text, 120);
+      return `  ${ts}  Claude: "${text}"`;
+    }
+
     case "tool_call": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       const summary = truncate(event.summary, 60 - event.toolName.length - 2);
@@ -139,6 +145,12 @@ function formatEvent(
       const shortHash = event.hash.slice(0, 7);
       const subject = truncate(event.subject, 120);
       return `  ${ts}  \u25cf ${shortHash} ${subject}`;
+    }
+
+    case "idle_gap": {
+      const ts = formatTimestamp(event.timestamp, sessionStartMs);
+      const duration = formatDuration(event.durationMs);
+      return `  ${ts}  \u22ef idle ${duration}`;
     }
   }
 }
