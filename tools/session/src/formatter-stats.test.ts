@@ -1279,6 +1279,172 @@ describe("JSON format output shape", () => {
     });
   });
 
+  test("includes tokenStats in JSON output when per-turn token data available", () => {
+    const session = makeSession({
+      model: "claude-sonnet-4-5-20250929",
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "First response", {
+          tokenUsage: {
+            inputTokens: 4000,
+            outputTokens: 12000,
+            cacheCreationInputTokens: 10000,
+            cacheReadInputTokens: 150000,
+          },
+        }),
+        userTurn("u2", "Follow up"),
+        assistantTurn("a2", "Second response", {
+          tokenUsage: {
+            inputTokens: 5000,
+            outputTokens: 8000,
+            cacheCreationInputTokens: 12000,
+            cacheReadInputTokens: 160000,
+          },
+        }),
+      ],
+    });
+
+    const json = buildJsonOutput(session);
+
+    // tokenStats should be present with raw numeric values
+    expect(json.tokenStats).toBeDefined();
+
+    // Peak context = max(4000+10000+150000, 5000+12000+160000) = max(164000, 177000) = 177000
+    expect(json.tokenStats!.peakContextTokens).toBe(177000);
+    expect(json.tokenStats!.peakContextPercent).toBeCloseTo(177000 / 200000, 6);
+
+    // Final context = last assistant turn = 5000+12000+160000 = 177000
+    expect(json.tokenStats!.finalContextTokens).toBe(177000);
+
+    // Cumulative output = 12000 + 8000 = 20000
+    expect(json.tokenStats!.cumulativeOutputTokens).toBe(20000);
+
+    // Cumulative input = 164000 + 177000 = 341000
+    expect(json.tokenStats!.cumulativeInputTokens).toBe(341000);
+
+    // Cache hit rate = (150000+160000) / 341000
+    expect(json.tokenStats!.cacheHitRate).toBeCloseTo(310000 / 341000, 6);
+
+    // Cost should be defined for known model
+    expect(json.tokenStats!.estimatedCostUsd).toBeDefined();
+    expect(typeof json.tokenStats!.estimatedCostUsd).toBe("number");
+
+    // Context window
+    expect(json.tokenStats!.contextWindowSize).toBe(200000);
+    expect(json.tokenStats!.model).toBe("claude-sonnet-4-5-20250929");
+  });
+
+  test("omits tokenStats when no per-turn token data", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+      ],
+    });
+
+    const json = buildJsonOutput(session);
+
+    expect(json.tokenStats).toBeUndefined();
+  });
+
+  test("includes per-subagent tokenUsage in JSON subagentSummaries", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      subagents: [
+        makeSubagent(
+          asAgentId("agent-with-tokens"),
+          [assistantTurn("sa1", "Working on analysis")],
+          {
+            tokenUsage: {
+              inputTokens: 5000,
+              outputTokens: 12000,
+              cacheCreationInputTokens: 80000,
+              cacheReadInputTokens: 400000,
+            },
+          }
+        ),
+        makeSubagent(
+          asAgentId("agent-no-tokens"),
+          [assistantTurn("sa2", "Quick task")]
+        ),
+      ],
+    });
+
+    const json = buildJsonOutput(session);
+
+    expect(json.subagentSummaries).toHaveLength(2);
+
+    // First subagent has tokenUsage
+    const withTokens = json.subagentSummaries[0]!;
+    expect(withTokens.agentId).toBe("agent-with-tokens");
+    expect(withTokens.tokenUsage).toEqual({
+      inputTokens: 5000,
+      outputTokens: 12000,
+      cacheCreationInputTokens: 80000,
+      cacheReadInputTokens: 400000,
+    });
+
+    // Second subagent has no tokenUsage
+    const noTokens = json.subagentSummaries[1]!;
+    expect(noTokens.agentId).toBe("agent-no-tokens");
+    expect(noTokens.tokenUsage).toBeUndefined();
+  });
+
+  test("tokenStats and subagent tokenUsage survive JSON round-trip", () => {
+    const session = makeSession({
+      model: "claude-sonnet-4-5-20250929",
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 2000,
+            outputTokens: 5000,
+            cacheCreationInputTokens: 8000,
+            cacheReadInputTokens: 90000,
+          },
+        }),
+      ],
+      subagents: [
+        makeSubagent(
+          asAgentId("agent-roundtrip"),
+          [assistantTurn("sa1", "Subagent work")],
+          {
+            tokenUsage: {
+              inputTokens: 1000,
+              outputTokens: 3000,
+              cacheCreationInputTokens: 5000,
+              cacheReadInputTokens: 20000,
+            },
+          }
+        ),
+      ],
+    });
+
+    const json = buildJsonOutput(session);
+    const serialized = JSON.stringify(json, null, 2);
+    const parsed = JSON.parse(serialized);
+
+    // tokenStats survives round-trip
+    expect(parsed.tokenStats).toBeDefined();
+    expect(parsed.tokenStats.peakContextTokens).toBe(100000); // 2000+8000+90000
+    expect(parsed.tokenStats.peakContextPercent).toBeCloseTo(0.5, 2);
+    expect(parsed.tokenStats.finalContextTokens).toBe(100000);
+    expect(parsed.tokenStats.cumulativeOutputTokens).toBe(5000);
+    expect(parsed.tokenStats.cacheHitRate).toBeCloseTo(0.9, 1);
+    expect(parsed.tokenStats.contextWindowSize).toBe(200000);
+    expect(parsed.tokenStats.model).toBe("claude-sonnet-4-5-20250929");
+    expect(typeof parsed.tokenStats.estimatedCostUsd).toBe("number");
+
+    // Subagent tokenUsage survives round-trip
+    expect(parsed.subagentSummaries).toHaveLength(1);
+    expect(parsed.subagentSummaries[0].tokenUsage).toEqual({
+      inputTokens: 1000,
+      outputTokens: 3000,
+      cacheCreationInputTokens: 5000,
+      cacheReadInputTokens: 20000,
+    });
+  });
+
   test("round-trips through JSON.stringify/parse cleanly", () => {
     const session = makeSession({
       sessionId: asSessionId("roundtrip-test-id"),
