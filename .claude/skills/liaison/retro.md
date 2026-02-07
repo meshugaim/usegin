@@ -13,13 +13,20 @@ Session ID is passed by liaison. Use the `session` CLI to read transcripts.
 **First:** Run `session --help` to understand available flags.
 
 **Key flags:**
-- `--subagents` - includes subagent transcripts (usually want this)
+- `--subagents` - includes subagent transcripts (expensive — reads full parent + all children)
 - `--format narrative` - human-readable output (default)
 - `--tool-input` - shows what was passed to tools
 
-**Example:**
+**Target subagent sessions directly.** Each subagent has its own session ID. If you're doing a retro on a specific subagent (e.g., `a8a595f`), use `session a8a595f` directly instead of `session <parent-id> --subagents`. This is much faster and keeps your context lean. Only use `--subagents` when you genuinely need the full parent + children view.
+
+**Example — parent session retro:**
 ```bash
-session <session-id> --format narrative --subagents
+session <parent-session-id> --format narrative --subagents
+```
+
+**Example — targeted subagent retro:**
+```bash
+session <subagent-session-id>
 ```
 
 ## What to Look For

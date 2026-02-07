@@ -35,6 +35,8 @@ The liaison manages **conversation flow**, not just task flow. When in doubt, bi
 
 Before delegating any phase/slice, list success criteria explicitly. Empirical (verifiable) and Non-empirical (judgment).
 
+**UI slices require functional round-trips.** "Visible on screen" is not done. The DoD must verify the full cycle: click/interact → persist to backend → reload page → verify state survived. Include this explicitly in criteria for any UI work.
+
 After a phase is "done" - verify (also sub agents, everything sub agents).
 
 ## How It Works
@@ -48,6 +50,15 @@ After a phase is "done" - verify (also sub agents, everything sub agents).
 7. After phase / slice / feature - review / retro.
 
 **Alternative:** For resumable/iterative work, `crun` allows session continuation.
+
+## Implementation Prompts — What to Specify
+
+When delegating to implementation agents, be explicit about things they'll otherwise miss:
+
+- **Error handling**: Always specify error UX behavior. Reference existing patterns (e.g., `showError` from `@/lib/notifications`). Don't leave error paths to imagination.
+- **Failure path tests**: Explicitly request tests for error/failure paths — especially for optimistic update patterns where rollback logic is easy to get wrong.
+- **Complete file list**: When threading props or data through multiple components, list ALL files that need changes — including test drivers, helpers, and type files, not just the main components.
+- **Prop contracts**: Specify prop optionality explicitly at every layer. `required` in the parent doesn't mean `required` in the child. Spell it out.
 
 ## Verifying Definition of Done
 
@@ -64,6 +75,13 @@ Implementation agent → completes → Verification agent → PASS → Next phas
 ```
 
 Verification is also execution — use sub-agents for it, not direct checks.
+
+**Making verifiers effective:**
+
+- **Provide working commands.** Test commands before giving them to verifiers. Integration tests often need specific flags (e.g., `--preload`). A verifier that can't run the tests is useless.
+- **Pre-flight context.** If verification needs Supabase running, ensure it's up before spawning the verifier. Don't let them waste turns debugging infrastructure.
+- **Functional round-trips for UI.** Don't just check "component renders." Specify the full cycle in the DoD: interact → persist → reload → verify.
+- **Check for absence too.** Verifiers should confirm no rogue `eslint-disable`, no `console.log`, no stale comments, no dead code left behind.
 
 ## Safeguarding Workflow
 
@@ -95,9 +113,11 @@ Don't wait to be asked. When conditions met, spawn the retro.
 
 **Flow:**
 1. Spawn retro agent with parent session ID (`$CLAUDE_SESSION_ID` - pass this not as a variable but the value itself to avoid confusion with sub agent session id) and context about what happened
-2. Retro agent reads session + subagents, returns findings + proposed actions
+2. Retro agent reads session, returns findings + proposed actions
 3. Present findings to user, ask what matters (questionnaire)
 4. Spawn workers for agreed actions (Linear issues, skill/tool updates)
+
+**Targeting subagent sessions:** When spawning retro agents for specific subagents, pass the subagent's own session ID and tell the retro agent to use `session <subagent-id>` directly — not `session <parent-id> --subagents`. Each subagent has its own session ID. Targeting it directly is much faster and keeps context lean.
 
 Tell the retro agent to use [retro.md](retro.md) for retro agent instructions.
 
