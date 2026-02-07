@@ -18,7 +18,7 @@
  * ```
  */
 
-import type { Turn, ToolCall, ToolResult, EntryUuid, ToolUseId } from "../types";
+import type { Turn, ToolCall, ToolResult, EntryUuid, ToolUseId, TurnTokenUsage } from "../types";
 import { asEntryUuid, asToolUseId } from "../types";
 
 // ============================================================================
@@ -36,6 +36,8 @@ export interface TurnOptions {
   toolCalls?: ToolCall[];
   /** Tool results in a user message */
   toolResults?: ToolResult[];
+  /** Token usage for this turn (assistant turns only) */
+  tokenUsage?: TurnTokenUsage;
 }
 
 /**
@@ -112,6 +114,7 @@ export function assistantTurn(
     isOnCurrentBranch = true,
     toolCalls = [],
     toolResults = [],
+    tokenUsage,
   } = options;
 
   const brandedUuid: EntryUuid = typeof uuid === "string" ? asEntryUuid(uuid) : uuid;
@@ -133,6 +136,7 @@ export function assistantTurn(
     isOnCurrentBranch,
     ...(brandedParentUuid !== undefined ? { parentUuid: brandedParentUuid } : {}),
     ...(timestamp !== undefined ? { timestamp } : {}),
+    ...(tokenUsage !== undefined ? { tokenUsage } : {}),
   };
 }
 

@@ -1346,3 +1346,164 @@ describe("turn duration collection", () => {
     expect(result.turnDurations![0]).toBe(5000);
   });
 });
+
+// ==========================================================================
+// PER-TURN TOKEN USAGE
+// ==========================================================================
+
+describe("per-turn token usage", () => {
+  test("assistant turn gets tokenUsage populated from entry usage data", () => {
+    const entries: Entry[] = [
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet",
+          content: [{ type: "text", text: "Hello" }],
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_creation_input_tokens: 1000,
+            cache_read_input_tokens: 5000,
+          },
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(1);
+    expect(result.turns[0]?.tokenUsage).toBeDefined();
+    expect(result.turns[0]?.tokenUsage).toEqual({
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheCreationInputTokens: 1000,
+      cacheReadInputTokens: 5000,
+    });
+  });
+
+  test("user turn has tokenUsage as undefined", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(1);
+    expect(result.turns[0]?.tokenUsage).toBeUndefined();
+  });
+
+  test("assistant turn without usage data has tokenUsage as undefined", () => {
+    const entries: Entry[] = [
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet",
+          content: [{ type: "text", text: "Hello" }],
+          // No usage field
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(1);
+    expect(result.turns[0]?.tokenUsage).toBeUndefined();
+  });
+
+  test("handles missing cache fields gracefully (defaults to 0)", () => {
+    const entries: Entry[] = [
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet",
+          content: [{ type: "text", text: "Hello" }],
+          usage: {
+            input_tokens: 200,
+            output_tokens: 80,
+            // No cache fields — older API responses may omit these
+          },
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns[0]?.tokenUsage).toBeDefined();
+    expect(result.turns[0]?.tokenUsage).toEqual({
+      inputTokens: 200,
+      outputTokens: 80,
+      cacheCreationInputTokens: 0,
+      cacheReadInputTokens: 0,
+    });
+  });
+
+  test("each assistant turn gets its own tokenUsage (not aggregated)", () => {
+    const entries: Entry[] = [
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet",
+          content: [{ type: "text", text: "First" }],
+          usage: {
+            input_tokens: 10,
+            output_tokens: 50,
+            cache_creation_input_tokens: 100,
+            cache_read_input_tokens: 500,
+          },
+        },
+      },
+      {
+        type: "assistant",
+        uuid: "a2",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet",
+          content: [{ type: "text", text: "Second" }],
+          usage: {
+            input_tokens: 20,
+            output_tokens: 100,
+            cache_creation_input_tokens: 200,
+            cache_read_input_tokens: 1000,
+          },
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turns).toHaveLength(2);
+    expect(result.turns[0]?.tokenUsage).toEqual({
+      inputTokens: 10,
+      outputTokens: 50,
+      cacheCreationInputTokens: 100,
+      cacheReadInputTokens: 500,
+    });
+    expect(result.turns[1]?.tokenUsage).toEqual({
+      inputTokens: 20,
+      outputTokens: 100,
+      cacheCreationInputTokens: 200,
+      cacheReadInputTokens: 1000,
+    });
+  });
+});

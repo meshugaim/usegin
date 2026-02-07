@@ -695,6 +695,19 @@ export interface ToolResult {
   isError: boolean;
 }
 
+/**
+ * Token usage for a single assistant turn.
+ *
+ * Mirrors the session-level `TokenUsage` but scoped to one API response.
+ * Only present on assistant turns that include usage data in the entry.
+ */
+export interface TurnTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationInputTokens: number;
+  cacheReadInputTokens: number;
+}
+
 export interface Turn {
   role: "user" | "assistant";
   text: string;
@@ -703,6 +716,7 @@ export interface Turn {
   uuid: EntryUuid;
   parentUuid?: EntryUuid | null;
   timestamp?: string;
+  tokenUsage?: TurnTokenUsage;
   isOnCurrentBranch: boolean;
 }
 

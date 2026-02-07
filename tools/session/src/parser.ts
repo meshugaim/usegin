@@ -7,9 +7,11 @@ import { dirname, join, basename } from "node:path";
 import { formatTurn, type FormatOptions } from "./formatter";
 import type {
   Entry,
+  AssistantEntry,
   ParsedSession,
   ParsedSubagent,
   Turn,
+  TurnTokenUsage,
   ToolCall,
   ToolResult,
   MessageContent,
@@ -882,6 +884,20 @@ function parseTurn(
     }
   }
 
+  // Extract per-turn token usage from assistant entries
+  let tokenUsage: TurnTokenUsage | undefined;
+  if (entry.type === "assistant") {
+    const usage = (entry as AssistantEntry).message?.usage;
+    if (usage) {
+      tokenUsage = {
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
+        cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
+      };
+    }
+  }
+
   return {
     role: entry.type as "user" | "assistant",
     text: text.trim(),
@@ -890,6 +906,7 @@ function parseTurn(
     uuid: asEntryUuid(entry.uuid ?? ""),
     parentUuid: entry.parentUuid === null ? null : entry.parentUuid ? asEntryUuid(entry.parentUuid) : undefined,
     timestamp: entry.timestamp,
+    ...(tokenUsage ? { tokenUsage } : {}),
     isOnCurrentBranch: true, // Will be updated by detectRewinds
   };
 }
