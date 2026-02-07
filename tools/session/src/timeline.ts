@@ -468,12 +468,19 @@ export function buildTimeline(
       const ts = parseTimestamp(qm.timestamp);
       if (!ts) continue;
 
-      events.push({
-        kind: "user_message",
-        timestamp: ts,
-        text: truncate(qm.content, 80),
-        queued: true,
-      });
+      // Apply the same classification as regular user messages —
+      // queued task-notifications are still noise.
+      const classification = classifyUserMessage(qm.content);
+      if (classification === "interrupted") {
+        events.push({ kind: "interrupted", timestamp: ts });
+      } else if (classification === "human") {
+        events.push({
+          kind: "user_message",
+          timestamp: ts,
+          text: truncate(qm.content, 80),
+          queued: true,
+        });
+      }
     }
   }
 
