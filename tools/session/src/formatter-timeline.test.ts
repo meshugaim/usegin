@@ -306,6 +306,17 @@ describe("formatTimeline event kinds", () => {
     expect(lines[1]).toBe('  00:10  Claude: "I\'ve fixed the auth bug."');
   });
 
+  test("interrupted shows scissors symbol", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "interrupted", timestamp: at(mins(2) + secs(56)) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines[1]).toBe("  02:56  \u2702 interrupted");
+  });
+
   test("idle_gap shows ellipsis and duration", () => {
     const events: TimelineEvent[] = [
       start,

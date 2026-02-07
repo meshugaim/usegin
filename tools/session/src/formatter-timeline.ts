@@ -161,6 +161,11 @@ function formatEvent(
       return `  ${ts}  \u25cf ${shortHash} ${subject}`;
     }
 
+    case "interrupted": {
+      const ts = formatTimestamp(event.timestamp, sessionStartMs);
+      return `  ${ts}  \u2702 interrupted`;
+    }
+
     case "idle_gap": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       const duration = formatDuration(event.durationMs);

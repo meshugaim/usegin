@@ -31,6 +31,7 @@ export type TimelineEvent =
   | { kind: "subagent_spawn"; timestamp: Date; agentId: AgentId; description: string }
   | { kind: "subagent_return"; timestamp: Date; agentId: AgentId; turns: number; durationMs?: number; report?: string }
   | { kind: "commit"; timestamp: Date; hash: string; subject: string }
+  | { kind: "interrupted"; timestamp: Date }
   | { kind: "idle_gap"; timestamp: Date; durationMs: number }
   | { kind: "session_end"; timestamp: Date; totalDurationMs?: number };
 
@@ -341,10 +342,12 @@ export function buildTimeline(session: ParsedSession): TimelineEvent[] {
 
     if (turn.role === "user") {
       const classification = classifyUserMessage(turn.text);
-      // Only emit user_message for real human input and interruptions.
+      // Only emit events for real human input and interruptions.
       // System noise (notifications, skill injections, commands, bare tool results)
       // is filtered out to keep the timeline readable.
-      if (classification === "human" || classification === "interrupted") {
+      if (classification === "interrupted") {
+        events.push({ kind: "interrupted", timestamp: ts });
+      } else if (classification === "human") {
         events.push({
           kind: "user_message",
           timestamp: ts,

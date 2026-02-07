@@ -644,7 +644,7 @@ describe("buildTimeline", () => {
       expect(userMessages).toHaveLength(0);
     });
 
-    test("keeps interrupted messages", () => {
+    test("emits interrupted event for interruptions (not user_message)", () => {
       const ts = createTimestampGenerator();
       const t1 = ts();
 
@@ -657,10 +657,15 @@ describe("buildTimeline", () => {
       });
 
       const events = buildTimeline(session);
-      const userMessages = events.filter((e) => e.kind === "user_message");
 
-      expect(userMessages).toHaveLength(1);
-      expect((userMessages[0] as TimelineEvent & { kind: "user_message" }).text).toBe("[Request interrupted by user]");
+      // Should NOT produce a user_message
+      const userMessages = events.filter((e) => e.kind === "user_message");
+      expect(userMessages).toHaveLength(0);
+
+      // Should produce an interrupted event
+      const interrupted = events.filter((e) => e.kind === "interrupted");
+      expect(interrupted).toHaveLength(1);
+      expect(interrupted[0]!.timestamp.toISOString()).toBe(t1);
     });
 
     test("keeps normal human messages", () => {
