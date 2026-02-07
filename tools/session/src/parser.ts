@@ -403,11 +403,34 @@ async function parseSubagentFile(
     }
   }
 
+  // Aggregate token usage from assistant turns that carry per-turn data
+  const turnsWithTokens = turns.filter((t) => t.tokenUsage);
+  const tokenUsage =
+    turnsWithTokens.length > 0
+      ? turnsWithTokens.reduce(
+          (acc, t) => ({
+            inputTokens: acc.inputTokens + t.tokenUsage!.inputTokens,
+            outputTokens: acc.outputTokens + t.tokenUsage!.outputTokens,
+            cacheCreationInputTokens:
+              acc.cacheCreationInputTokens + t.tokenUsage!.cacheCreationInputTokens,
+            cacheReadInputTokens:
+              acc.cacheReadInputTokens + t.tokenUsage!.cacheReadInputTokens,
+          }),
+          {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+          }
+        )
+      : undefined;
+
   return {
     agentId: asAgentId(rawAgentId),
     sessionId: asSessionId(parentSessionId),
     turns,
     startTimestamp,
+    ...(tokenUsage ? { tokenUsage } : {}),
   };
 }
 

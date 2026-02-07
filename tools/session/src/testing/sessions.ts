@@ -21,6 +21,7 @@ import type {
   ParsedSession,
   ParsedSubagent,
   Turn,
+  TurnTokenUsage,
   RewindInfo,
   CommitInfo,
   SessionId,
@@ -93,15 +94,20 @@ export function makeSession(overrides: Partial<ParsedSession> = {}): ParsedSessi
 export function makeSubagent(
   agentId: string | AgentId,
   turns: Turn[] = [],
-  options: { sessionId?: string | SessionId; startTimestamp?: string } = {}
+  options: {
+    sessionId?: string | SessionId;
+    startTimestamp?: string;
+    tokenUsage?: TurnTokenUsage;
+  } = {}
 ): ParsedSubagent {
-  const { sessionId = TEST_SESSION_ID, startTimestamp } = options;
+  const { sessionId = TEST_SESSION_ID, startTimestamp, tokenUsage } = options;
 
   return {
     agentId: typeof agentId === "string" ? asAgentId(agentId) : agentId,
     sessionId: typeof sessionId === "string" ? asSessionId(sessionId) : sessionId,
     turns,
     ...(startTimestamp ? { startTimestamp } : {}),
+    ...(tokenUsage ? { tokenUsage } : {}),
   };
 }
 

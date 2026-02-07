@@ -725,6 +725,8 @@ export interface ParsedSubagent {
   sessionId: SessionId; // Parent session ID
   turns: Turn[];
   startTimestamp?: string;
+  /** Aggregated token usage across all assistant turns in this subagent. */
+  tokenUsage?: TurnTokenUsage;
 }
 
 export interface RewindInfo {

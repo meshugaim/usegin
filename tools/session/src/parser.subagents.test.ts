@@ -475,3 +475,179 @@ describe("discoverSubagents with nested subagents directory", () => {
     expect(files).toHaveLength(3);
   });
 });
+
+describe("subagent token aggregation", () => {
+  const TOKEN_TEST_DIR = "/tmp/session-parser-subagent-tokens-test";
+  const TOKEN_SESSION_ID = asSessionId("token-test-session");
+
+  beforeAll(async () => {
+    await mkdir(TOKEN_TEST_DIR, { recursive: true });
+
+    // Create main session file
+    const mainSession = [
+      JSON.stringify({
+        type: "system",
+        subtype: "init",
+        uuid: "sys1",
+        session_id: TOKEN_SESSION_ID,
+        cwd: "/test",
+        tools: ["Read"],
+        model: "claude",
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        session_id: TOKEN_SESSION_ID,
+        message: { role: "user", content: "Hello" },
+      }),
+    ].join("\n");
+
+    await writeFile(join(TOKEN_TEST_DIR, `${TOKEN_SESSION_ID}.jsonl`), mainSession);
+
+    // Create subagent with token usage on assistant entries
+    const subagentWithTokens = [
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        sessionId: TOKEN_SESSION_ID,
+        agentId: "agent-tokens",
+        timestamp: "2025-01-01T10:00:00.000Z",
+        message: {
+          role: "assistant",
+          model: "claude",
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_creation_input_tokens: 10,
+            cache_read_input_tokens: 20,
+          },
+          content: [
+            { type: "text", text: "Let me search" },
+            { type: "tool_use", id: "t1", name: "Grep", input: { pattern: "test" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u2",
+        sessionId: TOKEN_SESSION_ID,
+        agentId: "agent-tokens",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "t1", content: "found it" }],
+        },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a2",
+        sessionId: TOKEN_SESSION_ID,
+        agentId: "agent-tokens",
+        timestamp: "2025-01-01T10:01:00.000Z",
+        message: {
+          role: "assistant",
+          model: "claude",
+          usage: {
+            input_tokens: 200,
+            output_tokens: 75,
+            cache_creation_input_tokens: 5,
+            cache_read_input_tokens: 30,
+          },
+          content: [{ type: "text", text: "Here are the results." }],
+        },
+      }),
+    ].join("\n");
+
+    await writeFile(join(TOKEN_TEST_DIR, "agent-tokens.jsonl"), subagentWithTokens);
+
+    // Create subagent WITHOUT token usage (older sessions)
+    const subagentNoTokens = [
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a3",
+        sessionId: TOKEN_SESSION_ID,
+        agentId: "agent-no-tokens",
+        timestamp: "2025-01-01T11:00:00.000Z",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: [
+            { type: "text", text: "Searching..." },
+            { type: "tool_use", id: "t2", name: "Read", input: { file_path: "/foo.ts" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u3",
+        sessionId: TOKEN_SESSION_ID,
+        agentId: "agent-no-tokens",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "t2", content: "contents" }],
+        },
+      }),
+    ].join("\n");
+
+    await writeFile(join(TOKEN_TEST_DIR, "agent-no-tokens.jsonl"), subagentNoTokens);
+  });
+
+  afterAll(async () => {
+    await rm(TOKEN_TEST_DIR, { recursive: true, force: true });
+  });
+
+  test("aggregates token usage from multiple assistant turns", async () => {
+    const session = await parseSession(join(TOKEN_TEST_DIR, `${TOKEN_SESSION_ID}.jsonl`), {
+      includeSubagents: true,
+    });
+
+    const tokensAgent = session.subagents.find(
+      (s) => s.agentId === asAgentId("agent-tokens")
+    );
+    expect(tokensAgent).toBeDefined();
+    expect(tokensAgent!.tokenUsage).toEqual({
+      inputTokens: 300, // 100 + 200
+      outputTokens: 125, // 50 + 75
+      cacheCreationInputTokens: 15, // 10 + 5
+      cacheReadInputTokens: 50, // 20 + 30
+    });
+  });
+
+  test("returns undefined tokenUsage when no assistant turns have token data", async () => {
+    const session = await parseSession(join(TOKEN_TEST_DIR, `${TOKEN_SESSION_ID}.jsonl`), {
+      includeSubagents: true,
+    });
+
+    const noTokensAgent = session.subagents.find(
+      (s) => s.agentId === asAgentId("agent-no-tokens")
+    );
+    expect(noTokensAgent).toBeDefined();
+    expect(noTokensAgent!.tokenUsage).toBeUndefined();
+  });
+
+  test("per-turn tokenUsage is set on individual assistant turns", async () => {
+    const session = await parseSession(join(TOKEN_TEST_DIR, `${TOKEN_SESSION_ID}.jsonl`), {
+      includeSubagents: true,
+    });
+
+    const tokensAgent = session.subagents.find(
+      (s) => s.agentId === asAgentId("agent-tokens")
+    );
+    expect(tokensAgent).toBeDefined();
+
+    const assistantTurns = tokensAgent!.turns.filter((t) => t.role === "assistant");
+    expect(assistantTurns).toHaveLength(2);
+
+    expect(assistantTurns[0]!.tokenUsage).toEqual({
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheCreationInputTokens: 10,
+      cacheReadInputTokens: 20,
+    });
+    expect(assistantTurns[1]!.tokenUsage).toEqual({
+      inputTokens: 200,
+      outputTokens: 75,
+      cacheCreationInputTokens: 5,
+      cacheReadInputTokens: 30,
+    });
+  });
+});
