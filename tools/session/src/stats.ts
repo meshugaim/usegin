@@ -55,6 +55,8 @@ export interface SubagentSummary {
   toolCalls: number;
   /** Duration from first to last turn timestamp, if available */
   durationMs?: number;
+  /** Aggregated token usage across all assistant turns in this subagent */
+  tokenUsage?: TurnTokenUsage;
 }
 
 // ============================================================================
@@ -214,6 +216,7 @@ function summarizeSubagent(
     turns: subagent.turns.length,
     toolCalls: toolCallCount,
     ...(durationMs !== undefined ? { durationMs } : {}),
+    ...(subagent.tokenUsage ? { tokenUsage: subagent.tokenUsage } : {}),
   };
 }
 

@@ -284,6 +284,16 @@ function formatSubagentLine(index: number, sub: SubagentSummary): string {
   if (sub.durationMs !== undefined) {
     parts.push(formatDuration(sub.durationMs));
   }
+  if (sub.tokenUsage) {
+    const total =
+      sub.tokenUsage.inputTokens +
+      sub.tokenUsage.outputTokens +
+      sub.tokenUsage.cacheCreationInputTokens +
+      sub.tokenUsage.cacheReadInputTokens;
+    if (total > 0) {
+      parts.push(`${formatTokenCount(total)} tok`);
+    }
+  }
 
   return ` ${String(index).padStart(2)}. ${idShort}${desc}   ${parts.join("  ")}`;
 }

@@ -378,6 +378,38 @@ describe("computeStats", () => {
 
       expect(stats.subagentSummaries[0]!.durationMs).toBeUndefined();
     });
+
+    test("includes tokenUsage when subagent has token data", () => {
+      const agentId = asAgentId("agent-tok");
+      const tokenUsage: TurnTokenUsage = {
+        inputTokens: 5000,
+        outputTokens: 12000,
+        cacheCreationInputTokens: 80000,
+        cacheReadInputTokens: 400000,
+      };
+      const subagent = makeSubagent(
+        agentId,
+        [assistantTurn("sa1", "Working")],
+        { tokenUsage }
+      );
+
+      const session = makeSession({ subagents: [subagent] });
+      const stats = computeStats(session);
+
+      expect(stats.subagentSummaries[0]!.tokenUsage).toEqual(tokenUsage);
+    });
+
+    test("omits tokenUsage when subagent has no token data", () => {
+      const agentId = asAgentId("agent-no-tok");
+      const subagent = makeSubagent(agentId, [
+        assistantTurn("sa1", "Working"),
+      ]);
+
+      const session = makeSession({ subagents: [subagent] });
+      const stats = computeStats(session);
+
+      expect(stats.subagentSummaries[0]!.tokenUsage).toBeUndefined();
+    });
   });
 
   // ========================================================================

@@ -437,6 +437,77 @@ describe("formatStats subagent summaries", () => {
 
     expect(output).not.toContain("Subagents");
   });
+
+  test("shows token count on subagent line when token data available", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      subagents: [
+        makeSubagent(
+          asAgentId("agent-tok1"),
+          [
+            assistantTurn("sa1", "Investigate the auth module"),
+          ],
+          {
+            tokenUsage: {
+              inputTokens: 50000,
+              outputTokens: 100000,
+              cacheCreationInputTokens: 500000,
+              cacheReadInputTokens: 1500000,
+            },
+          }
+        ),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // Total = 50000 + 100000 + 500000 + 1500000 = 2150000 = 2.1M tok
+    expect(output).toContain("2.1M tok");
+  });
+
+  test("omits token count on subagent line when no token data", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      subagents: [
+        makeSubagent(
+          asAgentId("agent-notok"),
+          [
+            assistantTurn("sa1", "Working on it"),
+          ]
+        ),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).not.toContain("tok");
+  });
+
+  test("omits token count when all token fields are zero", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      subagents: [
+        makeSubagent(
+          asAgentId("agent-zerotok"),
+          [
+            assistantTurn("sa1", "Working on it"),
+          ],
+          {
+            tokenUsage: {
+              inputTokens: 0,
+              outputTokens: 0,
+              cacheCreationInputTokens: 0,
+              cacheReadInputTokens: 0,
+            },
+          }
+        ),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).not.toContain("tok");
+  });
 });
 
 // ============================================================================
