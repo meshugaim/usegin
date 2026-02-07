@@ -654,6 +654,16 @@ export function parseEntries(entries: Entry[]): ParsedSession {
       rawSessionId = (e.session_id as string) || (e.sessionId as string) || "";
     }
 
+    // Extract cwd from any entry that has it (user, assistant, progress, etc.)
+    // Modern Claude Code sessions may not have a system/init entry, but most
+    // entry types include a cwd field. Capture from the first entry that has one.
+    if (!cwd) {
+      const entryCwd = e.cwd as string | undefined;
+      if (entryCwd) {
+        cwd = entryCwd;
+      }
+    }
+
     switch (entry.type) {
       case "summary":
         summary = entry.summary;

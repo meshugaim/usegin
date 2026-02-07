@@ -159,6 +159,94 @@ describe("parseEntries", () => {
     expect(result.sessionId).toBe(asSessionId("session-from-entry"));
   });
 
+  test("extracts cwd from entry fields when no system/init exists", () => {
+    // Modern Claude Code sessions may not have a system/init entry,
+    // but user/assistant/progress entries include a cwd field.
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:00.000Z",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+        // cwd is not in the UserEntry type definition, but exists at runtime
+        // on real session entries — the parser uses a Record<string, unknown> cast
+      } as Entry,
+    ];
+
+    // Inject cwd on the raw entry (simulating real session data)
+    (entries[0] as unknown as Record<string, unknown>).cwd = "/workspaces/test-mvp";
+
+    const result = parseEntries(entries);
+
+    expect(result.cwd).toBe("/workspaces/test-mvp");
+  });
+
+  test("extracts cwd from progress entry when it appears first", () => {
+    const entries: Entry[] = [
+      {
+        type: "progress",
+        uuid: "p1",
+        sessionId: "s1",
+        timestamp: "2025-01-15T10:00:00.000Z",
+      } as Entry,
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:01.000Z",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      } as Entry,
+    ];
+
+    // Inject cwd on both entries (progress has it, user has it)
+    (entries[0] as unknown as Record<string, unknown>).cwd = "/workspaces/test-mvp";
+    (entries[1] as unknown as Record<string, unknown>).cwd = "/workspaces/test-mvp";
+
+    const result = parseEntries(entries);
+
+    expect(result.cwd).toBe("/workspaces/test-mvp");
+  });
+
+  test("system/init cwd takes precedence over entry cwd fields", () => {
+    // If a system/init entry exists, its cwd should be used (it's set in the switch case)
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      } as Entry,
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        cwd: "/from/system/init",
+        tools: [],
+        model: "claude-sonnet",
+      },
+    ];
+
+    // User entry also has cwd, but system/init should win
+    (entries[0] as unknown as Record<string, unknown>).cwd = "/from/user/entry";
+
+    const result = parseEntries(entries);
+
+    // The user entry cwd is captured first (since it appears first),
+    // but system/init overwrites it
+    expect(result.cwd).toBe("/from/system/init");
+  });
+
   test("propagates timestamp from user entry to turn", () => {
     const entries: Entry[] = [
       {

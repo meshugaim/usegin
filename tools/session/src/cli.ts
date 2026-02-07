@@ -532,6 +532,8 @@ async function main() {
           model: session.model,
           cwd: session.cwd,
           summary: session.summary ?? null,
+          startTimestamp: session.startTimestamp ?? null,
+          endTimestamp: session.endTimestamp ?? null,
           ...stats,
         };
         output = JSON.stringify(jsonOutput, null, 2);
