@@ -1219,12 +1219,12 @@ describe("buildTimeline", () => {
       });
 
       const events = buildTimeline(session);
-      const ret = events.find((e) => e.kind === "subagent_return") as
-        | (TimelineEvent & { kind: "subagent_return" })
+      const spawn = events.find((e) => e.kind === "subagent_spawn") as
+        | (TimelineEvent & { kind: "subagent_spawn" })
         | undefined;
 
-      expect(ret).toBeDefined();
-      expect(ret!.report).toBe(
+      expect(spawn).toBeDefined();
+      expect(spawn!.report).toBe(
         "Found 5 TODO comments across 3 files. The most critical one is in auth.ts line 42.",
       );
     });
@@ -1270,14 +1270,14 @@ describe("buildTimeline", () => {
       });
 
       const events = buildTimeline(session);
-      const ret = events.find((e) => e.kind === "subagent_return") as
-        | (TimelineEvent & { kind: "subagent_return" })
+      const spawn = events.find((e) => e.kind === "subagent_spawn") as
+        | (TimelineEvent & { kind: "subagent_spawn" })
         | undefined;
 
-      expect(ret).toBeDefined();
+      expect(spawn).toBeDefined();
       // "## Summary" is stripped to "Summary", which is a preamble line.
       // With substance after it ("Found the bug in auth.ts."), preamble is skipped.
-      expect(ret!.report).toBe("Found the bug in auth.ts.");
+      expect(spawn!.report).toBe("Found the bug in auth.ts.");
     });
 
     test("skips agentId-only lines and finds the real content", () => {
@@ -1321,12 +1321,12 @@ describe("buildTimeline", () => {
       });
 
       const events = buildTimeline(session);
-      const ret = events.find((e) => e.kind === "subagent_return") as
-        | (TimelineEvent & { kind: "subagent_return" })
+      const spawn = events.find((e) => e.kind === "subagent_spawn") as
+        | (TimelineEvent & { kind: "subagent_spawn" })
         | undefined;
 
-      expect(ret).toBeDefined();
-      expect(ret!.report).toBe("Completed the refactoring of the auth module.");
+      expect(spawn).toBeDefined();
+      expect(spawn!.report).toBe("Completed the refactoring of the auth module.");
     });
 
     test("omits report when tool result has no meaningful content", () => {
@@ -1413,14 +1413,14 @@ describe("buildTimeline", () => {
       });
 
       const events = buildTimeline(session);
-      const ret = events.find((e) => e.kind === "subagent_return") as
-        | (TimelineEvent & { kind: "subagent_return" })
+      const spawn = events.find((e) => e.kind === "subagent_spawn") as
+        | (TimelineEvent & { kind: "subagent_spawn" })
         | undefined;
 
-      expect(ret).toBeDefined();
-      expect(ret!.report).toBeDefined();
-      expect(ret!.report!.length).toBe(120);
-      expect(ret!.report!.endsWith("...")).toBe(true);
+      expect(spawn).toBeDefined();
+      expect(spawn!.report).toBeDefined();
+      expect(spawn!.report!.length).toBe(120);
+      expect(spawn!.report!.endsWith("...")).toBe(true);
     });
 
     test("omits report when no matching Task tool result exists", () => {
@@ -1495,12 +1495,12 @@ describe("buildTimeline", () => {
 
       // With reportLines: 3, should skip preamble "Here is a summary:" and get 3 substance lines
       const events = buildTimeline(session, { reportLines: 3 });
-      const ret = events.find((e) => e.kind === "subagent_return") as
-        | (TimelineEvent & { kind: "subagent_return" })
+      const spawn = events.find((e) => e.kind === "subagent_spawn") as
+        | (TimelineEvent & { kind: "subagent_spawn" })
         | undefined;
 
-      expect(ret).toBeDefined();
-      expect(ret!.report).toBe("Changed auth.ts\nChanged login.ts\nChanged session.ts");
+      expect(spawn).toBeDefined();
+      expect(spawn!.report).toBe("Changed auth.ts\nChanged login.ts\nChanged session.ts");
     });
   });
 });

@@ -15,6 +15,7 @@ import type {
   Turn,
   ToolCall,
   AgentId,
+  ToolUseId,
   CommitInfo,
 } from "./types";
 import { getToolCallInput } from "./types";
@@ -28,7 +29,8 @@ export type TimelineEvent =
   | { kind: "user_message"; timestamp: Date; text: string; queued?: boolean }
   | { kind: "assistant_message"; timestamp: Date; text: string }
   | { kind: "tool_call"; timestamp: Date; toolName: string; summary: string }
-  | { kind: "subagent_spawn"; timestamp: Date; agentId: AgentId; description: string }
+  | { kind: "subagent_spawn"; timestamp: Date; agentId: AgentId; description: string; report?: string }
+  | { kind: "subagent_resume"; timestamp: Date; agentId: AgentId; description: string; report?: string }
   | { kind: "subagent_return"; timestamp: Date; agentId: AgentId; turns: number; durationMs?: number; report?: string }
   | { kind: "commit"; timestamp: Date; hash: string; subject: string }
   | { kind: "interrupted"; timestamp: Date }
@@ -187,7 +189,8 @@ function buildSpawnDescription(
   sub: ParsedSubagent,
   mainTurns: Turn[],
 ): string {
-  // Try matching via Task tool call results in the main session
+  // Try matching via Task tool call results in the main session.
+  // Skip resume calls — we want the original spawn description.
   for (const turn of mainTurns) {
     for (const tr of turn.toolResults) {
       if (tr.content.includes(String(sub.agentId))) {
@@ -200,7 +203,7 @@ function buildSpawnDescription(
           );
           if (taskCall) {
             const taskInput = getToolCallInput("Task", taskCall);
-            if (taskInput) {
+            if (taskInput && !taskInput.resume) {
               // Prefer description (short summary) over prompt (full instruction text)
               const desc = taskInput.description || taskInput.prompt;
               const name = taskInput.name;
@@ -228,21 +231,20 @@ function buildSpawnDescription(
 // ============================================================================
 
 /**
- * Build a map of agentId -> report text from Task tool results in the main session.
+ * Build a map of toolUseId -> report text from Task tool results in the main session.
  *
  * When a Task tool call completes, its tool_result content contains the subagent's
  * final output. This function scans main session turns to find those results and
  * extracts a cleaned, truncated preview of the report.
  *
- * The matching uses the same pattern as buildSpawnDescription: scan user turns
- * for tool results whose content mentions the agentId, then extract the report.
+ * Uses toolUseId as key (rather than agentId) so that multiple Task calls for the
+ * same agent (spawn + resume) each get their own report.
  */
-function buildSubagentReportMap(
+function buildToolUseReportMap(
   mainTurns: Turn[],
-  subagents: ParsedSubagent[],
   reportLines: number = 1,
-): Map<AgentId, string> {
-  const reports = new Map<AgentId, string>();
+): Map<ToolUseId, string> {
+  const reports = new Map<ToolUseId, string>();
 
   // Build a set of Task tool use IDs for quick lookup
   const taskToolUseIds = new Set<string>();
@@ -254,26 +256,49 @@ function buildSubagentReportMap(
     }
   }
 
-  for (const sub of subagents) {
-    // Find the tool result that references this agent
-    for (const turn of mainTurns) {
-      for (const tr of turn.toolResults) {
-        if (
-          tr.content.includes(String(sub.agentId)) &&
-          taskToolUseIds.has(tr.toolUseId)
-        ) {
-          const cleaned = cleanReportText(tr.content, reportLines);
-          if (cleaned) {
-            reports.set(sub.agentId, cleaned);
-          }
-          break;
+  // Scan all tool results and match them to Task tool calls
+  for (const turn of mainTurns) {
+    for (const tr of turn.toolResults) {
+      if (taskToolUseIds.has(tr.toolUseId)) {
+        const cleaned = cleanReportText(tr.content, reportLines);
+        if (cleaned) {
+          reports.set(tr.toolUseId, cleaned);
         }
       }
-      if (reports.has(sub.agentId)) break;
     }
   }
 
   return reports;
+}
+
+/**
+ * Find the Task tool call that originally spawned a given subagent.
+ *
+ * Scans main turns for a Task tool_result whose content mentions the agentId
+ * and whose corresponding Task tool_call does NOT have a `resume` field.
+ * Returns the toolUseId of the spawning Task call, or undefined.
+ */
+function findSpawnToolUseId(
+  agentId: AgentId,
+  mainTurns: Turn[],
+): ToolUseId | undefined {
+  for (const turn of mainTurns) {
+    for (const tr of turn.toolResults) {
+      if (!tr.content.includes(String(agentId))) continue;
+      // Find the matching Task tool call
+      for (const t of mainTurns) {
+        for (const tc of t.toolCalls) {
+          if (tc.id === tr.toolUseId && tc.name === "Task") {
+            const taskInput = getToolCallInput("Task", tc);
+            if (taskInput && !taskInput.resume) {
+              return tc.id;
+            }
+          }
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -484,32 +509,64 @@ export function buildTimeline(
     }
   }
 
-  // --- Subagent spawn and return events ---
+  // --- Subagent spawn, resume, and return events ---
   const { reportLines = 1 } = options ?? {};
-  const reportMap = buildSubagentReportMap(session.turns, session.subagents, reportLines);
+  const reportMap = buildToolUseReportMap(session.turns, reportLines);
 
   for (const sub of session.subagents) {
     const spawnTs = subagentStartTimestamp(sub);
     if (spawnTs) {
+      // Find the spawning Task call's toolUseId for report lookup
+      const spawnToolUseId = findSpawnToolUseId(sub.agentId, session.turns);
+      const spawnReport = spawnToolUseId ? reportMap.get(spawnToolUseId) : undefined;
       events.push({
         kind: "subagent_spawn",
         timestamp: spawnTs,
         agentId: sub.agentId,
         description: buildSpawnDescription(sub, session.turns),
+        ...(spawnReport ? { report: spawnReport } : {}),
       });
     }
 
     const endTs = subagentEndTimestamp(sub);
     if (endTs) {
       const startTs = subagentStartTimestamp(sub);
-      const report = reportMap.get(sub.agentId);
       events.push({
         kind: "subagent_return",
         timestamp: endTs,
         agentId: sub.agentId,
         turns: sub.turns.length,
         ...(startTs ? { durationMs: durationMs(startTs, endTs) } : {}),
-        ...(report ? { report } : {}),
+      });
+    }
+  }
+
+  // --- Subagent resume events ---
+  // Scan assistant turns for Task tool calls with a `resume` field.
+  // These represent a previously-returned agent being resumed with a new prompt.
+  for (const turn of session.turns) {
+    const ts = parseTimestamp(turn.timestamp);
+    if (!ts) continue;
+
+    for (const tc of turn.toolCalls) {
+      const taskInput = getToolCallInput("Task", tc);
+      if (!taskInput?.resume) continue;
+
+      const agentId = taskInput.resume as AgentId;
+      const desc = taskInput.description || taskInput.prompt;
+      const name = taskInput.name;
+      const description = name
+        ? `${name}: ${truncate(desc, 70)}`
+        : truncate(desc, 80);
+
+      const resumeReport = reportMap.get(tc.id);
+
+      events.push({
+        kind: "subagent_resume",
+        timestamp: ts,
+        agentId,
+        description,
+        ...(resumeReport ? { report: resumeReport } : {}),
       });
     }
   }

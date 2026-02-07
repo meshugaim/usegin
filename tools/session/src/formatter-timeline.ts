@@ -133,7 +133,33 @@ function formatEvent(
       const shortId = shortAgentId(event.agentId);
       const desc = truncate(event.description, 80);
       const descPart = desc ? ` "${desc}"` : "";
-      return `  ${ts}  \u2192 Task:${descPart} (${shortId})`;
+      const mainLine = `  ${ts}  \u2192 Task:${descPart} (${shortId})`;
+      if (event.report) {
+        const indent = " ".repeat(10);
+        const reportLines = event.report.split("\n").filter(Boolean);
+        const formattedReportLines = reportLines.map(
+          (line) => `${indent}"${truncate(line, 120)}"`,
+        );
+        return [mainLine, ...formattedReportLines];
+      }
+      return mainLine;
+    }
+
+    case "subagent_resume": {
+      const ts = formatTimestamp(event.timestamp, sessionStartMs);
+      const shortId = shortAgentId(event.agentId);
+      const desc = truncate(event.description, 80);
+      const descPart = desc ? ` "${desc}"` : "";
+      const mainLine = `  ${ts}  \u21bb ${shortId} resumed:${descPart}`;
+      if (event.report) {
+        const indent = " ".repeat(10);
+        const reportLines = event.report.split("\n").filter(Boolean);
+        const formattedReportLines = reportLines.map(
+          (line) => `${indent}"${truncate(line, 120)}"`,
+        );
+        return [mainLine, ...formattedReportLines];
+      }
+      return mainLine;
     }
 
     case "subagent_return": {
@@ -145,12 +171,9 @@ function formatEvent(
       }
       const mainLine = `  ${ts}  \u2190 ${shortId} returned (${parts.join(", ")})`;
       if (event.report) {
-        // Indent the report preview to align under the return line.
-        // The timestamp field is 5 chars (MM:SS) + surrounding spaces = "  MM:SS  " = 9 chars.
-        // We use a fixed indent that visually nests the report under the event.
+        // Reports are typically on spawn/resume events now, but the return
+        // event type still supports them for backward compatibility.
         const indent = " ".repeat(10);
-        // Report may be multi-line (from cleanReportText with maxLines > 1).
-        // Render each line on its own indented row with quotes.
         const reportLines = event.report.split("\n").filter(Boolean);
         const formattedReportLines = reportLines.map(
           (line) => `${indent}"${truncate(line, 120)}"`,

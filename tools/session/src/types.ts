@@ -367,6 +367,7 @@ export interface ToolInputMap {
     description: string;
     name?: string;
     subagent_type?: string;
+    resume?: string;
   };
 
   Skill: {
