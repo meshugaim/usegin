@@ -579,6 +579,262 @@ describe("formatStats empty section omission", () => {
 });
 
 // ============================================================================
+// TOKEN STATS SECTION (context/cost/cache display)
+// ============================================================================
+
+describe("formatStats token stats section", () => {
+  /**
+   * Helper: create a session with per-turn tokenUsage on assistant turns,
+   * which triggers tokenStats computation via computeStats.
+   */
+  function makeSessionWithTokenStats(overrides: {
+    model?: string;
+    turnTokenUsages: Array<{
+      inputTokens: number;
+      outputTokens: number;
+      cacheCreationInputTokens: number;
+      cacheReadInputTokens: number;
+    }>;
+  }) {
+    const { model = "claude-sonnet-4-5-20250929", turnTokenUsages } = overrides;
+    const turns = turnTokenUsages.flatMap((usage, i) => [
+      userTurn(`u${i}`, `msg ${i}`),
+      assistantTurn(`a${i}`, `resp ${i}`, { tokenUsage: usage }),
+    ]);
+
+    return makeSession({ model, turns });
+  }
+
+  test("shows Context / Cost / Output / Cache section when tokenStats available", () => {
+    const session = makeSessionWithTokenStats({
+      turnTokenUsages: [
+        {
+          inputTokens: 4000,
+          outputTokens: 12000,
+          cacheCreationInputTokens: 10000,
+          cacheReadInputTokens: 150000,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // Section header
+    expect(output).toContain("Tokens");
+
+    // Line 1: Context peak / window (percent)
+    // context = 4000 + 10000 + 150000 = 164000
+    // window = 200000
+    // pct = 164000/200000 = 82%
+    expect(output).toContain("Context  164k / 200k (82%)");
+
+    // Cost should be present (known model: sonnet 4.5)
+    expect(output).toContain("Cost  $");
+
+    // Line 2: Output tokens
+    // cumulativeOutput = 12000
+    expect(output).toContain("Output   12.0k tokens");
+
+    // Cache rate = 150000 / 164000 = 91.46% -> 91%
+    expect(output).toContain("Cache  91%");
+  });
+
+  test("shows context in header as concise summary", () => {
+    const session = makeSessionWithTokenStats({
+      turnTokenUsages: [
+        {
+          inputTokens: 2000,
+          outputTokens: 5000,
+          cacheCreationInputTokens: 8000,
+          cacheReadInputTokens: 90000,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+    const headerLine = output.split("\n")[1]!;
+
+    // context = 2000 + 8000 + 90000 = 100000
+    // pct = 100000/200000 = 50%
+    expect(headerLine).toContain("Context 100k (50%)");
+    // Should NOT show old "Tokens" format
+    expect(headerLine).not.toContain("Tokens");
+  });
+
+  test("omits Cost when model is unknown", () => {
+    const session = makeSessionWithTokenStats({
+      model: "unknown-model-xyz",
+      turnTokenUsages: [
+        {
+          inputTokens: 1000,
+          outputTokens: 2000,
+          cacheCreationInputTokens: 3000,
+          cacheReadInputTokens: 44000,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // Context line should be present
+    expect(output).toContain("Context  48.0k / 200k (24%)");
+
+    // Cost should NOT be present (unknown model)
+    const tokenSection = output.split("Tokens")[1]?.split("\n") ?? [];
+    const contextLine = tokenSection.find((l) => l.includes("Context"));
+    if (contextLine) {
+      expect(contextLine).not.toContain("Cost");
+    }
+
+    // Output and cache should still be present
+    expect(output).toContain("Output   2.0k tokens");
+    expect(output).toContain("Cache  92%");
+  });
+
+  test("falls back to old Tokens display when no per-turn tokenUsage", () => {
+    // Session-level tokenUsage but no per-turn data -> old fallback
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+      ],
+      tokenUsage: {
+        inputTokens: 200,
+        outputTokens: 1000,
+        cacheCreationInputTokens: 10000,
+        cacheReadInputTokens: 34000,
+      },
+    });
+
+    const output = formatStats(session);
+
+    // Old-style header display
+    expect(output).toContain("Tokens  45.2k");
+    // Should NOT have the new Tokens section
+    expect(output).not.toContain("Context  ");
+  });
+
+  test("rounds cache hit rate to nearest percent", () => {
+    // cacheRead=1, totalInput=3 => 33.33% -> 33%
+    const session = makeSessionWithTokenStats({
+      turnTokenUsages: [
+        {
+          inputTokens: 1,
+          outputTokens: 100,
+          cacheCreationInputTokens: 1,
+          cacheReadInputTokens: 1,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // cacheRate = 1/3 = 33%
+    expect(output).toContain("Cache  33%");
+  });
+
+  test("handles zero tokens gracefully", () => {
+    const session = makeSessionWithTokenStats({
+      turnTokenUsages: [
+        {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: 0,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // context = 0, pct = 0%
+    expect(output).toContain("Context  0 / 200k (0%)");
+    expect(output).toContain("Output   0 tokens");
+    expect(output).toContain("Cache  0%");
+  });
+
+  test("accumulates across multiple assistant turns for peak context", () => {
+    const session = makeSessionWithTokenStats({
+      turnTokenUsages: [
+        // Turn 1: context = 50k
+        {
+          inputTokens: 10000,
+          outputTokens: 5000,
+          cacheCreationInputTokens: 20000,
+          cacheReadInputTokens: 20000,
+        },
+        // Turn 2: context = 120k (peak)
+        {
+          inputTokens: 20000,
+          outputTokens: 8000,
+          cacheCreationInputTokens: 30000,
+          cacheReadInputTokens: 70000,
+        },
+        // Turn 3: context = 80k (below peak)
+        {
+          inputTokens: 10000,
+          outputTokens: 3000,
+          cacheCreationInputTokens: 20000,
+          cacheReadInputTokens: 50000,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // Peak context = 120k, pct = 60%
+    expect(output).toContain("Context  120k / 200k (60%)");
+    // Cumulative output = 5000 + 8000 + 3000 = 16000
+    expect(output).toContain("Output   16.0k tokens");
+    // Header should show peak context
+    expect(output).toContain("Context 120k (60%)");
+  });
+
+  test("Cost and Cache align with right-padding on their lines", () => {
+    const session = makeSessionWithTokenStats({
+      turnTokenUsages: [
+        {
+          inputTokens: 4000,
+          outputTokens: 892000,
+          cacheCreationInputTokens: 10000,
+          cacheReadInputTokens: 150000,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // Find the Context line and verify Cost is on the same line
+    const lines = output.split("\n");
+    const contextLine = lines.find((l) => l.includes("Context  164k"));
+    expect(contextLine).toBeDefined();
+    expect(contextLine).toContain("Cost  $");
+
+    // Find the Output line and verify Cache is on the same line
+    const outputLine = lines.find((l) => l.includes("Output   892k"));
+    expect(outputLine).toBeDefined();
+    expect(outputLine).toContain("Cache  ");
+  });
+
+  test("shows Tokens section header with light rule", () => {
+    const session = makeSessionWithTokenStats({
+      turnTokenUsages: [
+        {
+          inputTokens: 1000,
+          outputTokens: 2000,
+          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: 0,
+        },
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("\u2500\u2500\u2500 Tokens");
+  });
+});
+
+// ============================================================================
 // HINTS SUPPRESSION
 // ============================================================================
 

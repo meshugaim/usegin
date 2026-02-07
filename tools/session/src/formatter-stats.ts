@@ -14,6 +14,7 @@
 import type { ParsedSession } from "./types";
 import { computeStats } from "./stats";
 import type { SessionStats, SubagentSummary, TurnDurationStats } from "./stats";
+import { formatCost as formatCostUsd } from "./pricing";
 
 // ============================================================================
 // PUBLIC API
@@ -53,6 +54,7 @@ export function formatStats(
   // Sections — each returns lines or empty array if nothing to show
   appendSection(lines, formatConversationSection(stats, showHints));
   appendSection(lines, formatTurnDurationsSection(stats));
+  appendSection(lines, formatTokenStatsSection(stats));
   appendSection(lines, formatToolsSection(stats, showHints));
   appendSection(lines, formatSubagentsSection(stats, showHints));
   appendSection(lines, formatRewindsSection(stats, showHints));
@@ -95,7 +97,10 @@ function formatHeaderLine(sessionId: string, stats: SessionStats, slug?: string)
     parts.push(`Cost  $${formatCost(stats.costUsd)}`);
   }
 
-  if (stats.tokenUsage) {
+  if (stats.tokenStats) {
+    const pct = Math.round(stats.tokenStats.peakContextPercent * 100);
+    parts.push(`Context ${formatTokenCount(stats.tokenStats.peakContextTokens)} (${pct}%)`);
+  } else if (stats.tokenUsage) {
     const total =
       stats.tokenUsage.inputTokens +
       stats.tokenUsage.outputTokens +
@@ -147,6 +152,62 @@ function formatTurnDurationsSection(stats: SessionStats): string[] {
   lines.push(`${count} turn${count === 1 ? "" : "s"} measured`);
 
   return lines;
+}
+
+// ============================================================================
+// SECTION: TOKEN STATS
+// ============================================================================
+
+/**
+ * Render a two-line token statistics section.
+ *
+ * Line 1: Context  164k / 200k (82%)    Cost  $4.27
+ * Line 2: Output   892k tokens           Cache  94%
+ *
+ * Cost is omitted when model is unknown (estimatedCostUsd undefined).
+ * Section is omitted entirely when no tokenStats are available.
+ */
+function formatTokenStatsSection(stats: SessionStats): string[] {
+  if (!stats.tokenStats) return [];
+
+  const ts = stats.tokenStats;
+  const lines: string[] = [];
+  lines.push(sectionHeader("Tokens"));
+
+  // Line 1: Context + optional Cost
+  const peak = formatTokenCount(ts.peakContextTokens);
+  const window = formatTokenCount(ts.contextWindowSize);
+  const pct = Math.round(ts.peakContextPercent * 100);
+  const contextPart = `Context  ${peak} / ${window} (${pct}%)`;
+
+  if (ts.estimatedCostUsd !== undefined) {
+    const costPart = `Cost  ${formatCostUsd(ts.estimatedCostUsd)}`;
+    lines.push(`${contextPart}${alignRight(contextPart, costPart)}`);
+  } else {
+    lines.push(contextPart);
+  }
+
+  // Line 2: Output + Cache
+  const outputPart = `Output   ${formatTokenCount(ts.cumulativeOutputTokens)} tokens`;
+  const cachePercent = Math.round(ts.cacheHitRate * 100);
+  const cachePart = `Cache  ${cachePercent}%`;
+  lines.push(`${outputPart}${alignRight(outputPart, cachePart)}`);
+
+  return lines;
+}
+
+/**
+ * Right-align a secondary label on the same line as a primary label.
+ *
+ * Returns a padding string + the right part, such that the total line
+ * length is at least CARD_WIDTH. If the two parts together exceed
+ * CARD_WIDTH, uses a minimum gap of 4 spaces.
+ */
+function alignRight(leftPart: string, rightPart: string): string {
+  const minGap = 4;
+  const targetLen = CARD_WIDTH;
+  const gap = Math.max(minGap, targetLen - leftPart.length - rightPart.length);
+  return " ".repeat(gap) + rightPart;
 }
 
 // ============================================================================
