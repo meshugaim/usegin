@@ -13,6 +13,17 @@ import type { GitCommit } from "./git-commits";
 // TYPES
 // ============================================================================
 
+export interface TurnDurationStats {
+  /** Total active time across all measured turns (ms) */
+  totalActiveMs: number;
+  /** Average turn duration (ms) */
+  averageMs: number;
+  /** Longest single turn (ms) */
+  longestMs: number;
+  /** Number of turns measured */
+  count: number;
+}
+
 export interface SessionStats {
   turnCount: { total: number; user: number; assistant: number };
   toolCounts: Record<string, number>; // tool name -> call count, sorted by count desc
@@ -27,6 +38,8 @@ export interface SessionStats {
   costUsd?: number;
   /** Aggregated token usage across all assistant turns, if available */
   tokenUsage?: TokenUsage;
+  /** Turn duration summary stats from system/turn_duration entries */
+  turnDurationStats?: TurnDurationStats;
 }
 
 export interface SubagentSummary {
@@ -199,6 +212,26 @@ function summarizeSubagent(
   };
 }
 
+/**
+ * Compute summary statistics from per-turn duration measurements.
+ *
+ * Returns undefined if no durations are available.
+ */
+function computeTurnDurationStats(durations?: number[]): TurnDurationStats | undefined {
+  if (!durations || durations.length === 0) return undefined;
+
+  const totalActiveMs = durations.reduce((sum, d) => sum + d, 0);
+  const averageMs = Math.round(totalActiveMs / durations.length);
+  const longestMs = Math.max(...durations);
+
+  return {
+    totalActiveMs,
+    averageMs,
+    longestMs,
+    count: durations.length,
+  };
+}
+
 // ============================================================================
 // PUBLIC API
 // ============================================================================
@@ -235,6 +268,9 @@ export function computeStats(session: ParsedSession): SessionStats {
     ? session.gitCommits!.length
     : session.commits.length;
 
+  // Compute turn duration summary stats if available
+  const turnDurationStats = computeTurnDurationStats(session.turnDurations);
+
   return {
     turnCount: {
       total: session.turns.length,
@@ -255,5 +291,6 @@ export function computeStats(session: ParsedSession): SessionStats {
         }
       : {}),
     ...(session.tokenUsage ? { tokenUsage: session.tokenUsage } : {}),
+    ...(turnDurationStats ? { turnDurationStats } : {}),
   };
 }

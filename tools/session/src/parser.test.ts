@@ -933,7 +933,7 @@ describe("queued messages", () => {
     expect(result.queuedMessages![1]!.content).toBe("second message");
   });
 
-  test("ignores queue-operation entries that are not enqueue", () => {
+  test("ignores queue-operation entries that are not enqueue or popAll", () => {
     const entries: Entry[] = [
       {
         type: "queue-operation",
@@ -1012,5 +1012,337 @@ describe("queued messages", () => {
     const result = parseEntries(entries);
 
     expect(result.queuedMessages).toBeUndefined();
+  });
+
+  test("captures popAll queue operations with string content", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "popAll",
+        timestamp: "2026-02-06T19:15:00.000Z",
+        sessionId: "session-1",
+        content: "how will it know what went well?",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeDefined();
+    expect(result.queuedMessages).toHaveLength(1);
+    expect(result.queuedMessages![0]!.content).toBe("how will it know what went well?");
+    expect(result.queuedMessages![0]!.timestamp).toBe("2026-02-06T19:15:00.000Z");
+  });
+
+  test("captures both enqueue and popAll operations", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        timestamp: "2026-02-06T19:11:00.000Z",
+        sessionId: "session-1",
+        content: "first message",
+      },
+      {
+        type: "queue-operation",
+        operation: "popAll",
+        timestamp: "2026-02-06T19:12:00.000Z",
+        sessionId: "session-1",
+        content: "second message via popAll",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toHaveLength(2);
+    expect(result.queuedMessages![0]!.content).toBe("first message");
+    expect(result.queuedMessages![1]!.content).toBe("second message via popAll");
+  });
+
+  test("ignores popAll entries with non-string content", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "popAll",
+        timestamp: "2026-02-06T19:11:00.000Z",
+        sessionId: "session-1",
+        content: { some: "object" },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeUndefined();
+  });
+});
+
+// ==========================================================================
+// MODEL EXTRACTION FROM ASSISTANT ENTRIES
+// ==========================================================================
+
+describe("model extraction", () => {
+  test("extracts model from assistant entry message.model when no system/init", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-opus-4-6",
+          content: [{ type: "text", text: "Hi!" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.model).toBe("claude-opus-4-6");
+  });
+
+  test("system/init model takes precedence over assistant message.model", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        cwd: "/test",
+        tools: [],
+        model: "claude-sonnet",
+      },
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-opus-4-6",
+          content: [{ type: "text", text: "Hi!" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    // system/init model is set first; assistant model only fills if empty
+    expect(result.model).toBe("claude-sonnet");
+  });
+
+  test("extracts model from first assistant entry only", () => {
+    const entries: Entry[] = [
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-opus-4-6",
+          content: [{ type: "text", text: "First" }],
+        },
+      },
+      {
+        type: "assistant",
+        uuid: "a2",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude-sonnet-4",
+          content: [{ type: "text", text: "Second" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.model).toBe("claude-opus-4-6");
+  });
+
+  test("model is empty when no system/init and no assistant entries", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.model).toBe("");
+  });
+});
+
+// ==========================================================================
+// SLUG EXTRACTION
+// ==========================================================================
+
+describe("slug extraction", () => {
+  test("extracts slug from entry fields", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        timestamp: "2025-01-15T10:00:00.000Z",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      } as Entry,
+    ];
+
+    // Inject slug on the raw entry (simulating real session data)
+    (entries[0] as unknown as Record<string, unknown>).slug = "snoopy-exploring-elephant";
+
+    const result = parseEntries(entries);
+
+    expect(result.slug).toBe("snoopy-exploring-elephant");
+  });
+
+  test("captures slug from first entry that has it", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "First" }],
+        },
+      } as Entry,
+      {
+        type: "assistant",
+        uuid: "a1",
+        session_id: "s1",
+        message: {
+          role: "assistant",
+          model: "claude",
+          content: [{ type: "text", text: "Response" }],
+        },
+      } as Entry,
+    ];
+
+    // Only second entry has slug
+    (entries[1] as unknown as Record<string, unknown>).slug = "gleaming-fluttering-torvalds";
+
+    const result = parseEntries(entries);
+
+    expect(result.slug).toBe("gleaming-fluttering-torvalds");
+  });
+
+  test("returns undefined slug when no entries have it", () => {
+    const entries: Entry[] = [
+      {
+        type: "user",
+        uuid: "u1",
+        session_id: "s1",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Hello" }],
+        },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.slug).toBeUndefined();
+  });
+});
+
+// ==========================================================================
+// TURN DURATION COLLECTION
+// ==========================================================================
+
+describe("turn duration collection", () => {
+  test("collects turn durations from system/turn_duration entries", () => {
+    const entries: Entry[] = [
+      // system/turn_duration entries - use raw entry shape since
+      // SystemEntry type only covers subtype:"init"
+      {
+        type: "system",
+        subtype: "turn_duration",
+        uuid: "td1",
+        sessionId: "s1",
+        timestamp: "2025-01-15T10:01:00.000Z",
+        durationMs: 5000,
+      } as unknown as Entry,
+      {
+        type: "system",
+        subtype: "turn_duration",
+        uuid: "td2",
+        sessionId: "s1",
+        timestamp: "2025-01-15T10:02:00.000Z",
+        durationMs: 12000,
+      } as unknown as Entry,
+      {
+        type: "system",
+        subtype: "turn_duration",
+        uuid: "td3",
+        sessionId: "s1",
+        timestamp: "2025-01-15T10:03:00.000Z",
+        durationMs: 79259,
+      } as unknown as Entry,
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turnDurations).toBeDefined();
+    expect(result.turnDurations).toHaveLength(3);
+    expect(result.turnDurations).toEqual([5000, 12000, 79259]);
+  });
+
+  test("returns undefined turnDurations when no turn_duration entries exist", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        cwd: "/test",
+        tools: [],
+        model: "claude-sonnet",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turnDurations).toBeUndefined();
+  });
+
+  test("ignores negative durations", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "turn_duration",
+        uuid: "td1",
+        sessionId: "s1",
+        durationMs: -100,
+      } as unknown as Entry,
+      {
+        type: "system",
+        subtype: "turn_duration",
+        uuid: "td2",
+        sessionId: "s1",
+        durationMs: 5000,
+      } as unknown as Entry,
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.turnDurations).toHaveLength(1);
+    expect(result.turnDurations![0]).toBe(5000);
   });
 });

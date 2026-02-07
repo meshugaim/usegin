@@ -221,6 +221,79 @@ describe("formatStats with minimal session", () => {
 });
 
 // ============================================================================
+// SLUG IN HEADER
+// ============================================================================
+
+describe("formatStats slug", () => {
+  test("shows slug next to session ID in header", () => {
+    const session = makeSession({
+      sessionId: asSessionId("4a7ffc84-abcd-1234-ef56-789012345678"),
+      slug: "snoopy-exploring-elephant",
+      turns: [userTurn("u1", "Hello")],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Session   4a7ffc84  snoopy-exploring-elephant");
+  });
+
+  test("omits slug from header when not present", () => {
+    const session = makeSession({
+      sessionId: asSessionId("4a7ffc84-abcd-1234-ef56-789012345678"),
+      turns: [userTurn("u1", "Hello")],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Session   4a7ffc84");
+    // Should not have trailing spaces or undefined
+    expect(output).not.toContain("undefined");
+  });
+});
+
+// ============================================================================
+// TURN DURATION SECTION
+// ============================================================================
+
+describe("formatStats turn durations", () => {
+  test("shows Active Time section with summary stats", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      turnDurations: [5000, 12000, 79259],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Active Time");
+    expect(output).toContain("Total  1m 36s"); // 96259ms
+    expect(output).toContain("Avg  32s"); // 32086ms rounds to 32s
+    expect(output).toContain("Max  1m 19s"); // 79259ms
+    expect(output).toContain("3 turns measured");
+  });
+
+  test("omits Active Time section when no turn durations", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).not.toContain("Active Time");
+  });
+
+  test("uses singular for single turn", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      turnDurations: [42000],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("1 turn measured");
+  });
+});
+
+// ============================================================================
 // TOOL COUNT FORMATTING (3-column layout)
 // ============================================================================
 
@@ -760,9 +833,12 @@ function buildJsonOutput(session: ReturnType<typeof makeSession>) {
   const stats = computeStats(session);
   return {
     sessionId: session.sessionId,
+    slug: session.slug ?? null,
     model: session.model,
     cwd: session.cwd,
     summary: session.summary ?? null,
+    startTimestamp: session.startTimestamp ?? null,
+    endTimestamp: session.endTimestamp ?? null,
     ...stats,
   };
 }

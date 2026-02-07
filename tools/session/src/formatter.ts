@@ -2,7 +2,7 @@
  * Format parsed sessions into readable output
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, ToolCall } from "./types";
+import type { ParsedSession, ParsedSubagent, Turn, ToolCall, QueuedMessage } from "./types";
 import { getToolCallInput } from "./types";
 
 export interface FormatOptions {
@@ -54,10 +54,42 @@ export function formatNarrative(
     lines.push("");
   }
 
-  // Main session turns
-  for (const turn of session.turns) {
-    lines.push(formatTurn(turn, formatOptions));
-    lines.push("");
+  // Main session turns, interleaved with queued messages chronologically
+  const queuedMessages = session.queuedMessages ?? [];
+  if (queuedMessages.length > 0) {
+    // Merge turns and queued messages into a single chronological stream
+    const timedTurns = session.turns.map((turn) => ({
+      kind: "turn" as const,
+      timestamp: turn.timestamp,
+      turn,
+    }));
+    const timedQueued = queuedMessages.map((qm) => ({
+      kind: "queued" as const,
+      timestamp: qm.timestamp,
+      message: qm,
+    }));
+    const merged = [...timedTurns, ...timedQueued];
+    merged.sort((a, b) => {
+      // Items without timestamps go first (preserve original behavior)
+      if (!a.timestamp && !b.timestamp) return 0;
+      if (!a.timestamp) return -1;
+      if (!b.timestamp) return 1;
+      return a.timestamp.localeCompare(b.timestamp);
+    });
+
+    for (const item of merged) {
+      if (item.kind === "turn") {
+        lines.push(formatTurn(item.turn, formatOptions));
+      } else {
+        lines.push(`USER (queued): ${item.message.content}`);
+      }
+      lines.push("");
+    }
+  } else {
+    for (const turn of session.turns) {
+      lines.push(formatTurn(turn, formatOptions));
+      lines.push("");
+    }
   }
 
   // Commits section — prefer git-history commits when available

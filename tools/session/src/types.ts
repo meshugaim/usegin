@@ -746,11 +746,14 @@ export interface ParsedSession {
   commits: CommitInfo[]; // Commits made during this session (regex-extracted from Bash output)
   gitCommits?: GitCommit[]; // Commits from git history (richer data, preferred when available)
   queuedMessages?: QueuedMessage[]; // User messages sent while agent was mid-turn
+  slug?: string; // Human-readable session name (e.g., "gleaming-fluttering-torvalds")
   summary?: string; // Session summary from type:"summary" line
   /** Timestamp of the first entry in the session (ISO 8601) */
   startTimestamp?: string;
   /** Timestamp of the last entry in the session (ISO 8601) */
   endTimestamp?: string;
+  /** Per-turn durations from system/turn_duration entries (ms) */
+  turnDurations?: number[];
   /** Aggregated token usage across all assistant turns */
   tokenUsage?: TokenUsage;
   result?: {

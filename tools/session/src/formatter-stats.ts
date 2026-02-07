@@ -13,7 +13,7 @@
 
 import type { ParsedSession } from "./types";
 import { computeStats } from "./stats";
-import type { SessionStats, SubagentSummary } from "./stats";
+import type { SessionStats, SubagentSummary, TurnDurationStats } from "./stats";
 
 // ============================================================================
 // PUBLIC API
@@ -48,10 +48,11 @@ export function formatStats(
   lines.push(HEAVY_RULE);
 
   // Header line: Session / Duration / Cost
-  lines.push(formatHeaderLine(session.sessionId, stats));
+  lines.push(formatHeaderLine(session.sessionId, stats, session.slug));
 
   // Sections — each returns lines or empty array if nothing to show
   appendSection(lines, formatConversationSection(stats, showHints));
+  appendSection(lines, formatTurnDurationsSection(stats));
   appendSection(lines, formatToolsSection(stats, showHints));
   appendSection(lines, formatSubagentsSection(stats, showHints));
   appendSection(lines, formatRewindsSection(stats, showHints));
@@ -78,10 +79,13 @@ const TOOLS_PER_ROW = 3;
 // HEADER
 // ============================================================================
 
-function formatHeaderLine(sessionId: string, stats: SessionStats): string {
+function formatHeaderLine(sessionId: string, stats: SessionStats, slug?: string): string {
   const parts: string[] = [];
 
-  parts.push(`Session   ${sessionId.slice(0, 8)}`);
+  const sessionLabel = slug
+    ? `Session   ${sessionId.slice(0, 8)}  ${slug}`
+    : `Session   ${sessionId.slice(0, 8)}`;
+  parts.push(sessionLabel);
 
   if (stats.durationMs !== undefined) {
     parts.push(`Duration  ${formatDuration(stats.durationMs)}`);
@@ -119,6 +123,28 @@ function formatConversationSection(
   const turnSummary = `${stats.turnCount.total} turns (${stats.turnCount.user} user, ${stats.turnCount.assistant} assistant)`;
   const hint = showHints ? padHint("(--full to expand)") : "";
   lines.push(`${turnSummary}${hint}`);
+
+  return lines;
+}
+
+// ============================================================================
+// SECTION: TURN DURATIONS
+// ============================================================================
+
+function formatTurnDurationsSection(stats: SessionStats): string[] {
+  if (!stats.turnDurationStats) return [];
+
+  const { totalActiveMs, averageMs, longestMs, count } = stats.turnDurationStats;
+  const lines: string[] = [];
+  lines.push(sectionHeader("Active Time"));
+
+  const parts: string[] = [
+    `Total  ${formatDuration(totalActiveMs)}`,
+    `Avg  ${formatDuration(averageMs)}`,
+    `Max  ${formatDuration(longestMs)}`,
+  ];
+  lines.push(parts.join("    "));
+  lines.push(`${count} turn${count === 1 ? "" : "s"} measured`);
 
   return lines;
 }

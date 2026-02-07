@@ -530,6 +530,7 @@ async function main() {
         const stats = computeStats(session);
         const jsonOutput = {
           sessionId: session.sessionId,
+          slug: session.slug ?? null,
           model: session.model,
           cwd: session.cwd,
           summary: session.summary ?? null,

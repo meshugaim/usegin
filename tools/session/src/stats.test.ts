@@ -590,6 +590,57 @@ describe("computeStats", () => {
   });
 
   // ========================================================================
+  // TURN DURATION STATS
+  // ========================================================================
+
+  describe("turn duration stats", () => {
+    test("computes summary stats from turnDurations", () => {
+      const session = makeSession({
+        turnDurations: [5000, 12000, 79259],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.turnDurationStats).toBeDefined();
+      expect(stats.turnDurationStats!.totalActiveMs).toBe(96259);
+      expect(stats.turnDurationStats!.averageMs).toBe(32086); // Math.round(96259/3)
+      expect(stats.turnDurationStats!.longestMs).toBe(79259);
+      expect(stats.turnDurationStats!.count).toBe(3);
+    });
+
+    test("handles single turn duration", () => {
+      const session = makeSession({
+        turnDurations: [42000],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.turnDurationStats).toBeDefined();
+      expect(stats.turnDurationStats!.totalActiveMs).toBe(42000);
+      expect(stats.turnDurationStats!.averageMs).toBe(42000);
+      expect(stats.turnDurationStats!.longestMs).toBe(42000);
+      expect(stats.turnDurationStats!.count).toBe(1);
+    });
+
+    test("returns undefined turnDurationStats when no durations", () => {
+      const session = makeSession();
+      const stats = computeStats(session);
+
+      expect(stats.turnDurationStats).toBeUndefined();
+    });
+
+    test("returns undefined turnDurationStats when durations is empty array", () => {
+      const session = makeSession({
+        turnDurations: [],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.turnDurationStats).toBeUndefined();
+    });
+  });
+
+  // ========================================================================
   // INTEGRATION: FULL SESSION
   // ========================================================================
 

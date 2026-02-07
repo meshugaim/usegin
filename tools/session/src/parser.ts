@@ -606,11 +606,13 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   let rawSessionId = "";
   let cwd = "";
   let model = "";
+  let slug = "";
   let tools: string[] = [];
   const turns: Turn[] = [];
   const triggeredSkills: string[] = [];
   const commits: CommitInfo[] = [];
   const queuedMessages: QueuedMessage[] = [];
+  const turnDurations: number[] = [];
   const seenHashes = new Set<string>(); // Dedupe by hash
   // Map tool_use_id -> tool name, so we can filter which tool results to scan for commits.
   // Assistant turns (with tool_use blocks) always precede user turns (with tool_result blocks),
@@ -666,6 +668,15 @@ export function parseEntries(entries: Entry[]): ParsedSession {
       }
     }
 
+    // Extract slug (human-readable session name like "gleaming-fluttering-torvalds")
+    // from the first entry that has it. Most entry types carry slug.
+    if (!slug) {
+      const entrySlug = e.slug as string | undefined;
+      if (entrySlug) {
+        slug = entrySlug;
+      }
+    }
+
     switch (entry.type) {
       case "summary":
         summary = entry.summary;
@@ -676,6 +687,13 @@ export function parseEntries(entries: Entry[]): ParsedSession {
           cwd = entry.cwd;
           model = entry.model;
           tools = entry.tools;
+        }
+        // system/turn_duration entries carry per-turn timing data
+        if ((e.subtype as string) === "turn_duration") {
+          const durationMs = e.durationMs as number | undefined;
+          if (typeof durationMs === "number" && durationMs >= 0) {
+            turnDurations.push(durationMs);
+          }
         }
         break;
 
@@ -710,6 +728,15 @@ export function parseEntries(entries: Entry[]): ParsedSession {
               }
             }
           }
+          // Extract model from the first assistant entry that has one.
+          // Modern Claude Code sessions often lack system/init, so the model
+          // field on the assistant message is the most reliable source.
+          if (entry.type === "assistant" && !model) {
+            const entryModel = entry.message?.model;
+            if (entryModel) {
+              model = entryModel;
+            }
+          }
           // Aggregate token usage from assistant entries
           if (entry.type === "assistant") {
             const usage = entry.message?.usage;
@@ -733,11 +760,12 @@ export function parseEntries(entries: Entry[]): ParsedSession {
         break;
 
       case "queue-operation":
-        // queue-operation entries with operation "enqueue" and a non-empty
-        // string content represent user messages sent while the agent was
-        // mid-turn. Surface them so they can appear in the timeline.
+        // queue-operation entries represent user messages sent while the agent
+        // was mid-turn. Both "enqueue" (message queued) and "popAll" (messages
+        // delivered to the agent) carry the user's text. Surface them so they
+        // can appear in the timeline and narrative formatter.
         if (
-          entry.operation === "enqueue" &&
+          (entry.operation === "enqueue" || entry.operation === "popAll") &&
           typeof entry.content === "string" &&
           entry.content.trim() !== "" &&
           entry.timestamp
@@ -794,6 +822,8 @@ export function parseEntries(entries: Entry[]): ParsedSession {
     triggeredSkills,
     commits,
     ...(queuedMessages.length > 0 ? { queuedMessages } : {}),
+    ...(slug ? { slug } : {}),
+    ...(turnDurations.length > 0 ? { turnDurations } : {}),
     summary,
     startTimestamp,
     endTimestamp,

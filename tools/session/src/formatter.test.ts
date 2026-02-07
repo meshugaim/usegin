@@ -652,3 +652,90 @@ describe("formatToolFilter", () => {
     expect(output).toContain("Bash (1 call)");
   });
 });
+
+describe("formatNarrative with queued messages", () => {
+  test("renders queued messages as USER (queued)", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello", { timestamp: "2025-01-15T10:00:00.000Z" }),
+        assistantTurn("a1", "Working on it", { timestamp: "2025-01-15T10:00:05.000Z" }),
+      ],
+      queuedMessages: [
+        {
+          timestamp: "2025-01-15T10:00:03.000Z",
+          content: "also check the tests",
+        },
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).toContain("USER (queued): also check the tests");
+  });
+
+  test("interleaves queued messages chronologically with turns", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Start", { timestamp: "2025-01-15T10:00:00.000Z" }),
+        assistantTurn("a1", "Working", { timestamp: "2025-01-15T10:00:10.000Z" }),
+      ],
+      queuedMessages: [
+        {
+          timestamp: "2025-01-15T10:00:05.000Z",
+          content: "mid-turn message",
+        },
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // The queued message (T+5s) should appear between the user turn (T+0s) and assistant turn (T+10s)
+    const startIdx = output.indexOf("USER: Start");
+    const queuedIdx = output.indexOf("USER (queued): mid-turn message");
+    const assistIdx = output.indexOf("ASSISTANT: Working");
+
+    expect(startIdx).toBeGreaterThan(-1);
+    expect(queuedIdx).toBeGreaterThan(-1);
+    expect(assistIdx).toBeGreaterThan(-1);
+    expect(startIdx).toBeLessThan(queuedIdx);
+    expect(queuedIdx).toBeLessThan(assistIdx);
+  });
+
+  test("renders without queued messages when none exist", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).not.toContain("USER (queued)");
+    expect(output).toContain("USER: Hello");
+    expect(output).toContain("ASSISTANT: Hi!");
+  });
+
+  test("handles multiple queued messages", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Go", { timestamp: "2025-01-15T10:00:00.000Z" }),
+        assistantTurn("a1", "Done", { timestamp: "2025-01-15T10:05:00.000Z" }),
+      ],
+      queuedMessages: [
+        { timestamp: "2025-01-15T10:01:00.000Z", content: "first nudge" },
+        { timestamp: "2025-01-15T10:03:00.000Z", content: "second nudge" },
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    expect(output).toContain("USER (queued): first nudge");
+    expect(output).toContain("USER (queued): second nudge");
+
+    // Verify ordering
+    const firstIdx = output.indexOf("USER (queued): first nudge");
+    const secondIdx = output.indexOf("USER (queued): second nudge");
+    expect(firstIdx).toBeLessThan(secondIdx);
+  });
+});
