@@ -1,12 +1,14 @@
 import { test, expect, describe } from "bun:test";
 import {
   getModelPricing,
+  getContextWindowSize,
   estimateCost,
   formatCost,
   MODEL_PRICING,
+  DEFAULT_CONTEXT_WINDOW,
   type ModelPricing,
 } from "./pricing";
-import type { TurnTokenUsage } from "./types";
+import type { TokenUsage } from "./types";
 
 describe("pricing", () => {
   // ==========================================================================
@@ -26,19 +28,19 @@ describe("pricing", () => {
     test("returns pricing for claude-opus-4-6", () => {
       const pricing = getModelPricing("claude-opus-4-6");
       expect(pricing).toBeDefined();
-      expect(pricing!.inputPerMillion).toBe(15.0);
-      expect(pricing!.outputPerMillion).toBe(75.0);
-      expect(pricing!.cacheWritePerMillion).toBe(18.75);
-      expect(pricing!.cacheReadPerMillion).toBe(1.5);
+      expect(pricing!.inputPerMillion).toBe(5.0);
+      expect(pricing!.outputPerMillion).toBe(25.0);
+      expect(pricing!.cacheWritePerMillion).toBe(6.25);
+      expect(pricing!.cacheReadPerMillion).toBe(0.5);
     });
 
     test("returns pricing for claude-haiku-4-5-20251001", () => {
       const pricing = getModelPricing("claude-haiku-4-5-20251001");
       expect(pricing).toBeDefined();
-      expect(pricing!.inputPerMillion).toBe(0.8);
-      expect(pricing!.outputPerMillion).toBe(4.0);
-      expect(pricing!.cacheWritePerMillion).toBe(1.0);
-      expect(pricing!.cacheReadPerMillion).toBe(0.08);
+      expect(pricing!.inputPerMillion).toBe(1.0);
+      expect(pricing!.outputPerMillion).toBe(5.0);
+      expect(pricing!.cacheWritePerMillion).toBe(1.25);
+      expect(pricing!.cacheReadPerMillion).toBe(0.1);
     });
 
     test("returns undefined for unknown model", () => {
@@ -63,8 +65,21 @@ describe("pricing", () => {
       expect(pricing!.inputPerMillion).toBe(3.0);
     });
 
-    test("matches opus by prefix 'claude-opus-4'", () => {
+    test("matches legacy opus by prefix 'claude-opus-4'", () => {
+      // "claude-opus-4" without further version suffix maps to legacy Opus 4.0 pricing
       const pricing = getModelPricing("claude-opus-4");
+      expect(pricing).toBeDefined();
+      expect(pricing!.inputPerMillion).toBe(15.0);
+    });
+
+    test("matches opus 4.6 by prefix 'claude-opus-4-6'", () => {
+      const pricing = getModelPricing("claude-opus-4-6");
+      expect(pricing).toBeDefined();
+      expect(pricing!.inputPerMillion).toBe(5.0);
+    });
+
+    test("matches opus 4.1 by prefix 'claude-opus-4-1'", () => {
+      const pricing = getModelPricing("claude-opus-4-1-20250301");
       expect(pricing).toBeDefined();
       expect(pricing!.inputPerMillion).toBe(15.0);
     });
@@ -72,7 +87,7 @@ describe("pricing", () => {
     test("matches haiku by prefix 'claude-haiku-4-5'", () => {
       const pricing = getModelPricing("claude-haiku-4-5");
       expect(pricing).toBeDefined();
-      expect(pricing!.inputPerMillion).toBe(0.8);
+      expect(pricing!.inputPerMillion).toBe(1.0);
     });
 
     test("matches model with date suffix variation", () => {
@@ -85,7 +100,7 @@ describe("pricing", () => {
     test("matches model with extra suffix", () => {
       const pricing = getModelPricing("claude-opus-4-6-latest");
       expect(pricing).toBeDefined();
-      expect(pricing!.inputPerMillion).toBe(15.0);
+      expect(pricing!.inputPerMillion).toBe(5.0);
     });
 
     test("does not match partial non-model strings", () => {
@@ -107,7 +122,7 @@ describe("pricing", () => {
     };
 
     test("computes cost for 1M input tokens at $3/M", () => {
-      const usage: TurnTokenUsage = {
+      const usage: TokenUsage = {
         inputTokens: 1_000_000,
         outputTokens: 0,
         cacheCreationInputTokens: 0,
@@ -117,7 +132,7 @@ describe("pricing", () => {
     });
 
     test("computes cost for 1M output tokens at $15/M", () => {
-      const usage: TurnTokenUsage = {
+      const usage: TokenUsage = {
         inputTokens: 0,
         outputTokens: 1_000_000,
         cacheCreationInputTokens: 0,
@@ -127,7 +142,7 @@ describe("pricing", () => {
     });
 
     test("computes cost for 1M cache write tokens at $3.75/M", () => {
-      const usage: TurnTokenUsage = {
+      const usage: TokenUsage = {
         inputTokens: 0,
         outputTokens: 0,
         cacheCreationInputTokens: 1_000_000,
@@ -137,7 +152,7 @@ describe("pricing", () => {
     });
 
     test("computes cost for 1M cache read tokens at $0.30/M", () => {
-      const usage: TurnTokenUsage = {
+      const usage: TokenUsage = {
         inputTokens: 0,
         outputTokens: 0,
         cacheCreationInputTokens: 0,
@@ -147,7 +162,7 @@ describe("pricing", () => {
     });
 
     test("sums all token categories correctly", () => {
-      const usage: TurnTokenUsage = {
+      const usage: TokenUsage = {
         inputTokens: 100_000,
         outputTokens: 50_000,
         cacheCreationInputTokens: 200_000,
@@ -160,7 +175,7 @@ describe("pricing", () => {
     });
 
     test("returns 0 for zero token usage", () => {
-      const usage: TurnTokenUsage = {
+      const usage: TokenUsage = {
         inputTokens: 0,
         outputTokens: 0,
         cacheCreationInputTokens: 0,
@@ -171,14 +186,14 @@ describe("pricing", () => {
 
     test("works with opus pricing", () => {
       const opusPricing = getModelPricing("claude-opus-4-6")!;
-      const usage: TurnTokenUsage = {
+      const usage: TokenUsage = {
         inputTokens: 1_000_000,
         outputTokens: 100_000,
         cacheCreationInputTokens: 0,
         cacheReadInputTokens: 0,
       };
-      // 1M * 15/1M + 100k * 75/1M = 15.0 + 7.5 = 22.5
-      expect(estimateCost(usage, opusPricing)).toBeCloseTo(22.5, 6);
+      // 1M * 5/1M + 100k * 25/1M = 5.0 + 2.5 = 7.5
+      expect(estimateCost(usage, opusPricing)).toBeCloseTo(7.5, 6);
     });
   });
 
@@ -236,6 +251,42 @@ describe("pricing", () => {
           6,
         );
       }
+    });
+
+    test("all models have a contextWindow defined", () => {
+      for (const [model, pricing] of Object.entries(MODEL_PRICING)) {
+        expect(pricing.contextWindow).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  // ==========================================================================
+  // CONTEXT WINDOW SIZES
+  // ==========================================================================
+
+  describe("getContextWindowSize", () => {
+    test("returns context window for known model", () => {
+      expect(getContextWindowSize("claude-opus-4-6")).toBe(200_000);
+    });
+
+    test("returns context window via fuzzy match", () => {
+      expect(getContextWindowSize("claude-sonnet-4-5")).toBe(200_000);
+    });
+
+    test("returns default for unknown model", () => {
+      expect(getContextWindowSize("gpt-4o-2024-08-06")).toBe(DEFAULT_CONTEXT_WINDOW);
+    });
+
+    test("returns default for undefined model", () => {
+      expect(getContextWindowSize(undefined)).toBe(DEFAULT_CONTEXT_WINDOW);
+    });
+
+    test("returns default for empty string", () => {
+      expect(getContextWindowSize("")).toBe(DEFAULT_CONTEXT_WINDOW);
+    });
+
+    test("DEFAULT_CONTEXT_WINDOW is 200,000", () => {
+      expect(DEFAULT_CONTEXT_WINDOW).toBe(200_000);
     });
   });
 });

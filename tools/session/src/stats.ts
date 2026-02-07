@@ -5,10 +5,10 @@
  * Feed the result into a formatter for display.
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage, TokenStats, TurnTokenUsage } from "./types";
+import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage, TokenStats } from "./types";
 import { getToolCallInput } from "./types";
 import type { GitCommit } from "./git-commits";
-import { getModelPricing, estimateCost } from "./pricing";
+import { getModelPricing, getContextWindowSize, estimateCost } from "./pricing";
 
 // ============================================================================
 // TYPES
@@ -56,7 +56,7 @@ export interface SubagentSummary {
   /** Duration from first to last turn timestamp, if available */
   durationMs?: number;
   /** Aggregated token usage across all assistant turns in this subagent */
-  tokenUsage?: TurnTokenUsage;
+  tokenUsage?: TokenUsage;
 }
 
 // ============================================================================
@@ -244,8 +244,8 @@ function computeTurnDurationStats(durations?: number[]): TurnDurationStats | und
 // TOKEN STATS
 // ============================================================================
 
-/** Hardcoded context window size (tokens). */
-const CONTEXT_WINDOW_SIZE = 200_000;
+// Context window size is now derived per-model from the pricing table.
+// See getContextWindowSize() in pricing.ts.
 
 /**
  * Compute context size for a single turn's token usage.
@@ -253,7 +253,7 @@ const CONTEXT_WINDOW_SIZE = 200_000;
  * Context = input + cache_creation + cache_read.
  * Output tokens do NOT count toward the context window.
  */
-function contextSize(usage: TurnTokenUsage): number {
+function contextSize(usage: TokenUsage): number {
   return usage.inputTokens + usage.cacheCreationInputTokens + usage.cacheReadInputTokens;
 }
 
@@ -285,7 +285,7 @@ export function computeTokenStats(turns: Turn[], model?: string): TokenStats {
   let totalCacheRead = 0;
 
   // Cumulative usage for cost estimation
-  const cumulative: TurnTokenUsage = {
+  const cumulative: TokenUsage = {
     inputTokens: 0,
     outputTokens: 0,
     cacheCreationInputTokens: 0,
@@ -317,8 +317,11 @@ export function computeTokenStats(turns: Turn[], model?: string): TokenStats {
   const cacheHitRate =
     cumulativeInputTokens > 0 ? totalCacheRead / cumulativeInputTokens : 0;
 
+  // Resolve context window from per-model pricing table (falls back to 200k)
+  const contextWindowSize = getContextWindowSize(model);
+
   const peakContextPercent =
-    CONTEXT_WINDOW_SIZE > 0 ? peakContextTokens / CONTEXT_WINDOW_SIZE : 0;
+    contextWindowSize > 0 ? peakContextTokens / contextWindowSize : 0;
 
   // Cost estimation: only if model is known
   let estimatedCostUsd: number | undefined;
@@ -337,7 +340,7 @@ export function computeTokenStats(turns: Turn[], model?: string): TokenStats {
     cumulativeInputTokens,
     cacheHitRate,
     estimatedCostUsd,
-    contextWindowSize: CONTEXT_WINDOW_SIZE,
+    contextWindowSize,
     ...(model ? { model } : {}),
   };
 }

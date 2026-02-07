@@ -21,7 +21,7 @@ import type {
   ParsedSession,
   ParsedSubagent,
   Turn,
-  TurnTokenUsage,
+  TokenUsage,
   RewindInfo,
   CommitInfo,
   SessionId,
@@ -97,7 +97,7 @@ export function makeSubagent(
   options: {
     sessionId?: string | SessionId;
     startTimestamp?: string;
-    tokenUsage?: TurnTokenUsage;
+    tokenUsage?: TokenUsage;
   } = {}
 ): ParsedSubagent {
   const { sessionId = TEST_SESSION_ID, startTimestamp, tokenUsage } = options;

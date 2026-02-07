@@ -696,17 +696,12 @@ export interface ToolResult {
 }
 
 /**
- * Token usage for a single assistant turn.
+ * @deprecated Use `TokenUsage` instead. This alias exists for backward compatibility.
  *
- * Mirrors the session-level `TokenUsage` but scoped to one API response.
- * Only present on assistant turns that include usage data in the entry.
+ * `TurnTokenUsage` was originally a separate interface identical to `TokenUsage`.
+ * It has been unified into a single type.
  */
-export interface TurnTokenUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationInputTokens: number;
-  cacheReadInputTokens: number;
-}
+export type TurnTokenUsage = TokenUsage;
 
 /**
  * Computed token statistics derived from per-turn token data.
@@ -714,7 +709,8 @@ export interface TurnTokenUsage {
  * Context size is computed as: inputTokens + cacheReadInputTokens + cacheCreationInputTokens.
  * Output tokens are NOT counted toward context window — they represent generation cost.
  *
- * The context window is hardcoded at 200K tokens for now.
+ * Context window size is resolved per-model from the pricing table (see `getContextWindowSize`
+ * in pricing.ts). Falls back to 200K for unknown models.
  */
 export interface TokenStats {
   /** Highest context_size observed across all assistant turns */
@@ -731,7 +727,7 @@ export interface TokenStats {
   cacheHitRate: number;
   /** Estimated cost in USD based on cumulative usage and model pricing (undefined if model unknown) */
   estimatedCostUsd?: number;
-  /** Context window size in tokens (currently 200,000) */
+  /** Context window size in tokens (per-model, defaults to 200,000 for unknown models) */
   contextWindowSize: number;
   /** Model string used for pricing lookup */
   model?: string;
@@ -745,7 +741,7 @@ export interface Turn {
   uuid: EntryUuid;
   parentUuid?: EntryUuid | null;
   timestamp?: string;
-  tokenUsage?: TurnTokenUsage;
+  tokenUsage?: TokenUsage;
   isOnCurrentBranch: boolean;
 }
 
@@ -755,7 +751,7 @@ export interface ParsedSubagent {
   turns: Turn[];
   startTimestamp?: string;
   /** Aggregated token usage across all assistant turns in this subagent. */
-  tokenUsage?: TurnTokenUsage;
+  tokenUsage?: TokenUsage;
 }
 
 export interface RewindInfo {

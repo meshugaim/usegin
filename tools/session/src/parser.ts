@@ -11,7 +11,7 @@ import type {
   ParsedSession,
   ParsedSubagent,
   Turn,
-  TurnTokenUsage,
+  TokenUsage,
   ToolCall,
   ToolResult,
   MessageContent,
@@ -20,7 +20,6 @@ import type {
   ToolResultContent,
   RewindInfo,
   CommitInfo,
-  TokenUsage,
   QueuedMessage,
   SessionId,
   EntryUuid,
@@ -908,7 +907,7 @@ function parseTurn(
   }
 
   // Extract per-turn token usage from assistant entries
-  let tokenUsage: TurnTokenUsage | undefined;
+  let tokenUsage: TokenUsage | undefined;
   if (entry.type === "assistant") {
     const usage = (entry as AssistantEntry).message?.usage;
     if (usage) {

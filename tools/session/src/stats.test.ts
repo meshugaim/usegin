@@ -13,7 +13,7 @@ import {
   toolResult,
 } from "./testing";
 import { asAgentId } from "./types";
-import type { TurnTokenUsage } from "./types";
+import type { TokenUsage } from "./types";
 
 describe("computeStats", () => {
   // ========================================================================
@@ -381,7 +381,7 @@ describe("computeStats", () => {
 
     test("includes tokenUsage when subagent has token data", () => {
       const agentId = asAgentId("agent-tok");
-      const tokenUsage: TurnTokenUsage = {
+      const tokenUsage: TokenUsage = {
         inputTokens: 5000,
         outputTokens: 12000,
         cacheCreationInputTokens: 80000,

@@ -4,17 +4,17 @@
  * Provides a pricing table for known Claude models and functions to compute
  * estimated session cost from token usage data.
  *
- * Prices last verified: 2025-02 (https://docs.anthropic.com/en/docs/about-claude/pricing)
+ * Prices last verified: 2026-02-07 (https://platform.claude.com/docs/en/docs/about-claude/pricing)
  * Standard cache ratios: write = 1.25x input, read = 0.1x input
  */
 
-import type { TurnTokenUsage } from "./types";
+import type { TokenUsage } from "./types";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-/** Per-million-token pricing for a single model. */
+/** Per-million-token pricing and capabilities for a single model. */
 export interface ModelPricing {
   /** USD per 1M input tokens (non-cached) */
   inputPerMillion: number;
@@ -24,6 +24,8 @@ export interface ModelPricing {
   cacheWritePerMillion: number;
   /** USD per 1M cache read tokens (0.1x input) */
   cacheReadPerMillion: number;
+  /** Context window size in tokens (standard tier, not extended/1M beta) */
+  contextWindow: number;
 }
 
 // ============================================================================
@@ -35,6 +37,8 @@ export interface ModelPricing {
  *
  * When updating: check https://docs.anthropic.com/en/docs/about-claude/pricing
  * Cache write = 1.25x input. Cache read = 0.1x input.
+ *
+ * Prices last verified: 2026-02-07 from https://platform.claude.com/docs/en/docs/about-claude/pricing
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   "claude-sonnet-4-5-20250929": {
@@ -42,18 +46,36 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPerMillion: 15.0,
     cacheWritePerMillion: 3.75,
     cacheReadPerMillion: 0.3,
+    contextWindow: 200_000,
   },
   "claude-opus-4-6": {
+    inputPerMillion: 5.0,
+    outputPerMillion: 25.0,
+    cacheWritePerMillion: 6.25,
+    cacheReadPerMillion: 0.5,
+    contextWindow: 200_000,
+  },
+  // Legacy Opus models (4.0, 4.1) have different (higher) pricing
+  "claude-opus-4-1": {
     inputPerMillion: 15.0,
     outputPerMillion: 75.0,
     cacheWritePerMillion: 18.75,
     cacheReadPerMillion: 1.5,
+    contextWindow: 200_000,
+  },
+  "claude-opus-4-0": {
+    inputPerMillion: 15.0,
+    outputPerMillion: 75.0,
+    cacheWritePerMillion: 18.75,
+    cacheReadPerMillion: 1.5,
+    contextWindow: 200_000,
   },
   "claude-haiku-4-5-20251001": {
-    inputPerMillion: 0.8,
-    outputPerMillion: 4.0,
-    cacheWritePerMillion: 1.0,
-    cacheReadPerMillion: 0.08,
+    inputPerMillion: 1.0,
+    outputPerMillion: 5.0,
+    cacheWritePerMillion: 1.25,
+    cacheReadPerMillion: 0.1,
+    contextWindow: 200_000,
   },
 };
 
@@ -70,12 +92,45 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 const MODEL_PREFIX_MAP: [prefix: string, canonicalId: string][] = [
   // Sonnet 4.5
   ["claude-sonnet-4-5", "claude-sonnet-4-5-20250929"],
-  // Opus 4.6
+  // Opus 4.6 (must come before shorter "claude-opus-4" prefix)
   ["claude-opus-4-6", "claude-opus-4-6"],
-  ["claude-opus-4", "claude-opus-4-6"],
+  // Legacy Opus (4.1, 4.0) — "claude-opus-4-1" before the catch-all "claude-opus-4"
+  ["claude-opus-4-1", "claude-opus-4-1"],
+  ["claude-opus-4-0", "claude-opus-4-0"],
+  // Catch-all for "claude-opus-4" without further version — assume legacy pricing
+  ["claude-opus-4", "claude-opus-4-0"],
   // Haiku 4.5
   ["claude-haiku-4-5", "claude-haiku-4-5-20251001"],
 ];
+
+// ============================================================================
+// CONTEXT WINDOW
+// ============================================================================
+
+/** Default context window size for unknown models. */
+export const DEFAULT_CONTEXT_WINDOW = 200_000;
+
+/**
+ * Get the context window size for a model.
+ *
+ * Looks up the model in the pricing table (exact or fuzzy match) and
+ * returns its context window size. Falls back to DEFAULT_CONTEXT_WINDOW
+ * for unknown models.
+ *
+ * @param model - Model string (e.g., "claude-opus-4-6", "claude-sonnet-4-5-20250929")
+ * @returns Context window size in tokens
+ *
+ * @example
+ * ```ts
+ * getContextWindowSize("claude-opus-4-6");       // 200_000
+ * getContextWindowSize("unknown-model");          // 200_000 (default)
+ * ```
+ */
+export function getContextWindowSize(model?: string): number {
+  if (!model) return DEFAULT_CONTEXT_WINDOW;
+  const pricing = getModelPricing(model);
+  return pricing?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+}
 
 // ============================================================================
 // PUBLIC API
@@ -133,7 +188,7 @@ export function getModelPricing(model: string): ModelPricing | undefined {
  * ```
  */
 export function estimateCost(
-  tokenUsage: TurnTokenUsage,
+  tokenUsage: TokenUsage,
   pricing: ModelPricing,
 ): number {
   const perMillion = 1_000_000;

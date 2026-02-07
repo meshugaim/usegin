@@ -18,7 +18,7 @@
  * ```
  */
 
-import type { Turn, ToolCall, ToolResult, EntryUuid, ToolUseId, TurnTokenUsage } from "../types";
+import type { Turn, ToolCall, ToolResult, EntryUuid, ToolUseId, TokenUsage } from "../types";
 import { asEntryUuid, asToolUseId } from "../types";
 
 // ============================================================================
@@ -37,7 +37,7 @@ export interface TurnOptions {
   /** Tool results in a user message */
   toolResults?: ToolResult[];
   /** Token usage for this turn (assistant turns only) */
-  tokenUsage?: TurnTokenUsage;
+  tokenUsage?: TokenUsage;
 }
 
 /**
