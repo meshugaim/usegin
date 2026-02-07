@@ -429,6 +429,60 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--report-lines validation", () => {
+    it("defaults reportLines to 3", () => {
+      expect(parseMainArgs(["session.jsonl"]).reportLines).toBe(3);
+    });
+
+    it("sets reportLines when --report-lines is provided", () => {
+      expect(parseMainArgs(["session.jsonl", "--report-lines", "5"]).reportLines).toBe(5);
+    });
+
+    it("accepts 1 as minimum valid value", () => {
+      expect(parseMainArgs(["--report-lines", "1"]).reportLines).toBe(1);
+    });
+
+    it("throws when --report-lines is last argument with no value", () => {
+      expect(() => parseMainArgs(["--report-lines"])).toThrow("Missing value for --report-lines");
+    });
+
+    it("throws when --report-lines is followed by another flag", () => {
+      expect(() => parseMainArgs(["--report-lines", "--debug"])).toThrow(
+        "Missing value for --report-lines"
+      );
+    });
+
+    it("throws when --report-lines has non-numeric value", () => {
+      expect(() => parseMainArgs(["--report-lines", "abc"])).toThrow(
+        'Invalid --report-lines: expected non-negative integer, got "abc"'
+      );
+    });
+
+    it("throws when --report-lines is zero", () => {
+      expect(() => parseMainArgs(["--report-lines", "0"])).toThrow(
+        'Invalid --report-lines: expected positive integer, got "0"'
+      );
+    });
+
+    it("throws when --report-lines is negative (looks like a flag)", () => {
+      expect(() => parseMainArgs(["--report-lines", "-1"])).toThrow(
+        "Missing value for --report-lines"
+      );
+    });
+
+    it("throws when --report-lines is a float", () => {
+      expect(() => parseMainArgs(["--report-lines", "2.5"])).toThrow(
+        'Invalid --report-lines: expected non-negative integer, got "2.5"'
+      );
+    });
+
+    it("works alongside --timeline", () => {
+      const result = parseMainArgs(["session.jsonl", "--timeline", "--report-lines", "10"]);
+      expect(result.timeline).toBe(true);
+      expect(result.reportLines).toBe(10);
+    });
+  });
+
   describe("--tool validation", () => {
     it("defaults tool to undefined", () => {
       expect(parseMainArgs(["session.jsonl"]).tool).toBeUndefined();

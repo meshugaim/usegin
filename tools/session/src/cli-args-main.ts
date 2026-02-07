@@ -50,6 +50,7 @@ export interface MainArgs {
   full: boolean;
   timeline: boolean;
   showTools: boolean;
+  reportLines: number;
   debug: boolean;
   timeout: number;
   help: boolean;
@@ -71,6 +72,7 @@ export function parseMainArgs(args: string[]): MainArgs {
     full: false,
     timeline: false,
     showTools: false,
+    reportLines: 3,
     debug: false,
     timeout: 30,
     help: false,
@@ -111,6 +113,13 @@ export function parseMainArgs(args: string[]): MainArgs {
       result.timeline = true;
     } else if (arg === "--show-tools") {
       result.showTools = true;
+    } else if (arg === "--report-lines") {
+      const value = requireArgValue(args, i, "--report-lines");
+      result.reportLines = validateNonNegativeInteger(value, "--report-lines");
+      if (result.reportLines === 0) {
+        throw new Error('Invalid --report-lines: expected positive integer, got "0"');
+      }
+      i++;
     } else if (arg === "--debug") {
       result.debug = true;
     } else if (arg === "--timeout") {

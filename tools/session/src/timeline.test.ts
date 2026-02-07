@@ -1127,8 +1127,9 @@ describe("buildTimeline", () => {
         | undefined;
 
       expect(ret).toBeDefined();
-      // "## Summary" should be stripped to "Summary"
-      expect(ret!.report).toBe("Summary");
+      // "## Summary" is stripped to "Summary", which is a preamble line.
+      // With substance after it ("Found the bug in auth.ts."), preamble is skipped.
+      expect(ret!.report).toBe("Found the bug in auth.ts.");
     });
 
     test("skips agentId-only lines and finds the real content", () => {
@@ -1302,6 +1303,57 @@ describe("buildTimeline", () => {
       expect(ret).toBeDefined();
       expect(ret!.report).toBeUndefined();
     });
+
+    test("passes reportLines option through to cleanReportText", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+      const t2 = ts();
+      const t3 = ts();
+      const t4 = ts();
+
+      const agentId = asAgentId("agent-multiline");
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t4,
+        turns: [
+          assistantTurn("a1", "Spawning", {
+            timestamp: t1,
+            toolCalls: [
+              toolCall("task1", "Task", { prompt: "Refactor", description: "Refactor auth" }),
+            ],
+          }),
+          userTurn("u1", "", {
+            timestamp: t4,
+            toolResults: [
+              toolResult(
+                "task1",
+                `Here is a summary:\nChanged auth.ts\nChanged login.ts\nChanged session.ts\nagentId: ${String(agentId)}`,
+              ),
+            ],
+          }),
+        ],
+        subagents: [
+          makeSubagent(
+            agentId,
+            [
+              assistantTurn("sa1", "Working", { timestamp: t2 }),
+              assistantTurn("sa2", "Done", { timestamp: t3 }),
+            ],
+            { startTimestamp: t2 },
+          ),
+        ],
+      });
+
+      // With reportLines: 3, should skip preamble "Here is a summary:" and get 3 substance lines
+      const events = buildTimeline(session, { reportLines: 3 });
+      const ret = events.find((e) => e.kind === "subagent_return") as
+        | (TimelineEvent & { kind: "subagent_return" })
+        | undefined;
+
+      expect(ret).toBeDefined();
+      expect(ret!.report).toBe("Changed auth.ts\nChanged login.ts\nChanged session.ts");
+    });
   });
 });
 
@@ -1315,7 +1367,13 @@ describe("cleanReportText", () => {
   });
 
   test("strips markdown headings", () => {
-    expect(cleanReportText("## Summary\nThe details here")).toBe("Summary");
+    // "Summary" alone is a preamble line, so it gets skipped when substance follows
+    expect(cleanReportText("## Summary\nThe details here")).toBe("The details here");
+  });
+
+  test("strips markdown headings when not preamble", () => {
+    // A heading that isn't a preamble pattern is returned as-is (stripped of ##)
+    expect(cleanReportText("## Changes across 3 files")).toBe("Changes across 3 files");
   });
 
   test("strips multiple heading levels", () => {
@@ -1354,5 +1412,95 @@ describe("cleanReportText", () => {
     const result = cleanReportText(long);
     expect(result.length).toBe(120);
     expect(result.endsWith("...")).toBe(true);
+  });
+
+  // ========================================================================
+  // maxLines parameter
+  // ========================================================================
+
+  test("collects multiple lines when maxLines > 1", () => {
+    const raw = "Line one\nLine two\nLine three\nLine four";
+    expect(cleanReportText(raw, 3)).toBe("Line one\nLine two\nLine three");
+  });
+
+  test("returns fewer lines when not enough meaningful content", () => {
+    const raw = "Only one line";
+    expect(cleanReportText(raw, 5)).toBe("Only one line");
+  });
+
+  test("truncates each line independently when maxLines > 1", () => {
+    const longA = "A".repeat(200);
+    const longB = "B".repeat(200);
+    const result = cleanReportText(`${longA}\n${longB}`, 2);
+    const lines = result.split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]!.length).toBe(120);
+    expect(lines[0]!.endsWith("...")).toBe(true);
+    expect(lines[1]!.length).toBe(120);
+    expect(lines[1]!.endsWith("...")).toBe(true);
+  });
+
+  test("skips empty lines and metadata between meaningful lines", () => {
+    const raw = "First line\n\n\nagentId: agent-xyz\nSecond line\nThird line";
+    expect(cleanReportText(raw, 3)).toBe("First line\nSecond line\nThird line");
+  });
+
+  // ========================================================================
+  // Preamble skipping
+  // ========================================================================
+
+  test("skips preamble 'Here is a summary' when substance follows", () => {
+    const raw = "Here is a summary of what was done.\nActual content line 1\nActual content line 2";
+    expect(cleanReportText(raw, 2)).toBe("Actual content line 1\nActual content line 2");
+  });
+
+  test("skips 'Done.' preamble when substance follows", () => {
+    const raw = "Done.\nRefactored the auth module completely.";
+    expect(cleanReportText(raw, 1)).toBe("Refactored the auth module completely.");
+  });
+
+  test("skips 'All done.' preamble when substance follows", () => {
+    const raw = "All done.\nThree files were updated.";
+    expect(cleanReportText(raw, 1)).toBe("Three files were updated.");
+  });
+
+  test("skips 'Commit succeeded' preamble", () => {
+    const raw = "Commit succeeded. Here's the summary:\nChanges to auth.ts and login.ts";
+    // "Commit succeeded..." is first meaningful line but matches preamble
+    // "Here's the summary:" is second — also preamble
+    // "Changes to auth.ts and login.ts" is the substance
+    expect(cleanReportText(raw, 1)).toBe("Changes to auth.ts and login.ts");
+  });
+
+  test("keeps preamble-looking line when it's the only substance", () => {
+    const raw = "Done.";
+    // Only one meaningful line, and it looks like preamble — but there's nothing
+    // after it, so we keep it.
+    expect(cleanReportText(raw, 1)).toBe("Done.");
+  });
+
+  test("skips multiple consecutive preamble lines", () => {
+    const raw = "I've completed the task.\nHere is the summary:\nFile1: added types\nFile2: fixed bug";
+    expect(cleanReportText(raw, 2)).toBe("File1: added types\nFile2: fixed bug");
+  });
+
+  // ========================================================================
+  // Separator and usage block skipping
+  // ========================================================================
+
+  test("skips --- separators", () => {
+    const raw = "Preamble\n---\nActual content";
+    // "Preamble" doesn't match preamble patterns (it's not "Done.", "Here is", etc.)
+    expect(cleanReportText(raw, 2)).toBe("Preamble\nActual content");
+  });
+
+  test("skips <usage> blocks", () => {
+    const raw = "Report line\n<usage>\ntokens: 500\n</usage>\nSecond line";
+    expect(cleanReportText(raw, 2)).toBe("Report line\nSecond line");
+  });
+
+  test("defaults to maxLines=1 (backward compatible)", () => {
+    const raw = "Line one\nLine two\nLine three";
+    expect(cleanReportText(raw)).toBe("Line one");
   });
 });

@@ -148,8 +148,13 @@ function formatEvent(
         // The timestamp field is 5 chars (MM:SS) + surrounding spaces = "  MM:SS  " = 9 chars.
         // We use a fixed indent that visually nests the report under the event.
         const indent = " ".repeat(10);
-        const reportLine = `${indent}"${truncate(event.report, 120)}"`;
-        return [mainLine, reportLine];
+        // Report may be multi-line (from cleanReportText with maxLines > 1).
+        // Render each line on its own indented row with quotes.
+        const reportLines = event.report.split("\n").filter(Boolean);
+        const formattedReportLines = reportLines.map(
+          (line) => `${indent}"${truncate(line, 120)}"`,
+        );
+        return [mainLine, ...formattedReportLines];
       }
       return mainLine;
     }

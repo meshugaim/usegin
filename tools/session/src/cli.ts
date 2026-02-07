@@ -91,6 +91,7 @@ OPTIONS:
   --full             Full narrative output (default: compact stats card)
   --timeline         Chronological flow of events (messages, subagents, commits)
   --show-tools       Include tool calls in timeline (off by default)
+  --report-lines <n> Number of report lines from subagent results (default: 3)
   --format <fmt>     Output format: stats (default), narrative, terminal, markdown, json
                      Overrides --full when specified explicitly
   --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
@@ -497,7 +498,7 @@ async function main() {
 
     // --timeline: standalone output mode showing chronological event flow
     if (args.timeline) {
-      const events = buildTimeline(session);
+      const events = buildTimeline(session, { reportLines: args.reportLines });
       const isTTY = process.stdout.isTTY !== false;
       const lines = formatTimeline(events, { showHints: isTTY, showTools: args.showTools });
       debugLog(debug, "Total parse time", totalStart);

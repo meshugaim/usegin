@@ -240,6 +240,7 @@ function buildSpawnDescription(
 function buildSubagentReportMap(
   mainTurns: Turn[],
   subagents: ParsedSubagent[],
+  reportLines: number = 1,
 ): Map<AgentId, string> {
   const reports = new Map<AgentId, string>();
 
@@ -261,7 +262,7 @@ function buildSubagentReportMap(
           tr.content.includes(String(sub.agentId)) &&
           taskToolUseIds.has(tr.toolUseId)
         ) {
-          const cleaned = cleanReportText(tr.content);
+          const cleaned = cleanReportText(tr.content, reportLines);
           if (cleaned) {
             reports.set(sub.agentId, cleaned);
           }
@@ -276,22 +277,73 @@ function buildSubagentReportMap(
 }
 
 /**
- * Clean and truncate a subagent report for timeline display.
+ * Preamble patterns — lines that are just throat-clearing before the real content.
+ * These are only skipped when there are enough substantive lines after them.
+ */
+const PREAMBLE_PATTERNS = [
+  /^here is/i,
+  /^here's/i,
+  /^done\.?$/i,
+  /^all done\.?$/i,
+  /^commit succeeded/i,
+  /^all tasks complete/i,
+  /^i now have/i,
+  /^i've completed/i,
+  /^i have completed/i,
+  /^task complete/i,
+  /^completed\.?$/i,
+  /^finished\.?$/i,
+  /^summary:?$/i,
+];
+
+/**
+ * Check if a line matches a preamble pattern.
+ */
+function isPreambleLine(text: string): boolean {
+  return PREAMBLE_PATTERNS.some((p) => p.test(text));
+}
+
+/**
+ * Clean and extract subagent report lines for timeline display.
  *
  * The raw tool result content can be very long (the subagent's entire final message).
  * This function:
  * 1. Strips markdown heading markers (## , ### , etc.)
  * 2. Strips trailing agentId metadata from lines
- * 3. Skips empty lines and metadata-only lines
- * 4. Takes the first meaningful line of content
- * 5. Truncates to ~120 characters
+ * 3. Skips empty lines, metadata-only lines, `---` separators, and `<usage>` blocks
+ * 4. Skips preamble-ish first lines (when enough substance follows)
+ * 5. Collects up to `maxLines` meaningful lines
+ * 6. Truncates each line to ~120 characters
+ * 7. Joins collected lines with newline
+ *
+ * @param raw - Raw tool result content
+ * @param maxLines - Maximum number of meaningful lines to collect (default: 1)
  */
-export function cleanReportText(raw: string): string {
+export function cleanReportText(raw: string, maxLines: number = 1): string {
   const lines = raw.split("\n");
+
+  // First pass: collect all meaningful lines
+  const meaningful: string[] = [];
+  let inUsageBlock = false;
 
   for (const line of lines) {
     let cleaned = line.trim();
     if (!cleaned) continue;
+
+    // Skip <usage> XML blocks
+    if (cleaned.startsWith("<usage>") || cleaned.startsWith("<usage ")) {
+      inUsageBlock = true;
+      continue;
+    }
+    if (inUsageBlock) {
+      if (cleaned.includes("</usage>")) {
+        inUsageBlock = false;
+      }
+      continue;
+    }
+
+    // Skip --- separators
+    if (/^-{3,}$/.test(cleaned)) continue;
 
     // Strip markdown heading markers
     cleaned = cleaned.replace(/^#{1,6}\s+/, "");
@@ -306,15 +358,36 @@ export function cleanReportText(raw: string): string {
     cleaned = cleaned.trim();
     if (!cleaned) continue;
 
-    return truncate(cleaned, 120);
+    meaningful.push(cleaned);
   }
 
-  return "";
+  if (meaningful.length === 0) return "";
+
+  // Second pass: skip preamble lines at the start, but only if enough
+  // substance follows. If the report is just one line of substance, show
+  // it even if it looks like preamble.
+  let startIdx = 0;
+  while (
+    startIdx < meaningful.length &&
+    isPreambleLine(meaningful[startIdx]!) &&
+    meaningful.length - startIdx - 1 >= 1 // at least 1 line after this preamble
+  ) {
+    startIdx++;
+  }
+
+  const selected = meaningful.slice(startIdx, startIdx + maxLines);
+  return selected.map((l) => truncate(l, 120)).join("\n");
 }
 
 // ============================================================================
 // BUILD TIMELINE
 // ============================================================================
+
+/** Options for buildTimeline. */
+export interface BuildTimelineOptions {
+  /** Number of report lines to extract from subagent results (default: 1). */
+  reportLines?: number;
+}
 
 /**
  * Build a chronologically sorted timeline from a parsed session.
@@ -324,9 +397,13 @@ export function cleanReportText(raw: string): string {
  * are silently skipped.
  *
  * @param session - A fully parsed session (with subagents if available)
+ * @param options - Optional configuration for timeline construction
  * @returns Sorted array of timeline events
  */
-export function buildTimeline(session: ParsedSession): TimelineEvent[] {
+export function buildTimeline(
+  session: ParsedSession,
+  options?: BuildTimelineOptions,
+): TimelineEvent[] {
   const events: TimelineEvent[] = [];
 
   // --- Session start ---
@@ -384,7 +461,8 @@ export function buildTimeline(session: ParsedSession): TimelineEvent[] {
   }
 
   // --- Subagent spawn and return events ---
-  const reportMap = buildSubagentReportMap(session.turns, session.subagents);
+  const { reportLines = 1 } = options ?? {};
+  const reportMap = buildSubagentReportMap(session.turns, session.subagents, reportLines);
 
   for (const sub of session.subagents) {
     const spawnTs = subagentStartTimestamp(sub);

@@ -780,6 +780,55 @@ describe("formatTimeline subagent report", () => {
     expect(lines[2]).toBe('          "Quick summary"');
   });
 
+  test("renders multi-line report with each line indented", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(37)),
+        agentId: asAgentId("ab24e82"),
+        turns: 41,
+        durationMs: 65_000,
+        report: "Changes across 3 files:\n1. types.ts -- Added timestamp to Turn interface\n2. parser.ts -- Propagated entry.timestamp in parseTurn()",
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    // header + return line + 3 report lines = 5 lines
+    expect(lines).toHaveLength(5);
+    expect(lines[1]).toBe("  00:37  \u2190 ab24e82 returned (41 turns, 1m 05s)");
+    expect(lines[2]).toBe('          "Changes across 3 files:"');
+    expect(lines[3]).toBe('          "1. types.ts -- Added timestamp to Turn interface"');
+    expect(lines[4]).toBe('          "2. parser.ts -- Propagated entry.timestamp in parseTurn()"');
+  });
+
+  test("each multi-line report line is individually truncated to 120 chars", () => {
+    const longLine1 = "A".repeat(200);
+    const longLine2 = "B".repeat(200);
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "subagent_return",
+        timestamp: at(secs(10)),
+        agentId: asAgentId("agent-x"),
+        turns: 5,
+        report: `${longLine1}\n${longLine2}`,
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines).toHaveLength(4); // header + return + 2 report lines
+    // Extract text between quotes for each report line
+    for (const reportLine of lines.slice(2)) {
+      const match = reportLine.match(/"(.+)"/);
+      expect(match).not.toBeNull();
+      expect(match![1]!.length).toBe(120);
+      expect(match![1]!.endsWith("...")).toBe(true);
+    }
+  });
+
   test("integrates report in full timeline with other events", () => {
     const events: TimelineEvent[] = [
       start,
