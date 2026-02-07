@@ -5,7 +5,7 @@
  * - Relative timestamps from session start (MM:SS format)
  * - Falls back to absolute HH:MM:SS when no session_start is present
  * - Distinct symbols per event kind for scanability
- * - Long text truncated to fit ~80 char lines
+ * - Long text truncated with generous limits (120 chars for messages/commits)
  * - Optional hints for discoverability of related flags
  */
 
@@ -19,6 +19,10 @@ import { formatDuration } from "./formatter-stats";
 export interface TimelineFormatOptions {
   /** Show flag hints like "(--timeline --subagents ...)". Disable for piped output. */
   showHints?: boolean;
+  /** Show tool_call events in the timeline (default: false). */
+  showTools?: boolean;
+  /** Show commit events in the timeline (default: true). */
+  showCommits?: boolean;
 }
 
 /**
@@ -41,15 +45,24 @@ export function formatTimeline(
 ): string[] {
   if (events.length === 0) return [];
 
-  const { showHints = true } = options ?? {};
+  const { showHints = true, showTools = false, showCommits = true } = options ?? {};
   const lines: string[] = [];
+
+  // Filter events to show only the narrative by default.
+  // tool_call events are hidden unless showTools is true.
+  // commit events are shown by default but can be hidden.
+  const filtered = events.filter((e) => {
+    if (e.kind === "tool_call") return showTools;
+    if (e.kind === "commit") return showCommits;
+    return true;
+  });
 
   // Determine the session start time for relative timestamps.
   // If no session_start event exists, we use absolute timestamps instead.
-  const startEvent = events.find((e) => e.kind === "session_start");
+  const startEvent = filtered.find((e) => e.kind === "session_start");
   const sessionStartMs = startEvent?.timestamp.getTime();
 
-  for (const event of events) {
+  for (const event of filtered) {
     const line = formatEvent(event, sessionStartMs);
     if (line !== null) {
       lines.push(line);
@@ -57,7 +70,7 @@ export function formatTimeline(
   }
 
   if (showHints && lines.length > 0) {
-    lines.push(padHint("(--timeline --subagents to include subagent internals)"));
+    lines.push(padHint("(--show-tools to include tool calls, --subagents to include subagent internals)"));
   }
 
   return lines;
@@ -92,7 +105,7 @@ function formatEvent(
 
     case "user_message": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
-      const text = truncate(event.text, 60);
+      const text = truncate(event.text, 120);
       return `  ${ts}  User: "${text}"`;
     }
 
@@ -106,7 +119,7 @@ function formatEvent(
     case "subagent_spawn": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       const shortId = shortAgentId(event.agentId);
-      const desc = truncate(event.description, 50);
+      const desc = truncate(event.description, 80);
       const descPart = desc ? ` "${desc}"` : "";
       return `  ${ts}  \u2192 Task:${descPart} (${shortId})`;
     }
@@ -124,7 +137,7 @@ function formatEvent(
     case "commit": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       const shortHash = event.hash.slice(0, 7);
-      const subject = truncate(event.subject, 60);
+      const subject = truncate(event.subject, 120);
       return `  ${ts}  \u25cf ${shortHash} ${subject}`;
     }
   }

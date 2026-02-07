@@ -89,7 +89,8 @@ FIND OPTIONS:
 
 OPTIONS:
   --full             Full narrative output (default: compact stats card)
-  --timeline         Chronological flow of events (messages, tools, subagents, commits)
+  --timeline         Chronological flow of events (messages, subagents, commits)
+  --show-tools       Include tool calls in timeline (off by default)
   --format <fmt>     Output format: stats (default), narrative, terminal, markdown, json
                      Overrides --full when specified explicitly
   --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
@@ -498,7 +499,7 @@ async function main() {
     if (args.timeline) {
       const events = buildTimeline(session);
       const isTTY = process.stdout.isTTY !== false;
-      const lines = formatTimeline(events, { showHints: isTTY });
+      const lines = formatTimeline(events, { showHints: isTTY, showTools: args.showTools });
       debugLog(debug, "Total parse time", totalStart);
       console.log(lines.join("\n"));
       return;

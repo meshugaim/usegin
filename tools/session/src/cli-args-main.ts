@@ -49,6 +49,7 @@ export interface MainArgs {
   format: OutputFormat;
   full: boolean;
   timeline: boolean;
+  showTools: boolean;
   debug: boolean;
   timeout: number;
   help: boolean;
@@ -69,6 +70,7 @@ export function parseMainArgs(args: string[]): MainArgs {
     format: "stats",
     full: false,
     timeline: false,
+    showTools: false,
     debug: false,
     timeout: 30,
     help: false,
@@ -107,6 +109,8 @@ export function parseMainArgs(args: string[]): MainArgs {
       result.full = true;
     } else if (arg === "--timeline") {
       result.timeline = true;
+    } else if (arg === "--show-tools") {
+      result.showTools = true;
     } else if (arg === "--debug") {
       result.debug = true;
     } else if (arg === "--timeout") {

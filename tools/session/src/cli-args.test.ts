@@ -405,6 +405,30 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--show-tools flag", () => {
+    it("defaults showTools to false", () => {
+      expect(parseMainArgs(["session.jsonl"]).showTools).toBe(false);
+    });
+
+    it("sets showTools to true when --show-tools is specified", () => {
+      const result = parseMainArgs(["session.jsonl", "--show-tools"]);
+      expect(result.showTools).toBe(true);
+    });
+
+    it("works alongside --timeline", () => {
+      const result = parseMainArgs(["session.jsonl", "--timeline", "--show-tools"]);
+      expect(result.timeline).toBe(true);
+      expect(result.showTools).toBe(true);
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs(["session.jsonl", "--show-tools", "--debug"]);
+      expect(result.showTools).toBe(true);
+      expect(result.debug).toBe(true);
+      expect(result.file).toBe("session.jsonl");
+    });
+  });
+
   describe("--tool validation", () => {
     it("defaults tool to undefined", () => {
       expect(parseMainArgs(["session.jsonl"]).tool).toBeUndefined();

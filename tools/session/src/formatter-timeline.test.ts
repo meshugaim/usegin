@@ -165,7 +165,7 @@ describe("formatTimeline event kinds", () => {
     expect(lines[1]).toBe('  00:05  User: "Fix the login bug"');
   });
 
-  test("tool_call shows right arrow and tool name with summary", () => {
+  test("tool_call shows right arrow and tool name with summary when showTools is true", () => {
     const events: TimelineEvent[] = [
       start,
       {
@@ -176,12 +176,12 @@ describe("formatTimeline event kinds", () => {
       },
     ];
 
-    const lines = formatTimeline(events, { showHints: false });
+    const lines = formatTimeline(events, { showHints: false, showTools: true });
 
     expect(lines[1]).toBe("  00:12  \u2192 Read: /src/auth.ts");
   });
 
-  test("tool_call with empty summary shows just tool name", () => {
+  test("tool_call with empty summary shows just tool name when showTools is true", () => {
     const events: TimelineEvent[] = [
       start,
       {
@@ -192,7 +192,7 @@ describe("formatTimeline event kinds", () => {
       },
     ];
 
-    const lines = formatTimeline(events, { showHints: false });
+    const lines = formatTimeline(events, { showHints: false, showTools: true });
 
     expect(lines[1]).toBe("  00:12  \u2192 CustomTool");
   });
@@ -331,8 +331,8 @@ describe("formatTimeline single event", () => {
 describe("formatTimeline text truncation", () => {
   const start: TimelineEvent = { kind: "session_start", timestamp: at(0) };
 
-  test("truncates long user message text to 60 chars", () => {
-    const longText = "A".repeat(100);
+  test("truncates long user message text to 120 chars", () => {
+    const longText = "A".repeat(200);
     const events: TimelineEvent[] = [
       start,
       { kind: "user_message", timestamp: at(0), text: longText },
@@ -340,15 +340,15 @@ describe("formatTimeline text truncation", () => {
 
     const lines = formatTimeline(events, { showHints: false });
 
-    // The displayed text inside quotes should be 60 chars (57 chars + "...")
+    // The displayed text inside quotes should be 120 chars (117 chars + "...")
     const match = lines[1]!.match(/User: "(.+)"/);
     expect(match).not.toBeNull();
-    expect(match![1]!.length).toBe(60);
+    expect(match![1]!.length).toBe(120);
     expect(match![1]!.endsWith("...")).toBe(true);
   });
 
-  test("truncates long commit subject", () => {
-    const longSubject = "B".repeat(100);
+  test("truncates long commit subject to 120 chars", () => {
+    const longSubject = "B".repeat(200);
     const events: TimelineEvent[] = [
       start,
       {
@@ -361,16 +361,16 @@ describe("formatTimeline text truncation", () => {
 
     const lines = formatTimeline(events, { showHints: false });
 
-    // Subject should be truncated to 60 chars
+    // Subject should be truncated to 120 chars
     const bulletIdx = lines[1]!.indexOf("\u25cf");
     const afterBullet = lines[1]!.slice(bulletIdx + 2); // skip "● "
     // "abc1234 " = 8 chars, then truncated subject
     const subject = afterBullet.slice(8);
-    expect(subject.length).toBe(60);
+    expect(subject.length).toBe(120);
     expect(subject.endsWith("...")).toBe(true);
   });
 
-  test("truncates long subagent description", () => {
+  test("truncates long subagent description to 80 chars", () => {
     const longDesc = "C".repeat(100);
     const events: TimelineEvent[] = [
       start,
@@ -384,10 +384,10 @@ describe("formatTimeline text truncation", () => {
 
     const lines = formatTimeline(events, { showHints: false });
 
-    // Description should be truncated to 50 chars
+    // Description should be truncated to 80 chars
     const match = lines[1]!.match(/"(.+)"/);
     expect(match).not.toBeNull();
-    expect(match![1]!.length).toBe(50);
+    expect(match![1]!.length).toBe(80);
     expect(match![1]!.endsWith("...")).toBe(true);
   });
 
@@ -462,22 +462,111 @@ describe("formatTimeline hints", () => {
     const lines = formatTimeline(events);
     const lastLine = lines[lines.length - 1];
 
-    expect(lastLine).toContain("--timeline --subagents");
+    expect(lastLine).toContain("--show-tools");
+    expect(lastLine).toContain("--subagents");
   });
 
   test("shows hint when showHints is explicitly true", () => {
     const lines = formatTimeline(events, { showHints: true });
     const lastLine = lines[lines.length - 1];
 
-    expect(lastLine).toContain("--timeline --subagents to include subagent internals");
+    expect(lastLine).toContain("--show-tools to include tool calls");
+    expect(lastLine).toContain("--subagents to include subagent internals");
   });
 
   test("hides hint when showHints is false", () => {
     const lines = formatTimeline(events, { showHints: false });
 
     const joined = lines.join("\n");
-    expect(joined).not.toContain("--timeline");
+    expect(joined).not.toContain("--show-tools");
     expect(joined).not.toContain("subagent internals");
+  });
+});
+
+// ============================================================================
+// EVENT FILTERING
+// ============================================================================
+
+describe("formatTimeline event filtering", () => {
+  const start: TimelineEvent = { kind: "session_start", timestamp: at(0) };
+
+  test("filters out tool_call events by default", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(0), text: "Hello" },
+      { kind: "tool_call", timestamp: at(secs(1)), toolName: "Read", summary: "/file.ts" },
+      { kind: "tool_call", timestamp: at(secs(2)), toolName: "Bash", summary: "ls" },
+      { kind: "tool_call", timestamp: at(secs(3)), toolName: "Edit", summary: "/file.ts" },
+      { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    // Only header, user_message, footer
+    expect(lines).toHaveLength(3);
+    const joined = lines.join("\n");
+    expect(joined).not.toContain("Read:");
+    expect(joined).not.toContain("Bash:");
+    expect(joined).not.toContain("Edit:");
+  });
+
+  test("shows tool_call events when showTools is true", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(0), text: "Hello" },
+      { kind: "tool_call", timestamp: at(secs(1)), toolName: "Read", summary: "/file.ts" },
+      { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false, showTools: true });
+
+    expect(lines).toHaveLength(4);
+    expect(lines[2]).toContain("Read: /file.ts");
+  });
+
+  test("shows commit events by default", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "commit", timestamp: at(secs(30)), hash: "abc1234", subject: "fix: bug" },
+      { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines).toHaveLength(3);
+    expect(lines[1]).toContain("abc1234 fix: bug");
+  });
+
+  test("hides commit events when showCommits is false", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "commit", timestamp: at(secs(30)), hash: "abc1234", subject: "fix: bug" },
+      { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false, showCommits: false });
+
+    expect(lines).toHaveLength(2);
+    const joined = lines.join("\n");
+    expect(joined).not.toContain("abc1234");
+  });
+
+  test("always shows user_message, subagent_spawn, subagent_return regardless of filters", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(0), text: "Hello" },
+      { kind: "subagent_spawn", timestamp: at(secs(5)), agentId: asAgentId("agent-x"), description: "Work" },
+      { kind: "subagent_return", timestamp: at(secs(30)), agentId: asAgentId("agent-x"), turns: 5 },
+      { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false, showTools: false, showCommits: false });
+
+    expect(lines).toHaveLength(5); // header + user + spawn + return + footer
+    const joined = lines.join("\n");
+    expect(joined).toContain("User:");
+    expect(joined).toContain("Task:");
+    expect(joined).toContain("returned");
   });
 });
 
@@ -486,39 +575,57 @@ describe("formatTimeline hints", () => {
 // ============================================================================
 
 describe("formatTimeline full session", () => {
-  test("renders a complete timeline with interleaved events", () => {
-    const events: TimelineEvent[] = [
-      { kind: "session_start", timestamp: at(0) },
-      { kind: "user_message", timestamp: at(0), text: "Fix the authentication module" },
-      { kind: "tool_call", timestamp: at(secs(5)), toolName: "Read", summary: "/src/auth.ts" },
-      { kind: "tool_call", timestamp: at(secs(8)), toolName: "Bash", summary: "bun test" },
-      {
-        kind: "subagent_spawn",
-        timestamp: at(secs(15)),
-        agentId: asAgentId("agent-d4e2"),
-        description: "Run linting checks",
-      },
-      {
-        kind: "subagent_return",
-        timestamp: at(secs(45)),
-        agentId: asAgentId("agent-d4e2"),
-        turns: 12,
-        durationMs: 30_000,
-      },
-      {
-        kind: "commit",
-        timestamp: at(mins(1) + secs(2)),
-        hash: "abc1234",
-        subject: "fix: auth token refresh",
-      },
-      {
-        kind: "session_end",
-        timestamp: at(mins(3) + secs(15)),
-        totalDurationMs: mins(3) + secs(15),
-      },
-    ];
+  const fullEvents: TimelineEvent[] = [
+    { kind: "session_start", timestamp: at(0) },
+    { kind: "user_message", timestamp: at(0), text: "Fix the authentication module" },
+    { kind: "tool_call", timestamp: at(secs(5)), toolName: "Read", summary: "/src/auth.ts" },
+    { kind: "tool_call", timestamp: at(secs(8)), toolName: "Bash", summary: "bun test" },
+    {
+      kind: "subagent_spawn",
+      timestamp: at(secs(15)),
+      agentId: asAgentId("agent-d4e2"),
+      description: "Run linting checks",
+    },
+    {
+      kind: "subagent_return",
+      timestamp: at(secs(45)),
+      agentId: asAgentId("agent-d4e2"),
+      turns: 12,
+      durationMs: 30_000,
+    },
+    {
+      kind: "commit",
+      timestamp: at(mins(1) + secs(2)),
+      hash: "abc1234",
+      subject: "fix: auth token refresh",
+    },
+    {
+      kind: "session_end",
+      timestamp: at(mins(3) + secs(15)),
+      totalDurationMs: mins(3) + secs(15),
+    },
+  ];
 
-    const lines = formatTimeline(events, { showHints: false });
+  test("renders narrative timeline by default (tool_call events filtered out)", () => {
+    const lines = formatTimeline(fullEvents, { showHints: false });
+
+    // 6 lines: header, user_message, subagent_spawn, subagent_return, commit, footer
+    expect(lines).toHaveLength(6);
+    expect(lines[0]).toContain("Timeline");
+    expect(lines[1]).toContain('00:00  User: "Fix the authentication module"');
+    expect(lines[2]).toContain('00:15  \u2192 Task: "Run linting checks" (agent-d4e2)');
+    expect(lines[3]).toContain("00:45  \u2190 agent-d4e2 returned (12 turns, 30s)");
+    expect(lines[4]).toContain("01:02  \u25cf abc1234 fix: auth token refresh");
+    expect(lines[5]).toContain("End (3m 15s)");
+
+    // Verify tool calls are NOT present
+    const joined = lines.join("\n");
+    expect(joined).not.toContain("Read: /src/auth.ts");
+    expect(joined).not.toContain("Bash: bun test");
+  });
+
+  test("renders all events including tool calls when showTools is true", () => {
+    const lines = formatTimeline(fullEvents, { showHints: false, showTools: true });
 
     expect(lines).toHaveLength(8);
     expect(lines[0]).toContain("Timeline");
