@@ -5,9 +5,10 @@
  * Feed the result into a formatter for display.
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage } from "./types";
+import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage, TokenStats, TurnTokenUsage } from "./types";
 import { getToolCallInput } from "./types";
 import type { GitCommit } from "./git-commits";
+import { getModelPricing, estimateCost } from "./pricing";
 
 // ============================================================================
 // TYPES
@@ -23,6 +24,8 @@ export interface TurnDurationStats {
   /** Number of turns measured */
   count: number;
 }
+
+export type { TokenStats };
 
 export interface SessionStats {
   turnCount: { total: number; user: number; assistant: number };
@@ -40,6 +43,8 @@ export interface SessionStats {
   tokenUsage?: TokenUsage;
   /** Turn duration summary stats from system/turn_duration entries */
   turnDurationStats?: TurnDurationStats;
+  /** Per-turn token statistics with peak context, cost, and cache metrics */
+  tokenStats?: TokenStats;
 }
 
 export interface SubagentSummary {
@@ -233,6 +238,116 @@ function computeTurnDurationStats(durations?: number[]): TurnDurationStats | und
 }
 
 // ============================================================================
+// TOKEN STATS
+// ============================================================================
+
+/** Hardcoded context window size (tokens). */
+const CONTEXT_WINDOW_SIZE = 200_000;
+
+/**
+ * Compute context size for a single turn's token usage.
+ *
+ * Context = input + cache_creation + cache_read.
+ * Output tokens do NOT count toward the context window.
+ */
+function contextSize(usage: TurnTokenUsage): number {
+  return usage.inputTokens + usage.cacheCreationInputTokens + usage.cacheReadInputTokens;
+}
+
+/**
+ * Compute token statistics from per-turn token data.
+ *
+ * Iterates over all assistant turns that have tokenUsage, computing:
+ * - Peak and final context window utilization
+ * - Cumulative input/output token counts
+ * - Cache hit rate (fraction of input that came from cache reads)
+ * - Estimated cost in USD if the model is known
+ *
+ * Returns sensible defaults (zeros) for empty input.
+ *
+ * @param turns - All turns from the session (user + assistant)
+ * @param model - Model string for pricing lookup (optional)
+ *
+ * @example
+ * ```ts
+ * const stats = computeTokenStats(session.turns, session.model);
+ * console.log(`Peak context: ${stats.peakContextTokens} (${(stats.peakContextPercent * 100).toFixed(1)}%)`);
+ * ```
+ */
+export function computeTokenStats(turns: Turn[], model?: string): TokenStats {
+  let peakContextTokens = 0;
+  let finalContextTokens = 0;
+  let cumulativeOutputTokens = 0;
+  let cumulativeInputTokens = 0;
+  let totalCacheRead = 0;
+
+  // Cumulative usage for cost estimation
+  const cumulative: TurnTokenUsage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationInputTokens: 0,
+    cacheReadInputTokens: 0,
+  };
+
+  for (const turn of turns) {
+    if (turn.role !== "assistant" || !turn.tokenUsage) continue;
+
+    const usage = turn.tokenUsage;
+    const ctx = contextSize(usage);
+
+    if (ctx > peakContextTokens) {
+      peakContextTokens = ctx;
+    }
+    finalContextTokens = ctx;
+
+    cumulativeOutputTokens += usage.outputTokens;
+    cumulativeInputTokens += ctx; // all input categories
+    totalCacheRead += usage.cacheReadInputTokens;
+
+    // Accumulate for cost estimation
+    cumulative.inputTokens += usage.inputTokens;
+    cumulative.outputTokens += usage.outputTokens;
+    cumulative.cacheCreationInputTokens += usage.cacheCreationInputTokens;
+    cumulative.cacheReadInputTokens += usage.cacheReadInputTokens;
+  }
+
+  const cacheHitRate =
+    cumulativeInputTokens > 0 ? totalCacheRead / cumulativeInputTokens : 0;
+
+  const peakContextPercent =
+    CONTEXT_WINDOW_SIZE > 0 ? peakContextTokens / CONTEXT_WINDOW_SIZE : 0;
+
+  // Cost estimation: only if model is known
+  let estimatedCostUsd: number | undefined;
+  if (model) {
+    const pricing = getModelPricing(model);
+    if (pricing) {
+      estimatedCostUsd = estimateCost(cumulative, pricing);
+    }
+  }
+
+  return {
+    peakContextTokens,
+    peakContextPercent,
+    finalContextTokens,
+    cumulativeOutputTokens,
+    cumulativeInputTokens,
+    cacheHitRate,
+    estimatedCostUsd,
+    contextWindowSize: CONTEXT_WINDOW_SIZE,
+    ...(model ? { model } : {}),
+  };
+}
+
+/**
+ * Returns true if any assistant turn in the list has tokenUsage data.
+ * Used to decide whether to compute and include tokenStats.
+ */
+function hasAnyTokenUsage(turns: Turn[]): boolean {
+  return turns.some((t) => t.role === "assistant" && t.tokenUsage);
+}
+
+// ============================================================================
 // PUBLIC API
 // ============================================================================
 
@@ -271,6 +386,11 @@ export function computeStats(session: ParsedSession): SessionStats {
   // Compute turn duration summary stats if available
   const turnDurationStats = computeTurnDurationStats(session.turnDurations);
 
+  // Compute per-turn token stats if any assistant turn has token usage data
+  const tokenStats = hasAnyTokenUsage(session.turns)
+    ? computeTokenStats(session.turns, session.model)
+    : undefined;
+
   return {
     turnCount: {
       total: session.turns.length,
@@ -292,5 +412,6 @@ export function computeStats(session: ParsedSession): SessionStats {
       : {}),
     ...(session.tokenUsage ? { tokenUsage: session.tokenUsage } : {}),
     ...(turnDurationStats ? { turnDurationStats } : {}),
+    ...(tokenStats ? { tokenStats } : {}),
   };
 }

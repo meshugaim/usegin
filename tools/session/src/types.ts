@@ -708,6 +708,35 @@ export interface TurnTokenUsage {
   cacheReadInputTokens: number;
 }
 
+/**
+ * Computed token statistics derived from per-turn token data.
+ *
+ * Context size is computed as: inputTokens + cacheReadInputTokens + cacheCreationInputTokens.
+ * Output tokens are NOT counted toward context window — they represent generation cost.
+ *
+ * The context window is hardcoded at 200K tokens for now.
+ */
+export interface TokenStats {
+  /** Highest context_size observed across all assistant turns */
+  peakContextTokens: number;
+  /** peakContextTokens / contextWindowSize */
+  peakContextPercent: number;
+  /** Context size of the last assistant turn (current window usage) */
+  finalContextTokens: number;
+  /** Sum of outputTokens across all assistant turns */
+  cumulativeOutputTokens: number;
+  /** Sum of all input token categories across all assistant turns */
+  cumulativeInputTokens: number;
+  /** cacheReadInputTokens / totalInputTokens across all turns (0 if no input) */
+  cacheHitRate: number;
+  /** Estimated cost in USD based on cumulative usage and model pricing (undefined if model unknown) */
+  estimatedCostUsd?: number;
+  /** Context window size in tokens (currently 200,000) */
+  contextWindowSize: number;
+  /** Model string used for pricing lookup */
+  model?: string;
+}
+
 export interface Turn {
   role: "user" | "assistant";
   text: string;

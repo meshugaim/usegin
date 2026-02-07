@@ -1,6 +1,6 @@
 import { test, expect, describe } from "bun:test";
-import { computeStats } from "./stats";
-import type { SessionStats, SubagentSummary } from "./stats";
+import { computeStats, computeTokenStats } from "./stats";
+import type { SessionStats, SubagentSummary, TokenStats } from "./stats";
 import {
   makeSession,
   makeSubagent,
@@ -13,6 +13,7 @@ import {
   toolResult,
 } from "./testing";
 import { asAgentId } from "./types";
+import type { TurnTokenUsage } from "./types";
 
 describe("computeStats", () => {
   // ========================================================================
@@ -724,6 +725,541 @@ describe("computeStats", () => {
         cacheCreationInputTokens: 5000,
         cacheReadInputTokens: 25000,
       });
+    });
+  });
+});
+
+// ============================================================================
+// computeTokenStats
+// ============================================================================
+
+describe("computeTokenStats", () => {
+  // ========================================================================
+  // EMPTY TURNS
+  // ========================================================================
+
+  describe("empty turns", () => {
+    test("returns sensible defaults for empty turns array", () => {
+      const stats = computeTokenStats([]);
+
+      expect(stats.peakContextTokens).toBe(0);
+      expect(stats.peakContextPercent).toBe(0);
+      expect(stats.finalContextTokens).toBe(0);
+      expect(stats.cumulativeOutputTokens).toBe(0);
+      expect(stats.cumulativeInputTokens).toBe(0);
+      expect(stats.cacheHitRate).toBe(0);
+      expect(stats.estimatedCostUsd).toBeUndefined();
+      expect(stats.contextWindowSize).toBe(200_000);
+      expect(stats.model).toBeUndefined();
+    });
+
+    test("returns zeros when turns have no tokenUsage", () => {
+      const turns = [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi there!"),
+        userTurn("u2", "Thanks"),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      expect(stats.peakContextTokens).toBe(0);
+      expect(stats.finalContextTokens).toBe(0);
+      expect(stats.cumulativeOutputTokens).toBe(0);
+      expect(stats.cumulativeInputTokens).toBe(0);
+      expect(stats.cacheHitRate).toBe(0);
+    });
+  });
+
+  // ========================================================================
+  // PEAK CONTEXT DETECTION
+  // ========================================================================
+
+  describe("peak context detection", () => {
+    test("tracks peak context across multiple turns with growing context", () => {
+      const turns = [
+        assistantTurn("a1", "First response", {
+          tokenUsage: {
+            inputTokens: 1000,
+            outputTokens: 500,
+            cacheCreationInputTokens: 5000,
+            cacheReadInputTokens: 10000,
+          },
+        }),
+        userTurn("u1", "Next question"),
+        assistantTurn("a2", "Second response", {
+          tokenUsage: {
+            inputTokens: 2000,
+            outputTokens: 800,
+            cacheCreationInputTokens: 8000,
+            cacheReadInputTokens: 30000,
+          },
+        }),
+        userTurn("u2", "Another question"),
+        assistantTurn("a3", "Third response", {
+          tokenUsage: {
+            inputTokens: 3000,
+            outputTokens: 1200,
+            cacheCreationInputTokens: 10000,
+            cacheReadInputTokens: 50000,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // Turn 1 context: 1000 + 5000 + 10000 = 16000
+      // Turn 2 context: 2000 + 8000 + 30000 = 40000
+      // Turn 3 context: 3000 + 10000 + 50000 = 63000
+      expect(stats.peakContextTokens).toBe(63000);
+      expect(stats.peakContextPercent).toBeCloseTo(63000 / 200_000, 6);
+    });
+
+    test("detects peak when middle turn has highest context", () => {
+      const turns = [
+        assistantTurn("a1", "Start", {
+          tokenUsage: {
+            inputTokens: 1000,
+            outputTokens: 200,
+            cacheCreationInputTokens: 5000,
+            cacheReadInputTokens: 10000,
+          },
+        }),
+        userTurn("u1", ""),
+        assistantTurn("a2", "Big response", {
+          tokenUsage: {
+            inputTokens: 10000,
+            outputTokens: 3000,
+            cacheCreationInputTokens: 50000,
+            cacheReadInputTokens: 100000,
+          },
+        }),
+        userTurn("u2", ""),
+        // After compaction, context shrinks
+        assistantTurn("a3", "After compaction", {
+          tokenUsage: {
+            inputTokens: 500,
+            outputTokens: 100,
+            cacheCreationInputTokens: 2000,
+            cacheReadInputTokens: 5000,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // Peak is turn 2: 10000 + 50000 + 100000 = 160000
+      expect(stats.peakContextTokens).toBe(160000);
+      expect(stats.peakContextPercent).toBeCloseTo(160000 / 200_000, 6);
+    });
+  });
+
+  // ========================================================================
+  // FINAL CONTEXT
+  // ========================================================================
+
+  describe("final context", () => {
+    test("final context is the last assistant turn's context size", () => {
+      const turns = [
+        assistantTurn("a1", "Big context", {
+          tokenUsage: {
+            inputTokens: 10000,
+            outputTokens: 1000,
+            cacheCreationInputTokens: 50000,
+            cacheReadInputTokens: 80000,
+          },
+        }),
+        userTurn("u1", ""),
+        assistantTurn("a2", "Smaller context", {
+          tokenUsage: {
+            inputTokens: 500,
+            outputTokens: 200,
+            cacheCreationInputTokens: 2000,
+            cacheReadInputTokens: 5000,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // Last assistant turn context: 500 + 2000 + 5000 = 7500
+      expect(stats.finalContextTokens).toBe(7500);
+    });
+
+    test("final context ignores trailing user turns", () => {
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 3000,
+            outputTokens: 500,
+            cacheCreationInputTokens: 10000,
+            cacheReadInputTokens: 20000,
+          },
+        }),
+        userTurn("u1", "One more question"),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // Last assistant turn context: 3000 + 10000 + 20000 = 33000
+      expect(stats.finalContextTokens).toBe(33000);
+    });
+  });
+
+  // ========================================================================
+  // CUMULATIVE TOKENS
+  // ========================================================================
+
+  describe("cumulative tokens", () => {
+    test("sums output tokens across all assistant turns", () => {
+      const turns = [
+        assistantTurn("a1", "First", {
+          tokenUsage: {
+            inputTokens: 100,
+            outputTokens: 500,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+          },
+        }),
+        userTurn("u1", ""),
+        assistantTurn("a2", "Second", {
+          tokenUsage: {
+            inputTokens: 200,
+            outputTokens: 800,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+          },
+        }),
+        userTurn("u2", ""),
+        assistantTurn("a3", "Third", {
+          tokenUsage: {
+            inputTokens: 300,
+            outputTokens: 1200,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      expect(stats.cumulativeOutputTokens).toBe(500 + 800 + 1200);
+    });
+
+    test("sums all input categories for cumulativeInputTokens", () => {
+      const turns = [
+        assistantTurn("a1", "Turn 1", {
+          tokenUsage: {
+            inputTokens: 100,
+            outputTokens: 50,
+            cacheCreationInputTokens: 200,
+            cacheReadInputTokens: 300,
+          },
+        }),
+        userTurn("u1", ""),
+        assistantTurn("a2", "Turn 2", {
+          tokenUsage: {
+            inputTokens: 400,
+            outputTokens: 75,
+            cacheCreationInputTokens: 500,
+            cacheReadInputTokens: 600,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // (100 + 200 + 300) + (400 + 500 + 600) = 600 + 1500 = 2100
+      expect(stats.cumulativeInputTokens).toBe(2100);
+    });
+  });
+
+  // ========================================================================
+  // CACHE HIT RATE
+  // ========================================================================
+
+  describe("cache hit rate", () => {
+    test("computes cache hit rate as cacheRead / total input", () => {
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 1000,
+            outputTokens: 500,
+            cacheCreationInputTokens: 2000,
+            cacheReadInputTokens: 7000,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // cacheRead / (input + cacheRead + cacheCreation) = 7000 / (1000 + 7000 + 2000) = 0.7
+      expect(stats.cacheHitRate).toBeCloseTo(0.7, 6);
+    });
+
+    test("returns zero cache hit rate when no cache reads", () => {
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 5000,
+            outputTokens: 1000,
+            cacheCreationInputTokens: 3000,
+            cacheReadInputTokens: 0,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      expect(stats.cacheHitRate).toBe(0);
+    });
+
+    test("computes cache hit rate across multiple turns", () => {
+      const turns = [
+        assistantTurn("a1", "Turn 1", {
+          tokenUsage: {
+            inputTokens: 1000,
+            outputTokens: 200,
+            cacheCreationInputTokens: 5000,
+            cacheReadInputTokens: 0,
+          },
+        }),
+        userTurn("u1", ""),
+        assistantTurn("a2", "Turn 2", {
+          tokenUsage: {
+            inputTokens: 500,
+            outputTokens: 300,
+            cacheCreationInputTokens: 1000,
+            cacheReadInputTokens: 4500,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // Total cacheRead = 0 + 4500 = 4500
+      // Total input = (1000 + 5000 + 0) + (500 + 1000 + 4500) = 6000 + 6000 = 12000
+      // Hit rate = 4500 / 12000 = 0.375
+      expect(stats.cacheHitRate).toBeCloseTo(0.375, 6);
+    });
+
+    test("returns zero cache hit rate when total input is zero", () => {
+      // Edge case: assistant turn with all-zero token usage
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      expect(stats.cacheHitRate).toBe(0);
+    });
+  });
+
+  // ========================================================================
+  // COST ESTIMATION
+  // ========================================================================
+
+  describe("cost estimation", () => {
+    test("computes cost when model is known", () => {
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 100_000,
+            outputTokens: 50_000,
+            cacheCreationInputTokens: 200_000,
+            cacheReadInputTokens: 500_000,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns, "claude-sonnet-4-5-20250929");
+
+      // Sonnet pricing: input=$3/M, output=$15/M, cacheWrite=$3.75/M, cacheRead=$0.30/M
+      // 100k * 3/1M + 50k * 15/1M + 200k * 3.75/1M + 500k * 0.3/1M
+      // = 0.30 + 0.75 + 0.75 + 0.15 = 1.95
+      expect(stats.estimatedCostUsd).toBeCloseTo(1.95, 6);
+      expect(stats.model).toBe("claude-sonnet-4-5-20250929");
+    });
+
+    test("cost is undefined when model is unknown", () => {
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 100_000,
+            outputTokens: 50_000,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns, "gpt-4o-unknown");
+
+      expect(stats.estimatedCostUsd).toBeUndefined();
+      expect(stats.model).toBe("gpt-4o-unknown");
+    });
+
+    test("cost is undefined when model is not provided", () => {
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 50_000,
+            outputTokens: 10_000,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 0,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      expect(stats.estimatedCostUsd).toBeUndefined();
+      expect(stats.model).toBeUndefined();
+    });
+
+    test("sums costs across multiple turns for known model", () => {
+      const turns = [
+        assistantTurn("a1", "Turn 1", {
+          tokenUsage: {
+            inputTokens: 50_000,
+            outputTokens: 10_000,
+            cacheCreationInputTokens: 100_000,
+            cacheReadInputTokens: 0,
+          },
+        }),
+        userTurn("u1", ""),
+        assistantTurn("a2", "Turn 2", {
+          tokenUsage: {
+            inputTokens: 10_000,
+            outputTokens: 20_000,
+            cacheCreationInputTokens: 0,
+            cacheReadInputTokens: 150_000,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns, "claude-sonnet-4-5-20250929");
+
+      // Cumulative: input=60k, output=30k, cacheWrite=100k, cacheRead=150k
+      // 60k * 3/1M + 30k * 15/1M + 100k * 3.75/1M + 150k * 0.3/1M
+      // = 0.18 + 0.45 + 0.375 + 0.045 = 1.05
+      expect(stats.estimatedCostUsd).toBeCloseTo(1.05, 6);
+    });
+  });
+
+  // ========================================================================
+  // CONTEXT WINDOW SIZE
+  // ========================================================================
+
+  describe("context window", () => {
+    test("contextWindowSize is always 200,000", () => {
+      const stats = computeTokenStats([]);
+      expect(stats.contextWindowSize).toBe(200_000);
+    });
+
+    test("peakContextPercent is relative to 200K window", () => {
+      const turns = [
+        assistantTurn("a1", "Response", {
+          tokenUsage: {
+            inputTokens: 50_000,
+            outputTokens: 10_000,
+            cacheCreationInputTokens: 50_000,
+            cacheReadInputTokens: 100_000,
+          },
+        }),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      // Context: 50000 + 50000 + 100000 = 200000 = exactly the window
+      expect(stats.peakContextPercent).toBeCloseTo(1.0, 6);
+    });
+  });
+
+  // ========================================================================
+  // SKIPS USER TURNS
+  // ========================================================================
+
+  describe("ignores non-assistant turns", () => {
+    test("user turns without tokenUsage are skipped", () => {
+      const turns = [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi", {
+          tokenUsage: {
+            inputTokens: 1000,
+            outputTokens: 500,
+            cacheCreationInputTokens: 2000,
+            cacheReadInputTokens: 3000,
+          },
+        }),
+        userTurn("u2", "Thanks"),
+      ];
+
+      const stats = computeTokenStats(turns);
+
+      expect(stats.peakContextTokens).toBe(6000); // 1000 + 2000 + 3000
+      expect(stats.cumulativeOutputTokens).toBe(500);
+      expect(stats.cumulativeInputTokens).toBe(6000); // 1000 + 2000 + 3000
+    });
+  });
+
+  // ========================================================================
+  // INTEGRATION WITH computeStats
+  // ========================================================================
+
+  describe("integration with computeStats", () => {
+    test("computeStats includes tokenStats when turns have tokenUsage", () => {
+      const session = makeSession({
+        model: "claude-sonnet-4-5-20250929",
+        turns: [
+          userTurn("u1", "Hello"),
+          assistantTurn("a1", "Hi", {
+            tokenUsage: {
+              inputTokens: 1000,
+              outputTokens: 500,
+              cacheCreationInputTokens: 5000,
+              cacheReadInputTokens: 10000,
+            },
+          }),
+          userTurn("u2", ""),
+          assistantTurn("a2", "Done", {
+            tokenUsage: {
+              inputTokens: 2000,
+              outputTokens: 800,
+              cacheCreationInputTokens: 8000,
+              cacheReadInputTokens: 30000,
+            },
+          }),
+        ],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.tokenStats).toBeDefined();
+      expect(stats.tokenStats!.peakContextTokens).toBe(40000); // 2000+8000+30000
+      expect(stats.tokenStats!.finalContextTokens).toBe(40000);
+      expect(stats.tokenStats!.cumulativeOutputTokens).toBe(1300); // 500+800
+      expect(stats.tokenStats!.model).toBe("claude-sonnet-4-5-20250929");
+      expect(stats.tokenStats!.estimatedCostUsd).toBeDefined();
+    });
+
+    test("computeStats omits tokenStats when no turns have tokenUsage", () => {
+      const session = makeSession({
+        turns: [
+          userTurn("u1", "Hello"),
+          assistantTurn("a1", "Hi"),
+        ],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.tokenStats).toBeUndefined();
     });
   });
 });
