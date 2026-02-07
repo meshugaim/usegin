@@ -165,6 +165,29 @@ describe("formatTimeline event kinds", () => {
     expect(lines[1]).toBe('  00:05  User: "Fix the login bug"');
   });
 
+  test("queued user_message shows (queued) label", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(secs(30)), text: "small steps please", queued: true },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines[1]).toBe('  00:30  User (queued): "small steps please"');
+  });
+
+  test("non-queued user_message does not show (queued) label", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(secs(5)), text: "Normal message" },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    expect(lines[1]).not.toContain("(queued)");
+    expect(lines[1]).toBe('  00:05  User: "Normal message"');
+  });
+
   test("tool_call shows right arrow and tool name with summary when showTools is true", () => {
     const events: TimelineEvent[] = [
       start,

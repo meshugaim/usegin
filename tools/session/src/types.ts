@@ -722,6 +722,18 @@ export interface CommitInfo {
   message?: string; // First line of commit message if available
 }
 
+/**
+ * A user message that was queued while the agent was mid-turn.
+ *
+ * These come from `queue-operation` entries with `operation === "enqueue"`
+ * and a non-empty `content` string. They represent real user input that
+ * arrived asynchronously and was queued for processing.
+ */
+export interface QueuedMessage {
+  timestamp: string;
+  content: string;
+}
+
 export interface ParsedSession {
   sessionId: SessionId;
   cwd: string;
@@ -733,6 +745,7 @@ export interface ParsedSession {
   triggeredSkills: string[]; // Skills invoked via the Skill tool
   commits: CommitInfo[]; // Commits made during this session (regex-extracted from Bash output)
   gitCommits?: GitCommit[]; // Commits from git history (richer data, preferred when available)
+  queuedMessages?: QueuedMessage[]; // User messages sent while agent was mid-turn
   summary?: string; // Session summary from type:"summary" line
   /** Timestamp of the first entry in the session (ISO 8601) */
   startTimestamp?: string;

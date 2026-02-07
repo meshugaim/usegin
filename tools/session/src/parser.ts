@@ -19,6 +19,7 @@ import type {
   RewindInfo,
   CommitInfo,
   TokenUsage,
+  QueuedMessage,
   SessionId,
   EntryUuid,
   AgentId,
@@ -609,6 +610,7 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   const turns: Turn[] = [];
   const triggeredSkills: string[] = [];
   const commits: CommitInfo[] = [];
+  const queuedMessages: QueuedMessage[] = [];
   const seenHashes = new Set<string>(); // Dedupe by hash
   // Map tool_use_id -> tool name, so we can filter which tool results to scan for commits.
   // Assistant turns (with tool_use blocks) always precede user turns (with tool_result blocks),
@@ -729,6 +731,23 @@ export function parseEntries(entries: Entry[]): ParsedSession {
           costUsd: entry.total_cost_usd,
         };
         break;
+
+      case "queue-operation":
+        // queue-operation entries with operation "enqueue" and a non-empty
+        // string content represent user messages sent while the agent was
+        // mid-turn. Surface them so they can appear in the timeline.
+        if (
+          entry.operation === "enqueue" &&
+          typeof entry.content === "string" &&
+          entry.content.trim() !== "" &&
+          entry.timestamp
+        ) {
+          queuedMessages.push({
+            timestamp: entry.timestamp,
+            content: entry.content,
+          });
+        }
+        break;
     }
   }
 
@@ -764,7 +783,23 @@ export function parseEntries(entries: Entry[]): ParsedSession {
       }
     : undefined;
 
-  return { sessionId, cwd, model, tools, turns, subagents: [], rewinds, triggeredSkills, commits, summary, startTimestamp, endTimestamp, tokenUsage, result };
+  return {
+    sessionId,
+    cwd,
+    model,
+    tools,
+    turns,
+    subagents: [],
+    rewinds,
+    triggeredSkills,
+    commits,
+    ...(queuedMessages.length > 0 ? { queuedMessages } : {}),
+    summary,
+    startTimestamp,
+    endTimestamp,
+    tokenUsage,
+    result,
+  };
 }
 
 /**

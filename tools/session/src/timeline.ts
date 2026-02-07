@@ -25,7 +25,7 @@ import { getToolCallInput } from "./types";
 
 export type TimelineEvent =
   | { kind: "session_start"; timestamp: Date }
-  | { kind: "user_message"; timestamp: Date; text: string }
+  | { kind: "user_message"; timestamp: Date; text: string; queued?: boolean }
   | { kind: "assistant_message"; timestamp: Date; text: string }
   | { kind: "tool_call"; timestamp: Date; toolName: string; summary: string }
   | { kind: "subagent_spawn"; timestamp: Date; agentId: AgentId; description: string }
@@ -456,6 +456,23 @@ export function buildTimeline(
         timestamp: ts,
         toolName: tc.name,
         summary: summarizeToolCall(tc),
+      });
+    }
+  }
+
+  // --- Queued user messages ---
+  // These are messages the user sent while the agent was mid-turn.
+  // They exist as queue-operation/enqueue entries rather than normal turns.
+  if (session.queuedMessages) {
+    for (const qm of session.queuedMessages) {
+      const ts = parseTimestamp(qm.timestamp);
+      if (!ts) continue;
+
+      events.push({
+        kind: "user_message",
+        timestamp: ts,
+        text: truncate(qm.content, 80),
+        queued: true,
       });
     }
   }

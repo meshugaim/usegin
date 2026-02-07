@@ -111,7 +111,8 @@ function formatEvent(
     case "user_message": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       const text = truncate(event.text, 120);
-      return `  ${ts}  User: "${text}"`;
+      const label = event.queued ? "User (queued)" : "User";
+      return `  ${ts}  ${label}: "${text}"`;
     }
 
     case "assistant_message": {

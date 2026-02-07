@@ -879,6 +879,154 @@ describe("buildTimeline", () => {
   });
 
   // ========================================================================
+  // QUEUED USER MESSAGES
+  // ========================================================================
+
+  describe("queued user messages", () => {
+    test("surfaces queued messages as user_message events with queued flag", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts(); // 10:00
+      const t2 = ts(); // 10:01
+      const t3 = ts(); // 10:02
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t3,
+        turns: [
+          userTurn("u1", "Start working on the feature", { timestamp: t1 }),
+          assistantTurn("a1", "On it", {
+            timestamp: t1,
+            toolCalls: [toolCall("tc1", "Read", { file_path: "/src/app.ts" })],
+          }),
+        ],
+        queuedMessages: [
+          { timestamp: t2, content: "super small steps, small commits" },
+        ],
+      });
+
+      const events = buildTimeline(session);
+
+      // Find the queued message event
+      const queuedEvents = events.filter(
+        (e) => e.kind === "user_message" && (e as any).queued === true,
+      );
+      expect(queuedEvents).toHaveLength(1);
+
+      const qm = queuedEvents[0] as TimelineEvent & { kind: "user_message" };
+      expect(qm.text).toBe("super small steps, small commits");
+      expect(qm.timestamp.toISOString()).toBe(t2);
+      expect(qm.queued).toBe(true);
+    });
+
+    test("sorts queued messages chronologically with other events", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts(); // 10:00
+      const t2 = ts(); // 10:01
+      const t3 = ts(); // 10:02
+      const t4 = ts(); // 10:03
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t4,
+        turns: [
+          userTurn("u1", "Start", { timestamp: t1 }),
+          assistantTurn("a1", "Done", { timestamp: t4 }),
+        ],
+        queuedMessages: [
+          { timestamp: t2, content: "first queued" },
+          { timestamp: t3, content: "second queued" },
+        ],
+      });
+
+      const events = buildTimeline(session);
+
+      // Verify chronological order: session_start, user, queued1, queued2, assistant, session_end
+      expect(kinds(events)).toEqual([
+        "session_start",
+        "user_message", // "Start" at t1
+        "user_message", // "first queued" at t2
+        "user_message", // "second queued" at t3
+        "assistant_message", // "Done" at t4
+        "session_end",
+      ]);
+
+      // Verify the queued messages are in the right positions
+      const userMessages = events.filter((e) => e.kind === "user_message") as Array<
+        TimelineEvent & { kind: "user_message" }
+      >;
+      expect(userMessages[0]!.text).toBe("Start");
+      expect(userMessages[0]!.queued).toBeUndefined();
+      expect(userMessages[1]!.text).toBe("first queued");
+      expect(userMessages[1]!.queued).toBe(true);
+      expect(userMessages[2]!.text).toBe("second queued");
+      expect(userMessages[2]!.queued).toBe(true);
+    });
+
+    test("truncates long queued messages to 80 chars", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+
+      const longMessage = "Q".repeat(100);
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t1,
+        queuedMessages: [{ timestamp: t1, content: longMessage }],
+      });
+
+      const events = buildTimeline(session);
+      const queuedEvent = events.find(
+        (e) => e.kind === "user_message" && (e as any).queued === true,
+      ) as (TimelineEvent & { kind: "user_message" }) | undefined;
+
+      expect(queuedEvent).toBeDefined();
+      expect(queuedEvent!.text.length).toBe(80);
+      expect(queuedEvent!.text.endsWith("...")).toBe(true);
+    });
+
+    test("skips queued messages without valid timestamps", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t1,
+        queuedMessages: [
+          { timestamp: "invalid-date", content: "should be skipped" },
+          { timestamp: t1, content: "should appear" },
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const queuedEvents = events.filter(
+        (e) => e.kind === "user_message" && (e as any).queued === true,
+      );
+
+      expect(queuedEvents).toHaveLength(1);
+      expect((queuedEvents[0] as TimelineEvent & { kind: "user_message" }).text).toBe(
+        "should appear",
+      );
+    });
+
+    test("handles undefined queuedMessages gracefully", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts();
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t1,
+        turns: [userTurn("u1", "Hello", { timestamp: t1 })],
+        // queuedMessages is not set (undefined)
+      });
+
+      const events = buildTimeline(session);
+
+      // Should still work fine — just user message, no queued ones
+      const userMessages = events.filter((e) => e.kind === "user_message");
+      expect(userMessages).toHaveLength(1);
+    });
+  });
+
+  // ========================================================================
   // SUBAGENT SPAWN DESCRIPTION PRIORITY
   // ========================================================================
 

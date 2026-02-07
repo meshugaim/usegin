@@ -883,3 +883,134 @@ describe("tool result content normalization", () => {
     });
   });
 });
+
+// ==========================================================================
+// QUEUED MESSAGES (queue-operation/enqueue)
+// ==========================================================================
+
+describe("queued messages", () => {
+  test("extracts queued message from queue-operation enqueue entry", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        timestamp: "2026-02-06T19:11:02.484Z",
+        sessionId: "session-1",
+        content: "super small steps, small commits",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeDefined();
+    expect(result.queuedMessages).toHaveLength(1);
+    expect(result.queuedMessages![0]!.timestamp).toBe("2026-02-06T19:11:02.484Z");
+    expect(result.queuedMessages![0]!.content).toBe("super small steps, small commits");
+  });
+
+  test("extracts multiple queued messages", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        timestamp: "2026-02-06T19:11:00.000Z",
+        sessionId: "session-1",
+        content: "first message",
+      },
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        timestamp: "2026-02-06T19:12:00.000Z",
+        sessionId: "session-1",
+        content: "second message",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toHaveLength(2);
+    expect(result.queuedMessages![0]!.content).toBe("first message");
+    expect(result.queuedMessages![1]!.content).toBe("second message");
+  });
+
+  test("ignores queue-operation entries that are not enqueue", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "dequeue",
+        timestamp: "2026-02-06T19:11:00.000Z",
+        sessionId: "session-1",
+        content: "some content",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeUndefined();
+  });
+
+  test("ignores enqueue entries with empty content", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        timestamp: "2026-02-06T19:11:00.000Z",
+        sessionId: "session-1",
+        content: "   ",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeUndefined();
+  });
+
+  test("ignores enqueue entries with non-string content", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        timestamp: "2026-02-06T19:11:00.000Z",
+        sessionId: "session-1",
+        content: { some: "object" },
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeUndefined();
+  });
+
+  test("ignores enqueue entries without timestamp", () => {
+    const entries: Entry[] = [
+      {
+        type: "queue-operation",
+        operation: "enqueue",
+        sessionId: "session-1",
+        content: "message without timestamp",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeUndefined();
+  });
+
+  test("returns undefined queuedMessages when none exist", () => {
+    const entries: Entry[] = [
+      {
+        type: "system",
+        subtype: "init",
+        uuid: "sys",
+        session_id: "s1",
+        cwd: "/test",
+        tools: [],
+        model: "claude-sonnet",
+      },
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.queuedMessages).toBeUndefined();
+  });
+});
