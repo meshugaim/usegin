@@ -146,7 +146,7 @@ export function buildFzfArgs(options: FzfMultiLineOptions): string[] {
     const cliPath = new URL("../cli.ts", import.meta.url).pathname;
     args.push(
       "--preview",
-      `echo {} | tail -1 | xargs bun ${cliPath}`,
+      `echo {} | tail -1 | xargs bun ${cliPath} --timeline`,
       "--preview-window",
       "right:60%:wrap"
     );
