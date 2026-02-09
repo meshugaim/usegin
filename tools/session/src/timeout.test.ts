@@ -44,6 +44,42 @@ describe("withTimeout", () => {
 
     await expect(withTimeout(failingPromise, 5)).rejects.toThrow("original error");
   });
+
+  test("clears timeout when promise resolves (no orphaned timer)", async () => {
+    // Spy on global clearTimeout to verify cleanup
+    let clearTimeoutCalled = false;
+    const originalClearTimeout = globalThis.clearTimeout;
+    globalThis.clearTimeout = (...args: Parameters<typeof clearTimeout>) => {
+      clearTimeoutCalled = true;
+      return originalClearTimeout(...args);
+    };
+
+    try {
+      const fastPromise = Promise.resolve("done");
+      await withTimeout(fastPromise, 30);
+      expect(clearTimeoutCalled).toBe(true);
+    } finally {
+      globalThis.clearTimeout = originalClearTimeout;
+    }
+  });
+
+  test("clears timeout when promise rejects (no orphaned timer)", async () => {
+    // Verify cleanup also happens on rejection path
+    let clearTimeoutCalled = false;
+    const originalClearTimeout = globalThis.clearTimeout;
+    globalThis.clearTimeout = (...args: Parameters<typeof clearTimeout>) => {
+      clearTimeoutCalled = true;
+      return originalClearTimeout(...args);
+    };
+
+    try {
+      const failingPromise = Promise.reject(new Error("boom"));
+      await expect(withTimeout(failingPromise, 30)).rejects.toThrow("boom");
+      expect(clearTimeoutCalled).toBe(true);
+    } finally {
+      globalThis.clearTimeout = originalClearTimeout;
+    }
+  });
 });
 
 describe("CLI --timeout flag", () => {

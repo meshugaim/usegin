@@ -60,14 +60,22 @@ export async function withTimeout<T>(
     return promise;
   }
 
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new ParsingTimeoutError(timeoutSeconds, options));
-      }, timeoutSeconds * 1000);
-    }),
-  ]);
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => {
+          reject(new ParsingTimeoutError(timeoutSeconds, options));
+        }, timeoutSeconds * 1000);
+      }),
+    ]);
+  } finally {
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+  }
 }
 
 /**
