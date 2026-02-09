@@ -169,6 +169,7 @@ function getScriptDescription(filePath: string, name: string): string {
     "pick-and-push-session.ts": "Pick a session and push for retro",
     "pick-issue": "Interactive issue picker with fzf",
     "push-session": "Push Claude sessions to git for retro analysis",
+    "publish-terms-version": "Publish a new legal document version with SHA-256 hash migration",
     "qr-port": "Generate QR code for port forwarding",
   };
 
