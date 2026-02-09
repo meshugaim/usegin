@@ -155,7 +155,7 @@ export function buildFzfArgs(options: FzfMultiLineOptions): string[] {
   // Keybindings only in interactive mode
   if (isInteractive) {
     // Header with keybinding hints
-    args.push("--header", "ctrl-r: resume │ ctrl-t: retro │ ctrl-e: export │ enter: output path");
+    args.push("--header", "ctrl-r: resume │ ctrl-t: retro │ ctrl-e: export │ ctrl-u/d: scroll │ enter: output path");
 
     // ctrl-r: resume session - print special marker so CLI can spawn claude
     args.push(
@@ -174,6 +174,10 @@ export function buildFzfArgs(options: FzfMultiLineOptions): string[] {
       "--bind",
       `ctrl-e:become(printf 'EXPORT:'; echo {} | tail -1)`
     );
+
+    // ctrl-u/d: scroll preview pane
+    args.push("--bind", "ctrl-u:preview-half-page-up");
+    args.push("--bind", "ctrl-d:preview-half-page-down");
   }
 
   // Filter mode (non-interactive)

@@ -83,6 +83,28 @@ describe("buildFzfArgs", () => {
     expect(ctrlTBind).toContain("RETRO:");
   });
 
+  test("includes ctrl-u binding for preview-half-page-up", () => {
+    const args = buildFzfArgs({});
+    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
+    const ctrlUBind = bindArgs.find(b => b.includes("ctrl-u"));
+    expect(ctrlUBind).toBe("ctrl-u:preview-half-page-up");
+  });
+
+  test("includes ctrl-d binding for preview-half-page-down", () => {
+    const args = buildFzfArgs({});
+    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
+    const ctrlDBind = bindArgs.find(b => b.includes("ctrl-d"));
+    expect(ctrlDBind).toBe("ctrl-d:preview-half-page-down");
+  });
+
+  test("includes scroll hint in header", () => {
+    const args = buildFzfArgs({});
+    const headerIdx = args.indexOf("--header");
+    const headerValue = args[headerIdx + 1];
+    expect(headerValue).toContain("ctrl-u/d");
+    expect(headerValue).toContain("scroll");
+  });
+
   test("disables keybindings in filter mode", () => {
     const args = buildFzfArgs({ filter: "test" });
     expect(args).toContain("--filter");
