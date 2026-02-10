@@ -234,3 +234,51 @@ Issues that show no evidence of completion in git history.
 | ENG-753 | 2026-01-26 | 0 direct | OPEN |
 | ENG-754 | 2026-01-26 | 0 direct | OPEN |
 | ENG-762 | 2026-01-26 | 0 direct | OPEN |
+
+---
+
+## Non-Backlog Audit (2026-02-10)
+
+Focused audit of open issues from ENG-1200+ that are **not in Backlog** status (In Progress or Todo).
+Goal: identify which can be verified and closed, and which are main concerns needing attention.
+
+### Verify & Close
+
+Issues where work appears complete based on git history, code evidence, and sub-issue status.
+
+| Issue | Title | Status | Evidence | Recommendation |
+|-------|-------|--------|----------|----------------|
+| ENG-1245 | Track auth_mode in agent_usage (non-pooled) | In Progress | Migration `20260119005958_add_auth_mode_to_agent_usage.sql` exists. `auth_mode` tracked in `agent.py` and `auth.py`. 2 commits (`288b6ea0`, `eeec411f`). `build_auth_env()` in 10 files. All spec requirements met. | **Close** — auth_mode column added, non-pooled tracking implemented, tests exist. Pooled mode (separate issue) correctly returns NULL. |
+| ENG-1365 | refactor: simplify auth — pass mode string, single build_auth_env | In Progress | 7 commits including `fb8e2576` (main refactor), `ad7de4c0` (rewritten tests), `157ec8ab` (simplified verify script). `build_auth_env()` is the single function in `auth.py`, used across agent + tests. Subsumes ENG-1372 and ENG-1366. | **Close** — refactor fully landed. Single `build_auth_env(mode)` function replaces old multi-function approach. Tests consolidated. |
+| ENG-1475 | experiment: Vertex AI RAG Engine evaluation | In Progress | 3 commits. Experiment file at `python-services/experiments/vertex_rag_experiment.py`. Findings documented in issue description and MEMORY.md. Both sub-issues (ENG-1477, ENG-1479) are Done. | **Close** — experiment complete, findings documented, sub-issues done. This is a research/experiment issue, not a feature. |
+| ENG-1490 | feat: open source attribution page | In Progress | 4 commits. Page exists at `nextjs-app/app/open-source-attribution/page.tsx`. Added to `publicRoutes` in middleware. `AttributionTable` component with tests. Generation script with tests. All spec requirements implemented. | **Close** — page live, public route configured, tests pass, generation pipeline working. |
+| ENG-1526 | Env var schema validation | In Progress | 2 commits (`a0f8930e`, `ae7973c6`). Next.js schema at `nextjs-app/lib/env.ts` using `@t3-oss/env-nextjs` + Zod. Python schema at `agent_api/config.py` using Pydantic `BaseSettings`. Tests exist for both. | **Close** — both Part 1 schemas implemented and validated. Part 2 (full cleanup) is separate scope. |
+| ENG-1532 | ux: workspace tier indicators across app shell | Done (already!) | Already marked Done in Linear. 1 commit (`41ba2fa0`). Both sub-issues (ENG-1533, ENG-1534) Done. | **Already Done** — no action needed, status is correct. |
+
+### Main Concerns
+
+Issues that are legitimately in-progress or blocked, requiring active attention.
+
+| Issue | Title | Status | Evidence | Why It's Open |
+|-------|-------|--------|----------|---------------|
+| ENG-1249 | experiment: error handling pattern on removeMember | In Progress | Proposal doc exists (`nextjs-app/docs/specs/error-handling-proposal.md`) but status says "Proposal (Experiment Needed)". No commits reference this issue. The pattern (return vs throw) is used ad-hoc but never formally validated. | **Stale experiment** — proposal written but never executed. 46 locations with hidden exceptions per the doc. Decide: run the experiment or deprioritize to backlog. |
+| ENG-1307 | Optimize chat initialization DB calls | Todo | No commits reference this issue. No evidence of session-based caching, RPC consolidation, or any of the 3 proposed solutions. Backend still makes 3 queries per message. | **Unstarted Todo** — well-specified but never picked up. Per-message DB overhead is real but tolerable at current scale. Move to backlog or prioritize based on latency targets. |
+| ENG-1332 | Fix scalability issues: N+1 queries and unbounded fetches | In Progress | Sub-issue ENG-1339 (attachProjectOwners N+1) is Done with commit `444b3f12`. But 5 other items remain: admin invitation loop, unpaginated org projects, in-memory file filtering, inefficient workspace member count, unbounded workspace members RPC. | **Partially done** — 1 of 6 items fixed. The remaining items are latent bugs that work at current scale but will break as data grows. Keep open, track remaining items. |
+| ENG-1347 | email-rules: standalone filtering experiment | In Progress | 6 commits, full experiment built at `/email-rules`. Rules builder, thread grouping, preview panel all working. But description notes "Temporary Patches (TO DO: delete after ENG-1347)" — middleware auth bypass, Sentry skip, proxy exclusion still in place. | **Experiment complete, cleanup pending** — the experiment validated the UX. Either close as "experiment done" and track cleanup separately, or finish removing the temporary patches first. |
+| ENG-1419 | email: sender allowlist | In Progress | 3 of 7 sub-issues Done (ENG-1466 toggle, ENG-1467 stats, ENG-1468 member check). ENG-1469 (manual entries) In Progress. 3 remain in Backlog (source toggles, reply-chain, remove toggle). 3 commits reference it but are for sub-features. | **Active feature, ~40% done** — core slices shipped, advanced features pending. This is legitimate in-progress work on the email pipeline. |
+
+### Audit Log (2026-02-10)
+
+| Issue | Checked | Commits Found | Classification |
+|-------|---------|---------------|----------------|
+| ENG-1245 | 2026-02-10 | 2 (auth_mode tracking) | VERIFY_AND_CLOSE |
+| ENG-1249 | 2026-02-10 | 0 direct | MAIN_CONCERN |
+| ENG-1307 | 2026-02-10 | 0 direct | MAIN_CONCERN |
+| ENG-1332 | 2026-02-10 | 1 (ENG-1339 sub-issue) | MAIN_CONCERN |
+| ENG-1347 | 2026-02-10 | 6 (experiment) | MAIN_CONCERN |
+| ENG-1365 | 2026-02-10 | 7 (auth refactor) | VERIFY_AND_CLOSE |
+| ENG-1419 | 2026-02-10 | 3 (sub-features) | MAIN_CONCERN |
+| ENG-1475 | 2026-02-10 | 3 (experiment) | VERIFY_AND_CLOSE |
+| ENG-1490 | 2026-02-10 | 4 (attribution page) | VERIFY_AND_CLOSE |
+| ENG-1526 | 2026-02-10 | 2 (env validation) | VERIFY_AND_CLOSE |
+| ENG-1532 | 2026-02-10 | 1 (tier indicators) | ALREADY_DONE |
