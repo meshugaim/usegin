@@ -26,9 +26,19 @@ HANDOFF_FILE="$HANDOFF_DIR/handoff_${TIMESTAMP}.md"
 echo "Target: $HANDOFF_FILE"
 ```
 
-### Step 2: Write the handoff note
+### Step 2: Export the session transcript
 
-Use the `Write` tool to create the file at `$HANDOFF_FILE`. Follow this structure:
+Export the compact session transcript alongside the handoff note. This gives the next agent access to the full conversation if they need deeper context.
+
+```bash
+TRANSCRIPT_FILE="$HANDOFF_DIR/transcript_${TIMESTAMP}.md"
+session "$CLAUDE_SESSION_ID" --format terminal > "$TRANSCRIPT_FILE" 2>/dev/null
+echo "Transcript: $TRANSCRIPT_FILE ($(du -h "$TRANSCRIPT_FILE" | cut -f1))"
+```
+
+### Step 3: Write the handoff note
+
+Use the `Write` tool to create the file at `$HANDOFF_FILE`. Include a reference to the transcript. Follow this structure:
 
 ```markdown
 # Handoff: <issue-id> — <short title>
@@ -50,6 +60,10 @@ Use the `Write` tool to create the file at `$HANDOFF_FILE`. Follow this structur
 
 ## Notes
 <Anything else the next session needs to know — staging URLs, known failures, user preferences>
+
+## Session Transcript
+Full conversation from this session: `<path to transcript_TIMESTAMP.md>`
+Read this if you need deeper context on decisions made or approaches tried.
 ```
 
 **Guidelines:**
@@ -59,15 +73,16 @@ Use the `Write` tool to create the file at `$HANDOFF_FILE`. Follow this structur
 - If there's a relevant Linear issue, include it in the title
 - If no Linear issue, use a descriptive title instead
 
-### Step 3: Update the symlink
+### Step 4: Update the symlink
 
 ```bash
 ln -sf "$HANDOFF_FILE" "$HANDOFF_DIR/latest.md"
 echo "Handoff written: $HANDOFF_FILE"
+echo "Transcript: $TRANSCRIPT_FILE"
 echo "Latest symlink updated"
 ```
 
-### Step 4: Confirm to the user
+### Step 5: Confirm to the user
 
 Tell the user the handoff is written and what it contains. Ask if they want to adjust anything before ending the session.
 
@@ -88,6 +103,8 @@ After reading, output a SHORT summary (3-5 sentences):
 - What was being worked on
 - What's pending
 - What you'll do first
+
+If the handoff references a session transcript, note its path but **don't read it yet**. Only read the transcript if you need deeper context — e.g., understanding why a decision was made, what approaches were tried and failed, or what the user said about something specific.
 
 ### Step 3: Get to work
 
