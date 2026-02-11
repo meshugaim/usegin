@@ -56,9 +56,9 @@ logger = logging.getLogger(__name__)
 
 def init_client():
     """Initialize the Gemini client with API key."""
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY_DEV")
     if not api_key:
-        print("Error: GEMINI_API_KEY not found in environment")
+        print("Error: GEMINI_API_KEY or GEMINI_API_KEY_DEV not found in environment")
         sys.exit(1)
     return genai.Client(api_key=api_key)
 
@@ -344,7 +344,7 @@ def query_file(client, document_id, query_text):
         print(f"Querying document: {query_text}\n")
 
         # Get API key from environment
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY_DEV")
 
         # Query the specific document using REST API
         response = _query_file_api_call(api_key, document_id, query_text)
