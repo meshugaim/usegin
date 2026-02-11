@@ -171,6 +171,7 @@ function getScriptDescription(filePath: string, name: string): string {
     "push-session": "Push Claude sessions to git for retro analysis",
     "publish-terms-version": "Publish a new legal document version with SHA-256 hash migration",
     "qr-port": "Generate QR code for port forwarding",
+    "sentry-toggle": "Toggle real Sentry reporting on/off for local dev",
   };
 
   if (knownDescriptions[name]) {
