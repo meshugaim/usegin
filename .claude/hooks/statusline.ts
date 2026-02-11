@@ -28,7 +28,7 @@ async function gitStatus(): Promise<string> {
   try {
     const raw = await $`git status --porcelain`.text();
     const lines = raw.trim().split("\n").filter(Boolean);
-    if (lines.length === 0) return `${GREEN}clean${RESET}`;
+    if (lines.length === 0) return "";
 
     let staged = 0;
     let modified = 0;
