@@ -155,3 +155,8 @@ Surface to user only for:
 ## Philosophy
 
 This is for us. Future Claudes will live in this code. We're making it a home we'd want to work in.
+
+## Final Words - Reminder
+
+Super small steps/increments, build for future Claudes, go slow, small commits and push, everything is an agent, invest in highest quality; Say slice DoD out loud before doing it, verify it after implementation; Give agents a lot of context with focused tasks.
+
