@@ -376,4 +376,132 @@ describe("compaction edge cases", () => {
     expect(result.startTimestamp).toBe("2026-02-13T10:00:00.000Z");
     expect(result.endTimestamp).toBe("2026-02-13T14:56:00.000Z");
   });
+
+  test("handles compact_boundary with malformed compactMetadata gracefully", () => {
+    // compactMetadata has missing trigger and a non-number preTokens.
+    // The parser should not crash — trigger falls back to "unknown" via ??,
+    // and the non-number preTokens passes through (it's not undefined, so ?? doesn't fire).
+    const malformedBoundary = {
+      type: "system",
+      subtype: "compact_boundary",
+      uuid: "cb-malformed",
+      parentUuid: null,
+      session_id: "test-session",
+      timestamp: "2026-02-13T14:55:00.000Z",
+      logicalParentUuid: "a1",
+      compactMetadata: {
+        // trigger missing entirely — should fall back to "unknown"
+        preTokens: "not-a-number", // wrong type, but parser doesn't validate
+      },
+      content: "Conversation compacted",
+      level: "info",
+    } as unknown as Entry;
+
+    const entries: Entry[] = [
+      systemEntry(),
+      userEntry("u1", "Hello"),
+      assistantEntry("a1", "Response", { parentUuid: "u1" }),
+      malformedBoundary,
+      compactionSummaryEntry("u2", "cb-malformed"),
+    ];
+
+    const result = parseEntries(entries);
+
+    // Compaction should still be detected (doesn't crash on malformed data)
+    expect(result.compactions).toHaveLength(1);
+    expect(result.compactions[0]!.trigger).toBe("unknown");
+    // The summary message should still be linked
+    expect(result.compactions[0]!.summaryMessageUuid).toBe("u2");
+  });
+
+  test("handles compact_boundary with undefined preTokens and trigger", () => {
+    // When metadata fields are undefined, the ?? fallback should fire.
+    const sparseMetaBoundary = {
+      type: "system",
+      subtype: "compact_boundary",
+      uuid: "cb-sparse",
+      parentUuid: null,
+      session_id: "test-session",
+      timestamp: "2026-02-13T14:55:00.000Z",
+      logicalParentUuid: "a1",
+      compactMetadata: {}, // both trigger and preTokens missing
+      content: "Conversation compacted",
+      level: "info",
+    } as unknown as Entry;
+
+    const entries: Entry[] = [
+      systemEntry(),
+      userEntry("u1", "Hello"),
+      assistantEntry("a1", "Response", { parentUuid: "u1" }),
+      sparseMetaBoundary,
+      compactionSummaryEntry("u2", "cb-sparse"),
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.compactions).toHaveLength(1);
+    expect(result.compactions[0]!.trigger).toBe("unknown");
+    expect(result.compactions[0]!.preTokens).toBe(0);
+  });
+
+  test("handles compact_boundary with no uuid gracefully", () => {
+    // A compact_boundary entry without a uuid should be silently skipped
+    // (the parser requires boundaryUuid to be truthy).
+    const noUuidBoundary = {
+      type: "system",
+      subtype: "compact_boundary",
+      // uuid intentionally omitted
+      parentUuid: null,
+      session_id: "test-session",
+      timestamp: "2026-02-13T14:55:00.000Z",
+      logicalParentUuid: "a1",
+      compactMetadata: { trigger: "auto", preTokens: 170000 },
+    } as unknown as Entry;
+
+    const entries: Entry[] = [
+      systemEntry(),
+      userEntry("u1", "Hello"),
+      assistantEntry("a1", "Response", { parentUuid: "u1" }),
+      noUuidBoundary,
+      userEntry("u2", "Continue", { parentUuid: "a1" }),
+    ];
+
+    const result = parseEntries(entries);
+
+    // No compaction detected since the boundary had no uuid
+    expect(result.compactions).toEqual([]);
+    // The user message after should NOT be tagged as a compaction summary
+    const u2 = result.turns.find((t) => t.uuid === "u2");
+    expect(u2?.isCompactionSummary).toBeUndefined();
+  });
+
+  test("handles compact_boundary with missing compactMetadata entirely", () => {
+    // compactMetadata is undefined — parser should still create a compaction
+    // event with fallback defaults.
+    const nometaBoundary = {
+      type: "system",
+      subtype: "compact_boundary",
+      uuid: "cb-nometa",
+      parentUuid: null,
+      session_id: "test-session",
+      timestamp: "2026-02-13T14:55:00.000Z",
+      logicalParentUuid: "a1",
+      // compactMetadata intentionally omitted
+    } as unknown as Entry;
+
+    const entries: Entry[] = [
+      systemEntry(),
+      userEntry("u1", "Hello"),
+      assistantEntry("a1", "Response", { parentUuid: "u1" }),
+      nometaBoundary,
+      compactionSummaryEntry("u2", "cb-nometa"),
+    ];
+
+    const result = parseEntries(entries);
+
+    expect(result.compactions).toHaveLength(1);
+    expect(result.compactions[0]!.trigger).toBe("unknown");
+    expect(result.compactions[0]!.preTokens).toBe(0);
+    expect(result.compactions[0]!.boundaryUuid).toBe("cb-nometa");
+  });
 });
