@@ -10,14 +10,14 @@ import {
   makeSession,
   makeSubagent,
   makeCommit,
+  makeCompaction,
   userTurn,
   assistantTurn,
   toolCall,
   toolResult,
   createTimestampGenerator,
 } from "./testing";
-import { asAgentId, asEntryUuid } from "./types";
-import type { CompactionEvent } from "./types";
+import { asAgentId } from "./types";
 
 // ============================================================================
 // HELPERS
@@ -1673,22 +1673,6 @@ describe("classifyUserMessage — compaction summaries", () => {
 // COMPACTION EVENTS IN TIMELINE
 // ============================================================================
 
-/** Helper to create a CompactionEvent for tests. */
-function makeCompaction(
-  number: number,
-  timestamp: string,
-  opts: Partial<CompactionEvent> = {},
-): CompactionEvent {
-  return {
-    timestamp,
-    trigger: "auto",
-    preTokens: 172000,
-    boundaryUuid: asEntryUuid(`boundary-${number}`),
-    logicalParentUuid: asEntryUuid(`parent-${number}`),
-    ...opts,
-  };
-}
-
 describe("buildTimeline — compaction events", () => {
   test("inserts compaction event at correct chronological position", () => {
     const ts = createTimestampGenerator();
@@ -1705,7 +1689,7 @@ describe("buildTimeline — compaction events", () => {
         assistantTurn("a1", "On it", { timestamp: t2 }),
         userTurn("u3", "Continue after compaction", { timestamp: t3 }),
       ],
-      compactions: [makeCompaction(1, t2)],
+      compactions: [makeCompaction(t2, 172000)],
     });
 
     const events = buildTimeline(session);
@@ -1736,8 +1720,8 @@ describe("buildTimeline — compaction events", () => {
         userTurn("u3", "End", { timestamp: t5 }),
       ],
       compactions: [
-        makeCompaction(1, t2, { preTokens: 150000 }),
-        makeCompaction(2, t4, { preTokens: 180000, trigger: "manual" }),
+        makeCompaction(t2, 150000),
+        makeCompaction(t4, 180000, { trigger: "manual" }),
       ],
     });
 
@@ -1768,7 +1752,7 @@ describe("buildTimeline — compaction events", () => {
         userTurn("u1", "Start", { timestamp: t1 }),
         userTurn("u2", "After compaction", { timestamp: t3 }),
       ],
-      compactions: [makeCompaction(1, t2)],
+      compactions: [makeCompaction(t2, 172000)],
     });
 
     const events = buildTimeline(session);
@@ -1790,7 +1774,7 @@ describe("buildTimeline — compaction events", () => {
       startTimestamp: t1,
       endTimestamp: t1,
       turns: [userTurn("u1", "Hello", { timestamp: t1 })],
-      compactions: [makeCompaction(1, "invalid-date")],
+      compactions: [makeCompaction("invalid-date", 172000)],
     });
 
     const events = buildTimeline(session);
@@ -1841,7 +1825,7 @@ describe("buildTimeline — compaction summary messages", () => {
         summaryTurn,
         userTurn("u3", "Continue after", { timestamp: t3 }),
       ],
-      compactions: [makeCompaction(1, t2)],
+      compactions: [makeCompaction(t2, 172000)],
     });
 
     const events = buildTimeline(session);
