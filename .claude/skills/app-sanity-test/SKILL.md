@@ -147,6 +147,8 @@ Report each check as pass/fail to the user.
 
 After basic sanity passes, explore further — informed by the recent changes from step 2.
 
+**Feature toggles:** Some features are behind feature toggles. Focus on testing the **default path** of each toggle (what users actually see). Features behind toggles that are off by default may be under construction — don't spend time testing those unless the user specifically asks.
+
 Use **sequential sub-agents** (one at a time) for focused testing areas. Each sub-agent should:
 - Receive the auth file path and environment URL
 - `playwright-cli open` → `state-load` → test their area → report findings
@@ -159,7 +161,6 @@ Example areas (pick based on recent changes):
 - Chat export and history
 - Workspace settings
 - Auth edge cases (session expiry, sign out/in)
-- Email integration (if feature-flagged on)
 - Admin pages (if applicable)
 - Empty states (new project, no files)
 
