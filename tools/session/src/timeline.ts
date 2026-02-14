@@ -44,6 +44,24 @@ export type TimelineEvent =
 // HELPERS
 // ============================================================================
 
+/**
+ * Sort priority for event kinds when timestamps are equal.
+ *
+ * Lower values sort first. Only events that need explicit ordering
+ * have a defined priority; all others are treated as 0 (no preference).
+ *
+ * Key ordering: compaction markers (-1) should appear before user_messages (0)
+ * that follow them, since the summary message is a consequence of the compaction.
+ */
+function kindSortPriority(kind: TimelineEvent["kind"]): number {
+  switch (kind) {
+    case "session_start": return -10;
+    case "compaction": return -1;
+    case "session_end": return 10;
+    default: return 0;
+  }
+}
+
 // ============================================================================
 // USER MESSAGE CLASSIFICATION
 // ============================================================================
@@ -639,7 +657,13 @@ export function buildTimeline(
   }
 
   // --- Sort chronologically ---
-  events.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  // When timestamps are equal, use kind priority as tiebreaker.
+  // Compaction markers should appear before compaction summary messages.
+  events.sort((a, b) => {
+    const timeDiff = a.timestamp.getTime() - b.timestamp.getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return (kindSortPriority(a.kind) ?? 0) - (kindSortPriority(b.kind) ?? 0);
+  });
 
   // --- Detect idle gaps ---
   // Insert idle_gap events when consecutive events are more than 5 minutes apart.
