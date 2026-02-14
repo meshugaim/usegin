@@ -849,8 +849,8 @@ export interface CompactionEvent {
   preTokens: number;
   /** UUID of the compact_boundary system entry */
   boundaryUuid: EntryUuid;
-  /** UUID of the last entry before compaction (from logicalParentUuid) */
-  logicalParentUuid: EntryUuid;
+  /** UUID of the last entry before compaction (from logicalParentUuid), or null if absent */
+  logicalParentUuid: EntryUuid | null;
   /** UUID of the user message containing the compaction summary */
   summaryMessageUuid?: EntryUuid;
 }

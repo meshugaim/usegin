@@ -749,7 +749,7 @@ export function parseEntries(entries: Entry[]): ParsedSession {
               trigger: compactMeta?.trigger ?? "unknown",
               preTokens: compactMeta?.preTokens ?? 0,
               boundaryUuid: asEntryUuid(boundaryUuid),
-              logicalParentUuid: asEntryUuid(logicalParent ?? ""),
+              logicalParentUuid: logicalParent ? asEntryUuid(logicalParent) : null,
               // summaryMessageUuid will be filled in when we encounter the
               // following user turn whose parentUuid matches this boundary
             });
