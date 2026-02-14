@@ -37,7 +37,7 @@ export type TimelineEvent =
   | { kind: "subagent_return"; timestamp: Date; agentId: AgentId; turns: number; durationMs?: number; report?: string }
   | { kind: "commit"; timestamp: Date; hash: string; subject: string }
   | { kind: "interrupted"; timestamp: Date }
-  | { kind: "compaction"; timestamp: Date; number: number; trigger: string; preTokens: number }
+  | { kind: "compaction"; timestamp: Date; number: number; trigger: string; preTokens: number; segmentNumber: number; totalSegments: number; summaryPreview?: string }
   | { kind: "idle_gap"; timestamp: Date; durationMs: number }
   | { kind: "session_end"; timestamp: Date; totalDurationMs?: number };
 
@@ -79,7 +79,6 @@ function kindSortPriority(kind: TimelineEvent["kind"]): number {
  */
 export type UserMessageKind =
   | "human"
-  | "compaction-summary"
   | "notification"
   | "skill_injection"
   | "command"
@@ -624,16 +623,39 @@ export function buildTimeline(
   // --- Compaction boundary events ---
   // Each compaction marks a context window reset. They are numbered
   // sequentially (1-based) for display in the timeline.
+  // totalSegments = compaction count + 1 (one segment before first compaction,
+  // one after each compaction).
+  const totalSegments = session.compactions.length + 1;
+
+  // Build a lookup from summary turn UUID -> turn text for previews
+  const summaryTextByUuid = new Map<string, string>();
+  for (const turn of session.turns) {
+    if (turn.isCompactionSummary) {
+      summaryTextByUuid.set(turn.uuid, turn.text);
+    }
+  }
+
   for (let i = 0; i < session.compactions.length; i++) {
     const compaction = session.compactions[i]!;
     const compTs = parseTimestamp(compaction.timestamp);
     if (compTs) {
+      // Extract summary preview from the associated summary turn
+      const summaryText = compaction.summaryMessageUuid
+        ? summaryTextByUuid.get(compaction.summaryMessageUuid)
+        : undefined;
+      const summaryPreview = summaryText
+        ? truncate(summaryText.replace(/\n/g, " "), 80)
+        : undefined;
+
       events.push({
         kind: "compaction",
         timestamp: compTs,
         number: i + 1,
         trigger: compaction.trigger,
         preTokens: compaction.preTokens,
+        segmentNumber: i + 2, // Segment after this compaction (1-based)
+        totalSegments,
+        ...(summaryPreview ? { summaryPreview } : {}),
       });
     }
   }

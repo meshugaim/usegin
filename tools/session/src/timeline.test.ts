@@ -1701,6 +1701,9 @@ describe("buildTimeline — compaction events", () => {
     expect(ce.trigger).toBe("auto");
     expect(ce.preTokens).toBe(172000);
     expect(ce.timestamp.toISOString()).toBe(t2);
+    // Segment info: 1 compaction -> 2 segments, this compaction starts segment 2
+    expect(ce.segmentNumber).toBe(2);
+    expect(ce.totalSegments).toBe(2);
   });
 
   test("numbers multiple compaction events sequentially", () => {
@@ -1833,7 +1836,7 @@ describe("buildTimeline — compaction summary messages", () => {
       TimelineEvent & { kind: "user_message" }
     >;
 
-    // There should be 3 user messages: normal, compaction-summary, normal
+    // There should be 3 user messages: normal, compaction summary, normal
     expect(userMessages).toHaveLength(3);
 
     // The compaction summary should have the flag
