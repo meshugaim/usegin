@@ -102,10 +102,12 @@ export {
   assistantEntry,
   systemEntry,
   resultEntry,
+  compactBoundaryEntry,
   type UserEntryOptions,
   type AssistantEntryOptions,
   type SystemEntryOptions,
   type ResultEntryOptions,
+  type CompactBoundaryEntryOptions,
 } from "./entries";
 
 // Turn factories

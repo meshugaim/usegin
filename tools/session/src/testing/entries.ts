@@ -21,6 +21,7 @@ import type {
   UserEntry,
   AssistantEntry,
   SystemEntry,
+  CompactBoundaryEntry,
   ResultEntry,
   MessageContent,
 } from "../types";
@@ -357,4 +358,74 @@ export function resultEntry(
   }
 
   return entry;
+}
+
+// ============================================================================
+// COMPACT BOUNDARY ENTRY
+// ============================================================================
+
+export interface CompactBoundaryEntryOptions {
+  /** UUID of the last entry before compaction */
+  logicalParentUuid?: string;
+  /** What triggered the compaction (defaults to "auto") */
+  trigger?: string;
+  /** Token count before compaction (defaults to 170000) */
+  preTokens?: number;
+  /** Session ID (defaults to TEST_SESSION_ID) */
+  sessionId?: string;
+  /** Timestamp */
+  timestamp?: string;
+}
+
+/**
+ * Creates a compact_boundary system entry with sensible defaults.
+ *
+ * Mirrors the real structure from Claude Code sessions:
+ * - parentUuid is always null (starts a new conversation root)
+ * - logicalParentUuid points to the last pre-compaction entry
+ * - compactMetadata has trigger and preTokens
+ *
+ * @param uuid - Unique identifier for this entry
+ * @param options - Additional options
+ *
+ * @example
+ * ```ts
+ * // Basic compaction boundary
+ * compactBoundaryEntry("cb1")
+ *
+ * // With custom metadata
+ * compactBoundaryEntry("cb1", {
+ *   logicalParentUuid: "a5",
+ *   preTokens: 172646,
+ *   timestamp: "2026-02-13T14:55:14.557Z",
+ * })
+ * ```
+ */
+export function compactBoundaryEntry(
+  uuid: string,
+  options: CompactBoundaryEntryOptions = {}
+): CompactBoundaryEntry {
+  const {
+    logicalParentUuid = "pre-compact-001",
+    trigger = "auto",
+    preTokens = 170000,
+    sessionId = TEST_SESSION_ID,
+    timestamp = "2025-01-15T12:00:00.000Z",
+  } = options;
+
+  return {
+    type: "system",
+    subtype: "compact_boundary",
+    uuid,
+    parentUuid: null,
+    session_id: sessionId,
+    timestamp,
+    logicalParentUuid,
+    compactMetadata: {
+      trigger,
+      preTokens,
+    },
+    content: "Conversation compacted",
+    level: "info",
+  };
 }

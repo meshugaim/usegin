@@ -13,62 +13,21 @@
 
 import { test, expect, describe } from "bun:test";
 import { parseEntries } from "./parser";
-import type { Entry, CompactBoundaryEntry } from "./types";
-import { systemEntry, userEntry, assistantEntry, resultEntry } from "./testing";
+import type { Entry } from "./types";
+import {
+  systemEntry,
+  userEntry,
+  assistantEntry,
+  resultEntry,
+  compactBoundaryEntry,
+} from "./testing";
 
 // ============================================================================
-// COMPACT BOUNDARY ENTRY FACTORY
+// COMPACTION SUMMARY HELPER
 // ============================================================================
 
-interface CompactBoundaryOptions {
-  /** UUID for this entry */
-  uuid?: string;
-  /** UUID of the last entry before compaction */
-  logicalParentUuid?: string;
-  /** What triggered the compaction (defaults to "auto") */
-  trigger?: string;
-  /** Token count before compaction (defaults to 170000) */
-  preTokens?: number;
-  /** Timestamp (ISO 8601) */
-  timestamp?: string;
-  /** Session ID */
-  sessionId?: string;
-}
-
-/**
- * Creates a compact_boundary system entry for testing.
- *
- * Mirrors the real structure observed in session 4ce73b03:
- * - parentUuid is null (new conversation root)
- * - logicalParentUuid points to the last pre-compaction entry
- * - compactMetadata has trigger and preTokens
- */
-function compactBoundaryEntry(options: CompactBoundaryOptions = {}): Entry {
-  const {
-    uuid = "cb-001",
-    logicalParentUuid = "pre-compact-001",
-    trigger = "auto",
-    preTokens = 170000,
-    timestamp = "2026-02-13T14:55:14.557Z",
-    sessionId = "test-session",
-  } = options;
-
-  return {
-    type: "system",
-    subtype: "compact_boundary",
-    uuid,
-    parentUuid: null,
-    sessionId,
-    timestamp,
-    logicalParentUuid,
-    compactMetadata: {
-      trigger,
-      preTokens,
-    },
-    content: "Conversation compacted",
-    level: "info",
-  } as unknown as Entry;
-}
+const COMPACTION_SUMMARY_TEXT =
+  "This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier discussion...";
 
 /**
  * Creates a compaction summary user entry — the user message that
@@ -80,7 +39,7 @@ function compactionSummaryEntry(
   parentBoundaryUuid: string,
   options: { sessionId?: string; timestamp?: string } = {}
 ): Entry {
-  return userEntry(uuid, "This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier discussion...", {
+  return userEntry(uuid, COMPACTION_SUMMARY_TEXT, {
     parentUuid: parentBoundaryUuid,
     sessionId: options.sessionId ?? "test-session",
     timestamp: options.timestamp,
@@ -97,7 +56,7 @@ describe("compaction detection", () => {
       systemEntry(),
       userEntry("u1", "Hello"),
       assistantEntry("a1", "Hi there!", { parentUuid: "u1" }),
-      compactBoundaryEntry({ uuid: "cb1", logicalParentUuid: "a1" }),
+      compactBoundaryEntry("cb1", { logicalParentUuid: "a1" }),
       compactionSummaryEntry("u2", "cb1"),
       assistantEntry("a2", "Continuing after compaction", { parentUuid: "u2" }),
     ];
@@ -114,16 +73,14 @@ describe("compaction detection", () => {
       userEntry("u1", "Hello"),
       assistantEntry("a1", "Response 1", { parentUuid: "u1" }),
       // First compaction
-      compactBoundaryEntry({
-        uuid: "cb1",
+      compactBoundaryEntry("cb1", {
         logicalParentUuid: "a1",
         timestamp: "2026-02-13T14:00:00.000Z",
       }),
       compactionSummaryEntry("u2", "cb1"),
       assistantEntry("a2", "After first compaction", { parentUuid: "u2" }),
       // Second compaction
-      compactBoundaryEntry({
-        uuid: "cb2",
+      compactBoundaryEntry("cb2", {
         logicalParentUuid: "a2",
         timestamp: "2026-02-13T16:00:00.000Z",
       }),
@@ -158,7 +115,7 @@ describe("compaction detection", () => {
 describe("compaction metadata extraction", () => {
   test("extracts trigger type", () => {
     const entries: Entry[] = [
-      compactBoundaryEntry({ uuid: "cb1", trigger: "auto" }),
+      compactBoundaryEntry("cb1", { trigger: "auto" }),
       compactionSummaryEntry("u1", "cb1"),
     ];
 
@@ -169,7 +126,7 @@ describe("compaction metadata extraction", () => {
 
   test("extracts preTokens count", () => {
     const entries: Entry[] = [
-      compactBoundaryEntry({ uuid: "cb1", preTokens: 172646 }),
+      compactBoundaryEntry("cb1", { preTokens: 172646 }),
       compactionSummaryEntry("u1", "cb1"),
     ];
 
@@ -180,8 +137,7 @@ describe("compaction metadata extraction", () => {
 
   test("extracts timestamp", () => {
     const entries: Entry[] = [
-      compactBoundaryEntry({
-        uuid: "cb1",
+      compactBoundaryEntry("cb1", {
         timestamp: "2026-02-13T14:55:14.557Z",
       }),
       compactionSummaryEntry("u1", "cb1"),
@@ -194,8 +150,7 @@ describe("compaction metadata extraction", () => {
 
   test("extracts logicalParentUuid", () => {
     const entries: Entry[] = [
-      compactBoundaryEntry({
-        uuid: "cb1",
+      compactBoundaryEntry("cb1", {
         logicalParentUuid: "last-pre-compact",
       }),
       compactionSummaryEntry("u1", "cb1"),
@@ -208,7 +163,7 @@ describe("compaction metadata extraction", () => {
 
   test("extracts boundaryUuid from the compact_boundary entry uuid", () => {
     const entries: Entry[] = [
-      compactBoundaryEntry({ uuid: "50de44cf-e6b1-4fb3-80be-55468ec261b3" }),
+      compactBoundaryEntry("50de44cf-e6b1-4fb3-80be-55468ec261b3"),
       compactionSummaryEntry("u1", "50de44cf-e6b1-4fb3-80be-55468ec261b3"),
     ];
 
@@ -221,7 +176,7 @@ describe("compaction metadata extraction", () => {
 
   test("captures summaryMessageUuid from the following user message", () => {
     const entries: Entry[] = [
-      compactBoundaryEntry({ uuid: "cb1" }),
+      compactBoundaryEntry("cb1"),
       compactionSummaryEntry("summary-msg-001", "cb1"),
     ];
 
@@ -241,7 +196,7 @@ describe("compaction summary tagging", () => {
       systemEntry(),
       userEntry("u1", "Hello"),
       assistantEntry("a1", "Response", { parentUuid: "u1" }),
-      compactBoundaryEntry({ uuid: "cb1", logicalParentUuid: "a1" }),
+      compactBoundaryEntry("cb1", { logicalParentUuid: "a1" }),
       compactionSummaryEntry("u2", "cb1"),
       assistantEntry("a2", "Continuing", { parentUuid: "u2" }),
     ];
@@ -262,12 +217,12 @@ describe("compaction summary tagging", () => {
       systemEntry(),
       userEntry("u1", "Hello"),
       assistantEntry("a1", "Response 1", { parentUuid: "u1" }),
-      compactBoundaryEntry({ uuid: "cb1", logicalParentUuid: "a1" }),
+      compactBoundaryEntry("cb1", { logicalParentUuid: "a1" }),
       compactionSummaryEntry("u2", "cb1"),
       assistantEntry("a2", "After first compaction", { parentUuid: "u2" }),
       userEntry("u3", "Another question", { parentUuid: "a2" }),
       assistantEntry("a3", "Another answer", { parentUuid: "u3" }),
-      compactBoundaryEntry({ uuid: "cb2", logicalParentUuid: "a3" }),
+      compactBoundaryEntry("cb2", { logicalParentUuid: "a3" }),
       compactionSummaryEntry("u4", "cb2"),
       assistantEntry("a4", "After second compaction", { parentUuid: "u4" }),
     ];
@@ -331,7 +286,7 @@ describe("backwards compatibility", () => {
       systemEntry("sys", { tools: ["Read", "Write"], model: "claude-sonnet" }),
       userEntry("u1", "Hello"),
       assistantEntry("a1", "Response", { parentUuid: "u1" }),
-      compactBoundaryEntry({ uuid: "cb1", logicalParentUuid: "a1" }),
+      compactBoundaryEntry("cb1", { logicalParentUuid: "a1" }),
       compactionSummaryEntry("u2", "cb1"),
       assistantEntry("a2", "After compaction", {
         parentUuid: "u2",
@@ -372,7 +327,7 @@ describe("compaction edge cases", () => {
       systemEntry(),
       userEntry("u1", "Hello"),
       assistantEntry("a1", "Response", { parentUuid: "u1" }),
-      compactBoundaryEntry({ uuid: "cb1", logicalParentUuid: "a1" }),
+      compactBoundaryEntry("cb1", { logicalParentUuid: "a1" }),
     ];
 
     const result = parseEntries(entries);
@@ -391,7 +346,7 @@ describe("compaction edge cases", () => {
       systemEntry(),
       userEntry("u1", "Hello", { parentUuid: null }),
       assistantEntry("a1", "Response", { parentUuid: "u1" }),
-      compactBoundaryEntry({ uuid: "cb1", logicalParentUuid: "a1" }),
+      compactBoundaryEntry("cb1", { logicalParentUuid: "a1" }),
       compactionSummaryEntry("u2", "cb1"),
       assistantEntry("a2", "After compaction", { parentUuid: "u2" }),
     ];
@@ -407,8 +362,7 @@ describe("compaction edge cases", () => {
       systemEntry("sys", { sessionId: "s1" }),
       userEntry("u1", "Hello", { timestamp: "2026-02-13T10:00:00.000Z" }),
       assistantEntry("a1", "Hi", { timestamp: "2026-02-13T10:01:00.000Z" }),
-      compactBoundaryEntry({
-        uuid: "cb1",
+      compactBoundaryEntry("cb1", {
         timestamp: "2026-02-13T14:55:14.557Z",
       }),
       compactionSummaryEntry("u2", "cb1", {
