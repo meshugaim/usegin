@@ -155,7 +155,9 @@ If basic sanity fails, report to user and stop — no point in deeper exploratio
 
 #### Phase B: Deeper Exploration
 
-After basic sanity passes, spawn sequential sub-agents for focused testing areas. One area per agent. Pick areas based on recent changes from step 2.
+After basic sanity passes, propose a list of deeper testing areas based on recent changes from step 2. Present the plan to the user via `AskUserQuestion` (multi-select) and get approval before proceeding. Let the user add, remove, or reorder areas.
+
+Then spawn sequential sub-agents for approved areas. One area per agent.
 
 Example areas:
 - Project settings and config
