@@ -129,7 +129,9 @@ If `pw-auth.ts` fails, fall back to magic link via Inbucket:
 
 **The main thread orchestrates. Sub-agents do the browser work.**
 
-After auth is established, delegate all testing to Opus sub-agents sequentially. Each sub-agent receives:
+**IMPORTANT: Run sub-agents sequentially — one at a time, never in parallel.** `playwright-cli` controls a single browser instance. Parallel agents will conflict. Wait for each agent to complete before spawning the next.
+
+After auth is established, delegate all testing to Opus sub-agents. Each sub-agent receives:
 - The environment URL (e.g., `https://staging.askeffi.ai`)
 - The auth file path (e.g., `staging-auth.json`)
 - A focused testing mission
