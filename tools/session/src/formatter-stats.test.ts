@@ -222,6 +222,166 @@ describe("formatStats with minimal session", () => {
 });
 
 // ============================================================================
+// SEGMENT-AWARE CONVERSATION SECTION (compacted sessions)
+// ============================================================================
+
+describe("formatStats segment-aware turn count", () => {
+  test("shows segment info for compacted sessions", () => {
+    const turns = [
+      // Segment 0: 3 turns
+      userTurn("u1", "Hello"),
+      assistantTurn("a1", "Hi"),
+      userTurn("u2", "Question"),
+      // Compaction summary (starts segment 1)
+      userTurn("cs1", "This session is being continued...", { isCompactionSummary: true }),
+      // Segment 1: 3 turns (including summary)
+      assistantTurn("a2", "Continuing"),
+      userTurn("u3", "More"),
+    ];
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Conversation");
+    // Should show total turns, number of segments, and current segment size
+    expect(output).toContain("6 turns across 2 segments (3 in current)");
+  });
+
+  test("shows segment info with multiple compactions", () => {
+    const turns = [
+      // Segment 0: 4 turns
+      userTurn("u1", "Hello"),
+      assistantTurn("a1", "Hi"),
+      userTurn("u2", "Question"),
+      assistantTurn("a2", "Answer"),
+      // Compaction summary 1 (starts segment 1)
+      userTurn("cs1", "Continued...", { isCompactionSummary: true }),
+      // Segment 1: 3 turns (including summary)
+      assistantTurn("a3", "Continuing"),
+      userTurn("u3", "More"),
+      // Compaction summary 2 (starts segment 2)
+      userTurn("cs2", "Continued again...", { isCompactionSummary: true }),
+      // Segment 2: 2 turns (including summary)
+      assistantTurn("a4", "Still going"),
+    ];
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+        makeCompaction("2025-01-15T16:20:00Z", 174000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("9 turns across 3 segments (2 in current)");
+  });
+
+  test("non-compacted session shows classic format", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", "How?"),
+        assistantTurn("a2", "Like this"),
+      ],
+      compactions: [],
+    });
+
+    const output = formatStats(session);
+
+    // Classic format, no segment info
+    expect(output).toContain("4 turns (2 user, 2 assistant)");
+    expect(output).not.toContain("segments");
+    expect(output).not.toContain("in current");
+  });
+
+  test("includes --full hint for compacted sessions", () => {
+    const turns = [
+      userTurn("u1", "Hello"),
+      userTurn("cs1", "Continued...", { isCompactionSummary: true }),
+      assistantTurn("a1", "Hi"),
+    ];
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("(--full to expand)");
+  });
+
+  test("suppresses hint when showHints is false for compacted sessions", () => {
+    const turns = [
+      userTurn("u1", "Hello"),
+      userTurn("cs1", "Continued...", { isCompactionSummary: true }),
+      assistantTurn("a1", "Hi"),
+    ];
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session, { showHints: false });
+
+    expect(output).not.toContain("(--full to expand)");
+  });
+
+  test("large compacted session with many segments", () => {
+    // Simulate a session with 4 compactions (5 segments)
+    const turns: ReturnType<typeof userTurn>[] = [];
+
+    // Segment 0: 300 turns
+    for (let i = 0; i < 300; i++) {
+      turns.push(i % 2 === 0
+        ? userTurn(`s0u${i}`, `msg ${i}`)
+        : assistantTurn(`s0a${i}`, `resp ${i}`)
+      );
+    }
+
+    // 4 compactions, each followed by ~280 turns
+    for (let seg = 1; seg <= 4; seg++) {
+      turns.push(userTurn(`cs${seg}`, "Continued...", { isCompactionSummary: true }));
+      for (let i = 0; i < 279; i++) {
+        turns.push(i % 2 === 0
+          ? assistantTurn(`s${seg}a${i}`, `resp ${i}`)
+          : userTurn(`s${seg}u${i}`, `msg ${i}`)
+        );
+      }
+    }
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+        makeCompaction("2025-01-15T16:20:00Z", 174000),
+        makeCompaction("2025-01-15T18:34:00Z", 167000),
+        makeCompaction("2025-01-15T19:46:00Z", 167000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // 300 + 4*(280) = 300 + 1120 = 1420 turns, 5 segments, last segment has 280 turns
+    expect(output).toContain("1420 turns across 5 segments (280 in current)");
+  });
+});
+
+// ============================================================================
 // SLUG IN HEADER
 // ============================================================================
 

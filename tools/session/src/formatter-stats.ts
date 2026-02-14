@@ -126,9 +126,19 @@ function formatConversationSection(
   const lines: string[] = [];
   lines.push(sectionHeader("Conversation"));
 
-  const turnSummary = `${stats.turnCount.total} turns (${stats.turnCount.user} user, ${stats.turnCount.assistant} assistant)`;
   const hint = showHints ? padHint("(--full to expand)") : "";
-  lines.push(`${turnSummary}${hint}`);
+
+  // For compacted sessions, show segment-aware turn count
+  if (stats.compactionStats && stats.compactionStats.segmentTurnCounts.length > 1) {
+    const { segmentTurnCounts } = stats.compactionStats;
+    const segmentCount = segmentTurnCounts.length;
+    const currentSegmentSize = segmentTurnCounts[segmentTurnCounts.length - 1]!;
+    const turnSummary = `${stats.turnCount.total} turns across ${segmentCount} segments (${currentSegmentSize} in current)`;
+    lines.push(`${turnSummary}${hint}`);
+  } else {
+    const turnSummary = `${stats.turnCount.total} turns (${stats.turnCount.user} user, ${stats.turnCount.assistant} assistant)`;
+    lines.push(`${turnSummary}${hint}`);
+  }
 
   return lines;
 }
