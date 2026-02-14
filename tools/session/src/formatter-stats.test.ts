@@ -250,7 +250,7 @@ describe("formatStats segment-aware turn count", () => {
 
     expect(output).toContain("Conversation");
     // Should show total turns, number of segments, and current segment size
-    expect(output).toContain("6 turns across 2 segments (3 in current)");
+    expect(output).toContain("6 turns across 2 segments (3 in latest segment)");
   });
 
   test("shows segment info with multiple compactions", () => {
@@ -281,7 +281,7 @@ describe("formatStats segment-aware turn count", () => {
 
     const output = formatStats(session);
 
-    expect(output).toContain("9 turns across 3 segments (2 in current)");
+    expect(output).toContain("9 turns across 3 segments (2 in latest segment)");
   });
 
   test("non-compacted session shows classic format", () => {
@@ -300,7 +300,7 @@ describe("formatStats segment-aware turn count", () => {
     // Classic format, no segment info
     expect(output).toContain("4 turns (2 user, 2 assistant)");
     expect(output).not.toContain("segments");
-    expect(output).not.toContain("in current");
+    expect(output).not.toContain("in latest segment");
   });
 
   test("includes --full hint for compacted sessions", () => {
@@ -377,7 +377,7 @@ describe("formatStats segment-aware turn count", () => {
     const output = formatStats(session);
 
     // 300 + 4*(280) = 300 + 1120 = 1420 turns, 5 segments, last segment has 280 turns
-    expect(output).toContain("1420 turns across 5 segments (280 in current)");
+    expect(output).toContain("1420 turns across 5 segments (280 in latest segment)");
   });
 });
 

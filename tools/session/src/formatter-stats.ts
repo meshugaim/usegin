@@ -134,7 +134,7 @@ function formatConversationSection(
     const { segmentTurnCounts } = stats.compactionStats;
     const segmentCount = segmentTurnCounts.length;
     const currentSegmentSize = segmentTurnCounts[segmentTurnCounts.length - 1]!;
-    const turnSummary = `${stats.turnCount.total} turns across ${segmentCount} segments (${currentSegmentSize} in current)`;
+    const turnSummary = `${stats.turnCount.total} turns across ${segmentCount} segments (${currentSegmentSize} in latest segment)`;
     lines.push(`${turnSummary}${hint}`);
   } else {
     const turnSummary = `${stats.turnCount.total} turns (${stats.turnCount.user} user, ${stats.turnCount.assistant} assistant)`;
