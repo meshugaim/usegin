@@ -125,36 +125,37 @@ If `pw-auth.ts` fails, fall back to magic link via Inbucket:
    playwright-cli state-save <env>-auth.json
    ```
 
-### 5. Basic Sanity Checks (Must-Pass)
+### 5. Testing via Sub-Agents
 
-These run first, sequentially. Every sanity test must pass before moving to deeper exploration.
+**The main thread orchestrates. Sub-agents do the browser work.**
 
-The testing loop for every check:
-```
-snapshot → interact → snapshot → verify → repeat
-```
+After auth is established, delegate all testing to Opus sub-agents sequentially. Each sub-agent receives:
+- The environment URL (e.g., `https://staging.askeffi.ai`)
+- The auth file path (e.g., `staging-auth.json`)
+- A focused testing mission
+- Instructions to use `playwright-cli` (start with `playwright-cli --help`)
+- The testing loop: `snapshot → interact → snapshot → verify → repeat`
+- Instruction to `snapshot` before every interaction
+- Reference to the `manual-testing-by-agent` skill for playwright-cli details
 
-**Basic checks:**
+**Feature toggles:** Focus on the **default path** of each toggle (what users actually see). Features behind toggles that are off by default may be under construction — skip unless the user specifically asks.
 
-1. **Workspace loads** — after auth, verify the workspace page renders with project list
+#### Phase A: Basic Sanity (Must-Pass)
+
+Spawn a sub-agent for basic sanity. It must verify all of these:
+
+1. **Workspace loads** — after auth, the workspace page renders with project list
 2. **Project opens** — click into a project, verify it loads with chat input and summary panel
 3. **Chat with Effi** — send a message (e.g., "Summarize this project"), verify Effi responds (wait for streaming to complete, input re-enables)
 4. **Navigation works** — breadcrumbs, sidebar links, back to workspace
 
-Report each check as pass/fail to the user.
+If basic sanity fails, report to user and stop — no point in deeper exploration.
 
-### 6. Deeper Exploration
+#### Phase B: Deeper Exploration
 
-After basic sanity passes, explore further — informed by the recent changes from step 2.
+After basic sanity passes, spawn sequential sub-agents for focused testing areas. One area per agent. Pick areas based on recent changes from step 2.
 
-**Feature toggles:** Some features are behind feature toggles. Focus on testing the **default path** of each toggle (what users actually see). Features behind toggles that are off by default may be under construction — don't spend time testing those unless the user specifically asks.
-
-Use **sequential sub-agents** (one at a time) for focused testing areas. Each sub-agent should:
-- Receive the auth file path and environment URL
-- `playwright-cli open` → `state-load` → test their area → report findings
-- Use `snapshot` before every interaction
-
-Example areas (pick based on recent changes):
+Example areas:
 - Project settings and config
 - File upload and management
 - People/roles management
@@ -166,9 +167,9 @@ Example areas (pick based on recent changes):
 
 Agents have freedom to explore beyond their assigned area if something looks off.
 
-### 7. Report
+### 6. Report
 
-Summarize all findings to the user:
+After all sub-agents complete, summarize findings to the user:
 
 - **Pass/Fail** for each basic sanity check
 - **Observations** from deeper exploration
