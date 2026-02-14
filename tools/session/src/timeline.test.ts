@@ -23,6 +23,17 @@ import { asAgentId } from "./types";
 // HELPERS
 // ============================================================================
 
+/** Narrow a TimelineEvent to a specific kind variant. */
+type EventOf<K extends TimelineEvent["kind"]> = Extract<TimelineEvent, { kind: K }>;
+
+/** Type-safe filter: extract all events of a given kind. */
+function eventsOfKind<K extends TimelineEvent["kind"]>(
+  events: TimelineEvent[],
+  kind: K,
+): EventOf<K>[] {
+  return events.filter((e): e is EventOf<K> => e.kind === kind);
+}
+
 /** Extract kinds from a timeline for quick assertions. */
 function kinds(events: TimelineEvent[]): string[] {
   return events.map((e) => e.kind);
@@ -485,11 +496,13 @@ describe("buildTimeline", () => {
       const t3 = ts(); // 10:02
       const t4 = ts(); // 10:03
 
-      // Commits with timestamp property (duck-typed from GitCommit)
+      // Commits with timestamp property (duck-typed from GitCommit).
+      // buildTimeline duck-types CommitInfo to check for a timestamp field,
+      // so we widen through Record<string, unknown> to pass the extra field.
       const commitsWithTimestamp = [
         { hash: "abc1234", message: "fix: login bug", timestamp: t2 },
         { hash: "def5678", message: "feat: add search", timestamp: t3 },
-      ] as any[];
+      ] as Array<Record<string, unknown>>;
 
       const session = makeSession({
         startTimestamp: t1,
@@ -908,12 +921,10 @@ describe("buildTimeline", () => {
       const events = buildTimeline(session);
 
       // Find the queued message event
-      const queuedEvents = events.filter(
-        (e) => e.kind === "user_message" && (e as any).queued === true,
-      );
+      const queuedEvents = eventsOfKind(events, "user_message").filter((e) => e.queued === true);
       expect(queuedEvents).toHaveLength(1);
 
-      const qm = queuedEvents[0] as TimelineEvent & { kind: "user_message" };
+      const qm = queuedEvents[0]!;
       expect(qm.text).toBe("super small steps, small commits");
       expect(qm.timestamp.toISOString()).toBe(t2);
       expect(qm.queued).toBe(true);
@@ -975,9 +986,7 @@ describe("buildTimeline", () => {
       });
 
       const events = buildTimeline(session);
-      const queuedEvent = events.find(
-        (e) => e.kind === "user_message" && (e as any).queued === true,
-      ) as (TimelineEvent & { kind: "user_message" }) | undefined;
+      const queuedEvent = eventsOfKind(events, "user_message").find((e) => e.queued === true);
 
       expect(queuedEvent).toBeDefined();
       expect(queuedEvent!.text.length).toBe(80);
@@ -998,14 +1007,10 @@ describe("buildTimeline", () => {
       });
 
       const events = buildTimeline(session);
-      const queuedEvents = events.filter(
-        (e) => e.kind === "user_message" && (e as any).queued === true,
-      );
+      const queuedEvents = eventsOfKind(events, "user_message").filter((e) => e.queued === true);
 
       expect(queuedEvents).toHaveLength(1);
-      expect((queuedEvents[0] as TimelineEvent & { kind: "user_message" }).text).toBe(
-        "should appear",
-      );
+      expect(queuedEvents[0]!.text).toBe("should appear");
     });
 
     test("handles undefined queuedMessages gracefully", () => {
@@ -1823,15 +1828,12 @@ describe("buildTimeline — compaction summary messages", () => {
       "This session is being continued from a previous conversation that ran out of context. " +
       "Here is a recap of the earlier discussion...";
 
-    const summaryTurn = userTurn("u2", summaryText, { timestamp: t2 });
-    (summaryTurn as any).isCompactionSummary = true;
-
     const session = makeSession({
       startTimestamp: t1,
       endTimestamp: t3,
       turns: [
         userTurn("u1", "Start working", { timestamp: t1 }),
-        summaryTurn,
+        userTurn("u2", summaryText, { timestamp: t2, isCompactionSummary: true }),
         userTurn("u3", "Continue after", { timestamp: t3 }),
       ],
       compactions: [makeCompaction(t2, 172000)],
@@ -1858,19 +1860,14 @@ describe("buildTimeline — compaction summary messages", () => {
 
     const longSummary = "This session is being continued from a previous conversation. " + "X".repeat(16000);
 
-    const summaryTurn = userTurn("u1", longSummary, { timestamp: t1 });
-    (summaryTurn as any).isCompactionSummary = true;
-
     const session = makeSession({
       startTimestamp: t1,
       endTimestamp: t1,
-      turns: [summaryTurn],
+      turns: [userTurn("u1", longSummary, { timestamp: t1, isCompactionSummary: true })],
     });
 
     const events = buildTimeline(session);
-    const userMsg = events.find(
-      (e) => e.kind === "user_message" && (e as any).compactionSummary,
-    ) as (TimelineEvent & { kind: "user_message" }) | undefined;
+    const userMsg = eventsOfKind(events, "user_message").find((e) => e.compactionSummary);
 
     expect(userMsg).toBeDefined();
     // Should be truncated — 100 chars max
