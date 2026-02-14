@@ -185,6 +185,9 @@ export const KNOWN_FIELDS_BY_TYPE: Record<string, string[]> = {
     "isMeta",
     // Compaction fields
     "isCompactSummary",
+    // Transcript/plan fields
+    "isVisibleInTranscriptOnly",
+    "planContent",
   ],
   assistant: [
     "type",
