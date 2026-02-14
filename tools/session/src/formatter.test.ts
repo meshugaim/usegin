@@ -975,6 +975,27 @@ describe("formatNarrative with compactions", () => {
     expect(output).toContain("Compaction #1");
   });
 
+  test("trims trailing newlines from compaction summary text", () => {
+    const summaryWithTrailingNewlines = "This session is being continued.\n\n\n\n";
+    const session = makeSession({
+      turns: [
+        userTurn("u1", summaryWithTrailingNewlines, { isCompactionSummary: true }),
+        assistantTurn("a1", "Continuing"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 50000, {
+          summaryMessageUuid: asEntryUuid("u1"),
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // The summary text should be trimmed — no 4+ blank lines
+    expect(output).toContain("This session is being continued.");
+    expect(output).not.toContain("continued.\n\n\n");
+  });
+
   test("compaction markers appear in correct position with queued messages", () => {
     const session = makeSession({
       turns: [

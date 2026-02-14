@@ -338,11 +338,14 @@ function formatCompactionMarker(
  * Short summaries (<= preview limit) are shown in full.
  */
 function formatCompactionSummaryText(text: string): string {
-  if (text.length <= COMPACTION_SUMMARY_PREVIEW_CHARS) {
-    return text;
+  // Trim trailing whitespace/newlines — raw summary text often has trailing
+  // newlines that cause excess blank lines in the output.
+  const trimmed = text.trim();
+  if (trimmed.length <= COMPACTION_SUMMARY_PREVIEW_CHARS) {
+    return trimmed;
   }
-  const preview = text.slice(0, COMPACTION_SUMMARY_PREVIEW_CHARS);
-  const totalChars = text.length.toLocaleString("en-US");
+  const preview = trimmed.slice(0, COMPACTION_SUMMARY_PREVIEW_CHARS);
+  const totalChars = trimmed.length.toLocaleString("en-US");
   return `${preview}\n  ... [${totalChars} chars — compaction summary truncated]`;
 }
 
