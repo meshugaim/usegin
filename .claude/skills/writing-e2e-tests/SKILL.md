@@ -15,11 +15,11 @@ Write maintainable Playwright e2e tests using the driver pattern.
 
 ## Workflow
 
-### 1. Explore with Playwright MCP First
+### 1. Explore with playwright-cli First
 
-Before writing test scripts, manually test the flow using Playwright MCP.
+Before writing test scripts, manually test the flow using `playwright-cli`.
 
-**See:** `browser-testing-setup` skill for environment setup, `closed-loop-web-development` skill for the MCP workflow.
+**See:** `manual-testing-by-agent` skill for setup and commands.
 
 This helps you:
 - Understand the actual DOM structure
@@ -343,7 +343,7 @@ See `tests/e2e/drivers/conversation.driver.ts` for a complete example of:
 
 ### Before Writing
 
-- [ ] Explore the flow manually with Playwright MCP
+- [ ] Explore the flow manually with playwright-cli
 - [ ] Add `data-testid` to interactive elements in component
 - [ ] Start services with `e2e up`
 

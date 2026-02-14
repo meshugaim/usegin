@@ -35,7 +35,7 @@ Before browsing the app, ensure the **new UI toggle is enabled**:
 
 - `mcp__figma-personal__*` - Fetch Figma design data and download images
 - `mcp__figma-browser__*` - Read comments and browse team files
-- `mcp__playwright__*` - Browse app and capture screenshots
+- `playwright-cli` - Browse app and capture screenshots (via Bash)
 
 **File keys** (from manifest): `figma_file_personal` for design data, `figma_file_team` for comments.
 

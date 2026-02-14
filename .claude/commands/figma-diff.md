@@ -30,7 +30,7 @@ For implementing changes from app to match Figma, use `/figma-apply` instead.
 |-----|---------|---------|
 | `figma-personal` | Design data, images | `get_figma_data`, `download_figma_images` |
 | `figma-browser` | Designer comments | `figma_get_comments` |
-| `playwright` | App navigation, screenshots | `browser_navigate`, `browser_snapshot`, `browser_take_screenshot` |
+| `playwright-cli` | App navigation, screenshots | `goto`, `snapshot`, `screenshot` (via Bash) |
 
 **File keys** (from manifest): `figma_file_personal` for design data, `figma_file_team` for comments.
 

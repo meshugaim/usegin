@@ -63,24 +63,26 @@ Start by reading manifest.json to find pages with `status: not_started`.
 2. Enable "New UI Design" toggle
 3. Then navigate to `/workspaces` routes
 
-## Three MCPs
+## Tools
 
-| MCP | Purpose | When to use |
-|-----|---------|-------------|
-| `figma-personal` | Fetch design data, download images | Getting Figma node structure and screenshots |
-| `figma-browser` | Read comments, list projects | Checking designer notes |
-| `playwright` | Browse app, take screenshots | Capturing current app state |
+| Tool | Purpose | When to use |
+|------|---------|-------------|
+| `mcp__figma-personal__*` | Fetch design data, download images | Getting Figma node structure and screenshots |
+| `mcp__figma-browser__*` | Read comments, list projects | Checking designer notes |
+| `playwright-cli` | Browse app, take screenshots | Capturing current app state |
 
 ## Workflow
 
 ### 1. Browse App First
 
 Navigate to the app page with new UI enabled:
-```
-mcp__playwright__browser_navigate(url="http://localhost:3000/toggles")
+```bash
+bunx playwright-cli open
+bunx playwright-cli state-load local-auth.json
+bunx playwright-cli goto http://localhost:3000/toggles
 # Enable new_ui_design toggle if not already enabled
-mcp__playwright__browser_navigate(url="http://localhost:3000/workspaces")
-mcp__playwright__browser_snapshot()
+bunx playwright-cli goto http://localhost:3000/workspaces
+bunx playwright-cli snapshot
 ```
 
 ### 2. Identify Components
@@ -105,12 +107,8 @@ mcp__figma-personal__get_figma_data(
 ### 4. Compare and Capture Screenshots
 
 **Capture App screenshot:**
-```
-mcp__playwright__browser_take_screenshot(
-  filename="figma/apply/app/<impl-id>-<desc>.png",
-  element="<human description>",
-  ref="<ref from snapshot>"
-)
+```bash
+bunx playwright-cli screenshot <ref> --filename nextjs-app/public/screenshots/figma/apply/app/<impl-id>-<desc>.png
 ```
 
 **Capture Figma screenshot:**

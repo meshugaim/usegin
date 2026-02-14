@@ -56,17 +56,17 @@ nextjs-app/public/screenshots/figma/diff/
 
 Start by reading manifest.json to find frames with `status: not_started`.
 
-## Three MCPs
+## Tools
 
-| MCP | File Key | Purpose |
-|-----|----------|---------|
+| Tool | File Key | Purpose |
+|------|----------|---------|
 | `mcp__figma-personal__*` | `figma_file_personal` in manifest | Design data, downloading images |
 | `mcp__figma-browser__*` | `figma_file_team` in manifest | Designer comments |
-| `mcp__playwright__*` | N/A | App screenshots, navigation |
+| `playwright-cli` | N/A | App screenshots, navigation |
 
 Use **figma-personal** for `get_figma_data` and `download_figma_images`.
 Use **figma-browser** for `figma_get_comments`.
-Use **playwright** for app navigation and screenshots.
+Use **playwright-cli** for app navigation and screenshots.
 
 ## Workflow Per Frame
 
@@ -85,9 +85,9 @@ mcp__figma-browser__figma_get_comments(file_key="<figma_file_team>")
 ```
 
 **C. Load app view:**
-```
-mcp__playwright__browser_navigate(url="http://localhost:3000/<app_route>")
-mcp__playwright__browser_snapshot()
+```bash
+bunx playwright-cli goto http://localhost:3000/<app_route>
+bunx playwright-cli snapshot
 ```
 
 **D. Check the codebase** - This is critical:
@@ -127,14 +127,8 @@ mcp__figma-personal__download_figma_images(
 ```
 
 **Capture App screenshot:**
-
-Playwright saves to `nextjs-app/public/screenshots/`. Use subfolder path:
-```
-mcp__playwright__browser_take_screenshot(
-  filename="figma/diff/app/<diff-id>-<desc>.png",
-  element="<human description>",
-  ref="<ref from snapshot>"
-)
+```bash
+bunx playwright-cli screenshot <ref> --filename nextjs-app/public/screenshots/figma/diff/app/<diff-id>-<desc>.png
 ```
 
 **Verify screenshots exist:**

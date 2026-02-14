@@ -99,7 +99,7 @@ Backend:
 
 Frontend:
 - Component test to verify prop is passed correctly
-- Integration test via Playwright MCP to verify end-to-end flow
+- Integration test via playwright-cli to verify end-to-end flow
 
 **What I won't test (and why):**
 - Existing dashboard chat - already covered, just manual regression check
