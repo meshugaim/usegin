@@ -8,6 +8,7 @@ export function createBrowseCommand(): Command {
     .description("Interactive issue browser using fzf")
     .option("--team <key>", "Team key (e.g., ENG)")
     .option("--action <action>", "Action after selection: start, close, open, delegate")
+    .option("--output-file <path>", "Write selected identifier to file instead of stdout")
     .option("--multi", "Allow multiple selection")
     .action(async (opts) => {
       await runBrowse(opts);
@@ -41,6 +42,7 @@ export function extractIdentifier(line: string): string | null {
 async function runBrowse(opts: {
   team?: string;
   action?: string;
+  outputFile?: string;
   multi?: boolean;
 }): Promise<void> {
   const apiKey = process.env.LINEAR_API_KEY;
@@ -100,8 +102,9 @@ async function runBrowse(opts: {
       process.exit(0);
     }
 
-    // With --expect, first line is the key pressed, remaining lines are selections
-    const outputLines = result.trim().split("\n");
+    // With --expect, first line is the key pressed, remaining lines are selections.
+    // Don't trim() before split — the empty first line (enter key) is significant.
+    const outputLines = result.replace(/\n+$/, "").split("\n");
     const pressedKey = outputLines[0];
     const selectedLines = outputLines.slice(1);
 
@@ -136,9 +139,11 @@ async function runBrowse(opts: {
         await performAction(client, id, action);
       }
     } else {
-      // Just output the identifiers
-      for (const id of identifiers) {
-        console.log(id);
+      const output = identifiers.join("\n");
+      if (opts.outputFile) {
+        await Bun.write(opts.outputFile, output);
+      } else {
+        console.log(output);
       }
     }
   } catch (error) {
