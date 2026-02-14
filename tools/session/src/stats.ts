@@ -112,34 +112,6 @@ function totalToolCalls(turns: Turn[]): number {
 }
 
 /**
- * Try to find the Task tool call in the main session that spawned a subagent.
- *
- * The Task tool call result typically contains the agentId. We look through
- * assistant turns for Task tool calls and match by examining the tool call's
- * prompt/description fields.
- *
- * Returns the description (truncated to 80 chars) or undefined if not found.
- */
-function findSubagentDescription(
-  mainTurns: Turn[],
-  agentId: AgentId
-): string | undefined {
-  for (const turn of mainTurns) {
-    for (const tc of turn.toolCalls) {
-      const taskInput = getToolCallInput("Task", tc);
-      if (!taskInput) continue;
-
-      // We can't reliably match by agentId from the tool call alone
-      // (the agentId appears in the result, not the input), so we return
-      // undefined here and let the caller fall back to first assistant text.
-      // This is a best-effort heuristic — a future enhancement could match
-      // Task tool results to agentIds via the toolResults on the user turn.
-    }
-  }
-  return undefined;
-}
-
-/**
  * Build a description for a subagent.
  *
  * Priority:
