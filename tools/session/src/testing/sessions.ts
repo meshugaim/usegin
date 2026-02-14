@@ -72,6 +72,7 @@ export function makeSession(overrides: Partial<ParsedSession> = {}): ParsedSessi
     rewinds: [],
     triggeredSkills: [],
     commits: [],
+    compactions: [],
     ...overrides,
   };
 }

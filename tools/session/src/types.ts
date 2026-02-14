@@ -152,6 +152,10 @@ export const KNOWN_FIELDS_BY_TYPE: Record<string, string[]> = {
     "retryInMs",
     "retryAttempt",
     "maxRetries",
+    // Compaction fields (compact_boundary subtype)
+    "logicalParentUuid",
+    "compactMetadata",
+    "content",
   ],
   user: [
     "type",
@@ -286,13 +290,46 @@ export interface BaseEntry {
   parent_tool_use_id?: string | null;
 }
 
-export interface SystemEntry extends BaseEntry {
+export interface SystemInitEntry extends BaseEntry {
   type: "system";
   subtype: "init";
   cwd: string;
   tools: string[];
   model: string;
 }
+
+/**
+ * Auto-compaction boundary entry.
+ *
+ * Created when Claude Code's context window fills up and the conversation
+ * is automatically compacted. The entry marks the boundary between the
+ * pre-compaction conversation and the fresh post-compaction segment.
+ *
+ * Key fields:
+ * - `parentUuid: null` — starts a new conversation root (the context was wiped)
+ * - `logicalParentUuid` — points to the last entry before compaction
+ *   (preserves the logical thread even though the parent chain is severed)
+ * - `compactMetadata.trigger` — "auto" for auto-compaction
+ * - `compactMetadata.preTokens` — token count before compaction triggered
+ *
+ * The entry is immediately followed by a `user` message containing the
+ * compaction summary (a ~16-20k char recap starting with "This session is
+ * being continued from a previous conversation...").
+ */
+export interface CompactBoundaryEntry extends BaseEntry {
+  type: "system";
+  subtype: "compact_boundary";
+  logicalParentUuid: string;
+  compactMetadata: {
+    trigger: string; // "auto" | "manual" (only "auto" observed so far)
+    preTokens: number;
+  };
+  content?: string; // "Conversation compacted"
+  level?: string; // "info"
+}
+
+/** System entries encompass initialization, compaction boundaries, and other subtypes. */
+export type SystemEntry = SystemInitEntry | CompactBoundaryEntry;
 
 export interface TextContent {
   type: "text";
@@ -743,6 +780,16 @@ export interface Turn {
   timestamp?: string;
   tokenUsage?: TokenUsage;
   isOnCurrentBranch: boolean;
+  /**
+   * True when this user turn is the compaction summary message that
+   * immediately follows a compact_boundary entry. These messages start
+   * with "This session is being continued from a previous conversation..."
+   * and contain the AI-generated recap of the pre-compaction context.
+   *
+   * Formatters can use this flag to render compaction summaries differently
+   * from regular user messages (e.g., collapsed, dimmed, or with a marker).
+   */
+  isCompactionSummary?: boolean;
 }
 
 export interface ParsedSubagent {
@@ -776,6 +823,33 @@ export interface QueuedMessage {
   content: string;
 }
 
+/**
+ * Represents a single auto-compaction event detected in a session.
+ *
+ * Each compaction marks a boundary where Claude Code's context window was
+ * full and the conversation was summarized and restarted. The session is
+ * divided into segments separated by these boundaries.
+ *
+ * Segment numbering:
+ * - Segment 0: from session start to first compaction
+ * - Segment 1: from first compaction to second compaction
+ * - Segment N: from Nth compaction to (N+1)th compaction (or session end)
+ */
+export interface CompactionEvent {
+  /** When the compaction occurred (ISO 8601) */
+  timestamp: string;
+  /** What triggered the compaction ("auto" or "manual") */
+  trigger: string;
+  /** Token count in the context window just before compaction */
+  preTokens: number;
+  /** UUID of the compact_boundary system entry */
+  boundaryUuid: EntryUuid;
+  /** UUID of the last entry before compaction (from logicalParentUuid) */
+  logicalParentUuid: EntryUuid;
+  /** UUID of the user message containing the compaction summary */
+  summaryMessageUuid?: EntryUuid;
+}
+
 export interface ParsedSession {
   sessionId: SessionId;
   cwd: string;
@@ -786,6 +860,8 @@ export interface ParsedSession {
   rewinds: RewindInfo[];
   triggeredSkills: string[]; // Skills invoked via the Skill tool
   commits: CommitInfo[]; // Commits made during this session (regex-extracted from Bash output)
+  /** Auto-compaction events, in chronological order. Empty array if no compactions occurred. */
+  compactions: CompactionEvent[];
   gitCommits?: GitCommit[]; // Commits from git history (richer data, preferred when available)
   queuedMessages?: QueuedMessage[]; // User messages sent while agent was mid-turn
   slug?: string; // Human-readable session name (e.g., "gleaming-fluttering-torvalds")
