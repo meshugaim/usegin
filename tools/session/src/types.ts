@@ -183,6 +183,8 @@ export const KNOWN_FIELDS_BY_TYPE: Record<string, string[]> = {
     "todos",
     "permissionMode",
     "isMeta",
+    // Compaction fields
+    "isCompactSummary",
   ],
   assistant: [
     "type",
