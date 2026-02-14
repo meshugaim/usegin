@@ -2,7 +2,15 @@
  * Format parsed sessions into readable output
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, ToolCall, QueuedMessage } from "./types";
+import type {
+  ParsedSession,
+  ParsedSubagent,
+  Turn,
+  ToolCall,
+  QueuedMessage,
+  CompactionEvent,
+  EntryUuid,
+} from "./types";
 import { getToolCallInput } from "./types";
 
 export interface FormatOptions {
@@ -54,6 +62,23 @@ export function formatNarrative(
     lines.push("");
   }
 
+  // Build compaction context: map from summary turn UUID -> compaction info
+  const compactionCtx = buildCompactionContext(session.compactions);
+  const totalSegments = session.compactions.length + 1;
+
+  // Helper to render a turn with compaction awareness
+  const renderTurn = (turn: Turn): void => {
+    // Insert compaction boundary marker before compaction summary turns
+    const ctx = compactionCtx.get(turn.uuid);
+    if (ctx) {
+      lines.push(formatCompactionMarker(ctx.compaction, ctx.index, totalSegments));
+      lines.push("");
+    }
+
+    lines.push(formatTurn(turn, formatOptions));
+    lines.push("");
+  };
+
   // Main session turns, interleaved with queued messages chronologically
   const queuedMessages = session.queuedMessages ?? [];
   if (queuedMessages.length > 0) {
@@ -79,16 +104,15 @@ export function formatNarrative(
 
     for (const item of merged) {
       if (item.kind === "turn") {
-        lines.push(formatTurn(item.turn, formatOptions));
+        renderTurn(item.turn);
       } else {
         lines.push(`USER (queued): ${item.message.content}`);
+        lines.push("");
       }
-      lines.push("");
     }
   } else {
     for (const turn of session.turns) {
-      lines.push(formatTurn(turn, formatOptions));
-      lines.push("");
+      renderTurn(turn);
     }
   }
 
@@ -163,8 +187,11 @@ export function formatTurn(turn: Turn, formatOptions: FormatOptions): string {
   const role = turn.role.toUpperCase();
   const prefix = turn.isOnCurrentBranch === false ? "[REWIND] " : "";
 
-  // Text content
-  if (turn.text) {
+  // Text content — compaction summaries get special treatment
+  if (turn.isCompactionSummary && turn.text) {
+    const summaryPreview = formatCompactionSummaryText(turn.text);
+    lines.push(`${prefix}USER (compaction summary):\n${summaryPreview}`);
+  } else if (turn.text) {
     lines.push(`${prefix}${role}: ${turn.text}`);
   } else if (turn.toolCalls.length > 0 || turn.toolResults.length > 0) {
     lines.push(`${prefix}${role}:`);
@@ -245,6 +272,89 @@ export function getToolSummary(tool: ToolCall): string {
       return "";
   }
 }
+
+// ============================================================================
+// COMPACTION HELPERS
+// ============================================================================
+
+/** Max chars of compaction summary text to show before truncating */
+const COMPACTION_SUMMARY_PREVIEW_CHARS = 200;
+
+interface CompactionTurnContext {
+  compaction: CompactionEvent;
+  /** 1-based compaction index */
+  index: number;
+}
+
+/**
+ * Build a lookup map from compaction summary turn UUID to its context.
+ *
+ * This allows O(1) lookup during turn rendering to decide whether a turn
+ * needs a compaction boundary marker inserted before it.
+ */
+function buildCompactionContext(
+  compactions: CompactionEvent[]
+): Map<EntryUuid, CompactionTurnContext> {
+  const map = new Map<EntryUuid, CompactionTurnContext>();
+  for (let i = 0; i < compactions.length; i++) {
+    const compaction = compactions[i]!;
+    if (compaction.summaryMessageUuid) {
+      map.set(compaction.summaryMessageUuid, {
+        compaction,
+        index: i + 1,
+      });
+    }
+  }
+  return map;
+}
+
+/**
+ * Format token count for display: 172000 -> "172k", 1500 -> "1k"
+ */
+function formatTokenCount(tokens: number): string {
+  return `${Math.round(tokens / 1000)}k`;
+}
+
+/**
+ * Format a compaction boundary marker line.
+ *
+ * Example:
+ *   ━━━ Compaction #1 (auto) ━━━ 172k tokens ━━━ Segment 2 of 5 ━━━
+ */
+function formatCompactionMarker(
+  compaction: CompactionEvent,
+  index: number,
+  totalSegments: number
+): string {
+  const segmentNumber = index + 1; // Segment after this compaction
+  const parts = [
+    `Compaction #${index} (${compaction.trigger})`,
+    `${formatTokenCount(compaction.preTokens)} tokens`,
+    `Segment ${segmentNumber} of ${totalSegments}`,
+  ];
+  return `━━━ ${parts.join(" ━━━ ")} ━━━`;
+}
+
+/**
+ * Truncate compaction summary text for narrative display.
+ *
+ * Shows the first ~200 chars of the summary followed by a truncation
+ * indicator with the total character count.
+ *
+ * Short summaries (<= preview limit) are shown in full.
+ */
+function formatCompactionSummaryText(text: string): string {
+  if (text.length <= COMPACTION_SUMMARY_PREVIEW_CHARS) {
+    return text;
+  }
+  const preview = text.slice(0, COMPACTION_SUMMARY_PREVIEW_CHARS);
+  const totalChars = text.length.toLocaleString("en-US");
+  return `${preview}\n  ... [${totalChars} chars — compaction summary truncated]`;
+}
+
+// ============================================================================
+// GENERAL HELPERS
+// ============================================================================
 
 /**
  * Truncate a string to max length
