@@ -960,8 +960,8 @@ describe("formatTimeline compaction markers", () => {
 
     const compactionLine = lines.find((l) => l.includes("Compaction"));
     expect(compactionLine).toBeDefined();
-    // 98500 should render as "99k" (rounded)
-    expect(compactionLine).toContain("99k");
+    // 98500 should render as "98.5k" (one decimal for values < 100k)
+    expect(compactionLine).toContain("98.5k");
   });
 
   test("compaction marker is not filtered out by showTools/showCommits options", () => {

@@ -12,6 +12,7 @@ import type {
   EntryUuid,
 } from "./types";
 import { getToolCallInput } from "./types";
+import { truncate, formatTokenCount } from "./format-utils";
 
 export interface FormatOptions {
   toolInput: boolean;
@@ -309,13 +310,6 @@ function buildCompactionContext(
 }
 
 /**
- * Format token count for display: 172000 -> "172k", 1500 -> "1k"
- */
-function formatTokenCount(tokens: number): string {
-  return `${Math.round(tokens / 1000)}k`;
-}
-
-/**
  * Format a compaction boundary marker line.
  *
  * Example:
@@ -355,14 +349,6 @@ function formatCompactionSummaryText(text: string): string {
 // ============================================================================
 // GENERAL HELPERS
 // ============================================================================
-
-/**
- * Truncate a string to max length
- */
-function truncate(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen) + "...";
-}
 
 /**
  * Truncate by lines, showing first few and indicating how many more

@@ -11,6 +11,7 @@
 
 import type { TimelineEvent } from "./timeline";
 import { formatDuration } from "./formatter-stats";
+import { truncate, formatTokenCount } from "./format-utils";
 
 // ============================================================================
 // PUBLIC API
@@ -283,15 +284,6 @@ function formatAbsoluteTime(date: Date): string {
 }
 
 /**
- * Truncate a string to maxLen characters, appending "..." if truncated.
- */
-function truncate(text: string, maxLen: number): string {
-  if (maxLen <= 3) return text.length <= maxLen ? text : "...".slice(0, maxLen);
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen - 3) + "...";
-}
-
-/**
  * Shorten an agent ID for display.
  *
  * "agent-d4e2f891-..." → "agent-d4e2"
@@ -312,15 +304,6 @@ function padHint(hint: string): string {
 // ============================================================================
 // COMPACTION HELPERS
 // ============================================================================
-
-/**
- * Format a token count as a human-readable string with "k" suffix.
- *
- * Examples: 172000 → "172k", 98500 → "99k", 1500 → "2k"
- */
-function formatTokenCount(tokens: number): string {
-  return `${Math.round(tokens / 1000)}k`;
-}
 
 /**
  * Format a character count as a comma-separated string with " chars" suffix.

@@ -15,6 +15,7 @@ import type { ParsedSession } from "./types";
 import { computeStats } from "./stats";
 import type { SessionStats, SubagentSummary, TurnDurationStats, CompactionStats } from "./stats";
 import { formatCost as formatCostUsd } from "./pricing";
+import { truncate, formatTokenCount } from "./format-utils";
 
 // ============================================================================
 // PUBLIC API
@@ -481,34 +482,5 @@ export function formatCost(usd: number): string {
   return usd.toFixed(2);
 }
 
-/**
- * Format a token count with human-friendly suffixes.
- *
- * - Under 1,000:     "999"
- * - 1,000–999,999:   "1.2k", "45.2k", "123k"
- * - 1,000,000+:      "1.2M", "12.3M"
- *
- * Uses one decimal place when the leading digits are < 100,
- * drops the decimal when >= 100 (e.g., "123k" not "123.4k").
- */
-export function formatTokenCount(count: number): string {
-  if (count < 1_000) {
-    return String(count);
-  }
-
-  if (count < 1_000_000) {
-    const k = count / 1_000;
-    return k >= 100 ? `${Math.round(k)}k` : `${k.toFixed(1)}k`;
-  }
-
-  const m = count / 1_000_000;
-  return m >= 100 ? `${Math.round(m)}M` : `${m.toFixed(1)}M`;
-}
-
-/**
- * Truncate a string to maxLen, appending "..." if needed.
- */
-function truncate(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen - 3) + "...";
-}
+// Re-export for backward compatibility — other modules import from here
+export { formatTokenCount } from "./format-utils";

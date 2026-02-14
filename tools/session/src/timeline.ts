@@ -21,6 +21,7 @@ import type {
   EntryUuid,
 } from "./types";
 import { getToolCallInput } from "./types";
+import { truncate } from "./format-utils";
 
 // ============================================================================
 // TYPES
@@ -102,14 +103,6 @@ export function classifyUserMessage(text: string): UserMessageKind {
   if (text.includes("# ") && text.includes("Triggered by")) return "skill_injection";
   if (text === "[Request interrupted by user]") return "interrupted";
   return "human";
-}
-
-/**
- * Truncate a string to maxLen characters, appending "..." if truncated.
- */
-function truncate(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen - 3) + "...";
 }
 
 /**

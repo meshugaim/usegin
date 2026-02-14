@@ -9,6 +9,7 @@ import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage
 import { getToolCallInput } from "./types";
 import type { GitCommit } from "./git-commits";
 import { getModelPricing, getContextWindowSize, estimateCost } from "./pricing";
+import { truncate } from "./format-utils";
 
 // ============================================================================
 // TYPES
@@ -181,14 +182,6 @@ function buildSubagentDescription(
   }
 
   return "";
-}
-
-/**
- * Truncate a string to maxLen characters, appending "..." if truncated.
- */
-function truncate(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen - 3) + "...";
 }
 
 /**
