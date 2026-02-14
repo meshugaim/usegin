@@ -38,6 +38,8 @@ export interface TurnOptions {
   toolResults?: ToolResult[];
   /** Token usage for this turn (assistant turns only) */
   tokenUsage?: TokenUsage;
+  /** Whether this user turn is a compaction summary (user turns only) */
+  isCompactionSummary?: boolean;
 }
 
 /**
@@ -64,6 +66,7 @@ export function userTurn(
     isOnCurrentBranch = true,
     toolCalls = [],
     toolResults = [],
+    isCompactionSummary,
   } = options;
 
   const brandedUuid: EntryUuid = typeof uuid === "string" ? asEntryUuid(uuid) : uuid;
@@ -85,6 +88,7 @@ export function userTurn(
     isOnCurrentBranch,
     ...(brandedParentUuid !== undefined ? { parentUuid: brandedParentUuid } : {}),
     ...(timestamp !== undefined ? { timestamp } : {}),
+    ...(isCompactionSummary !== undefined ? { isCompactionSummary } : {}),
   };
 }
 

@@ -6,6 +6,7 @@ import {
   makeRewind,
   makeCommit,
   makeGitCommit,
+  makeCompaction,
   userTurn,
   assistantTurn,
   toolCall,
@@ -737,5 +738,272 @@ describe("formatNarrative with queued messages", () => {
     const firstIdx = output.indexOf("USER (queued): first nudge");
     const secondIdx = output.indexOf("USER (queued): second nudge");
     expect(firstIdx).toBeLessThan(secondIdx);
+  });
+});
+
+// ============================================================================
+// COMPACTION DISPLAY
+// ============================================================================
+
+describe("formatNarrative with compactions", () => {
+  const LONG_SUMMARY =
+    "This session is being continued from a previous conversation that ran out of context. The main focus of the work has been implementing a session CLI tool for parsing and displaying Claude Code sessions. " +
+    "A".repeat(16000);
+
+  test("inserts compaction boundary marker before summary turn", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a2", "Continuing after compaction"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should contain a compaction marker line
+    expect(output).toContain("Compaction #1");
+    // The marker should appear before the compaction summary
+    const markerIdx = output.indexOf("Compaction #1");
+    const summaryIdx = output.indexOf("USER (compaction summary):");
+    expect(markerIdx).toBeGreaterThan(-1);
+    expect(summaryIdx).toBeGreaterThan(-1);
+    expect(markerIdx).toBeLessThan(summaryIdx);
+  });
+
+  test("includes trigger and token count in boundary marker", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a2", "Continuing"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should contain trigger info
+    expect(output).toContain("auto");
+    // Should contain token count (172k)
+    expect(output).toContain("172k");
+  });
+
+  test("includes segment context in boundary marker", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a2", "Continuing"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // 1 compaction = 2 segments
+    expect(output).toContain("Segment 2 of 2");
+  });
+
+  test("truncates compaction summary content with char count", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a2", "Continuing"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should show the beginning of the summary text
+    expect(output).toContain("This session is being continued");
+    // Should NOT contain the full 16k+ summary
+    expect(output.length).toBeLessThan(LONG_SUMMARY.length);
+    // Should show truncation indicator with char count
+    expect(output).toMatch(/\d[\d,]+ chars/);
+    expect(output).toContain("compaction summary truncated");
+  });
+
+  test("labels compaction summary turns differently from regular user turns", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a2", "Continuing"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should use distinct label for compaction summaries
+    expect(output).toContain("USER (compaction summary):");
+    // Regular user turn should remain as-is
+    expect(output).toContain("USER: Hello");
+    // Should NOT have bare "USER:" for the compaction summary
+    const lines = output.split("\n");
+    const compactionLines = lines.filter(
+      (l) => l.includes("This session is being continued")
+    );
+    for (const line of compactionLines) {
+      expect(line).not.toMatch(/^USER: This session/);
+    }
+  });
+
+  test("handles multiple compactions with correct numbering", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a2", "After first compaction"),
+        userTurn("u3", "More work"),
+        assistantTurn("a3", "Done"),
+        userTurn("u4", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a4", "After second compaction"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+        makeCompaction("2025-01-15T16:20:00.000Z", 174000, {
+          summaryMessageUuid: "u4" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should number compactions sequentially
+    expect(output).toContain("Compaction #1");
+    expect(output).toContain("Compaction #2");
+    // Should show correct segment context (2 compactions = 3 segments)
+    expect(output).toContain("Segment 2 of 3");
+    expect(output).toContain("Segment 3 of 3");
+  });
+
+  test("uses heavy separator characters for visual distinction", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", LONG_SUMMARY, { isCompactionSummary: true }),
+        assistantTurn("a2", "Continuing"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should use heavy box-drawing characters (━) for compaction markers
+    // to visually distinguish from regular section separators (─)
+    expect(output).toContain("━━━");
+  });
+
+  test("session with no compactions renders identically to before", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+        userTurn("u2", "Follow up"),
+        assistantTurn("a2", "Sure!"),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // No compaction markers
+    expect(output).not.toContain("Compaction");
+    expect(output).not.toContain("compaction summary");
+    expect(output).not.toContain("Segment");
+    // Normal rendering
+    expect(output).toContain("USER: Hello");
+    expect(output).toContain("ASSISTANT: Hi!");
+  });
+
+  test("compaction summary with short text still gets truncation treatment", () => {
+    const shortSummary = "This session is being continued from a previous conversation.";
+    const session = makeSession({
+      turns: [
+        userTurn("u1", shortSummary, { isCompactionSummary: true }),
+        assistantTurn("a1", "Continuing"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 50000, {
+          summaryMessageUuid: "u1" as any,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Short summaries should still be labeled as compaction summaries
+    expect(output).toContain("USER (compaction summary):");
+    // Should still have the marker
+    expect(output).toContain("Compaction #1");
+  });
+
+  test("compaction markers appear in correct position with queued messages", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello", { timestamp: "2025-01-15T10:00:00.000Z" }),
+        assistantTurn("a1", "Hi!", { timestamp: "2025-01-15T10:01:00.000Z" }),
+        userTurn("u2", LONG_SUMMARY, {
+          isCompactionSummary: true,
+          timestamp: "2025-01-15T14:55:00.000Z",
+        }),
+        assistantTurn("a2", "Continuing", { timestamp: "2025-01-15T14:56:00.000Z" }),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
+          summaryMessageUuid: "u2" as any,
+        }),
+      ],
+      queuedMessages: [
+        { timestamp: "2025-01-15T10:00:30.000Z", content: "also do X" },
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should contain both queued message and compaction marker
+    expect(output).toContain("USER (queued): also do X");
+    expect(output).toContain("Compaction #1");
+    // Queued message should be before compaction
+    const queuedIdx = output.indexOf("USER (queued):");
+    const compactionIdx = output.indexOf("Compaction #1");
+    expect(queuedIdx).toBeLessThan(compactionIdx);
   });
 });
