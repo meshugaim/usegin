@@ -20,6 +20,7 @@ import type {
   ToolResultContent,
   RewindInfo,
   CommitInfo,
+  CompactionEvent,
   QueuedMessage,
   SessionId,
   EntryUuid,
@@ -654,6 +655,11 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   let result: ParsedSession["result"];
   let startTimestamp: string | undefined;
   let endTimestamp: string | undefined;
+  // Compaction tracking
+  const compactions: CompactionEvent[] = [];
+  // Set of compact_boundary UUIDs — the next user turn whose parentUuid matches
+  // one of these is the compaction summary message and gets tagged accordingly.
+  const pendingCompactionBoundaryUuids = new Set<string>();
   // Aggregate token usage across all assistant turns
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -727,12 +733,51 @@ export function parseEntries(entries: Entry[]): ParsedSession {
             turnDurations.push(durationMs);
           }
         }
+        // Auto-compaction boundary: extract metadata and prepare to tag
+        // the immediately-following user message as a compaction summary.
+        if ((e.subtype as string) === "compact_boundary") {
+          const compactMeta = e.compactMetadata as { trigger?: string; preTokens?: number } | undefined;
+          const boundaryUuid = e.uuid as string | undefined;
+          const logicalParent = e.logicalParentUuid as string | undefined;
+          const timestamp = e.timestamp as string | undefined;
+
+          if (boundaryUuid && timestamp) {
+            compactions.push({
+              timestamp,
+              trigger: compactMeta?.trigger ?? "unknown",
+              preTokens: compactMeta?.preTokens ?? 0,
+              boundaryUuid: asEntryUuid(boundaryUuid),
+              logicalParentUuid: asEntryUuid(logicalParent ?? ""),
+              // summaryMessageUuid will be filled in when we encounter the
+              // following user turn whose parentUuid matches this boundary
+            });
+            pendingCompactionBoundaryUuids.add(boundaryUuid);
+          }
+        }
         break;
 
       case "user":
       case "assistant":
         const turn = parseTurn(entry);
         if (turn) {
+          // Tag user turns that are compaction summaries.
+          // The user message immediately following a compact_boundary has its
+          // parentUuid pointing to the boundary entry's uuid.
+          if (
+            turn.role === "user" &&
+            turn.parentUuid &&
+            pendingCompactionBoundaryUuids.has(turn.parentUuid)
+          ) {
+            turn.isCompactionSummary = true;
+            // Link the compaction event to this summary message
+            const compaction = compactions.find(
+              (c) => c.boundaryUuid === turn.parentUuid
+            );
+            if (compaction) {
+              compaction.summaryMessageUuid = asEntryUuid(turn.uuid);
+            }
+            pendingCompactionBoundaryUuids.delete(turn.parentUuid);
+          }
           turns.push(turn);
           // Index tool calls by id so we can match results to their originating tool.
           // Also extract triggered skills from Skill tool calls.
@@ -853,6 +898,7 @@ export function parseEntries(entries: Entry[]): ParsedSession {
     rewinds,
     triggeredSkills,
     commits,
+    compactions,
     ...(queuedMessages.length > 0 ? { queuedMessages } : {}),
     ...(slug ? { slug } : {}),
     ...(turnDurations.length > 0 ? { turnDurations } : {}),
