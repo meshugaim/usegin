@@ -31,13 +31,32 @@ Use `AskUserQuestion` to ask which environment to test: **local**, **staging**, 
 
 ### 2. Explore Recent Changes
 
-Use `AskUserQuestion` to ask how far back to check changes. Suggested options: 1 day, 3 days, 1 week, custom.
+How to check changes depends on the environment:
 
-Then check what changed on the branch for that environment:
+**Staging** — Use `AskUserQuestion` to ask what to diff. Options:
+- **Staging vs Production** (recommended) — this is what will be promoted next, most relevant for sanity testing
+- **Recent commits by time** — 1 day, 3 days, 1 week, custom
 
 ```bash
-# Show recent changes relevant to the chosen env
-git log origin/<branch> --oneline --since="<timeframe>" -- nextjs-app/ python-services/
+# Staging vs Production (what's about to be promoted)
+git log origin/production..origin/staging --oneline -- nextjs-app/ python-services/
+
+# Or by time
+git log origin/staging --oneline --since="<timeframe>" -- nextjs-app/ python-services/
+```
+
+**Production** — Diff production vs what's live (recent production commits):
+```bash
+git log origin/production --oneline --since="<timeframe>" -- nextjs-app/ python-services/
+```
+
+**Local** — Diff main vs staging (what hasn't been promoted yet), or recent commits:
+```bash
+# What's on main but not yet on staging
+git log origin/staging..origin/main --oneline -- nextjs-app/ python-services/
+
+# Or by time
+git log origin/main --oneline --since="<timeframe>" -- nextjs-app/ python-services/
 ```
 
 Present the changes to the user — these inform what to focus testing on beyond the basic sanity checks.
