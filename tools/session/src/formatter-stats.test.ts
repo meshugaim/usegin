@@ -931,8 +931,9 @@ describe("formatStats compactions section", () => {
     const output = formatStats(session);
 
     // 2 segments: 3 turns before compaction, 2 turns after (including summary)
+    // Last segment is bracketed to highlight it as the active segment
     expect(output).toContain("2 segments:");
-    expect(output).toMatch(/3 .+ 2 turns/);
+    expect(output).toMatch(/3 .+ \[2\] turns/);
   });
 
   test("shows compaction section between Conversation and Tokens sections", () => {

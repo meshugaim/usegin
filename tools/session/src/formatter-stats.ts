@@ -163,10 +163,12 @@ function formatCompactionsSection(stats: SessionStats): string[] {
     lines.push(`  ${index}  ${time}  ${tokens} tokens \u2192 compacted (${event.trigger})`);
   });
 
-  // Segment turn breakdown
+  // Segment turn breakdown — bracket the last (active) segment
   if (segmentTurnCounts.length > 1) {
     const segmentLabel = `${segmentTurnCounts.length} segments:`;
-    const turnsList = segmentTurnCounts.join(" \u2192 ");
+    const allButLast = segmentTurnCounts.slice(0, -1);
+    const last = segmentTurnCounts[segmentTurnCounts.length - 1]!;
+    const turnsList = [...allButLast, `[${last}]`].join(" \u2192 ");
     lines.push(`${segmentLabel} ${turnsList} turns`);
   }
 
