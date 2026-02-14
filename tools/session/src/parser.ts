@@ -657,8 +657,10 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   let endTimestamp: string | undefined;
   // Compaction tracking
   const compactions: CompactionEvent[] = [];
-  // Set of compact_boundary UUIDs — the next user turn whose parentUuid matches
-  // one of these is the compaction summary message and gets tagged accordingly.
+  // Track compact_boundary UUIDs awaiting their summary message.
+  // After a compact_boundary, the next user turn has parentUuid pointing
+  // to the boundary entry. When we encounter that user turn, we tag it
+  // as a compaction summary and remove the boundary from this set.
   const pendingCompactionBoundaryUuids = new Set<string>();
   // Aggregate token usage across all assistant turns
   let totalInputTokens = 0;
