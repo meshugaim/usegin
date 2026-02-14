@@ -538,6 +538,37 @@ describe("formatTimeline hints", () => {
     expect(joined).not.toContain("--show-tools");
     expect(joined).not.toContain("subagent internals");
   });
+
+  test("includes --full hint when timeline has compaction events", () => {
+    const compactedEvents: TimelineEvent[] = [
+      { kind: "session_start", timestamp: at(0) },
+      { kind: "user_message", timestamp: at(0), text: "Hello" },
+      {
+        kind: "compaction",
+        timestamp: at(mins(5)),
+        number: 1,
+        trigger: "auto",
+        preTokens: 172000,
+        segmentNumber: 2,
+        totalSegments: 2,
+      },
+      { kind: "session_end", timestamp: at(mins(10)), totalDurationMs: mins(10) },
+    ];
+
+    const lines = formatTimeline(compactedEvents, { showHints: true });
+    const lastLine = lines[lines.length - 1];
+
+    expect(lastLine).toContain("--full to read compaction summaries");
+    expect(lastLine).toContain("--show-tools");
+    expect(lastLine).toContain("--subagents");
+  });
+
+  test("omits --full hint when no compaction events", () => {
+    const lines = formatTimeline(events, { showHints: true });
+    const lastLine = lines[lines.length - 1];
+
+    expect(lastLine).not.toContain("--full");
+  });
 });
 
 // ============================================================================

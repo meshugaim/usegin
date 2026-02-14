@@ -75,7 +75,12 @@ export function formatTimeline(
   }
 
   if (showHints && lines.length > 0) {
-    lines.push(padHint("(--show-tools to include tool calls, --subagents to include subagent internals)"));
+    const hasCompactions = filtered.some((e) => e.kind === "compaction");
+    const hints = ["--show-tools to include tool calls", "--subagents to include subagent internals"];
+    if (hasCompactions) {
+      hints.push("--full to read compaction summaries");
+    }
+    lines.push(padHint(`(${hints.join(", ")})`));
   }
 
   return lines;
