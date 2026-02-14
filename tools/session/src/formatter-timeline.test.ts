@@ -1031,7 +1031,7 @@ describe("formatTimeline compaction summary messages", () => {
     expect(summaryLine).toContain("chars");
   });
 
-  test("compaction summary shows character count indicator", () => {
+  test("compaction summary shows character count and preview text", () => {
     const events: TimelineEvent[] = [
       start,
       {
@@ -1046,6 +1046,9 @@ describe("formatTimeline compaction summary messages", () => {
 
     const summaryLine = lines.find((l) => l.includes("compaction summary"));
     expect(summaryLine).toBeDefined();
+    // Should show char count and a preview of the summary text
+    expect(summaryLine).toContain("chars");
+    expect(summaryLine).toContain('"This session is being continued..."');
   });
 
   test("integrates compaction marker and summary in full timeline", () => {

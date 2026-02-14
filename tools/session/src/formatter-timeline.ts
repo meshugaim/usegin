@@ -114,7 +114,8 @@ function formatEvent(
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       if (event.compactionSummary) {
         const charCount = event.originalLength ?? event.text.length;
-        return `  ${ts}  [compaction summary \u2014 ${formatCharCount(charCount)}]`;
+        const preview = truncate(event.text.replace(/\n/g, " "), 80);
+        return `  ${ts}  [compaction summary \u2014 ${formatCharCount(charCount)}: "${preview}"]`;
       }
       const text = truncate(event.text, 120);
       const label = event.queued ? "User (queued)" : "User";
