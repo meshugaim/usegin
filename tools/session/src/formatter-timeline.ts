@@ -204,7 +204,7 @@ function formatEvent(
     case "compaction": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       const tokens = formatTokenCount(event.preTokens);
-      return formatCompactionMarker(event.number, event.trigger, tokens, ts);
+      return formatCompactionMarker(event.number, event.trigger, tokens, event.segmentNumber, event.totalSegments);
     }
 
     case "idle_gap": {
@@ -317,7 +317,7 @@ function formatCharCount(chars: number): string {
 /**
  * Render a compaction boundary marker as a visually distinct separator.
  *
- * Output: "  ══════ Compaction #1 (auto) ── 172k tokens ── 14:55 ══════"
+ * Output: "  ══════ Compaction #1 (auto) ══ 172k tokens ══ Segment 2 of 5 ══════"
  *
  * Uses double-line box-drawing characters (═) to stand out from the
  * regular timeline events and the single-line header/footer rules.
@@ -326,9 +326,10 @@ function formatCompactionMarker(
   number: number,
   trigger: string,
   tokens: string,
-  timestamp: string,
+  segmentNumber: number,
+  totalSegments: number,
 ): string {
-  const content = ` Compaction #${number} (${trigger}) ${DOUBLE_RULE_CHAR}${DOUBLE_RULE_CHAR} ${tokens} tokens ${DOUBLE_RULE_CHAR}${DOUBLE_RULE_CHAR} ${timestamp} `;
+  const content = ` Compaction #${number} (${trigger}) ${DOUBLE_RULE_CHAR}${DOUBLE_RULE_CHAR} ${tokens} tokens ${DOUBLE_RULE_CHAR}${DOUBLE_RULE_CHAR} Segment ${segmentNumber} of ${totalSegments} `;
   const prefix = `  ${DOUBLE_RULE_CHAR.repeat(6)}`;
   const suffix = DOUBLE_RULE_CHAR.repeat(6);
   return `${prefix}${content}${suffix}`;

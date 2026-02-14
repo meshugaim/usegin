@@ -1736,9 +1736,15 @@ describe("buildTimeline — compaction events", () => {
     expect(compactionEvents).toHaveLength(2);
     expect(compactionEvents[0]!.number).toBe(1);
     expect(compactionEvents[0]!.preTokens).toBe(150000);
+    // 2 compactions -> 3 segments; first compaction starts segment 2
+    expect(compactionEvents[0]!.segmentNumber).toBe(2);
+    expect(compactionEvents[0]!.totalSegments).toBe(3);
     expect(compactionEvents[1]!.number).toBe(2);
     expect(compactionEvents[1]!.trigger).toBe("manual");
     expect(compactionEvents[1]!.preTokens).toBe(180000);
+    // Second compaction starts segment 3
+    expect(compactionEvents[1]!.segmentNumber).toBe(3);
+    expect(compactionEvents[1]!.totalSegments).toBe(3);
   });
 
   test("compaction events interleave correctly with user and assistant events", () => {

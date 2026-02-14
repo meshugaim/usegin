@@ -903,6 +903,8 @@ describe("formatTimeline compaction markers", () => {
         number: 1,
         trigger: "auto",
         preTokens: 172000,
+        segmentNumber: 2,
+        totalSegments: 3,
       },
       { kind: "session_end", timestamp: at(mins(20)), totalDurationMs: mins(20) },
     ];
@@ -913,11 +915,11 @@ describe("formatTimeline compaction markers", () => {
     const compactionLine = lines.find((l) => l.includes("Compaction"));
     expect(compactionLine).toBeDefined();
 
-    // Should contain compaction number, trigger, token count, and timestamp
+    // Should contain compaction number, trigger, token count, and segment info
     expect(compactionLine).toContain("Compaction #1");
     expect(compactionLine).toContain("auto");
     expect(compactionLine).toContain("172k");
-    expect(compactionLine).toContain("14:55");
+    expect(compactionLine).toContain("Segment 2 of 3");
 
     // Should use double-line separator characters
     expect(compactionLine).toContain("\u2550"); // ═
@@ -932,6 +934,8 @@ describe("formatTimeline compaction markers", () => {
         number: 2,
         trigger: "manual",
         preTokens: 150000,
+        segmentNumber: 3,
+        totalSegments: 4,
       },
     ];
 
@@ -942,6 +946,7 @@ describe("formatTimeline compaction markers", () => {
     expect(compactionLine).toContain("Compaction #2");
     expect(compactionLine).toContain("manual");
     expect(compactionLine).toContain("150k");
+    expect(compactionLine).toContain("Segment 3 of 4");
   });
 
   test("formats token count in human-readable form", () => {
@@ -953,6 +958,8 @@ describe("formatTimeline compaction markers", () => {
         number: 1,
         trigger: "auto",
         preTokens: 98500,
+        segmentNumber: 2,
+        totalSegments: 2,
       },
     ];
 
@@ -973,6 +980,8 @@ describe("formatTimeline compaction markers", () => {
         number: 1,
         trigger: "auto",
         preTokens: 172000,
+        segmentNumber: 2,
+        totalSegments: 2,
       },
       { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
     ];
@@ -1001,6 +1010,8 @@ describe("formatTimeline compaction summary messages", () => {
         number: 1,
         trigger: "auto",
         preTokens: 172000,
+        segmentNumber: 2,
+        totalSegments: 2,
       },
       {
         kind: "user_message",
@@ -1047,6 +1058,8 @@ describe("formatTimeline compaction summary messages", () => {
         number: 1,
         trigger: "auto",
         preTokens: 172000,
+        segmentNumber: 2,
+        totalSegments: 2,
       },
       {
         kind: "user_message",
