@@ -12,7 +12,7 @@ import {
   toolCall,
   toolResult,
 } from "./testing";
-import { asSessionId } from "./types";
+import { asSessionId, asEntryUuid } from "./types";
 
 describe("formatNarrative", () => {
   test("formats basic user/assistant turns", () => {
@@ -760,7 +760,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
       ],
     });
@@ -787,7 +787,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
       ],
     });
@@ -810,7 +810,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
       ],
     });
@@ -831,7 +831,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
       ],
     });
@@ -857,7 +857,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
       ],
     });
@@ -892,10 +892,10 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
         makeCompaction("2025-01-15T16:20:00.000Z", 174000, {
-          summaryMessageUuid: "u4" as any,
+          summaryMessageUuid: asEntryUuid("u4"),
         }),
       ],
     });
@@ -920,7 +920,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
       ],
     });
@@ -962,7 +962,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 50000, {
-          summaryMessageUuid: "u1" as any,
+          summaryMessageUuid: asEntryUuid("u1"),
         }),
       ],
     });
@@ -988,7 +988,7 @@ describe("formatNarrative with compactions", () => {
       ],
       compactions: [
         makeCompaction("2025-01-15T14:55:00.000Z", 172000, {
-          summaryMessageUuid: "u2" as any,
+          summaryMessageUuid: asEntryUuid("u2"),
         }),
       ],
       queuedMessages: [
