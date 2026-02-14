@@ -655,7 +655,7 @@ export function buildTimeline(
   events.sort((a, b) => {
     const timeDiff = a.timestamp.getTime() - b.timestamp.getTime();
     if (timeDiff !== 0) return timeDiff;
-    return (kindSortPriority(a.kind) ?? 0) - (kindSortPriority(b.kind) ?? 0);
+    return kindSortPriority(a.kind) - kindSortPriority(b.kind);
   });
 
   // --- Detect idle gaps ---
