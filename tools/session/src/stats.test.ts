@@ -299,6 +299,29 @@ describe("computeStats", () => {
       expect(stats.subagentSummaries[2]!.turns).toBe(0);
     });
 
+    test("filters out compaction subagents (acompact- prefix)", () => {
+      const session = makeSession({
+        subagents: [
+          makeSubagent("agent-real", [
+            assistantTurn("sa1", "Real subagent work"),
+          ]),
+          makeSubagent("acompact-abc123", [
+            assistantTurn("sa2", "Compaction summary generator"),
+          ]),
+          makeSubagent("agent-also-real", [
+            assistantTurn("sa3", "Another real subagent"),
+          ]),
+        ],
+      });
+
+      const stats = computeStats(session);
+
+      // Only the 2 real subagents should appear — compaction subagent is filtered
+      expect(stats.subagentSummaries).toHaveLength(2);
+      expect(stats.subagentSummaries[0]!.agentId).toBe("agent-real");
+      expect(stats.subagentSummaries[1]!.agentId).toBe("agent-also-real");
+    });
+
     test("computes duration from first to last turn timestamps", () => {
       const agentId = asAgentId("agent-dur");
       const subagent = makeSubagent(agentId, [
