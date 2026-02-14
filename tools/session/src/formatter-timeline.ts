@@ -86,6 +86,7 @@ export function formatTimeline(
 
 const HEADER_WIDTH = 44;
 const LIGHT_RULE_CHAR = "\u2500";
+const DOUBLE_RULE_CHAR = "\u2550"; // ═
 
 // ============================================================================
 // EVENT FORMATTING
@@ -110,6 +111,10 @@ function formatEvent(
 
     case "user_message": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
+      if (event.compactionSummary) {
+        const charCount = event.originalLength ?? event.text.length;
+        return `  ${ts}  [compaction summary \u2014 ${formatCharCount(charCount)}]`;
+      }
       const text = truncate(event.text, 120);
       const label = event.queued ? "User (queued)" : "User";
       return `  ${ts}  ${label}: "${text}"`;
@@ -193,6 +198,12 @@ function formatEvent(
     case "interrupted": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       return `  ${ts}  \u2702 interrupted`;
+    }
+
+    case "compaction": {
+      const ts = formatTimestamp(event.timestamp, sessionStartMs);
+      const tokens = formatTokenCount(event.preTokens);
+      return formatCompactionMarker(event.number, event.trigger, tokens, ts);
     }
 
     case "idle_gap": {
@@ -296,4 +307,46 @@ function shortAgentId(agentId: string): string {
  */
 function padHint(hint: string): string {
   return `  ${hint}`;
+}
+
+// ============================================================================
+// COMPACTION HELPERS
+// ============================================================================
+
+/**
+ * Format a token count as a human-readable string with "k" suffix.
+ *
+ * Examples: 172000 → "172k", 98500 → "99k", 1500 → "2k"
+ */
+function formatTokenCount(tokens: number): string {
+  return `${Math.round(tokens / 1000)}k`;
+}
+
+/**
+ * Format a character count as a comma-separated string with " chars" suffix.
+ *
+ * Examples: 16234 → "16,234 chars", 42 → "42 chars"
+ */
+function formatCharCount(chars: number): string {
+  return `${chars.toLocaleString("en-US")} chars`;
+}
+
+/**
+ * Render a compaction boundary marker as a visually distinct separator.
+ *
+ * Output: "  ══════ Compaction #1 (auto) ── 172k tokens ── 14:55 ══════"
+ *
+ * Uses double-line box-drawing characters (═) to stand out from the
+ * regular timeline events and the single-line header/footer rules.
+ */
+function formatCompactionMarker(
+  number: number,
+  trigger: string,
+  tokens: string,
+  timestamp: string,
+): string {
+  const content = ` Compaction #${number} (${trigger}) ${DOUBLE_RULE_CHAR}${DOUBLE_RULE_CHAR} ${tokens} tokens ${DOUBLE_RULE_CHAR}${DOUBLE_RULE_CHAR} ${timestamp} `;
+  const prefix = `  ${DOUBLE_RULE_CHAR.repeat(6)}`;
+  const suffix = DOUBLE_RULE_CHAR.repeat(6);
+  return `${prefix}${content}${suffix}`;
 }

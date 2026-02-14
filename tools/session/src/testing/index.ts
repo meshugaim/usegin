@@ -126,4 +126,5 @@ export {
   makeRewind,
   makeCommit,
   makeGitCommit,
+  makeCompaction,
 } from "./sessions";

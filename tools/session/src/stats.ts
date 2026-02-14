@@ -5,7 +5,7 @@
  * Feed the result into a formatter for display.
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage, TokenStats } from "./types";
+import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage, TokenStats, CompactionEvent } from "./types";
 import { getToolCallInput } from "./types";
 import type { GitCommit } from "./git-commits";
 import { getModelPricing, getContextWindowSize, estimateCost } from "./pricing";
@@ -27,6 +27,15 @@ export interface TurnDurationStats {
 
 export type { TokenStats };
 
+export interface CompactionStats {
+  /** Number of compaction events */
+  count: number;
+  /** Raw compaction events (for timestamp, trigger, token data) */
+  events: CompactionEvent[];
+  /** Turn counts per segment: [pre-first-compaction, between-1-and-2, ..., after-last] */
+  segmentTurnCounts: number[];
+}
+
 export interface SessionStats {
   turnCount: { total: number; user: number; assistant: number };
   toolCounts: Record<string, number>; // tool name -> call count, sorted by count desc
@@ -45,6 +54,8 @@ export interface SessionStats {
   turnDurationStats?: TurnDurationStats;
   /** Per-turn token statistics with peak context, cost, and cache metrics */
   tokenStats?: TokenStats;
+  /** Compaction events and segment breakdown, when compactions occurred */
+  compactionStats?: CompactionStats;
 }
 
 export interface SubagentSummary {
@@ -241,6 +252,53 @@ function computeTurnDurationStats(durations?: number[]): TurnDurationStats | und
 }
 
 // ============================================================================
+// COMPACTION STATS
+// ============================================================================
+
+/**
+ * Compute compaction statistics from session data.
+ *
+ * Segments are defined by compaction boundaries:
+ * - Segment 0: turns before the first compaction summary
+ * - Segment N: turns from compaction summary N to compaction summary N+1 (or session end)
+ *
+ * Compaction summary turns (isCompactionSummary=true) are included in the
+ * segment they start — they belong to the post-compaction segment, not the
+ * pre-compaction one.
+ *
+ * Returns undefined when no compactions occurred.
+ */
+function computeCompactionStats(
+  compactions: CompactionEvent[],
+  turns: Turn[]
+): CompactionStats | undefined {
+  if (compactions.length === 0) return undefined;
+
+  // Compute segment turn counts by splitting on compaction summary turns
+  const segmentTurnCounts: number[] = [];
+  let currentSegmentCount = 0;
+
+  for (const turn of turns) {
+    if (turn.isCompactionSummary) {
+      // Close the current segment
+      segmentTurnCounts.push(currentSegmentCount);
+      // Start a new segment (the summary turn is part of the new segment)
+      currentSegmentCount = 1;
+    } else {
+      currentSegmentCount++;
+    }
+  }
+  // Close the final segment
+  segmentTurnCounts.push(currentSegmentCount);
+
+  return {
+    count: compactions.length,
+    events: compactions,
+    segmentTurnCounts,
+  };
+}
+
+// ============================================================================
 // TOKEN STATS
 // ============================================================================
 
@@ -397,6 +455,12 @@ export function computeStats(session: ParsedSession): SessionStats {
     ? computeTokenStats(session.turns, session.model)
     : undefined;
 
+  // Compute compaction stats if any compaction events present
+  const compactionStats = computeCompactionStats(
+    session.compactions,
+    session.turns
+  );
+
   return {
     turnCount: {
       total: session.turns.length,
@@ -419,5 +483,6 @@ export function computeStats(session: ParsedSession): SessionStats {
     ...(session.tokenUsage ? { tokenUsage: session.tokenUsage } : {}),
     ...(turnDurationStats ? { turnDurationStats } : {}),
     ...(tokenStats ? { tokenStats } : {}),
+    ...(compactionStats ? { compactionStats } : {}),
   };
 }

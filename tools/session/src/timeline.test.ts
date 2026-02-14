@@ -16,7 +16,8 @@ import {
   toolResult,
   createTimestampGenerator,
 } from "./testing";
-import { asAgentId } from "./types";
+import { asAgentId, asEntryUuid } from "./types";
+import type { CompactionEvent } from "./types";
 
 // ============================================================================
 // HELPERS
@@ -1650,5 +1651,237 @@ describe("cleanReportText", () => {
   test("defaults to maxLines=1 (backward compatible)", () => {
     const raw = "Line one\nLine two\nLine three";
     expect(cleanReportText(raw)).toBe("Line one");
+  });
+});
+
+// ============================================================================
+// COMPACTION CLASSIFICATION
+// ============================================================================
+
+describe("classifyUserMessage — compaction summaries", () => {
+  test("classifies compaction summary text as human (classification is text-only)", () => {
+    // classifyUserMessage only sees text — it has no access to turn metadata.
+    // Compaction summaries look like normal human text to the classifier.
+    // The buildTimeline function uses turn.isCompactionSummary for detection.
+    const text =
+      "This session is being continued from a previous conversation that ran out of context...";
+    expect(classifyUserMessage(text)).toBe("human");
+  });
+});
+
+// ============================================================================
+// COMPACTION EVENTS IN TIMELINE
+// ============================================================================
+
+/** Helper to create a CompactionEvent for tests. */
+function makeCompaction(
+  number: number,
+  timestamp: string,
+  opts: Partial<CompactionEvent> = {},
+): CompactionEvent {
+  return {
+    timestamp,
+    trigger: "auto",
+    preTokens: 172000,
+    boundaryUuid: asEntryUuid(`boundary-${number}`),
+    logicalParentUuid: asEntryUuid(`parent-${number}`),
+    ...opts,
+  };
+}
+
+describe("buildTimeline — compaction events", () => {
+  test("inserts compaction event at correct chronological position", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts(); // 10:00
+    const t2 = ts(); // 10:01
+    const t3 = ts(); // 10:02
+    const t4 = ts(); // 10:03
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t4,
+      turns: [
+        userTurn("u1", "Start working", { timestamp: t1 }),
+        assistantTurn("a1", "On it", { timestamp: t2 }),
+        userTurn("u3", "Continue after compaction", { timestamp: t3 }),
+      ],
+      compactions: [makeCompaction(1, t2)],
+    });
+
+    const events = buildTimeline(session);
+    const compactionEvents = events.filter((e) => e.kind === "compaction");
+
+    expect(compactionEvents).toHaveLength(1);
+    const ce = compactionEvents[0] as TimelineEvent & { kind: "compaction" };
+    expect(ce.number).toBe(1);
+    expect(ce.trigger).toBe("auto");
+    expect(ce.preTokens).toBe(172000);
+    expect(ce.timestamp.toISOString()).toBe(t2);
+  });
+
+  test("numbers multiple compaction events sequentially", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts(); // 10:00
+    const t2 = ts(); // 10:01
+    const t3 = ts(); // 10:02
+    const t4 = ts(); // 10:03
+    const t5 = ts(); // 10:04
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t5,
+      turns: [
+        userTurn("u1", "Start", { timestamp: t1 }),
+        userTurn("u2", "Middle", { timestamp: t3 }),
+        userTurn("u3", "End", { timestamp: t5 }),
+      ],
+      compactions: [
+        makeCompaction(1, t2, { preTokens: 150000 }),
+        makeCompaction(2, t4, { preTokens: 180000, trigger: "manual" }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const compactionEvents = events.filter((e) => e.kind === "compaction") as Array<
+      TimelineEvent & { kind: "compaction" }
+    >;
+
+    expect(compactionEvents).toHaveLength(2);
+    expect(compactionEvents[0]!.number).toBe(1);
+    expect(compactionEvents[0]!.preTokens).toBe(150000);
+    expect(compactionEvents[1]!.number).toBe(2);
+    expect(compactionEvents[1]!.trigger).toBe("manual");
+    expect(compactionEvents[1]!.preTokens).toBe(180000);
+  });
+
+  test("compaction events interleave correctly with user and assistant events", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts(); // 10:00
+    const t2 = ts(); // 10:01
+    const t3 = ts(); // 10:02
+    const t4 = ts(); // 10:03
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t4,
+      turns: [
+        userTurn("u1", "Start", { timestamp: t1 }),
+        userTurn("u2", "After compaction", { timestamp: t3 }),
+      ],
+      compactions: [makeCompaction(1, t2)],
+    });
+
+    const events = buildTimeline(session);
+
+    expect(kinds(events)).toEqual([
+      "session_start",
+      "user_message",
+      "compaction",
+      "user_message",
+      "session_end",
+    ]);
+  });
+
+  test("skips compaction events with invalid timestamps", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t1,
+      turns: [userTurn("u1", "Hello", { timestamp: t1 })],
+      compactions: [makeCompaction(1, "invalid-date")],
+    });
+
+    const events = buildTimeline(session);
+    const compactionEvents = events.filter((e) => e.kind === "compaction");
+
+    expect(compactionEvents).toHaveLength(0);
+  });
+
+  test("handles empty compactions array gracefully", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t1,
+      turns: [userTurn("u1", "Hello", { timestamp: t1 })],
+      compactions: [],
+    });
+
+    const events = buildTimeline(session);
+    expect(events.filter((e) => e.kind === "compaction")).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// COMPACTION SUMMARY MESSAGES
+// ============================================================================
+
+describe("buildTimeline — compaction summary messages", () => {
+  test("emits compaction summary as user_message with compactionSummary flag", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts(); // 10:00
+    const t2 = ts(); // 10:01
+    const t3 = ts(); // 10:02
+
+    const summaryText =
+      "This session is being continued from a previous conversation that ran out of context. " +
+      "Here is a recap of the earlier discussion...";
+
+    const summaryTurn = userTurn("u2", summaryText, { timestamp: t2 });
+    (summaryTurn as any).isCompactionSummary = true;
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t3,
+      turns: [
+        userTurn("u1", "Start working", { timestamp: t1 }),
+        summaryTurn,
+        userTurn("u3", "Continue after", { timestamp: t3 }),
+      ],
+      compactions: [makeCompaction(1, t2)],
+    });
+
+    const events = buildTimeline(session);
+    const userMessages = events.filter((e) => e.kind === "user_message") as Array<
+      TimelineEvent & { kind: "user_message" }
+    >;
+
+    // There should be 3 user messages: normal, compaction-summary, normal
+    expect(userMessages).toHaveLength(3);
+
+    // The compaction summary should have the flag
+    expect(userMessages[1]!.compactionSummary).toBe(true);
+    // Other messages should NOT have the flag
+    expect(userMessages[0]!.compactionSummary).toBeUndefined();
+    expect(userMessages[2]!.compactionSummary).toBeUndefined();
+  });
+
+  test("truncates compaction summary text to ~100 chars for timeline display", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+
+    const longSummary = "This session is being continued from a previous conversation. " + "X".repeat(16000);
+
+    const summaryTurn = userTurn("u1", longSummary, { timestamp: t1 });
+    (summaryTurn as any).isCompactionSummary = true;
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t1,
+      turns: [summaryTurn],
+    });
+
+    const events = buildTimeline(session);
+    const userMsg = events.find(
+      (e) => e.kind === "user_message" && (e as any).compactionSummary,
+    ) as (TimelineEvent & { kind: "user_message" }) | undefined;
+
+    expect(userMsg).toBeDefined();
+    // Should be truncated — 100 chars max
+    expect(userMsg!.text.length).toBeLessThanOrEqual(100);
+    expect(userMsg!.text.endsWith("...")).toBe(true);
   });
 });

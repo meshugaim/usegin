@@ -17,6 +17,8 @@ import type {
   AgentId,
   ToolUseId,
   CommitInfo,
+  CompactionEvent,
+  EntryUuid,
 } from "./types";
 import { getToolCallInput } from "./types";
 
@@ -26,7 +28,7 @@ import { getToolCallInput } from "./types";
 
 export type TimelineEvent =
   | { kind: "session_start"; timestamp: Date }
-  | { kind: "user_message"; timestamp: Date; text: string; queued?: boolean }
+  | { kind: "user_message"; timestamp: Date; text: string; queued?: boolean; compactionSummary?: boolean; originalLength?: number }
   | { kind: "assistant_message"; timestamp: Date; text: string }
   | { kind: "tool_call"; timestamp: Date; toolName: string; summary: string }
   | { kind: "subagent_spawn"; timestamp: Date; agentId: AgentId; description: string; report?: string }
@@ -34,6 +36,7 @@ export type TimelineEvent =
   | { kind: "subagent_return"; timestamp: Date; agentId: AgentId; turns: number; durationMs?: number; report?: string }
   | { kind: "commit"; timestamp: Date; hash: string; subject: string }
   | { kind: "interrupted"; timestamp: Date }
+  | { kind: "compaction"; timestamp: Date; number: number; trigger: string; preTokens: number }
   | { kind: "idle_gap"; timestamp: Date; durationMs: number }
   | { kind: "session_end"; timestamp: Date; totalDurationMs?: number };
 
@@ -57,6 +60,7 @@ export type TimelineEvent =
  */
 export type UserMessageKind =
   | "human"
+  | "compaction-summary"
   | "notification"
   | "skill_injection"
   | "command"
@@ -443,6 +447,20 @@ export function buildTimeline(
     if (!ts) continue;
 
     if (turn.role === "user") {
+      // Compaction summaries are detected via the turn metadata flag
+      // (set by the parser when a user message follows a compact_boundary).
+      // They get their own classification so they render distinctly.
+      if (turn.isCompactionSummary) {
+        events.push({
+          kind: "user_message",
+          timestamp: ts,
+          text: truncate(turn.text, 100),
+          compactionSummary: true,
+          originalLength: turn.text.length,
+        });
+        continue;
+      }
+
       const classification = classifyUserMessage(turn.text);
       // Only emit events for real human input and interruptions.
       // System noise (notifications, skill injections, commands, bare tool results)
@@ -588,6 +606,23 @@ export function buildTimeline(
         timestamp: commitTs,
         hash: commit.hash,
         subject: commit.message ?? "",
+      });
+    }
+  }
+
+  // --- Compaction boundary events ---
+  // Each compaction marks a context window reset. They are numbered
+  // sequentially (1-based) for display in the timeline.
+  for (let i = 0; i < session.compactions.length; i++) {
+    const compaction = session.compactions[i]!;
+    const compTs = parseTimestamp(compaction.timestamp);
+    if (compTs) {
+      events.push({
+        kind: "compaction",
+        timestamp: compTs,
+        number: i + 1,
+        trigger: compaction.trigger,
+        preTokens: compaction.preTokens,
       });
     }
   }

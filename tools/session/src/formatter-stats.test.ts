@@ -7,6 +7,7 @@ import {
   makeCommit,
   makeGitCommit,
   makeRewind,
+  makeCompaction,
   userTurn,
   assistantTurn,
   toolCall,
@@ -646,6 +647,226 @@ describe("formatStats empty section omission", () => {
     expect(output).toContain("Git");
     expect(output).toContain("2 commits");
     expect(output).not.toContain("lines");
+  });
+});
+
+// ============================================================================
+// COMPACTIONS SECTION
+// ============================================================================
+
+describe("formatStats compactions section", () => {
+  test("omits Compactions section when no compactions", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      compactions: [],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).not.toContain("Compactions");
+  });
+
+  test("shows Compactions section with count in header", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Compactions (1)");
+  });
+
+  test("shows timestamp, token count, and trigger for each compaction", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+        makeCompaction("2025-01-15T16:20:00Z", 174000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Compactions (2)");
+    expect(output).toContain("#1  14:55  172k tokens");
+    expect(output).toContain("(auto)");
+    expect(output).toContain("#2  16:20  174k tokens");
+  });
+
+  test("shows manual trigger type", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      compactions: [
+        makeCompaction("2025-01-15T10:30:00Z", 150000, { trigger: "manual" }),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("(manual)");
+  });
+
+  test("shows segment turn breakdown", () => {
+    // 4 compactions create 5 segments.
+    // We need turns with isCompactionSummary markers to determine segment boundaries.
+    // The compaction summaries are user turns that follow compact_boundary entries.
+    // Turns before the first compaction summary = segment 0
+    // Turns between compaction summary N and N+1 = segment N+1
+    const turns = [
+      // Segment 0: 4 turns before first compaction
+      userTurn("u1", "Hello"),
+      assistantTurn("a1", "Hi"),
+      userTurn("u2", "Question"),
+      assistantTurn("a2", "Answer"),
+      // Compaction summary 1 (counts as part of segment 1)
+      userTurn("cs1", "This session is being continued...", { isOnCurrentBranch: true }),
+      // Segment 1: 3 turns (including the summary)
+      assistantTurn("a3", "Continuing"),
+      userTurn("u3", "More"),
+      // Compaction summary 2 (counts as part of segment 2)
+      userTurn("cs2", "This session is being continued...", { isOnCurrentBranch: true }),
+      // Segment 2: 2 turns (including the summary)
+      assistantTurn("a4", "Still going"),
+    ];
+    // Mark compaction summaries
+    turns[4]!.isCompactionSummary = true;
+    turns[7]!.isCompactionSummary = true;
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+        makeCompaction("2025-01-15T16:20:00Z", 174000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("3 segments:");
+  });
+
+  test("shows segment turn counts separated by arrows", () => {
+    const turns = [
+      // Segment 0: 3 turns
+      userTurn("u1", "Hello"),
+      assistantTurn("a1", "Hi"),
+      userTurn("u2", "Question"),
+      // Compaction summary (part of segment 1)
+      userTurn("cs1", "Continued...", { isOnCurrentBranch: true }),
+      // Segment 1: 2 turns (summary + 1 more)
+      assistantTurn("a2", "Answer"),
+    ];
+    turns[3]!.isCompactionSummary = true;
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // 2 segments: 3 turns before compaction, 2 turns after (including summary)
+    expect(output).toContain("2 segments:");
+    expect(output).toMatch(/3 .+ 2 turns/);
+  });
+
+  test("shows compaction section between Conversation and Tokens sections", () => {
+    const session = makeSession({
+      model: "claude-sonnet-4-5-20250929",
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!", {
+          tokenUsage: {
+            inputTokens: 4000,
+            outputTokens: 12000,
+            cacheCreationInputTokens: 10000,
+            cacheReadInputTokens: 150000,
+          },
+        }),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // Compactions should appear after Conversation and before Tokens
+    const conversationIdx = output.indexOf("Conversation");
+    const compactionsIdx = output.indexOf("Compactions");
+    const tokensIdx = output.indexOf("Tokens");
+
+    expect(conversationIdx).toBeGreaterThan(-1);
+    expect(compactionsIdx).toBeGreaterThan(-1);
+    expect(tokensIdx).toBeGreaterThan(-1);
+    expect(compactionsIdx).toBeGreaterThan(conversationIdx);
+    expect(compactionsIdx).toBeLessThan(tokensIdx);
+  });
+
+  test("handles multiple compactions with realistic data", () => {
+    // Simulates a session with 4 compactions (from the example output)
+    const session = makeSession({
+      turns: [
+        // Just enough turns to make it non-empty
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi"),
+      ],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+        makeCompaction("2025-01-15T16:20:00Z", 174000),
+        makeCompaction("2025-01-15T18:34:00Z", 167000),
+        makeCompaction("2025-01-15T19:46:00Z", 167000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("Compactions (4)");
+    expect(output).toContain("#1  14:55  172k tokens");
+    expect(output).toContain("#2  16:20  174k tokens");
+    expect(output).toContain("#3  18:34  167k tokens");
+    expect(output).toContain("#4  19:46  167k tokens");
+  });
+
+  test("formats compaction with arrow indicator", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    // Each compaction line should show "→ compacted"
+    expect(output).toMatch(/172k tokens .+ compacted/);
+  });
+
+  test("singular segment label for single compaction with no boundary turns", () => {
+    // If there are 0 compactions, no segment line.
+    // If there is 1 compaction, there are 2 segments.
+    const turns = [
+      userTurn("u1", "Hello"),
+      userTurn("cs1", "Continued...", { isOnCurrentBranch: true }),
+      assistantTurn("a1", "Answer"),
+    ];
+    turns[1]!.isCompactionSummary = true;
+
+    const session = makeSession({
+      turns,
+      compactions: [
+        makeCompaction("2025-01-15T14:55:00Z", 172000),
+      ],
+    });
+
+    const output = formatStats(session);
+
+    expect(output).toContain("2 segments:");
   });
 });
 

@@ -24,6 +24,7 @@ import type {
   TokenUsage,
   RewindInfo,
   CommitInfo,
+  CompactionEvent,
   SessionId,
   AgentId,
   EntryUuid,
@@ -183,5 +184,40 @@ export function makeGitCommit(
     authorEmail,
     timestamp,
     ...rest,
+  };
+}
+
+/**
+ * Creates a CompactionEvent with sensible defaults.
+ *
+ * @param timestamp - When the compaction occurred (ISO 8601)
+ * @param preTokens - Token count before compaction
+ * @param options - Override trigger, UUIDs, etc.
+ *
+ * @example
+ * ```ts
+ * makeCompaction("2025-01-15T14:55:00Z", 172000)
+ * makeCompaction("2025-01-15T16:20:00Z", 174000, { trigger: "manual" })
+ * ```
+ */
+export function makeCompaction(
+  timestamp: string,
+  preTokens: number,
+  options: Partial<Omit<CompactionEvent, "timestamp" | "preTokens">> = {}
+): CompactionEvent {
+  const {
+    trigger = "auto",
+    boundaryUuid = asEntryUuid(`compact-${timestamp}`),
+    logicalParentUuid = asEntryUuid(`parent-${timestamp}`),
+    summaryMessageUuid,
+  } = options;
+
+  return {
+    timestamp,
+    trigger,
+    preTokens,
+    boundaryUuid,
+    logicalParentUuid,
+    ...(summaryMessageUuid !== undefined ? { summaryMessageUuid } : {}),
   };
 }

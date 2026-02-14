@@ -885,3 +885,192 @@ describe("formatTimeline subagent report", () => {
     expect(lines[5]).toContain("End");
   });
 });
+
+// ============================================================================
+// COMPACTION MARKER RENDERING
+// ============================================================================
+
+describe("formatTimeline compaction markers", () => {
+  const start: TimelineEvent = { kind: "session_start", timestamp: at(0) };
+
+  test("renders compaction marker as double-line separator with metadata", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(0), text: "Start working" },
+      {
+        kind: "compaction",
+        timestamp: at(mins(14) + secs(55)),
+        number: 1,
+        trigger: "auto",
+        preTokens: 172000,
+      },
+      { kind: "session_end", timestamp: at(mins(20)), totalDurationMs: mins(20) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    // Find the compaction line
+    const compactionLine = lines.find((l) => l.includes("Compaction"));
+    expect(compactionLine).toBeDefined();
+
+    // Should contain compaction number, trigger, token count, and timestamp
+    expect(compactionLine).toContain("Compaction #1");
+    expect(compactionLine).toContain("auto");
+    expect(compactionLine).toContain("172k");
+    expect(compactionLine).toContain("14:55");
+
+    // Should use double-line separator characters
+    expect(compactionLine).toContain("\u2550"); // ═
+  });
+
+  test("renders compaction marker with manual trigger", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "compaction",
+        timestamp: at(mins(5)),
+        number: 2,
+        trigger: "manual",
+        preTokens: 150000,
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    const compactionLine = lines.find((l) => l.includes("Compaction"));
+    expect(compactionLine).toBeDefined();
+    expect(compactionLine).toContain("Compaction #2");
+    expect(compactionLine).toContain("manual");
+    expect(compactionLine).toContain("150k");
+  });
+
+  test("formats token count in human-readable form", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "compaction",
+        timestamp: at(secs(30)),
+        number: 1,
+        trigger: "auto",
+        preTokens: 98500,
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    const compactionLine = lines.find((l) => l.includes("Compaction"));
+    expect(compactionLine).toBeDefined();
+    // 98500 should render as "99k" (rounded)
+    expect(compactionLine).toContain("99k");
+  });
+
+  test("compaction marker is not filtered out by showTools/showCommits options", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "compaction",
+        timestamp: at(secs(30)),
+        number: 1,
+        trigger: "auto",
+        preTokens: 172000,
+      },
+      { kind: "session_end", timestamp: at(mins(1)), totalDurationMs: mins(1) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false, showTools: false, showCommits: false });
+
+    const compactionLine = lines.find((l) => l.includes("Compaction"));
+    expect(compactionLine).toBeDefined();
+  });
+});
+
+// ============================================================================
+// COMPACTION SUMMARY MESSAGE RENDERING
+// ============================================================================
+
+describe("formatTimeline compaction summary messages", () => {
+  const start: TimelineEvent = { kind: "session_start", timestamp: at(0) };
+
+  test("renders compaction summary with bracketed label and char count", () => {
+    const longSummary = "This session is being continued from a previous conversation. " + "X".repeat(200);
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "compaction",
+        timestamp: at(mins(14) + secs(55)),
+        number: 1,
+        trigger: "auto",
+        preTokens: 172000,
+      },
+      {
+        kind: "user_message",
+        timestamp: at(mins(14) + secs(55)),
+        text: longSummary.slice(0, 100) + "...",
+        compactionSummary: true,
+      },
+      { kind: "session_end", timestamp: at(mins(20)), totalDurationMs: mins(20) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    // Find the compaction summary line
+    const summaryLine = lines.find((l) => l.includes("compaction summary"));
+    expect(summaryLine).toBeDefined();
+    // Should show character count
+    expect(summaryLine).toContain("chars");
+  });
+
+  test("compaction summary shows character count indicator", () => {
+    const events: TimelineEvent[] = [
+      start,
+      {
+        kind: "user_message",
+        timestamp: at(secs(30)),
+        text: "This session is being continued...",
+        compactionSummary: true,
+      },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    const summaryLine = lines.find((l) => l.includes("compaction summary"));
+    expect(summaryLine).toBeDefined();
+  });
+
+  test("integrates compaction marker and summary in full timeline", () => {
+    const events: TimelineEvent[] = [
+      start,
+      { kind: "user_message", timestamp: at(0), text: "Fix the auth bug" },
+      {
+        kind: "compaction",
+        timestamp: at(mins(14) + secs(55)),
+        number: 1,
+        trigger: "auto",
+        preTokens: 172000,
+      },
+      {
+        kind: "user_message",
+        timestamp: at(mins(14) + secs(55)),
+        text: "This session is being continued...",
+        compactionSummary: true,
+      },
+      { kind: "user_message", timestamp: at(mins(15)), text: "Continue working" },
+      { kind: "session_end", timestamp: at(mins(20)), totalDurationMs: mins(20) },
+    ];
+
+    const lines = formatTimeline(events, { showHints: false });
+
+    // Should have: header, user, compaction marker, compaction summary, user, footer
+    expect(lines.length).toBeGreaterThanOrEqual(6);
+
+    // Verify ordering: compaction marker comes before summary
+    const compactionIdx = lines.findIndex((l) => l.includes("Compaction #1"));
+    const summaryIdx = lines.findIndex((l) => l.includes("compaction summary"));
+    const continueIdx = lines.findIndex((l) => l.includes("Continue working"));
+
+    expect(compactionIdx).toBeGreaterThan(-1);
+    expect(summaryIdx).toBeGreaterThan(-1);
+    expect(compactionIdx).toBeLessThan(summaryIdx);
+    expect(summaryIdx).toBeLessThan(continueIdx);
+  });
+});

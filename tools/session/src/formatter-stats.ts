@@ -13,7 +13,7 @@
 
 import type { ParsedSession } from "./types";
 import { computeStats } from "./stats";
-import type { SessionStats, SubagentSummary, TurnDurationStats } from "./stats";
+import type { SessionStats, SubagentSummary, TurnDurationStats, CompactionStats } from "./stats";
 import { formatCost as formatCostUsd } from "./pricing";
 
 // ============================================================================
@@ -53,6 +53,7 @@ export function formatStats(
 
   // Sections — each returns lines or empty array if nothing to show
   appendSection(lines, formatConversationSection(stats, showHints));
+  appendSection(lines, formatCompactionsSection(stats));
   appendSection(lines, formatTurnDurationsSection(stats));
   appendSection(lines, formatTokenStatsSection(stats));
   appendSection(lines, formatToolsSection(stats, showHints));
@@ -130,6 +131,47 @@ function formatConversationSection(
   lines.push(`${turnSummary}${hint}`);
 
   return lines;
+}
+
+// ============================================================================
+// SECTION: COMPACTIONS
+// ============================================================================
+
+function formatCompactionsSection(stats: SessionStats): string[] {
+  if (!stats.compactionStats) return [];
+
+  const { count, events, segmentTurnCounts } = stats.compactionStats;
+  const lines: string[] = [];
+  lines.push(sectionHeader(`Compactions (${count})`));
+
+  // One line per compaction event
+  events.forEach((event, i) => {
+    const index = `#${i + 1}`;
+    const time = formatTime(event.timestamp);
+    const tokens = formatTokenCount(event.preTokens);
+    lines.push(`  ${index}  ${time}  ${tokens} tokens \u2192 compacted (${event.trigger})`);
+  });
+
+  // Segment turn breakdown
+  if (segmentTurnCounts.length > 1) {
+    const segmentLabel = `${segmentTurnCounts.length} segments:`;
+    const turnsList = segmentTurnCounts.join(" \u2192 ");
+    lines.push(`${segmentLabel} ${turnsList} turns`);
+  }
+
+  return lines;
+}
+
+/**
+ * Extract HH:MM from an ISO timestamp.
+ * Falls back to the raw string if parsing fails.
+ */
+function formatTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return timestamp;
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
 }
 
 // ============================================================================
