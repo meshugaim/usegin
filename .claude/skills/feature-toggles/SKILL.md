@@ -51,10 +51,8 @@ Never insert directly into the database - migrations ensure toggles exist across
 
 ## Retiring Toggles
 
-Toggles are temporary. Once a feature is released to the general population, retire the toggle:
+Toggles are temporary. Once a feature is proven stable in production, retire the toggle.
 
-1. Remove the toggle check from code
-2. Remove the registry entry (browser) or delete via migration (DB)
-3. Clean up any toggle-specific test mocks
+See the **remove-toggles** skill (`/remove-toggles`) for the complete removal process — checklists per toggle type, removal order, migration patterns, and the Mikado method for large removals.
 
 Leaving stale toggles creates confusion and technical debt.
