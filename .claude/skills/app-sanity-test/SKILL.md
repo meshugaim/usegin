@@ -116,9 +116,9 @@ If `pw-auth.ts` fails, fall back to magic link via Inbucket:
 
 **Staging / Production** (one-time human in the loop):
 
-1. Use `AskUserQuestion` to ask for the user email to sign in with
+1. Use `AskUserQuestion` to ask which email to sign in with. Offer the user's known email (e.g., from a previous auth session or context) as the default option — "Other" lets them type a different one.
 2. Navigate to `/sign-in`, fill email, click "Send magic link"
-3. Ask the user to check their email and paste the magic link URL
+3. Ask the user to paste the magic link URL (plain text — don't use `AskUserQuestion` for this, just ask and wait for their response)
 4. Navigate to the magic link URL to complete sign-in
 5. Save state for reuse:
    ```bash
