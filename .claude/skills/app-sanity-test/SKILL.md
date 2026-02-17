@@ -79,9 +79,10 @@ No setup needed — the app is already deployed. Skip to auth.
 
 #### Try Existing Session First
 
-Always attempt to reuse an existing auth file:
+Always clean up stale daemons before opening the browser, then attempt to reuse an existing auth file:
 
 ```bash
+playwright-cli kill-all 2>/dev/null || true
 playwright-cli open
 playwright-cli state-load <env>-auth.json
 playwright-cli goto <app-url>
