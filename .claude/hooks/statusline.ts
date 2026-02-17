@@ -67,11 +67,21 @@ if (input.context_window?.used_percentage !== undefined) {
   parts.push(`${input.context_window.used_percentage}%`);
 }
 
-const isOpus = input.model.display_name.toLowerCase().includes("opus");
-if (isOpus) {
-  parts.push(`${GREEN}${input.model.display_name}${RESET}`);
+const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+const modelName = input.model.display_name.toLowerCase();
+const modelEmoji = modelName.includes("opus")
+  ? pick(["🧠", "🔬", "🧬", "🧪", "👨‍🔬", "👩‍🔬", "🤓", "💡"])
+  : modelName.includes("sonnet")
+    ? pick(["👷", "🔨", "⚒️", "🏗️", "💪", "🛠️"])
+    : modelName.includes("haiku")
+      ? pick(["😵‍💫", "🫠", "😅", "🤔", "😬", "🥴"])
+      : "🤖";
+
+if (modelName.includes("opus")) {
+  parts.push(`${modelEmoji} ${GREEN}${input.model.display_name}${RESET}`);
 } else {
-  parts.push(`${BOLD_BLACK_ON_YELLOW}${input.model.display_name}${RESET}`);
+  parts.push(`${modelEmoji} ${BOLD_BLACK_ON_YELLOW}${input.model.display_name}${RESET}`);
 }
 
 if (git) parts.push(git);
