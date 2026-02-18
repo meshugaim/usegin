@@ -30,6 +30,7 @@ import type {
 import { asSessionId, asEntryUuid, asAgentId, asToolUseId, normalizeToolResultContent } from "./types";
 import { debugLog } from "./debug";
 import { isEntry, getSessionId, hasAgentId } from "./validation";
+import { readJsonlContent } from "./utils";
 import { ParsingTimeoutError } from "./errors";
 
 // Re-export for consumers
@@ -91,8 +92,7 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
   const files = [absolutePath];
 
   // Get sessionId from main file
-  const mainFile = Bun.file(absolutePath);
-  const content = await mainFile.text();
+  const content = await readJsonlContent(absolutePath);
   const firstLine = content.split("\n")[0] ?? "";
 
   let sessionId = "";
@@ -131,8 +131,7 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
   for (const subagentFile of subagentFiles) {
     seenFiles.add(subagentFile);
     const subagentPath = join(dir, subagentFile);
-    const subFile = Bun.file(subagentPath);
-    const subContent = await subFile.text();
+    const subContent = await readJsonlContent(subagentPath);
     const subFirstLine = subContent.split("\n")[0] ?? "";
 
     try {
@@ -160,8 +159,7 @@ export async function listRelatedFiles(jsonlPath: string): Promise<string[]> {
 
     for (const subagentFile of nestedSubagentFiles) {
       const subagentPath = join(nestedSubagentsDir, subagentFile);
-      const subFile = Bun.file(subagentPath);
-      const subContent = await subFile.text();
+      const subContent = await readJsonlContent(subagentPath);
       const subFirstLine = subContent.split("\n")[0] ?? "";
 
       try {
@@ -195,8 +193,7 @@ export async function parseSession(
 
   let stepStart = Date.now();
   debugLog(debug, "Reading file...");
-  const file = Bun.file(jsonlPath);
-  const content = await file.text();
+  const content = await readJsonlContent(jsonlPath);
   debugLog(debug, `Read ${content.length} bytes`, stepStart);
 
   stepStart = Date.now();
@@ -340,8 +337,7 @@ async function parseSubagentFile(
   parentSessionId: string,
   debug: boolean = false
 ): Promise<ParsedSubagent | null> {
-  const file = Bun.file(filePath);
-  const content = await file.text();
+  const content = await readJsonlContent(filePath);
   const lines = content.split("\n").filter((line) => line.trim());
   const filename = basename(filePath);
 

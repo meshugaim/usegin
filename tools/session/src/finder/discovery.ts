@@ -10,6 +10,7 @@ import { stat, lstat } from "fs/promises";
 import { homedir } from "os";
 import { basename, dirname } from "path";
 import { debugLog } from "../debug";
+import { readJsonlContent } from "../utils";
 import type { SessionInfo, DiscoverOptions } from "./types";
 
 // =============================================================================
@@ -122,8 +123,7 @@ export async function isBrokenSymlink(filePath: string): Promise<boolean> {
  * More efficient than full extractSessionMeta - just looks for first user type.
  */
 export async function hasUserMessages(filePath: string): Promise<boolean> {
-  const file = Bun.file(filePath);
-  const content = await file.text();
+  const content = await readJsonlContent(filePath);
 
   // Quick regex check - much faster than parsing every line
   return /"type"\s*:\s*"user"/.test(content);

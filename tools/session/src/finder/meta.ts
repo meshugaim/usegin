@@ -6,6 +6,7 @@
  */
 
 import { isEntry } from "../validation";
+import { readJsonlContent } from "../utils";
 import type { SessionMeta, SessionSummary } from "./types";
 
 // =============================================================================
@@ -30,8 +31,7 @@ export function truncateMessage(text: string, maxLen = 80): string {
  * Extract metadata from a session file including summary, user messages, and line count.
  */
 export async function extractSessionMeta(sessionPath: string): Promise<SessionMeta> {
-  const file = Bun.file(sessionPath);
-  const content = await file.text();
+  const content = await readJsonlContent(sessionPath);
   const lines = content.split("\n").filter((line) => line.trim());
 
   const messages: string[] = [];
