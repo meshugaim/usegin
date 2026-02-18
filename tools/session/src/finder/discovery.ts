@@ -142,6 +142,12 @@ export async function discoverSessions(
   const debug = options.debug ?? false;
   const claudeDir = getClaudeProjectsDir();
 
+  // Return empty if the projects directory doesn't exist
+  if (!(await claudeProjectsDirExists())) {
+    debugLog(debug, `Projects directory does not exist: ${claudeDir}`);
+    return [];
+  }
+
   // allProjects overrides project filter
   const globPattern = options.allProjects
     ? "*/*.jsonl"
