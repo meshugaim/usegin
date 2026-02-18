@@ -3,7 +3,7 @@
  */
 
 import { existsSync, mkdirSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { $ } from "bun";
 import type { Config } from "./config";
 import { extractConversation, formatConversation } from "./extractor";
@@ -95,6 +95,40 @@ export async function findExistingConversation(
 }
 
 /**
+ * Find an existing archive (.jsonl.gz) for a conversation across all date folders.
+ * Mirrors findExistingConversation but looks for the compressed JSONL archive.
+ */
+export async function findExistingArchive(
+	config: Config,
+	conversationId: string,
+): Promise<string | null> {
+	const userDir = join(config.cloneDir, toKebabCase(config.username));
+
+	if (!existsSync(userDir)) {
+		return null;
+	}
+
+	try {
+		const { Glob } = await import("bun");
+		const glob = new Glob(
+			`**/*conversation-${conversationId}.jsonl.gz`,
+		);
+		const files = Array.from(glob.scanSync(userDir));
+
+		if (files.length > 0 && files[0]) {
+			return join(userDir, files[0]);
+		}
+	} catch (error) {
+		console.error(
+			"Error searching for existing archive:",
+			(error as Error).message,
+		);
+	}
+
+	return null;
+}
+
+/**
  * Get the output path for a conversation file
  * If the conversation already exists in a different date folder, returns that path
  * Otherwise creates a new path based on current date with HHMMSS prefix from first message
@@ -137,6 +171,137 @@ export async function getOutputPath(
 }
 
 /**
+ * Ensure .gitattributes exists in the clone directory with binary treatment for .jsonl.gz files.
+ * Idempotent: only writes the file if it doesn't already exist.
+ */
+export async function ensureGitAttributes(cloneDir: string): Promise<void> {
+	const gitattributesPath = join(cloneDir, ".gitattributes");
+	if (!existsSync(gitattributesPath)) {
+		await Bun.write(gitattributesPath, "*.jsonl.gz binary\n");
+		console.log("Created .gitattributes with binary rule for *.jsonl.gz");
+	}
+}
+
+/**
+ * Compress a file with gzip and write it to the destination path.
+ * Returns true on success, false on failure (logs the error).
+ */
+async function compressAndWrite(
+	sourcePath: string,
+	destPath: string,
+): Promise<boolean> {
+	try {
+		const buffer = new Uint8Array(await Bun.file(sourcePath).arrayBuffer());
+		const compressed = Bun.gzipSync(buffer);
+		await Bun.write(destPath, compressed);
+		return true;
+	} catch (error) {
+		console.error(
+			`Warning: Failed to compress ${sourcePath}:`,
+			(error as Error).message,
+		);
+		return false;
+	}
+}
+
+/**
+ * Discover subagent JSONL files associated with a session.
+ *
+ * Claude Code stores subagent files in two possible layouts:
+ * - Flat: agent-*.jsonl in the same directory as the main JSONL
+ * - Nested: {session-uuid}/subagents/agent-*.jsonl
+ */
+export async function discoverSubagentFiles(
+	jsonlPath: string,
+): Promise<string[]> {
+	const dir = dirname(jsonlPath);
+	const sessionId = basename(jsonlPath, ".jsonl");
+	const subagentFiles: string[] = [];
+
+	try {
+		const { Glob } = await import("bun");
+
+		// Flat layout: agent-*.jsonl in the same directory
+		const flatGlob = new Glob("agent-*.jsonl");
+		for (const file of flatGlob.scanSync(dir)) {
+			subagentFiles.push(join(dir, file));
+		}
+
+		// Nested layout: {session-uuid}/subagents/agent-*.jsonl
+		const nestedDir = join(dir, sessionId, "subagents");
+		if (existsSync(nestedDir)) {
+			const nestedGlob = new Glob("agent-*.jsonl");
+			for (const file of nestedGlob.scanSync(nestedDir)) {
+				subagentFiles.push(join(nestedDir, file));
+			}
+		}
+	} catch (error) {
+		console.error(
+			"Warning: Error discovering subagent files:",
+			(error as Error).message,
+		);
+	}
+
+	return subagentFiles;
+}
+
+/**
+ * Archive the main session JSONL and any subagent JSONL files.
+ *
+ * Returns an array of relative paths (relative to cloneDir) of all newly written
+ * archive files, suitable for passing to `git add`.
+ */
+async function archiveSessionJsonl(
+	config: Config,
+	jsonlPath: string,
+	outputPath: string,
+): Promise<string[]> {
+	const archivedRelativePaths: string[] = [];
+
+	// 1. Archive the main session JSONL
+	const archivePath = outputPath.replace(/\.txt$/, ".jsonl.gz");
+	const mainSuccess = await compressAndWrite(jsonlPath, archivePath);
+	if (mainSuccess) {
+		const relativePath = archivePath.replace(`${config.cloneDir}/`, "");
+		archivedRelativePaths.push(relativePath);
+		console.log(`Archived session JSONL to: ${archivePath}`);
+	}
+
+	// 2. Discover and archive subagent files
+	const subagentFiles = await discoverSubagentFiles(jsonlPath);
+	if (subagentFiles.length > 0) {
+		// Subagents go into a directory named after the text file (minus .txt)
+		const subagentsDir = join(
+			outputPath.replace(/\.txt$/, ""),
+			"subagents",
+		);
+		mkdirSync(subagentsDir, { recursive: true });
+
+		for (const subagentPath of subagentFiles) {
+			const subagentFilename = basename(subagentPath, ".jsonl");
+			const subagentArchivePath = join(
+				subagentsDir,
+				`${subagentFilename}.jsonl.gz`,
+			);
+			const subSuccess = await compressAndWrite(
+				subagentPath,
+				subagentArchivePath,
+			);
+			if (subSuccess) {
+				const relativePath = subagentArchivePath.replace(
+					`${config.cloneDir}/`,
+					"",
+				);
+				archivedRelativePaths.push(relativePath);
+				console.log(`Archived subagent JSONL to: ${subagentArchivePath}`);
+			}
+		}
+	}
+
+	return archivedRelativePaths;
+}
+
+/**
  * Extract and sync a conversation file to git repository
  */
 export async function syncConversation(
@@ -173,9 +338,31 @@ export async function syncConversation(
 		console.log(`Writing to: ${outputPath}`);
 		await Bun.write(outputPath, formatted);
 
-		// Git add
-		const relativePath = outputPath.replace(`${config.cloneDir}/`, "");
-		await $`git add ${relativePath}`.cwd(config.cloneDir);
+		// Archive the full JSONL (gzip-compressed) alongside the text extract.
+		// Errors here are non-fatal: text extraction is the primary artifact.
+		let archivedPaths: string[] = [];
+		try {
+			await ensureGitAttributes(config.cloneDir);
+			archivedPaths = await archiveSessionJsonl(config, jsonlPath, outputPath);
+		} catch (error) {
+			console.error(
+				"Warning: JSONL archival failed, continuing with text only:",
+				(error as Error).message,
+			);
+		}
+
+		// Git add: stage the text file, .gitattributes, and all archive files
+		const textRelativePath = outputPath.replace(`${config.cloneDir}/`, "");
+		const allPaths = [textRelativePath, ...archivedPaths];
+
+		// Always stage .gitattributes if it exists (idempotent)
+		if (existsSync(join(config.cloneDir, ".gitattributes"))) {
+			allPaths.push(".gitattributes");
+		}
+
+		for (const filePath of allPaths) {
+			await $`git add ${filePath}`.cwd(config.cloneDir);
+		}
 
 		// Check if there are changes to commit
 		const status = await $`git status --porcelain`.cwd(config.cloneDir).text();
