@@ -25,6 +25,8 @@ export function formatOutput(session: SessionInfo, format: OutputFormat): string
         id: session.id,
         date: session.mtime.toISOString(),
         project: session.project,
+        ...(session.source && { source: session.source }),
+        ...(session.username && { username: session.username }),
       });
     case "path":
     default:

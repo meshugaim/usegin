@@ -7,6 +7,7 @@
  * Module structure:
  * - types.ts     - Type definitions (SessionInfo, DiscoverOptions, etc.)
  * - discovery.ts - Session discovery (discoverSessions, getCurrentProjectHash)
+ * - remote.ts    - Remote discovery (discoverRemoteSessions from ~/agent-records/)
  * - meta.ts      - Metadata extraction (extractSessionMeta, extractUserMessages)
  * - resolve.ts   - Session resolution (resolveSessionPath, findSessionById)
  * - fzf.ts       - FZF integration (runFzf, formatMultiLineEntry)
@@ -72,6 +73,17 @@ export {
   discoverSessions,
   // Note: hasUserMessages is internal, not exported
 } from "./discovery";
+
+// =============================================================================
+// REMOTE DISCOVERY
+// =============================================================================
+
+export {
+  AGENT_RECORDS_DIR,
+  discoverRemoteSessions,
+  findRemoteSessionById,
+  findRemoteSessionsByPrefix,
+} from "./remote";
 
 // =============================================================================
 // METADATA

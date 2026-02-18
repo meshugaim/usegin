@@ -17,6 +17,8 @@ export interface SessionInfo {
   id: string;
   mtime: Date;
   project: string; // Project hash (directory name)
+  source?: "local" | "remote"; // Where this session was discovered
+  username?: string; // agent-records username directory (remote sessions only)
 }
 
 /**
