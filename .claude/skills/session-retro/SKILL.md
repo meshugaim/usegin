@@ -1,6 +1,6 @@
 ---
 name: session-retro
-description: Analyze Claude Code sessions and create Linear issues for suggested improvements. Triggered by "retro on session", "analyze this session", or "session retro".
+description: Analyze Claude Code sessions and create GitHub + Linear issues for suggested improvements. Triggered by "retro on session", "analyze this session", or "session retro".
 ---
 
 # Session Retro
@@ -58,11 +58,44 @@ description: <normal description>. Triggered by "<trigger>".
 <rough ideas, to be refined>
 ```
 
-### Step 3: Create Linear Issues
+### Step 3: Create Issues (Both GitHub + Linear)
 
-**Use `plan create`, NOT `gh issue create`.** Work tracking lives in Linear. GitHub issues trigger CI workflows (`claude.yml` fires on `issues: [opened]`).
+Each retro item goes to **two places**:
+- **GitHub issue** — for CI traceability (`retro-analysis.yml` integration)
+- **Linear issue** — for work tracking (our source of truth for task management)
 
-For each concrete improvement:
+#### 3a. GitHub Issue
+
+```bash
+gh issue create \
+  --title "retro: <short description>" \
+  --label "retro" \
+  --body "$(cat <<'EOF'
+## Summary
+
+<1-2 sentences: what to change and why>
+
+## Context
+
+<Brief explanation of the friction point or gap observed in the session>
+
+## Suggested Changes
+
+- <file or area to change>
+- <what to change>
+
+## Skill Attribution
+
+- **Target:** `<skill-name>` | `CLAUDE.md` | `new placeholder skill: <name>`
+
+## Source
+
+Session: `<session-branch or session-id>`
+EOF
+)"
+```
+
+#### 3b. Linear Issue
 
 ```bash
 plan create --label chore "retro: <short description>" --description "$(cat <<'EOF'
