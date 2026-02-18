@@ -26,12 +26,14 @@ import { getCommitsFromGitHistory } from "./git-commits";
 import {
   checkFzfAvailable,
   claudeProjectsDirExists,
+  discoverRemoteSessions,
   discoverSessions,
   extractSessionMeta,
   formatMultiLineEntry,
   formatOutput,
   formatListLine,
   getCurrentProjectHash,
+  mergeSessionLists,
   openSessionPicker,
   resolveSessionPath,
   runFzfMultiLine,
@@ -81,12 +83,14 @@ LIST OPTIONS:
   --all-projects     Show sessions from all projects
   --output <format>  Output format: path, id, json (default: path)
   --since <filter>   Filter sessions by date (e.g., 1d, 2w, 2024-01-15)
+  --remote           Include remote sessions from ~/agent-records/
 
 FIND OPTIONS:
   --project <hash>   Filter to specific project (default: current project)
   --all-projects     Show sessions from all projects
   --output <format>  Output format: path, id, json (default: path)
   --since <filter>   Filter sessions by date (e.g., 1d, 2w, 2024-01-15)
+  --remote           Include remote sessions from ~/agent-records/
   --no-preview       Disable preview pane
   --output-file <path>  Write selection to JSON file (for tmux integration)
 
@@ -191,11 +195,21 @@ async function runFind(args: string[]) {
     ? undefined
     : findArgs.project || currentProject || undefined;
 
-  const sessions = await discoverSessions({
+  const localSessions = await discoverSessions({
     project: projectFilter,
     allProjects: findArgs.allProjects,
     since: findArgs.since,
   });
+
+  // When --remote is set, discover remote sessions and merge with local ones.
+  // Local sessions take priority over remote duplicates (higher fidelity).
+  let sessions = localSessions;
+  if (findArgs.remote) {
+    const remoteSessions = await discoverRemoteSessions({
+      since: findArgs.since,
+    });
+    sessions = mergeSessionLists(localSessions, remoteSessions);
+  }
 
   if (sessions.length === 0) {
     // Check if the projects directory exists for better error message
@@ -242,6 +256,34 @@ async function runFind(args: string[]) {
   // Check for RESUME: action marker
   if (result.startsWith("RESUME:")) {
     const path = result.slice(7); // Remove "RESUME:" prefix
+    const selectedSession = sessionMap.get(path);
+
+    // For remote sessions, fetch to local storage first so claude can resume them
+    if (selectedSession?.source === "remote") {
+      try {
+        const fetchResult = await fetchSession(selectedSession.id);
+        if (!fetchResult.alreadyLocal) {
+          console.log(formatFetchResult(fetchResult));
+        }
+        // Use the fetched session ID for resume
+        const resumeProcess = Bun.spawn(["bun", "run", "c", "--resume", fetchResult.sessionId], {
+          stdin: "inherit",
+          stdout: "inherit",
+          stderr: "inherit",
+        });
+        await resumeProcess.exited;
+        process.exit(resumeProcess.exitCode ?? 0);
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error(`Error fetching remote session: ${error.message}`);
+        } else {
+          console.error("Failed to fetch remote session");
+        }
+        process.exit(1);
+      }
+    }
+
+    // Local session: extract ID directly from the filename
     const sessionId = path.replace(/.*\//, "").replace(/\.jsonl$/, "");
 
     // Spawn claude --resume, inheriting stdio for interactive use
@@ -350,11 +392,21 @@ async function runList(args: string[]) {
     ? undefined
     : listArgs.project || currentProject || undefined;
 
-  const sessions = await discoverSessions({
+  const localSessions = await discoverSessions({
     project: projectFilter,
     allProjects: listArgs.allProjects,
     since: listArgs.since,
   });
+
+  // When --remote is set, discover remote sessions and merge with local ones.
+  // Local sessions take priority over remote duplicates (higher fidelity).
+  let sessions = localSessions;
+  if (listArgs.remote) {
+    const remoteSessions = await discoverRemoteSessions({
+      since: listArgs.since,
+    });
+    sessions = mergeSessionLists(localSessions, remoteSessions);
+  }
 
   if (sessions.length === 0) {
     // Check if the projects directory exists for better error message

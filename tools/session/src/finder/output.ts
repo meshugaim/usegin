@@ -97,13 +97,16 @@ export function formatListLine(
     prompt = truncateMessage(meta.messages[0], 50);
   }
 
+  // Remote indicator: [R] prefix for sessions from ~/agent-records/
+  const remotePrefix = session.source === "remote" ? "[R] " : "";
+
   // Right-align the relative time and turn count for scanability.
   // Use explicit separators so columns never merge regardless of content width.
   const timePad = relTime.padStart(8);
   const turnStr = `${turns} turns`.padStart(10);
 
   const quotedPrompt = prompt ? `  "${prompt}"` : "";
-  return `${shortId}  ${timePad}  ${turnStr}${quotedPrompt}`;
+  return `${remotePrefix}${shortId}  ${timePad}  ${turnStr}${quotedPrompt}`;
 }
 
 // =============================================================================

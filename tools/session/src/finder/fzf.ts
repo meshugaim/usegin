@@ -64,9 +64,12 @@ export function formatMultiLineEntry(
   // Check if this is a live session (recently modified)
   const liveIndicator = isLiveSession(session.mtime) ? " [LIVE]" : "";
 
+  // Remote indicator for sessions from ~/agent-records/
+  const remoteIndicator = session.source === "remote" ? " [REMOTE]" : "";
+
   const lines: string[] = [];
-  // Line 1: date + line count + live indicator
-  lines.push(`${date} ${time}  [${lineCount}]${liveIndicator}`);
+  // Line 1: date + line count + status indicators
+  lines.push(`${date} ${time}  [${lineCount}]${liveIndicator}${remoteIndicator}`);
 
   // Line 2: summary (if present) or short path
   if (summary) {

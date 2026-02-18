@@ -206,6 +206,28 @@ export async function discoverRemoteSessions(
 }
 
 /**
+ * Merge local and remote session arrays with deduplication.
+ *
+ * When the same session exists both locally and remotely, the local version
+ * is kept because it has higher fidelity (uncompressed, includes subagent
+ * files alongside). The merged result is sorted by mtime descending.
+ *
+ * @param local  Sessions discovered from ~/.claude/projects/
+ * @param remote Sessions discovered from ~/agent-records/
+ * @returns Deduplicated, sorted array with local versions preferred
+ */
+export function mergeSessionLists(
+  local: SessionInfo[],
+  remote: SessionInfo[]
+): SessionInfo[] {
+  const localIds = new Set(local.map((s) => s.id));
+  const uniqueRemote = remote.filter((s) => !localIds.has(s.id));
+  const merged = [...local, ...uniqueRemote];
+  merged.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+  return merged;
+}
+
+/**
  * Find a specific remote session by its full UUID.
  *
  * Scans agent-records for an exact match. Returns the SessionInfo or null.

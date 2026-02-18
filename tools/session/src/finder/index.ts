@@ -83,6 +83,7 @@ export {
   discoverRemoteSessions,
   findRemoteSessionById,
   findRemoteSessionsByPrefix,
+  mergeSessionLists,
 } from "./remote";
 
 // =============================================================================

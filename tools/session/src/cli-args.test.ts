@@ -83,6 +83,25 @@ describe("parseFindArgs", () => {
     });
   });
 
+  describe("--remote flag", () => {
+    it("defaults remote to false", () => {
+      const result = parseFindArgs([]);
+      expect(result.remote).toBe(false);
+    });
+
+    it("sets remote to true when --remote is passed", () => {
+      const result = parseFindArgs(["--remote"]);
+      expect(result.remote).toBe(true);
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseFindArgs(["--remote", "--all-projects", "--since", "7d"]);
+      expect(result.remote).toBe(true);
+      expect(result.allProjects).toBe(true);
+      expect(result.since).toBe("7d");
+    });
+  });
+
   describe("--output-file validation", () => {
     it("throws when --output-file is last argument with no value", () => {
       expect(() => parseFindArgs(["--output-file"])).toThrow("Missing value for --output-file");
@@ -152,6 +171,25 @@ describe("parseListArgs", () => {
       expect(parseListArgs(["--since", "7d"]).since).toBe("7d");
       expect(parseListArgs(["--since", "1w"]).since).toBe("1w");
       expect(parseListArgs(["--since", "2025-12-31"]).since).toBe("2025-12-31");
+    });
+  });
+
+  describe("--remote flag", () => {
+    it("defaults remote to false", () => {
+      const result = parseListArgs([]);
+      expect(result.remote).toBe(false);
+    });
+
+    it("sets remote to true when --remote is passed", () => {
+      const result = parseListArgs(["--remote"]);
+      expect(result.remote).toBe(true);
+    });
+
+    it("works alongside --limit and --since", () => {
+      const result = parseListArgs(["--remote", "--limit", "20", "--since", "3d"]);
+      expect(result.remote).toBe(true);
+      expect(result.limit).toBe(20);
+      expect(result.since).toBe("3d");
     });
   });
 

@@ -84,6 +84,7 @@ export interface FindArgs {
   since?: string;
   noPreview: boolean;
   outputFile?: string;
+  remote: boolean;
 }
 
 export function parseFindArgs(args: string[]): FindArgs {
@@ -91,6 +92,7 @@ export function parseFindArgs(args: string[]): FindArgs {
     allProjects: false,
     output: "path",
     noPreview: false,
+    remote: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -115,6 +117,8 @@ export function parseFindArgs(args: string[]): FindArgs {
       const value = requireArgValue(args, i, "--output-file");
       result.outputFile = value;
       i++;
+    } else if (arg === "--remote") {
+      result.remote = true;
     }
   }
 
@@ -133,6 +137,7 @@ export interface ListArgs {
   output: OutputFormat;
   since?: string;
   limit: number;
+  remote: boolean;
 }
 
 export function parseListArgs(args: string[]): ListArgs {
@@ -140,6 +145,7 @@ export function parseListArgs(args: string[]): ListArgs {
     allProjects: false,
     output: "path",
     limit: 10,
+    remote: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -162,6 +168,8 @@ export function parseListArgs(args: string[]): ListArgs {
       const value = requireArgValue(args, i, arg);
       result.limit = validatePositiveInteger(value, arg);
       i++;
+    } else if (arg === "--remote") {
+      result.remote = true;
     }
   }
 

@@ -181,6 +181,56 @@ describe("formatMultiLineEntry with summary", () => {
   });
 });
 
+describe("formatMultiLineEntry with remote session", () => {
+  test("includes [REMOTE] indicator for remote sessions", () => {
+    const session: SessionInfo = {
+      path: "/home/user/agent-records/user/2026-02/2026-02-18/120000-conversation-abc123.jsonl.gz",
+      id: "abc123",
+      mtime: new Date("2024-11-29T14:32:00Z"),
+      project: "",
+      source: "remote",
+      username: "user",
+    };
+    const messages = ["Hello"];
+    const lineCount = 10;
+
+    const entry = formatMultiLineEntry(session, messages, lineCount);
+
+    expect(entry).toContain("[REMOTE]");
+  });
+
+  test("does not include [REMOTE] for local sessions", () => {
+    const session: SessionInfo = {
+      path: "/home/user/.claude/projects/-workspaces-foo/abc123.jsonl",
+      id: "abc123",
+      mtime: new Date("2024-11-29T14:32:00Z"),
+      project: "-workspaces-foo",
+    };
+    const messages = ["Hello"];
+    const lineCount = 10;
+
+    const entry = formatMultiLineEntry(session, messages, lineCount);
+
+    expect(entry).not.toContain("[REMOTE]");
+  });
+
+  test("does not include [REMOTE] for sessions with source=local", () => {
+    const session: SessionInfo = {
+      path: "/home/user/.claude/projects/-workspaces-foo/abc123.jsonl",
+      id: "abc123",
+      mtime: new Date("2024-11-29T14:32:00Z"),
+      project: "-workspaces-foo",
+      source: "local",
+    };
+    const messages = ["Hello"];
+    const lineCount = 10;
+
+    const entry = formatMultiLineEntry(session, messages, lineCount);
+
+    expect(entry).not.toContain("[REMOTE]");
+  });
+});
+
 describe("formatMultiLineEntry with live session", () => {
   test("includes [LIVE] indicator for live sessions", () => {
     const session: SessionInfo = {
@@ -406,5 +456,30 @@ describe("formatListLine", () => {
       makeMeta({ turnCount: 0, messages: [] }),
     );
     expect(line).toContain("0 turns");
+  });
+
+  test("includes [R] prefix for remote sessions", () => {
+    const line = formatListLine(
+      makeSession({ source: "remote" }),
+      makeMeta(),
+    );
+    expect(line).toMatch(/^\[R\] /);
+    expect(line).toContain("4a7ffc84");
+  });
+
+  test("does not include [R] prefix for local sessions", () => {
+    const line = formatListLine(
+      makeSession({ source: "local" }),
+      makeMeta(),
+    );
+    expect(line).not.toContain("[R]");
+  });
+
+  test("does not include [R] prefix when source is undefined", () => {
+    const line = formatListLine(
+      makeSession(), // source defaults to undefined
+      makeMeta(),
+    );
+    expect(line).not.toContain("[R]");
   });
 });
