@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { parseFindArgs, parseListArgs, parsePickArgs } from "./cli-args";
+import { parseFindArgs, parseListArgs, parsePickArgs, parseFetchArgs, parseResumeArgs } from "./cli-args";
 import { parseMainArgs } from "./cli-args-main";
 
 describe("parseFindArgs", () => {
@@ -526,5 +526,83 @@ describe("parseMainArgs", () => {
       expect(result.debug).toBe(true);
       expect(result.format).toBe("terminal");
     });
+  });
+});
+
+describe("parseFetchArgs", () => {
+  it("defaults to empty sessionId and help=false", () => {
+    const result = parseFetchArgs([]);
+    expect(result.sessionId).toBe("");
+    expect(result.help).toBe(false);
+  });
+
+  it("accepts a session ID as positional argument", () => {
+    const result = parseFetchArgs(["159b7095-3f96-4de5-a8a5-7cf445849bd6"]);
+    expect(result.sessionId).toBe("159b7095-3f96-4de5-a8a5-7cf445849bd6");
+  });
+
+  it("accepts a short prefix as positional argument", () => {
+    const result = parseFetchArgs(["159b7095"]);
+    expect(result.sessionId).toBe("159b7095");
+  });
+
+  it("sets help when --help is passed", () => {
+    const result = parseFetchArgs(["--help"]);
+    expect(result.help).toBe(true);
+  });
+
+  it("sets help when -h is passed", () => {
+    const result = parseFetchArgs(["-h"]);
+    expect(result.help).toBe(true);
+  });
+
+  it("accepts session ID alongside --help", () => {
+    const result = parseFetchArgs(["159b7095", "--help"]);
+    expect(result.sessionId).toBe("159b7095");
+    expect(result.help).toBe(true);
+  });
+
+  it("ignores unknown flags gracefully", () => {
+    const result = parseFetchArgs(["--unknown", "159b7095"]);
+    expect(result.sessionId).toBe("159b7095");
+  });
+});
+
+describe("parseResumeArgs", () => {
+  it("defaults to empty sessionId and help=false", () => {
+    const result = parseResumeArgs([]);
+    expect(result.sessionId).toBe("");
+    expect(result.help).toBe(false);
+  });
+
+  it("accepts a session ID as positional argument", () => {
+    const result = parseResumeArgs(["159b7095-3f96-4de5-a8a5-7cf445849bd6"]);
+    expect(result.sessionId).toBe("159b7095-3f96-4de5-a8a5-7cf445849bd6");
+  });
+
+  it("accepts a short prefix as positional argument", () => {
+    const result = parseResumeArgs(["159b7095"]);
+    expect(result.sessionId).toBe("159b7095");
+  });
+
+  it("sets help when --help is passed", () => {
+    const result = parseResumeArgs(["--help"]);
+    expect(result.help).toBe(true);
+  });
+
+  it("sets help when -h is passed", () => {
+    const result = parseResumeArgs(["-h"]);
+    expect(result.help).toBe(true);
+  });
+
+  it("accepts session ID alongside --help", () => {
+    const result = parseResumeArgs(["159b7095", "--help"]);
+    expect(result.sessionId).toBe("159b7095");
+    expect(result.help).toBe(true);
+  });
+
+  it("ignores unknown flags gracefully", () => {
+    const result = parseResumeArgs(["--unknown", "159b7095"]);
+    expect(result.sessionId).toBe("159b7095");
   });
 });

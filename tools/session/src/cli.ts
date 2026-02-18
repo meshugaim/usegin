@@ -39,8 +39,9 @@ import {
   writeOutputFile,
 } from "./finder";
 import { NoSessionsFoundError, FzfNotFoundError } from "./errors";
-import { parseFindArgs, parsePickArgs, parseListArgs } from "./cli-args";
+import { parseFindArgs, parsePickArgs, parseListArgs, parseFetchArgs, parseResumeArgs } from "./cli-args";
 import { parseMainArgs, type MainArgs } from "./cli-args-main";
+import { fetchSession, formatFetchResult } from "./fetch";
 import { debugLog } from "./debug";
 
 /**
@@ -60,6 +61,8 @@ USAGE:
   session ls [options]      Alias for 'list'
   session find [options]    Browse sessions interactively with fzf
   session pick [options]    Pick session via popup (for Claude)
+  session fetch <id>        Fetch archived session to local storage
+  session resume <id>       Fetch (if needed) and resume a session
 
 SESSION IDENTIFIERS:
   You can specify sessions by:
@@ -86,6 +89,15 @@ FIND OPTIONS:
   --since <filter>   Filter sessions by date (e.g., 1d, 2w, 2024-01-15)
   --no-preview       Disable preview pane
   --output-file <path>  Write selection to JSON file (for tmux integration)
+
+FETCH:
+  session fetch <id>   Fetch an archived session from ~/agent-records/ to local storage.
+                       If the session is already local, prints its path and exits.
+                       Also fetches associated subagent files.
+
+RESUME:
+  session resume <id>  Fetch the session (if remote) then spawn claude --resume.
+                       Equivalent to: session fetch <id> && claude --resume <id>
 
 OPTIONS:
   --full             Full narrative output (default: compact stats card)
@@ -376,6 +388,113 @@ async function runList(args: string[]) {
   }
 }
 
+function printFetchHelp() {
+  console.log(`
+session fetch - Fetch an archived session to local storage
+
+USAGE:
+  session fetch <session-id|prefix>
+
+Searches for the session locally first. If not found, searches the remote
+archive at ~/agent-records/, decompresses the .jsonl.gz file, and places
+it in the local Claude projects directory for use with other session commands.
+
+Also fetches associated subagent files.
+
+EXAMPLES:
+  session fetch 159b7095                              # Fetch by short prefix
+  session fetch 159b7095-3f96-4de5-a8a5-7cf445849bd6  # Fetch by full UUID
+`);
+}
+
+function printResumeHelp() {
+  console.log(`
+session resume - Fetch (if needed) and resume a session
+
+USAGE:
+  session resume <session-id|prefix>
+
+Fetches the session from ~/agent-records/ if it's not already local,
+then spawns \`claude --resume <session-id>\` with interactive stdio.
+
+EXAMPLES:
+  session resume 159b7095                              # Resume by short prefix
+  session resume 159b7095-3f96-4de5-a8a5-7cf445849bd6  # Resume by full UUID
+`);
+}
+
+async function runFetch(args: string[]) {
+  const fetchArgs = parseFetchArgs(args);
+
+  if (fetchArgs.help) {
+    printFetchHelp();
+    return;
+  }
+
+  if (!fetchArgs.sessionId) {
+    console.error("Error: session ID required\n");
+    printFetchHelp();
+    process.exit(1);
+  }
+
+  try {
+    const result = await fetchSession(fetchArgs.sessionId);
+    console.log(formatFetchResult(result));
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`Error: ${error.message}`);
+    } else {
+      console.error("An unknown error occurred");
+    }
+    process.exit(1);
+  }
+}
+
+async function runResume(args: string[]) {
+  const resumeArgs = parseResumeArgs(args);
+
+  if (resumeArgs.help) {
+    printResumeHelp();
+    return;
+  }
+
+  if (!resumeArgs.sessionId) {
+    console.error("Error: session ID required\n");
+    printResumeHelp();
+    process.exit(1);
+  }
+
+  try {
+    // Step 1: Fetch (no-op if already local)
+    const result = await fetchSession(resumeArgs.sessionId);
+
+    if (!result.alreadyLocal) {
+      // Print the fetch result so the user knows what happened
+      console.log(formatFetchResult(result));
+    }
+
+    // Step 2: Spawn claude --resume with interactive stdio
+    // Use "bun run c" which runs claude with --dangerously-skip-permissions
+    const resumeProcess = Bun.spawn(
+      ["bun", "run", "c", "--resume", result.sessionId],
+      {
+        stdin: "inherit",
+        stdout: "inherit",
+        stderr: "inherit",
+      }
+    );
+    await resumeProcess.exited;
+    process.exit(resumeProcess.exitCode ?? 0);
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`Error: ${error.message}`);
+    } else {
+      console.error("An unknown error occurred");
+    }
+    process.exit(1);
+  }
+}
+
 async function main() {
   const rawArgs = process.argv.slice(2);
 
@@ -394,6 +513,18 @@ async function main() {
   // Check for 'pick' subcommand
   if (rawArgs[0] === "pick") {
     await runPick(rawArgs.slice(1));
+    return;
+  }
+
+  // Check for 'fetch' subcommand
+  if (rawArgs[0] === "fetch") {
+    await runFetch(rawArgs.slice(1));
+    return;
+  }
+
+  // Check for 'resume' subcommand
+  if (rawArgs[0] === "resume") {
+    await runResume(rawArgs.slice(1));
     return;
   }
 

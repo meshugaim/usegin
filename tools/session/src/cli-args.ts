@@ -191,3 +191,67 @@ export function parsePickArgs(args: string[]): PickArgs {
 
   return result;
 }
+
+// =============================================================================
+// FETCH ARGS
+// =============================================================================
+
+export interface FetchArgs {
+  sessionId: string;
+  help: boolean;
+}
+
+/**
+ * Parse arguments for `session fetch <id>`.
+ *
+ * Accepts a single positional session ID argument and --help.
+ * The session ID can be a full UUID or a short prefix.
+ */
+export function parseFetchArgs(args: string[]): FetchArgs {
+  const result: FetchArgs = {
+    sessionId: "",
+    help: false,
+  };
+
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      result.help = true;
+    } else if (!arg.startsWith("-")) {
+      result.sessionId = arg;
+    }
+  }
+
+  return result;
+}
+
+// =============================================================================
+// RESUME ARGS
+// =============================================================================
+
+export interface ResumeArgs {
+  sessionId: string;
+  help: boolean;
+}
+
+/**
+ * Parse arguments for `session resume <id>`.
+ *
+ * Accepts a single positional session ID argument and --help.
+ * The session ID can be a full UUID or a short prefix.
+ */
+export function parseResumeArgs(args: string[]): ResumeArgs {
+  const result: ResumeArgs = {
+    sessionId: "",
+    help: false,
+  };
+
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      result.help = true;
+    } else if (!arg.startsWith("-")) {
+      result.sessionId = arg;
+    }
+  }
+
+  return result;
+}

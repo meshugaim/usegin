@@ -24,9 +24,10 @@ session list --limit 5
 ```
 src/
 ├── cli.ts              # Main entry point, subcommand routing
-├── cli-args.ts         # Argument parsing for find/list/pick commands
+├── cli-args.ts         # Argument parsing for find/list/pick/fetch/resume commands
 ├── cli-args-main.ts    # Argument parsing for main parse command
 ├── parser.ts           # Core JSONL parsing logic
+├── fetch.ts            # Fetch archived sessions from ~/agent-records/ to local
 ├── formatter.ts        # Output formatting (narrative, terminal, markdown)
 ├── types.ts            # Core types, branded IDs, ToolInputMap
 ├── errors.ts           # Custom error classes with actionable hints
@@ -36,6 +37,7 @@ src/
 │   ├── index.ts        # Re-exports all finder APIs
 │   ├── types.ts        # SessionInfo, DiscoverOptions, etc.
 │   ├── discovery.ts    # Find sessions in ~/.claude/projects/
+│   ├── remote.ts       # Remote discovery from ~/agent-records/
 │   ├── resolve.ts      # Resolve session ID/prefix to file path
 │   ├── meta.ts         # Extract metadata (summary, user messages)
 │   ├── fzf.ts          # FZF integration for interactive browsing
@@ -220,6 +222,7 @@ bun test --grep "rewind"
 | `branded-types.test.ts` | Branded type safety |
 | `tool-input-types.test.ts` | ToolInputMap type safety |
 | `cli-args.test.ts` | Argument parsing |
+| `fetch.test.ts` | Session fetch from remote archives |
 | `timeout.test.ts` | Timeout handling |
 | `debug-logging.test.ts` | Debug output |
 | `finder/*.test.ts` | Session discovery and browsing |
@@ -292,6 +295,12 @@ session list [--limit 10] [--all-projects] [--since 7d] [--output path|id|json]
 
 # Popup picker (for Claude/automation)
 session pick [--method auto|tmux|vsc] [--all-projects]
+
+# Fetch archived session from ~/agent-records/ to local storage
+session fetch <id|prefix>
+
+# Fetch (if needed) then resume with claude --resume
+session resume <id|prefix>
 ```
 
 ## Error Handling
