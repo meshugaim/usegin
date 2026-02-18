@@ -150,7 +150,12 @@ export async function getOutputPath(
 	const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 	const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-	const dir = join(config.cloneDir, toKebabCase(config.username), yearMonth, date);
+	const dir = join(
+		config.cloneDir,
+		toKebabCase(config.username),
+		yearMonth,
+		date,
+	);
 	mkdirSync(dir, { recursive: true });
 
 	// Generate HHMMSS prefix from first message timestamp if available
@@ -331,10 +336,15 @@ export async function syncConversation(
 		}
 
 		// Get first message timestamp for filename
-		const firstMessageTimestamp = messages.length > 0 ? messages[0]?.timestamp : undefined;
+		const firstMessageTimestamp =
+			messages.length > 0 ? messages[0]?.timestamp : undefined;
 
 		// Write to output file
-		const outputPath = await getOutputPath(config, conversationId, firstMessageTimestamp);
+		const outputPath = await getOutputPath(
+			config,
+			conversationId,
+			firstMessageTimestamp,
+		);
 		console.log(`Writing to: ${outputPath}`);
 		await Bun.write(outputPath, formatted);
 
