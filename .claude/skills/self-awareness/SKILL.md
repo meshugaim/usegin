@@ -16,6 +16,38 @@ A reflective protocol for agents working on subtasks. Prevents three failure mod
 - **Via liaison**: Enabled when `.claude/skills/liaison/config.json` has `"selfAwareness": true`. Liaison tells sub-agents to follow this protocol.
 - **Manual**: Any agent can read and follow this skill directly.
 
+## Logging
+
+Log key events using `sa-log` (on PATH). This creates a diagnostic trail in `.claude/logs/self-awareness.log` that the orchestrator and humans can review.
+
+```bash
+sa-log <event> <message>
+```
+
+| Event | When to log |
+|-------|-------------|
+| `orient` | Orientation completed — what you found, how many files planned |
+| `orient:fail` | Orientation test failed — what's unclear, escalating |
+| `spinning` | Spinning detected — what you reflected on, new approach |
+| `escalation` | Escalating to spawner/user — what you're stuck on |
+| `connect` | Connection check passed — tests ran, no conflicts |
+| `connect:conflict` | Conflict detected with recent changes — what and where |
+
+Log at each protocol transition. Keep messages brief — one line, concrete facts.
+
+## Reporting to Spawner
+
+When returning results to your spawner (or completing your task), include a **self-awareness summary** at the end of your output:
+
+```
+## Self-Awareness Summary
+- Orientation: [what you found — recent commits, files read, issues checked]
+- Spinning: [none / detected N times, resolved by X]
+- Connection: [tests passed, no conflicts / conflict found in X, resolved by Y]
+```
+
+This gives the orchestrator visibility into whether the protocol was followed and what it caught.
+
 ---
 
 ## Protocol 1: Orient Before Acting
@@ -68,6 +100,16 @@ Before proceeding, answer these **with specifics** — file paths, function name
 
 **If you can only answer with vague descriptions, you don't understand your task yet.** Go back to steps 1-3, or escalate to your spawner/user.
 
+### Step 5: Log orientation result
+
+```bash
+# Success — log what you found and what you plan to do
+sa-log orient "4 files planned (auth.ts, client.ts, 2 tests), 2 recently modified, read diffs"
+
+# Failure — log what's unclear and that you're escalating
+sa-log orient:fail "unclear how auth tokens refresh, escalating to spawner"
+```
+
 ---
 
 ## Protocol 2: Recognize Spinning
@@ -95,6 +137,10 @@ Do not make another edit. Answer these questions first:
 
 Only after answering, decide your next move: a fundamentally different approach, or escalation.
 
+```bash
+sa-log spinning "3 failed edits to auth.ts — root cause is stale token cache, changing approach to invalidate first"
+```
+
 ### Escalation over stubbornness
 
 If you've reflected once and are still stuck after the next attempt, **escalate.** Do not reflect a third time — you're past the point where self-correction helps.
@@ -104,6 +150,10 @@ To your spawner (if in a team) or to the user:
 > I'm stuck on [specific problem]. I've tried [approaches]. The root cause appears to be [analysis]. I need help deciding between [options].
 
 This is not failure. Burning 20 more tool calls on a dead end helps nobody.
+
+```bash
+sa-log escalation "stuck on token refresh after 2 attempts, need guidance on cache invalidation strategy"
+```
 
 ---
 
@@ -142,6 +192,14 @@ Would the next agent picking up after you understand what you did and why?
 - Commits tell a clear story (not a mess of "fix" and "try again")
 - Changes follow the patterns established by prior work in the same area
 - No orphaned code, no half-finished ideas left behind
+
+```bash
+# All clear
+sa-log connect "tests pass, no conflicts with recent commits, 3 files modified"
+
+# Conflict found
+sa-log connect:conflict "auth.ts modified by commit abc123 (2h ago), my changes to refreshToken may conflict"
+```
 
 ---
 
