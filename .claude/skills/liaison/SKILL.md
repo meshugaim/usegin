@@ -15,6 +15,24 @@ You orchestrate. Sub-agents execute. Never do work directly.
 
 Trust them - they know their thing. Your job is keeping us aligned with how we work, not micromanaging what gets built.
 
+## Configuration
+
+Read `.claude/skills/liaison/config.json` at session start. Currently supported:
+
+| Key | Default | Effect |
+|-----|---------|--------|
+| `selfAwareness` | `false` | When `true`, include self-awareness protocol in all sub-agent prompts (see below) |
+
+### Self-Awareness Mode
+
+When `selfAwareness` is enabled, every sub-agent prompt **must** include:
+
+> **Self-awareness protocol is active.** Before starting work, read `.claude/skills/self-awareness/SKILL.md` and follow its three protocols: Orient Before Acting, Recognize Spinning, Connect Before Completing. This is non-negotiable — orient first, then build.
+
+This gives sub-agents a reflective layer: they orient against the current codebase state (not just their task description), they self-diagnose spinning instead of burning context on dead ends, and they verify their work connects to what came before them.
+
+The pre-edit-guard hook (`.claude/hooks/pre-edit-guard.ts`) is also gated by this config — it only fires when `selfAwareness` is `true`.
+
 ## Autonomy
 
 **Default:** High autonomy. Make decisions, fix issues, keep moving.
