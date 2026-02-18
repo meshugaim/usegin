@@ -9,6 +9,14 @@ import type { Config } from "./config";
 import { extractConversation, formatConversation } from "./extractor";
 
 /**
+ * Options for syncConversation
+ */
+export interface SyncOptions {
+	/** Include .jsonl.gz archive alongside text extract (default: false) */
+	includeArchive?: boolean;
+}
+
+/**
  * Convert a string to kebab-case
  */
 export function toKebabCase(str: string): string {
@@ -312,6 +320,7 @@ async function archiveSessionJsonl(
 export async function syncConversation(
 	config: Config,
 	jsonlPath: string,
+	options: SyncOptions = {},
 ): Promise<void> {
 	const conversationId = getConversationId(jsonlPath);
 	console.log(`\nProcessing conversation: ${conversationId}`);
@@ -349,16 +358,23 @@ export async function syncConversation(
 		await Bun.write(outputPath, formatted);
 
 		// Archive the full JSONL (gzip-compressed) alongside the text extract.
+		// Only when includeArchive is true (throttled separately from text extraction).
 		// Errors here are non-fatal: text extraction is the primary artifact.
 		let archivedPaths: string[] = [];
-		try {
-			await ensureGitAttributes(config.cloneDir);
-			archivedPaths = await archiveSessionJsonl(config, jsonlPath, outputPath);
-		} catch (error) {
-			console.error(
-				"Warning: JSONL archival failed, continuing with text only:",
-				(error as Error).message,
-			);
+		if (options.includeArchive) {
+			try {
+				await ensureGitAttributes(config.cloneDir);
+				archivedPaths = await archiveSessionJsonl(
+					config,
+					jsonlPath,
+					outputPath,
+				);
+			} catch (error) {
+				console.error(
+					"Warning: JSONL archival failed, continuing with text only:",
+					(error as Error).message,
+				);
+			}
 		}
 
 		// Git add: stage the text file, .gitattributes, and all archive files
@@ -419,6 +435,7 @@ export async function syncConversation(
 export async function syncAllConversations(
 	config: Config,
 	watchDir: string,
+	options: SyncOptions = {},
 ): Promise<void> {
 	console.log("Processing existing conversations...");
 
@@ -429,7 +446,7 @@ export async function syncAllConversations(
 
 		for (const file of files) {
 			const fullPath = join(watchDir, file);
-			await syncConversation(config, fullPath);
+			await syncConversation(config, fullPath, options);
 		}
 	} catch (error) {
 		console.error(

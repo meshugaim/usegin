@@ -5,7 +5,7 @@
  * Run directly by PM2 for process management
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { watch } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +16,18 @@ import {
 	syncAllConversations,
 	syncConversation,
 } from "./git-sync";
+
+// Archive throttling constants
+// Text extraction syncs on every 2s debounce; .jsonl.gz archival is throttled
+// to reduce git bloat (gzip output is random bytes, git can't delta-compress)
+const ARCHIVE_IDLE_MS = 5 * 60 * 1000; // 5 minutes of no changes
+const ARCHIVE_PERIODIC_MS = 20 * 60 * 1000; // 20-minute safety net
+
+interface ArchiveState {
+	lastArchivedMtime: number;
+	idleTimer: Timer | null;
+	periodicTimer: Timer | null;
+}
 
 // Default paths
 const defaultCloneDir = join(homedir(), ".conversation-watcher", "repo");
@@ -104,7 +116,7 @@ async function main() {
 
 		for (const file of files) {
 			const fullPath = join(config.watchDir, file);
-			await syncConversation(config, fullPath);
+			await syncConversation(config, fullPath, { includeArchive: true });
 		}
 
 		console.log("\n✓ Extraction complete");
@@ -193,8 +205,71 @@ async function startWatcherService(config: Config): Promise<void> {
 	console.log(`Watching directory: ${config.watchDir}`);
 	console.log("Press Ctrl+C to stop\n");
 
-	// Process existing files first
-	await syncAllConversations(config, config.watchDir);
+	// Process existing files first (include archives on startup since we
+	// don't know how stale they are)
+	await syncAllConversations(config, config.watchDir, {
+		includeArchive: true,
+	});
+
+	// Archive state: per-file tracking for throttled .jsonl.gz archival
+	const archiveState = new Map<string, ArchiveState>();
+
+	/**
+	 * Run an archive sync for a file if its content has changed since last archive.
+	 */
+	const runArchiveSync = async (fullPath: string, filename: string) => {
+		const state = archiveState.get(filename);
+		if (!state) return;
+
+		try {
+			const currentMtime = statSync(fullPath).mtimeMs;
+			if (currentMtime <= state.lastArchivedMtime) {
+				console.log(`⊘ Skipping archive for ${filename}: unchanged`);
+				return;
+			}
+
+			console.log(`📦 Archiving ${filename} (throttled)`);
+			await syncConversation(config, fullPath, { includeArchive: true });
+			state.lastArchivedMtime = currentMtime;
+		} catch (error) {
+			console.error(
+				`Warning: Archive sync failed for ${filename}:`,
+				(error as Error).message,
+			);
+		}
+	};
+
+	/**
+	 * Schedule archive timers for a file after a text-only sync.
+	 * - Idle timer: fires 5 min after last change (session appears done)
+	 * - Periodic timer: fires every 20 min for long active sessions
+	 */
+	const scheduleArchiveTimers = (fullPath: string, filename: string) => {
+		let state = archiveState.get(filename);
+		if (!state) {
+			state = { lastArchivedMtime: 0, idleTimer: null, periodicTimer: null };
+			archiveState.set(filename, state);
+		}
+
+		// Reset idle timer (5 min from now)
+		if (state.idleTimer) clearTimeout(state.idleTimer);
+		state.idleTimer = setTimeout(async () => {
+			await runArchiveSync(fullPath, filename);
+			// Session appears idle — clear periodic timer too
+			const s = archiveState.get(filename);
+			if (s?.periodicTimer) {
+				clearInterval(s.periodicTimer);
+				s.periodicTimer = null;
+			}
+		}, ARCHIVE_IDLE_MS);
+
+		// Start periodic timer if not already running (20 min interval)
+		if (!state.periodicTimer) {
+			state.periodicTimer = setInterval(async () => {
+				await runArchiveSync(fullPath, filename);
+			}, ARCHIVE_PERIODIC_MS);
+		}
+	};
 
 	// Set up signal handlers for graceful shutdown
 	let isShuttingDown = false;
@@ -203,6 +278,31 @@ async function startWatcherService(config: Config): Promise<void> {
 		if (isShuttingDown) return;
 		isShuttingDown = true;
 		console.log("\nReceived shutdown signal. Cleaning up...");
+
+		// Flush pending archives before exiting
+		for (const [filename, state] of archiveState) {
+			if (state.idleTimer) clearTimeout(state.idleTimer);
+			if (state.periodicTimer) clearInterval(state.periodicTimer);
+
+			const fullPath = join(config.watchDir, filename);
+			if (existsSync(fullPath)) {
+				try {
+					const currentMtime = statSync(fullPath).mtimeMs;
+					if (currentMtime > state.lastArchivedMtime) {
+						console.log(`📦 Final archive for ${filename} before shutdown`);
+						await syncConversation(config, fullPath, {
+							includeArchive: true,
+						});
+					}
+				} catch (error) {
+					console.error(
+						`Warning: Shutdown archive failed for ${filename}:`,
+						(error as Error).message,
+					);
+				}
+			}
+		}
+
 		process.exit(0);
 	};
 
@@ -234,10 +334,12 @@ async function startWatcherService(config: Config): Promise<void> {
 				clearTimeout(pendingSyncs.get(filename));
 			}
 
-			// Schedule a new sync after debounce period
+			// Schedule a new text-only sync after debounce period
 			const timeoutId = setTimeout(async () => {
 				pendingSyncs.delete(filename);
 				await syncConversation(config, fullPath);
+				// Schedule throttled archive (5 min idle / 20 min periodic)
+				scheduleArchiveTimers(fullPath, filename);
 			}, config.debounceMs);
 
 			pendingSyncs.set(filename, timeoutId);
