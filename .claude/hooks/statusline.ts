@@ -63,21 +63,19 @@ const parts: string[] = [];
 
 parts.push(`v${input.version}`);
 
-if (input.context_window?.used_percentage != null) {
+if (input.context_window?.used_percentage !== undefined) {
   parts.push(`${input.context_window.used_percentage}%`);
 }
 
 const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
 const modelName = input.model.display_name.toLowerCase();
-// Avoid ZWJ sequences (👨‍🔬, 👩‍🔬, 😵‍💫) — terminals miscalculate their width,
-// causing the status line to spread vertically. Single-codepoint emojis only.
 const modelEmoji = modelName.includes("opus")
-  ? pick(["🧠", "🔬", "🧬", "🧪", "🤓", "💡"])
+  ? pick(["🧠", "🔬", "🧬", "🧪", "👨‍🔬", "👩‍🔬", "🤓", "💡"])
   : modelName.includes("sonnet")
-    ? pick(["🔨", "💪"])
+    ? pick(["👷", "🔨", "⚒️", "🏗️", "💪", "🛠️"])
     : modelName.includes("haiku")
-      ? pick(["🫠", "😅", "🤔", "😬", "🥴"])
+      ? pick(["😵‍💫", "🫠", "😅", "🤔", "😬", "🥴"])
       : "🤖";
 
 if (modelName.includes("opus")) {
