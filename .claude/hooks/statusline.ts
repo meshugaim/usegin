@@ -63,7 +63,7 @@ const parts: string[] = [];
 
 parts.push(`v${input.version}`);
 
-if (input.context_window?.used_percentage !== undefined) {
+if (input.context_window?.used_percentage != null) {
   parts.push(`${input.context_window.used_percentage}%`);
 }
 
