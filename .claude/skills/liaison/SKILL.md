@@ -109,6 +109,7 @@ Ensure sub-agents follow project patterns:
 - **Small commits**: frequent, focused, mention Linear issue
 - **Push often**: keep main moving, trunk-based, feature toggle
 - **TDD**: Always attempt to TDD
+- **Feature toggles**: When a feature needs a toggle, make it a **separate slice** with the instruction "use `/feature-toggles` to add toggle X." Don't embed toggle work inside wiring/implementation slices — agents scoped to one repo miss the cross-repo pipeline. The skill handles both ends.
 
 You're safeguarding *how* we work, not *what* gets built. Content decisions belong to sub-agents.
 
