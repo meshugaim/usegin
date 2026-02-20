@@ -35,6 +35,7 @@ export class LinearClient {
     );
     this.relations = new RelationsClient(
       this.sdk,
+      this.graphql.bind(this),
       trackCall,
       this.issues.getIssueByIdentifier.bind(this.issues)
     );
@@ -295,6 +296,13 @@ export class LinearClient {
    */
   async addBlockedBy(identifier: string, blockedByIdentifier: string): Promise<void> {
     return this.relations.addBlockedBy(identifier, blockedByIdentifier);
+  }
+
+  /**
+   * Remove a blocked-by relationship
+   */
+  async removeBlockedBy(identifier: string, blockedByIdentifier: string): Promise<void> {
+    return this.relations.removeBlockedBy(identifier, blockedByIdentifier);
   }
 
   /**

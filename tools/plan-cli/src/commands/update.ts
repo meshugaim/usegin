@@ -20,6 +20,7 @@ export function createUpdateCommand(): Command {
     .option("--label <name>", "Set labels (can repeat, replaces existing)", collect, undefined)
     .option("--project <name>", "Move to project")
     .option("--blocked-by <id>", "Add blocked-by relationship")
+    .option("--remove-blocked-by <id>", "Remove blocked-by relationship")
     .option("--blocking <id>", "Add blocking relationship (this blocks another)")
     .option("--related-to <id>", "Add related-to relationship")
     .option("--duplicate-of <id>", "Mark as duplicate of another issue")
@@ -34,6 +35,7 @@ export function createUpdateCommand(): Command {
         ...opts,
         parent: opts.parent ? normalizeIssueId(opts.parent) : opts.parent,
         blockedBy: opts.blockedBy ? normalizeIssueId(opts.blockedBy) : opts.blockedBy,
+        removeBlockedBy: opts.removeBlockedBy ? normalizeIssueId(opts.removeBlockedBy) : opts.removeBlockedBy,
         blocking: opts.blocking ? normalizeIssueId(opts.blocking) : opts.blocking,
         relatedTo: opts.relatedTo ? normalizeIssueId(opts.relatedTo) : opts.relatedTo,
         duplicateOf: opts.duplicateOf ? normalizeIssueId(opts.duplicateOf) : opts.duplicateOf,
@@ -62,6 +64,7 @@ async function runUpdate(
     label?: string[];
     project?: string;
     blockedBy?: string;
+    removeBlockedBy?: string;
     blocking?: string;
     relatedTo?: string;
     duplicateOf?: string;
@@ -117,6 +120,13 @@ async function runUpdate(
       await client.addBlockedBy(identifier, opts.blockedBy);
       if (!opts.quiet && !opts.json) {
         console.log(`${colors.success("Added")}: ${colors.identifier(identifier)} blocked by ${colors.identifier(opts.blockedBy)}`);
+      }
+    }
+
+    if (opts.removeBlockedBy) {
+      await client.removeBlockedBy(identifier, opts.removeBlockedBy);
+      if (!opts.quiet && !opts.json) {
+        console.log(`${colors.success("Removed")}: ${colors.identifier(identifier)} no longer blocked by ${colors.identifier(opts.removeBlockedBy)}`);
       }
     }
 
@@ -195,7 +205,7 @@ async function runUpdate(
       } else {
         console.log(`${colors.success("Updated")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
       }
-    } else if (!opts.blockedBy && !opts.blocking && !opts.relatedTo && !opts.duplicateOf && !opts.comment) {
+    } else if (!opts.blockedBy && !opts.removeBlockedBy && !opts.blocking && !opts.relatedTo && !opts.duplicateOf && !opts.comment) {
       console.error("Error: No updates specified. Use --help to see options.");
       process.exit(1);
     }
