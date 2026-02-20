@@ -826,7 +826,7 @@ describe("context-based handoff thresholds", () => {
       expect(result!.mandatory).toBe(true);
       expect(result!.message).toContain("85%");
       expect(result!.message).toContain("MANDATORY HANDOFF REQUIRED");
-      expect(result!.message).toContain("MUST run /auto-handoff NOW");
+      expect(result!.message).toContain("MUST run /handoff NOW");
     });
 
     test("returns mandatory above threshold", () => {

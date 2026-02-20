@@ -71,14 +71,14 @@ export interface ContextReminder {
 export function getContextReminderFromUtilization(utilization: number): ContextReminder | null {
   if (utilization >= CONTEXT_THRESHOLD_MANDATORY) {
     return {
-      message: `🛑 CONTEXT AT ${utilization.toFixed(0)}% - MANDATORY HANDOFF REQUIRED. You MUST run /auto-handoff NOW. Do not continue with any other work. This is not optional. Execute the handoff skill immediately.`,
+      message: `🛑 CONTEXT AT ${utilization.toFixed(0)}% - MANDATORY HANDOFF REQUIRED. You MUST run /handoff NOW. Do not continue with any other work. This is not optional. Execute the handoff skill immediately.`,
       mandatory: true,
     };
   }
 
   if (utilization >= CONTEXT_THRESHOLD_WARNING) {
     return {
-      message: `Context at ${utilization.toFixed(0)}%. Consider wrapping up your current task and running /auto-handoff to hand off to a fresh agent.`,
+      message: `Context at ${utilization.toFixed(0)}%. Consider wrapping up your current task and running /handoff to hand off to a fresh agent.`,
       mandatory: false,
     };
   }
