@@ -74,11 +74,9 @@ Build the continue prompt and spawn in tmux:
 WINDOW_ISSUE="${RECENT_ISSUE:-${MAIN_ISSUE:-continue}}"
 
 # Build the continue prompt - IMPORTANT: customize this with your current context
-CONTINUE_PROMPT="Context was running high. Session handed off.
+CONTINUE_PROMPT="STOP. You have exactly TWO jobs: (1) read the handoff, (2) present your understanding and ask for confirmation. Do NOT write code, edit files, run commands, or start implementing.
 
 Previous session transcript: $HANDOFF_FILE
-
-The previous agent was working on a task. The work may not be complete.
 The handoff is almost always about the LAST task the previous agent was working on.
 
 Issue context:
@@ -86,13 +84,11 @@ Issue context:
 - Most recent issue: $RECENT_ISSUE
 
 Instructions:
-1. Read the handoff file, focusing on the LAST 20% of the conversation to understand the most recent task
-2. Present to the user:
-   a. What I understood: 2-3 sentences on what the previous session was working on (focus on the last task)
-   b. What I plan to do: concrete next steps, starting from where the previous agent left off
-   c. Questions (if any): anything unclear or ambiguous
-3. Use the AskUserQuestion tool to ask: 'Does my understanding and plan look right, or would you like to adjust anything?' with options 'Looks good, go ahead' and 'Let me adjust'. This is a HARD GATE — do NOT proceed to any implementation until the user responds.
-4. Only consult the full transcript if you are genuinely missing context after reading the last 20%."
+1. Read the handoff file, focusing on the LAST 20% to understand the most recent task. Only consult earlier parts if genuinely missing context.
+2. In a SINGLE response, do both:
+   a. Output a short summary: what you understood (focus on the last task), what you plan to do, and any questions
+   b. Call the AskUserQuestion tool with question 'Does my understanding and plan look right?' and options 'Looks good, go ahead' and 'Let me adjust'
+3. Your turn ENDS there. Do NOT call any other tools. Do NOT start implementing. Wait for the user to respond."
 
 # Check if in tmux
 if [ -n "$TMUX" ]; then
@@ -141,7 +137,7 @@ MAIN_ISSUE=$(grep -oE 'ENG-[0-9]+' "$HANDOFF_FILE" | sort | uniq -c | sort -rn |
 RECENT_ISSUE=$(grep -oE 'ENG-[0-9]+' "$HANDOFF_FILE" | tail -1) && \
 WINDOW_ISSUE="${RECENT_ISSUE:-${MAIN_ISSUE:-continue}}" && \
 tmux new-window -n "claude-${WINDOW_ISSUE}" \
-    "claude --dangerously-skip-permissions --append-system-prompt 'Handoff file: $HANDOFF_FILE' 'Context was running high. Session handed off. Previous session: $HANDOFF_FILE. Main issue: $MAIN_ISSUE. Recent issue: $RECENT_ISSUE. Read the handoff file (focus on the last 20% — the handoff is almost always about the last task). Present what you understood and your plan, then use the AskUserQuestion tool to confirm before starting any work.'"
+    "claude --dangerously-skip-permissions --append-system-prompt 'Handoff file: $HANDOFF_FILE' 'STOP. You have exactly TWO jobs: (1) read the handoff at $HANDOFF_FILE (focus on the last 20% — the handoff is almost always about the last task), (2) present your understanding and call AskUserQuestion to confirm. Do NOT write code, edit files, or start implementing. Your turn ENDS with AskUserQuestion. Main issue: $MAIN_ISSUE. Recent issue: $RECENT_ISSUE.'"
 ```
 
 ## Notes

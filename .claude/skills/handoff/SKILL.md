@@ -89,6 +89,8 @@ Tell the user the handoff is written and what it contains. Ask if they want to a
 
 ## Continue Mode (`/handoff --continue`)
 
+> **STOP. You have exactly TWO jobs in this mode: (1) read the handoff, (2) present your understanding and ask for confirmation. That's it. Do NOT write code, edit files, run commands, or start implementing. Your turn ends with an `AskUserQuestion` call.**
+
 ### Step 1: Read the latest handoff
 
 ```bash
@@ -98,25 +100,23 @@ ls -la "$HANDOFF_DIR/latest.md"
 
 Then read the file at the symlink target using the `Read` tool.
 
-### Step 2: Orient and propose
+If the handoff references a session transcript, note its path but **don't read it yet**. The handoff note should contain everything you need. Only consult the transcript later if you're genuinely missing context.
 
-After reading, present a SHORT summary to the user:
+### Step 2: Present understanding and ask for confirmation
 
-1. **What I understood**: 2-3 sentences on what the previous session was working on, focusing on the most recent task (the handoff is almost always about the last thing being worked on)
-2. **What I plan to do**: A concrete list of next steps, starting from where the previous agent left off
-3. **Questions** (if any): Anything unclear or ambiguous from the handoff
+After reading, output a SHORT summary:
 
-If the handoff references a session transcript, note its path but **don't read it yet**. The handoff note should contain everything you need. Only read the transcript if you're genuinely missing context — e.g., understanding why a decision was made, what approaches were tried and failed, or what the user said about something specific.
+1. **What I understood**: 2-3 sentences on what the previous session was working on (the handoff is almost always about the last thing being worked on — focus on that)
+2. **What I plan to do**: A concrete list of next steps
+3. **Questions** (if any): Anything unclear or ambiguous
 
-### Step 3: Ask for confirmation
-
-**Do NOT start working yet.** Use the `AskUserQuestion` tool to ask the user to confirm your plan:
+Then — in the SAME response — call `AskUserQuestion`:
 
 ```
-Question: "I've read the handoff. Does my understanding and plan look right, or would you like to adjust anything?"
+Question: "Does my understanding and plan look right?"
 Options:
   - "Looks good, go ahead"
   - "Let me adjust"
 ```
 
-This is a hard gate — do NOT proceed to any implementation until the user responds. They may correct your interpretation, reprioritize, or add context.
+**This is where your turn ENDS.** Do not call any other tools after `AskUserQuestion`. Do not start implementing. Wait for the user's response. They may correct your interpretation, reprioritize, or add context. Only begin work after they confirm.
