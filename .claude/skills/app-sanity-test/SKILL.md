@@ -79,17 +79,25 @@ No setup needed — the app is already deployed. Skip to auth.
 
 #### Try Existing Session First
 
-Always clean up stale daemons before opening the browser, then attempt to reuse an existing auth file:
+Always clean up stale daemons before opening the browser. Before loading auth state, **check if the tokens are still valid** to avoid a stale-token retry storm that triggers Supabase rate limiting:
 
 ```bash
 playwright-cli kill-all 2>/dev/null || true
 playwright-cli open
-playwright-cli state-load <env>-auth.json
-playwright-cli goto <app-url>
-playwright-cli snapshot
+
+# Check token validity BEFORE loading state
+if auth-check <env>-auth.json; then
+  playwright-cli state-load <env>-auth.json
+  playwright-cli goto <app-url>
+  playwright-cli snapshot
+  # If page loaded normally (not /sign-in), auth is valid — proceed to testing
+else
+  # Tokens expired — skip straight to fresh sign-in (see below)
+  playwright-cli goto <app-url>/sign-in
+fi
 ```
 
-Check the snapshot — if the page loaded normally (not redirected to `/sign-in`), auth is valid. Proceed to testing.
+**NEVER load expired auth state** — it triggers a token refresh retry storm that rate-limits the Supabase auth endpoint, blocking fresh sign-in attempts too.
 
 #### If Auth Expired or Missing
 
