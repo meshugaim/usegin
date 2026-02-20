@@ -91,7 +91,7 @@ Instructions:
    a. What I understood: 2-3 sentences on what the previous session was working on (focus on the last task)
    b. What I plan to do: concrete next steps, starting from where the previous agent left off
    c. Questions (if any): anything unclear or ambiguous
-3. WAIT for user confirmation before starting any work. Do NOT begin implementing until the user gives the go-ahead.
+3. Use the AskUserQuestion tool to ask: 'Does my understanding and plan look right, or would you like to adjust anything?' with options 'Looks good, go ahead' and 'Let me adjust'. This is a HARD GATE — do NOT proceed to any implementation until the user responds.
 4. Only consult the full transcript if you are genuinely missing context after reading the last 20%."
 
 # Check if in tmux
@@ -141,7 +141,7 @@ MAIN_ISSUE=$(grep -oE 'ENG-[0-9]+' "$HANDOFF_FILE" | sort | uniq -c | sort -rn |
 RECENT_ISSUE=$(grep -oE 'ENG-[0-9]+' "$HANDOFF_FILE" | tail -1) && \
 WINDOW_ISSUE="${RECENT_ISSUE:-${MAIN_ISSUE:-continue}}" && \
 tmux new-window -n "claude-${WINDOW_ISSUE}" \
-    "claude --dangerously-skip-permissions --append-system-prompt 'Handoff file: $HANDOFF_FILE' 'Context was running high. Session handed off. Previous session: $HANDOFF_FILE. Main issue: $MAIN_ISSUE. Recent issue: $RECENT_ISSUE. Read the handoff file (focus on the last 20% — the handoff is almost always about the last task). Present what you understood and your plan. WAIT for user confirmation before starting work.'"
+    "claude --dangerously-skip-permissions --append-system-prompt 'Handoff file: $HANDOFF_FILE' 'Context was running high. Session handed off. Previous session: $HANDOFF_FILE. Main issue: $MAIN_ISSUE. Recent issue: $RECENT_ISSUE. Read the handoff file (focus on the last 20% — the handoff is almost always about the last task). Present what you understood and your plan, then use the AskUserQuestion tool to confirm before starting any work.'"
 ```
 
 ## Notes

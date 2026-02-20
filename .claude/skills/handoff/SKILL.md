@@ -108,6 +108,15 @@ After reading, present a SHORT summary to the user:
 
 If the handoff references a session transcript, note its path but **don't read it yet**. The handoff note should contain everything you need. Only read the transcript if you're genuinely missing context — e.g., understanding why a decision was made, what approaches were tried and failed, or what the user said about something specific.
 
-### Step 3: Wait for confirmation
+### Step 3: Ask for confirmation
 
-**Do NOT start working yet.** Wait for the user to confirm your understanding and plan. They may correct your interpretation, reprioritize, or add context. Only begin work after they give the go-ahead.
+**Do NOT start working yet.** Use the `AskUserQuestion` tool to ask the user to confirm your plan:
+
+```
+Question: "I've read the handoff. Does my understanding and plan look right, or would you like to adjust anything?"
+Options:
+  - "Looks good, go ahead"
+  - "Let me adjust"
+```
+
+This is a hard gate — do NOT proceed to any implementation until the user responds. They may correct your interpretation, reprioritize, or add context.
