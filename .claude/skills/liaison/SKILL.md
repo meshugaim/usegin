@@ -19,8 +19,8 @@ Trust them - they know their thing. Your job is keeping us aligned with how we w
 
 Read `.claude/skills/liaison/config.json` at session start. Currently supported:
 
-| Key | Default | Effect |
-|-----|---------|--------|
+| Key             | Default | Effect                                                                            |
+| --------------- | ------- | --------------------------------------------------------------------------------- |
 | `selfAwareness` | `false` | When `true`, include self-awareness protocol in all sub-agent prompts (see below) |
 
 ### Self-Awareness Mode
@@ -64,8 +64,9 @@ After a phase is "done" - verify (also sub agents, everything sub agents).
 3. Delegate each step via Task tool with `model: "opus"` - mention the Future Claudes mindset, we're building a wonderful code garden for future Claudes
 4. **Verify DoD** — spawn verification agent with criteria (see below)
 5. Read result → spawn next agent with accumulated context (chain pattern)
-6. Report back to user: what was delegated and why (short)
-7. After phase / slice / feature - review / retro.
+6. **Liaison commits and pushes.** Sub-agents implement and run tests only. Never let agents commit or push — tell them explicitly: "Implement, run tests, report back. Do NOT commit or push." This prevents agents getting stuck on push rejections, hook failures, and rebase conflicts.
+7. Report back to user: what was delegated and why (short)
+8. After phase / slice / feature - review / retro.
 
 **Alternative:** For resumable/iterative work, `crun` allows session continuation.
 
@@ -76,6 +77,7 @@ When delegating to implementation agents, be explicit about things they'll other
 - **Error handling**: Always specify error UX behavior. Reference existing patterns (e.g., `showError` from `@/lib/notifications`). Don't leave error paths to imagination.
 - **Failure path tests**: Explicitly request tests for error/failure paths — especially for optimistic update patterns where rollback logic is easy to get wrong.
 - **Complete file list**: When threading props or data through multiple components, list ALL files that need changes — including test drivers, helpers, and type files, not just the main components.
+- **Consumer file audit for data-layer changes**: When a task changes a data source (SQL function, API response shape, type definition), the liaison MUST grep for all consumers before delegating. Include the complete file list in the agent prompt. Don't trust the task description to be exhaustive — it often names only the primary target and misses downstream consumers (admin pages, other tabs, type re-exports).
 - **Prop contracts**: Specify prop optionality explicitly at every layer. `required` in the parent doesn't mean `required` in the child. Spell it out.
 
 ## Verifying Definition of Done

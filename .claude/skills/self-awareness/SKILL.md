@@ -32,6 +32,8 @@ sa-log <event> <message>
 | `escalation` | Escalating to spawner/user — what you're stuck on |
 | `connect` | Connection check passed — tests ran, no conflicts |
 | `connect:conflict` | Conflict detected with recent changes — what and where |
+| `complete` | Task finished successfully — brief summary of what was done |
+| `stuck` | Cannot proceed — what's blocking and what was tried |
 
 Log at each protocol transition. Keep messages brief — one line, concrete facts.
 
@@ -214,3 +216,23 @@ sa-log connect:conflict "auth.ts modified by commit abc123 (2h ago), my changes 
 | You realize you're building something that won't integrate | "My output won't connect to [sibling work] because [reason]. Should I adjust?" |
 
 Escalation is always better than silent failure. A stuck agent that asks for help wastes 1 minute. A stuck agent that keeps trying wastes 30 minutes and leaves damage.
+
+---
+
+## Protocol 4: Signal Completion
+
+The orchestrator has no visibility into your progress unless you signal it. Your **final action** before returning results must be a completion signal.
+
+### When done successfully:
+
+```bash
+sa-log complete "implemented auth refresh, 3 files modified, all tests pass"
+```
+
+### When stuck and escalating:
+
+```bash
+sa-log stuck "token refresh fails after 2 approaches, need guidance on cache strategy"
+```
+
+**Always signal.** The liaison polls these logs to answer "who is done? who is waiting?" Without signals, the orchestrator is blind and the user gets frustrated.
