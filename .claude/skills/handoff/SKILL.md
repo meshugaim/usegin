@@ -69,6 +69,7 @@ Read this if you need deeper context on decisions made or approaches tried.
 **Guidelines:**
 - Be specific: file paths, function names, migration names
 - Focus on what the next agent needs to ACT, not just understand
+- **Emphasize the last task**: The handoff is almost always about the most recent thing being worked on. Make sure "What's Pending" leads with that — it's what the next agent will focus on first
 - Include any user preferences or decisions made during this session
 - If there's a relevant Linear issue, include it in the title
 - If no Linear issue, use a descriptive title instead
@@ -97,15 +98,16 @@ ls -la "$HANDOFF_DIR/latest.md"
 
 Then read the file at the symlink target using the `Read` tool.
 
-### Step 2: Orient
+### Step 2: Orient and propose
 
-After reading, output a SHORT summary (3-5 sentences):
-- What was being worked on
-- What's pending
-- What you'll do first
+After reading, present a SHORT summary to the user:
 
-If the handoff references a session transcript, note its path but **don't read it yet**. Only read the transcript if you need deeper context — e.g., understanding why a decision was made, what approaches were tried and failed, or what the user said about something specific.
+1. **What I understood**: 2-3 sentences on what the previous session was working on, focusing on the most recent task (the handoff is almost always about the last thing being worked on)
+2. **What I plan to do**: A concrete list of next steps, starting from where the previous agent left off
+3. **Questions** (if any): Anything unclear or ambiguous from the handoff
 
-### Step 3: Get to work
+If the handoff references a session transcript, note its path but **don't read it yet**. The handoff note should contain everything you need. Only read the transcript if you're genuinely missing context — e.g., understanding why a decision was made, what approaches were tried and failed, or what the user said about something specific.
 
-Start on the first pending item. Don't ask for permission — the handoff IS the instruction.
+### Step 3: Wait for confirmation
+
+**Do NOT start working yet.** Wait for the user to confirm your understanding and plan. They may correct your interpretation, reprioritize, or add context. Only begin work after they give the go-ahead.

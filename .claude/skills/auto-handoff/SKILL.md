@@ -78,21 +78,21 @@ CONTINUE_PROMPT="Context was running high. Session handed off.
 
 Previous session transcript: $HANDOFF_FILE
 
-CRITICAL: The previous agent was working on a task. The work may not be complete.
-Focus on the END of the transcript to see what was in progress.
+The previous agent was working on a task. The work may not be complete.
+The handoff is almost always about the LAST task the previous agent was working on.
 
 Issue context:
 - Main issue this session: $MAIN_ISSUE (most frequently mentioned)
 - Most recent issue: $RECENT_ISSUE
 
 Instructions:
-1. Read the handoff file, focusing on the LAST 20% of the conversation
-2. Identify the specific task that was in progress when the session ended
-3. Output a SHORT paragraph (3-4 sentences) confirming:
-   - What was being worked on
-   - What specific step was interrupted
-   - What you will do to complete it
-4. Continue from where the previous agent left off"
+1. Read the handoff file, focusing on the LAST 20% of the conversation to understand the most recent task
+2. Present to the user:
+   a. What I understood: 2-3 sentences on what the previous session was working on (focus on the last task)
+   b. What I plan to do: concrete next steps, starting from where the previous agent left off
+   c. Questions (if any): anything unclear or ambiguous
+3. WAIT for user confirmation before starting any work. Do NOT begin implementing until the user gives the go-ahead.
+4. Only consult the full transcript if you are genuinely missing context after reading the last 20%."
 
 # Check if in tmux
 if [ -n "$TMUX" ]; then
@@ -141,7 +141,7 @@ MAIN_ISSUE=$(grep -oE 'ENG-[0-9]+' "$HANDOFF_FILE" | sort | uniq -c | sort -rn |
 RECENT_ISSUE=$(grep -oE 'ENG-[0-9]+' "$HANDOFF_FILE" | tail -1) && \
 WINDOW_ISSUE="${RECENT_ISSUE:-${MAIN_ISSUE:-continue}}" && \
 tmux new-window -n "claude-${WINDOW_ISSUE}" \
-    "claude --dangerously-skip-permissions --append-system-prompt 'Handoff file: $HANDOFF_FILE' 'Context was running high. Session handed off. Previous session: $HANDOFF_FILE. Main issue: $MAIN_ISSUE. Recent issue: $RECENT_ISSUE. Read the handoff file (focus on the last 20%), confirm what was being worked on, and continue.'"
+    "claude --dangerously-skip-permissions --append-system-prompt 'Handoff file: $HANDOFF_FILE' 'Context was running high. Session handed off. Previous session: $HANDOFF_FILE. Main issue: $MAIN_ISSUE. Recent issue: $RECENT_ISSUE. Read the handoff file (focus on the last 20% — the handoff is almost always about the last task). Present what you understood and your plan. WAIT for user confirmation before starting work.'"
 ```
 
 ## Notes
