@@ -78,6 +78,7 @@ When delegating to implementation agents, be explicit about things they'll other
 - **Failure path tests**: Explicitly request tests for error/failure paths — especially for optimistic update patterns where rollback logic is easy to get wrong.
 - **Complete file list**: When threading props or data through multiple components, list ALL files that need changes — including test drivers, helpers, and type files, not just the main components.
 - **Consumer file audit for data-layer changes**: When a task changes a data source (SQL function, API response shape, type definition), the liaison MUST grep for all consumers before delegating. Include the complete file list in the agent prompt. Don't trust the task description to be exhaustive — it often names only the primary target and misses downstream consumers (admin pages, other tabs, type re-exports).
+- **Affected test files**: When grepping for consumers, explicitly include test files that import or exercise the changed code. Tell the agent: "These test files depend on the code you're changing: [list]. Read them and update them to match your changes *before* running the test suite. Don't run tests blind and react to failures."
 - **Prop contracts**: Specify prop optionality explicitly at every layer. `required` in the parent doesn't mean `required` in the child. Spell it out.
 
 ## Verifying Definition of Done
