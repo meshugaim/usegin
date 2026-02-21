@@ -36,6 +36,16 @@ At session start, ask the user:
 
 **The whiteboard is yours.** Phase managers don't see it by default. You distill what's relevant into their prompts. If a phase manager needs broader context, you decide what to share.
 
+**Recovery line** — at the top of the whiteboard, always keep:
+```
+## Current State
+Phase: [N] [name] | Status: [in-progress/iterating/done]
+Last checkpoint: [one line about what just happened]
+Next: [one line about what's coming]
+Process: Invoke /research → read whiteboard → note-to-self → spawn phase manager → distill → update
+```
+The `Process` line survives context compaction and reminds you HOW to work, not just WHERE you are.
+
 **Suggested elements** (flexible — adapt to the research):
 - Thesis or driving question
 - Phases (planned, in progress, done — with one-line outcomes)
@@ -46,17 +56,18 @@ At session start, ask the user:
 
 Don't over-template. The whiteboard should feel like a researcher's notebook, not a form.
 
-## The Note-to-Self Ritual
+## Pre-Phase Hook (Mandatory)
 
-This is the anti-drift mechanism. Every phase follows this sequence:
+This is the anti-drift mechanism. Every phase follows this sequence in order. Skipping any step is a bug.
 
+0. **Re-read this skill** — `Read .claude/skills/research/SKILL.md`. This prevents role drift after context compaction. After compaction you retain state (whiteboard) but lose process (how to orchestrate). Re-reading restores your operating instructions.
 1. **Read the whiteboard** — re-ground yourself
 2. **Decide the phase question** — what are we exploring next and why?
 3. **Write your note-to-self** — output it as text before spawning. This is for future-you who will be receiving a wall of findings and needs an anchor.
 4. **Spawn the phase manager**
 5. Phase manager returns findings
 6. **You see your note-to-self sitting above the findings** — grounded
-7. **Process findings** through the lens of your note
+7. **Process findings** through the lens of your note (trust the summary — see Context Budget below)
 8. **Update the whiteboard** — distill high-SNR insights, update phases, add open questions
 
 The note-to-self should include:
@@ -205,6 +216,17 @@ Both judges write their assessments. The director:
 3. Updates the whiteboard with a final confidence assessment
 4. Presents the whiteboard to the user as the research deliverable
 
+## Context Budget
+
+The director's context is the scarcest resource. Protect it.
+
+- **Trust phase manager summaries.** When a phase manager returns, it provides a high-level summary in its response AND writes detailed findings to a phase file. Use the summary for your whiteboard update. Do NOT read the phase file yourself — that's what the summary is for. If you need deeper verification, spawn a reviewer agent to read the phase file and assess quality.
+- **Never read phase output files directly.** A single phase file can be 500-1000 lines (~10-15k tokens). Three phase files = 30-45k tokens consumed in your context. At 200k total, that's 15-22% of your budget gone on one read pass. Spawn a reviewer instead.
+- **Never load sub-skills into your own context.** If a phase needs a skill (e.g., experiment phases), tell the phase manager which skill to use. Don't call `Skill:` yourself — it loads the full skill text into your context and makes you adopt that role.
+- **Experiment phases run in foreground.** Never use `run_in_background: true` for experiment iterations — you need to see results to decide the next iteration.
+
+**The director's only tools:** Read (whiteboard only), Write (whiteboard only), Task (spawn agents), text output (notes-to-self). If you find yourself using Grep, Glob, Edit, or Bash — you've collapsed a level. Stop and delegate.
+
 ## Workflow Summary
 
 ```
@@ -214,17 +236,18 @@ User gives topic
 Director creates whiteboard (autonomous or collaborative)
      │
      ▼
-┌─── Loop ────────────────────────────────────┐
-│  1. Read whiteboard                         │
-│  2. Design next phase question              │
-│  3. Write note-to-self                      │
-│  4. Spawn phase manager                     │
-│  5. Receive findings                        │
-│  6. Distill into whiteboard                 │
-│  7. Update phase plan                       │
-│  8. Check-in with user (if configured)      │
-│  9. Decide: continue or converge?           │
-└─────────────────────────────────────────────┘
+┌─── Loop (Pre-Phase Hook) ──────────────────┐
+│  0. Re-read THIS SKILL (prevents drift)    │
+│  1. Read whiteboard                        │
+│  2. Design next phase question             │
+│  3. Write note-to-self                     │
+│  4. Spawn phase manager                    │
+│  5. Receive findings (trust the summary)   │
+│  6. Distill into whiteboard                │
+│  7. Update phase plan                      │
+│  8. Check-in with user (if configured)     │
+│  9. Decide: continue or converge?          │
+└────────────────────────────────────────────┘
      │
      ▼
 Spawn Process Judge + Answer Judge (parallel)
