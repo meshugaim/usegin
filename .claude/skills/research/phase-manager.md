@@ -21,13 +21,28 @@ Use the Task tool to spawn workers. Workers are:
 
 Match worker type to the task. A file search needs an Explorer. Running an experiment needs Bash. Analyzing findings needs general-purpose.
 
-## Lightweight vs. Heavy
+## Lightweight vs. Heavy vs. Experiment
 
 The director told you your weight. Follow accordingly:
 
 **Lightweight:** You are a single agent. Spawn workers via the Task tool. Keep it focused — a few workers, clear questions, synthesize and return. Good for 1-3 workers.
 
 **Heavy:** Create a Team (TeamCreate). Spawn named workers. Coordinate via task list. Use this when you have 4+ parallel threads, workers need to build on each other's findings, or the question has multiple independent facets that benefit from structured coordination.
+
+**Experiment:** You are running one iteration of an experiment. The director gave you:
+- An **Experiment State** block — what's deployed, what's been tried, current hypothesis
+- Optionally, the **previous phase file path** — read it if you need tactical detail from the last iteration (code, commands, exact outputs)
+
+Your job for this iteration:
+1. Read the experiment state to orient
+2. If given a previous phase file, read it for tactical context you need
+3. Spawn workers to execute the iteration (deploy code, run tests, collect measurements)
+4. Write results to your phase file — include what you did, what you observed, and what changed in the infrastructure
+5. Return to the director: what happened, whether it worked, and any observations that should update the experiment state
+
+**Key difference from research phases:** Your return should include not just findings but also **what changed** — new endpoints deployed, infrastructure modified, parameters adjusted. The director needs this to update the experiment state for the next iteration.
+
+**Keep iterations small.** One iteration = one testable change or measurement. "Deploy the two-hop endpoint AND run the soak test AND analyze results" is three iterations, not one.
 
 ## What to Return
 

@@ -68,6 +68,8 @@ The note-to-self should include:
 
 Write it before the spawn, not after. It's a bookmark in your own context.
 
+**For experiment iterations:** The note-to-self can be shorter — mostly "updated experiment state, here's what I'm sending the next iteration to do and what I expect back." The full ritual is for phase *transitions* (forensics → reproduction), not iteration transitions within an experiment.
+
 ## Phases
 
 **Start hybrid:** Sketch high-level phases at the beginning (1, 2, 3... then we'll see), but keep them dynamic. Each phase can break into sub-phases as you learn more.
@@ -87,15 +89,45 @@ Phases are a living plan, not a fixed roadmap. Update the whiteboard as the plan
 
 A phase manager is focused on ONE research question. They spawn workers, synthesize findings, and return results. They die after the phase — no state to carry.
 
-**Two weights — choose per phase:**
+**Three weights — choose per phase:**
 
 ### Lightweight
 A single Task agent (subagent_type: "general-purpose") that uses the Task tool to spawn a few workers. Good for focused questions: "read these files and identify the pattern", "search for how X is implemented", "check if Y is documented."
 
 ### Heavy
-Creates a Team (TeamCreate), spawns named workers, coordinates via task list. Good for multi-faceted investigation: "trace the auth flow across frontend and backend", "run experiments and compare results", "gather evidence from code, docs, logs, and production."
+Creates a Team (TeamCreate), spawns named workers, coordinates via task list. Good for multi-faceted investigation: "trace the auth flow across frontend and backend", "gather evidence from code, docs, logs, and production."
 
-**Choosing:** Start lightweight. Escalate to heavy when a phase has multiple independent threads that benefit from parallel execution and coordination.
+### Experiment
+For phases that involve deploying infrastructure, running tests, and iterating based on results. The phase manager spawns workers to execute commands and write code, but the key difference is how **state carries between iterations**.
+
+**How experiment phases work:**
+
+Each iteration is its own sub-phase. The director treats them as cheap, fast phases — not heavyweight investigations. The cycle:
+
+1. Director writes an **Experiment State** section on the whiteboard before the first experiment phase
+2. Director spawns a phase manager for one iteration (e.g., "deploy the two-hop endpoint and run 20 connections")
+3. Phase manager executes via workers, writes results to a phase file (e.g., `phase-02a-direct-tests.md`)
+4. Director receives results, updates the Experiment State section, decides the next iteration
+5. Director spawns a new phase manager for the next iteration, feeding them:
+   - The Experiment State section (strategic context — what's deployed, what's been tried, what worked/failed)
+   - The previous phase file path (tactical detail — if they need to build on last iteration's code or commands)
+
+**The Experiment State section** on the whiteboard:
+```
+## Experiment State
+- Infrastructure: what's deployed and where
+- Tried: what's been attempted and what happened (one line each)
+- Current hypothesis: what we're testing now
+- Next: what the next iteration should do
+```
+
+The director maintains this section between iterations. It's the strategic memory that makes stateless phase managers work for iterative experiments. Phase managers read it to orient, but don't update it — that's the director's job, same as the rest of the whiteboard.
+
+**Pre-register success criteria.** Before the first experiment phase, write on the whiteboard: "We consider X reproduced/proven if [specific observable criteria]." The judges evaluate against these criteria, not the narrative.
+
+**Phase file naming for experiment iterations:** Use letter suffixes: `phase-02a-direct-tests.md`, `phase-02b-proxy-deploy.md`, `phase-02c-two-hop-soak.md`. This keeps them grouped under the experiment's phase number while preserving iteration order.
+
+**Choosing:** Start lightweight. Escalate to heavy when a phase has multiple independent parallel threads. Use experiment when the work involves deploying, testing, observing results, and iterating — when the answer comes from doing, not reading.
 
 **What to send the phase manager:**
 - The specific question for this phase
@@ -112,14 +144,19 @@ Creates a Team (TeamCreate), spawns named workers, coordinates via task list. Go
 
 ```
 .claude/research/<topic-slug>/
-  whiteboard.md       — the director's whiteboard (the artifact)
-  phase-01.md         — phase 1 detailed findings + evidence
-  phase-02.md         — phase 2 detailed findings + evidence
+  whiteboard.md           — the director's whiteboard (the artifact)
+  phase-01.md             — phase 1 detailed findings + evidence
+  phase-02a-setup.md      — experiment iteration: infrastructure setup
+  phase-02b-baseline.md   — experiment iteration: baseline measurements
+  phase-02c-treatment.md  — experiment iteration: variable introduced
+  phase-03.md             — phase 3 (back to research, or another experiment)
   ...
-  judgment.md         — final judgment assessment (written by judges)
+  judgment.md             — final judgment assessment (written by judges)
 ```
 
 Phase files hold the evidence trail — the raw findings, sources, code references, experiment results. The whiteboard holds the distilled insights. This separation keeps the whiteboard readable while preserving auditability.
+
+Experiment iterations use letter suffixes (`02a`, `02b`, `02c`) to group under the experiment's phase number while preserving iteration order.
 
 ## Convergence — When to Stop
 
