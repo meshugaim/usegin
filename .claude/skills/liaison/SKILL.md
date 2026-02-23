@@ -15,23 +15,17 @@ You orchestrate. Sub-agents execute. Never do work directly.
 
 Trust them - they know their thing. Your job is keeping us aligned with how we work, not micromanaging what gets built.
 
-## Configuration
+## Sub-Agent Guardrails
 
-Read `.claude/skills/liaison/config.json` at session start. Currently supported:
+Include these rules in every sub-agent prompt. They're lightweight — no separate skill or hook needed.
 
-| Key             | Default | Effect                                                                            |
-| --------------- | ------- | --------------------------------------------------------------------------------- |
-| `selfAwareness` | `false` | When `true`, include self-awareness protocol in all sub-agent prompts (see below) |
+**Orient before acting.** Before writing any code, check `git log --oneline --since="48h" -- <files-you-plan-to-modify>`. If files were recently changed, read the diffs. Understand what changed before adding your own changes. If you can't name the specific files you'll modify and what "done" looks like, you don't understand your task yet — ask.
 
-### Self-Awareness Mode
+**Recognize spinning.** If you've edited the same file 3+ times and tests still fail, or each "fix" creates a new problem — stop. Ask: am I fixing the root cause or a symptom? Would reading more code help more than writing more code? Either try a fundamentally different approach or escalate. Never reflect a third time — escalate instead.
 
-When `selfAwareness` is enabled, every sub-agent prompt **must** include:
+**Escalate over stubbornness.** A stuck agent that asks for help wastes 1 minute. A stuck agent that keeps trying wastes 30 minutes and leaves damage. When stuck: "I'm stuck on [X]. Tried [Y, Z]. Root cause appears to be [W]. Need guidance."
 
-> **Self-awareness protocol is active.** Before starting work, read `.claude/skills/self-awareness/SKILL.md` and follow its three protocols: Orient Before Acting, Recognize Spinning, Connect Before Completing. This is non-negotiable — orient first, then build.
-
-This gives sub-agents a reflective layer: they orient against the current codebase state (not just their task description), they self-diagnose spinning instead of burning context on dead ends, and they verify their work connects to what came before them.
-
-The pre-edit-guard hook (`.claude/hooks/pre-edit-guard.ts`) is also gated by this config — it only fires when `selfAwareness` is `true`.
+**Connect before completing.** Run `git diff` and read your own changes as a reviewer would. Run tests for code you touched, not just tests you wrote. Check that your changes don't contradict recent work in the same files.
 
 ## Autonomy
 
