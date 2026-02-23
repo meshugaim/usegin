@@ -44,7 +44,7 @@ The pre-edit-guard hook (`.claude/hooks/pre-edit-guard.ts`) is also gated by thi
 
 - "Finished the bugs. Feature work next — same pace, or discuss design first?"
 - "Found 3 unimplemented ideas. Create issues and keep going, or discuss?"
-- "About to spawn 4 parallel agents. Auto-proceed with results, or review each?"
+- "User requested parallel execution for next phase. Define contracts first, or proceed with your judgment?"
 - "Work is shifting from implementation to docs/config. Changing gears — still autonomous?"
 
 The liaison manages **conversation flow**, not just task flow. When in doubt, bias toward action — do the work, explain after.
@@ -60,13 +60,32 @@ After a phase is "done" - verify (also sub agents, everything sub agents).
 ## How It Works
 
 1. Receive task from user
-2. Break into small steps (lean sequential, parallelize only when clearly safe)
+2. Break into small steps — **always sequential by default** (see Sequencing below)
 3. Delegate each step via Task tool with `model: "opus"` - mention the Future Claudes mindset, we're building a wonderful code garden for future Claudes
 4. **Verify DoD** — spawn verification agent with criteria (see below)
 5. Read result → spawn next agent with accumulated context (chain pattern)
 6. **Liaison commits and pushes.** Sub-agents implement and run tests only. Never let agents commit or push — tell them explicitly: "Implement, run tests, report back. Do NOT commit or push." This prevents agents getting stuck on push rejections, hook failures, and rebase conflicts.
 7. Report back to user: what was delegated and why (short)
 8. After phase / slice / feature - review / retro.
+
+## Sequencing: Sequential by Default
+
+**Do NOT parallelize unless the user explicitly requests it.**
+
+Sequential execution means each agent builds against committed code from the previous step. The code IS the contract — no risk of agents making divergent assumptions about shared interfaces. This is slower but dramatically reduces integration bugs.
+
+**Why this is a hard rule:** The Drive integration (ENG-1624) parallelized 8 slices and spent 1.5 days fixing integration bugs (FK assumptions, OAuth routing, enum handling). The same feature built sequentially (ENG-1886, Feb 19) had zero integration bugs. Speed from parallelism was completely eaten by debugging cost. See ENG-2002 for the full retro.
+
+**When the user explicitly requests parallel execution:**
+
+1. **Define integration contracts first.** Before delegating, specify between each slice:
+   - API request/response shapes
+   - DB schema and FK relationships (exact column names, not just table names)
+   - Enum values and status flows
+   - Callback URLs and redirect targets
+   - File ownership boundaries (which files each agent may modify)
+2. **Include contracts in every agent prompt.** Each agent gets its own contract AND the contracts of adjacent slices it depends on.
+3. **Run an integration checkpoint after all parallel agents complete.** Spawn a verification agent that tests the seams between slices before proceeding.
 
 **Alternative:** For resumable/iterative work, `crun` allows session continuation.
 
