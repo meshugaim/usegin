@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
-import { fetchEvents, type SpotlightEvent, type BufferInfo } from "./client";
+import { fetchEvents, type BufferInfo } from "./client";
 import { formatTraces } from "./format/traces";
 import { formatErrors } from "./format/errors";
 import { formatLogs } from "./format/logs";
@@ -22,12 +22,13 @@ program
   .option("--slow <ms>", "Only show traces slower than N ms")
   .option("--errors", "Only show traces with error status")
   .option("--json", "Output as JSON")
+  .option("--no-cache", "Bypass cache and fetch fresh data from sidecar")
   .action(async (opts) => {
-    const { events, buffer } = await fetchEvents("traces");
+    const { events, buffer } = await fetchEvents("traces", { noCache: opts.cache === false });
     if (!events.length) return noData("traces");
     if (!opts.json) printBufferStatus(buffer);
     console.log(formatTraces(events, opts));
-    jsonHint(opts, "spotlight-dev traces --json | jq '.[] | {transaction, duration_ms}'");
+    if (!opts.json) printHints(opts, "traces");
   });
 
 // --- trace <id> ---
@@ -36,11 +37,11 @@ program
   .command("trace <id>")
   .description("Show span tree for a trace ID")
   .option("--json", "Output as JSON")
+  .option("--no-cache", "Bypass cache and fetch fresh data from sidecar")
   .action(async (id: string, opts) => {
-    const { events } = await fetchEvents("traces");
+    const { events } = await fetchEvents("traces", { noCache: opts.cache === false });
     if (!events.length) return noData("traces");
     console.log(formatTraceDetail(events, id, opts));
-    jsonHint(opts, "spotlight-dev trace " + id + " --json | jq 'sort_by(.timestamp) | .[] | {transaction, duration_ms}'");
   });
 
 // --- errors ---
@@ -50,12 +51,12 @@ program
   .description("List recent errors")
   .option("-n, --limit <n>", "Number of errors to show", "20")
   .option("--json", "Output as JSON")
+  .option("--no-cache", "Bypass cache and fetch fresh data from sidecar")
   .action(async (opts) => {
-    const { events, buffer } = await fetchEvents("errors");
+    const { events, buffer } = await fetchEvents("errors", { noCache: opts.cache === false });
     if (!events.length) return noData("errors");
     if (!opts.json) printBufferStatus(buffer);
     console.log(formatErrors(events, opts));
-    jsonHint(opts, "spotlight-dev errors --json | jq '.[] | {event_id, transaction}'");
   });
 
 // --- logs ---
@@ -65,15 +66,15 @@ program
   .description("List recent logs")
   .option("-n, --limit <n>", "Number of logs to show", "20")
   .option("--json", "Output as JSON")
+  .option("--no-cache", "Bypass cache and fetch fresh data from sidecar")
   .action(async (opts) => {
-    const { events, buffer } = await fetchEvents("logs");
+    const { events, buffer } = await fetchEvents("logs", { noCache: opts.cache === false });
     if (!events.length) return noData("logs");
     if (!opts.json) printBufferStatus(buffer);
     console.log(formatLogs(events, opts));
-    jsonHint(opts, "spotlight-dev logs --json | jq '.'");
   });
 
-// --- help hints ---
+// --- help ---
 
 program.addHelpText(
   "afterAll",
@@ -81,12 +82,12 @@ program.addHelpText(
 Examples:
   spotlight-dev traces                       # Recent traces (default 20)
   spotlight-dev traces --slow 1000           # Traces slower than 1s
-  spotlight-dev traces --op http.server      # Only server request traces
   spotlight-dev traces --transaction chat     # Filter by route/transaction name
-  spotlight-dev trace abc123                 # Span tree for trace ID (prefix match)
+  spotlight-dev trace abc123                 # Span tree for a trace
   spotlight-dev errors                       # Recent errors
   spotlight-dev logs                         # Recent logs
   spotlight-dev traces --json | jq .         # JSON for scripting
+  spotlight-dev traces --no-cache            # Force fresh fetch
 
 Requires Spotlight sidecar running on localhost:8969 (started by dev server).
 `
@@ -118,10 +119,20 @@ function formatAge(timestamp: string): string {
   return `${Math.round(ms / 3_600_000)}h`;
 }
 
-/** Print a jq hint to stderr — only when --json is NOT active */
-function jsonHint(opts: { json?: boolean }, example: string): void {
-  if (!opts.json) {
-    console.error(`\x1b[2mTip: ${example}\x1b[0m`);
+/** Print contextual hints — only suggest flags the user isn't already using */
+function printHints(opts: Record<string, unknown>, command: string): void {
+  const dim = "\x1b[2m";
+  const reset = "\x1b[0m";
+  const hints: string[] = [];
+
+  if (command === "traces") {
+    hints.push("Drill in:  spotlight-dev trace <id>");
+    if (!opts.slow) hints.push("Slow only: spotlight-dev traces --slow 1000");
+    if (!opts.transaction) hints.push("By route:  spotlight-dev traces --transaction <name>");
+  }
+
+  if (hints.length) {
+    console.error(hints.map((h) => `${dim}${h}${reset}`).join("\n"));
   }
 }
 

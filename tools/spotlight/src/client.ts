@@ -47,7 +47,7 @@ export interface BufferInfo {
 
 const SPOTLIGHT_PORT = 8969;
 const TAIL_TIMEOUT_MS = 3_000;
-const CACHE_TTL_MS = 5_000;
+const CACHE_TTL_MS = 30_000;
 const CACHE_FILE = join(tmpdir(), "spotlight-dev-cache.json");
 
 interface CacheEntry {
@@ -88,10 +88,11 @@ function writeCache(events: SpotlightEvent[]): void {
  * is shared across `traces`, `errors`, `logs`, and `all` queries.
  */
 export async function fetchEvents(
-  types: "traces" | "errors" | "logs" | "all" = "all"
+  types: "traces" | "errors" | "logs" | "all" = "all",
+  options?: { noCache?: boolean }
 ): Promise<{ events: SpotlightEvent[]; buffer: BufferInfo }> {
-  // Try cache first
-  const cached = readCache();
+  // Try cache first (skip if --no-cache)
+  const cached = options?.noCache ? null : readCache();
   if (cached) {
     const filtered = filterByType(cached, types);
     return { events: filtered, buffer: computeBufferInfo(cached) };
