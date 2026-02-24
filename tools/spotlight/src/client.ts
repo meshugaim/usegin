@@ -21,6 +21,7 @@ export interface SpotlightEvent {
   span_id?: string;
   parent_span_id?: string;
   op?: string;
+  description?: string;
   status?: string;
   duration_ms?: number;
   span_count?: number;
@@ -30,6 +31,12 @@ export interface SpotlightEvent {
   server_name?: string;
   sdk?: string;
   sdk_version?: string;
+  // Error events
+  exception_type?: string;
+  exception_value?: string;
+  // Log events
+  log_level?: string;
+  log_message?: string;
   // Measurements (traces)
   [key: `measurement.${string}`]: number;
   // Replay

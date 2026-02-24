@@ -107,6 +107,11 @@ function renderSpan(
   const dur =
     span.duration_ms != null ? `${c.yellow}${span.duration_ms}ms${c.reset}` : "";
   const name = span.transaction ?? span.op ?? "unnamed";
+  // Show description when it adds info beyond the transaction name
+  // (e.g., SQL query, HTTP URL, server action path)
+  const desc = span.description && span.description !== span.transaction
+    ? span.description
+    : "";
   const op = span.op ? `${c.cyan}[${span.op}]${c.reset} ` : "";
   const status =
     span.status && span.status !== "ok"
@@ -121,7 +126,7 @@ function renderSpan(
   // For the very first span (offset 0), skip the label to reduce noise
   const offset = offsetMs > 0 ? dim(` +${offsetMs}ms`) : "";
 
-  lines.push(`${prefix}${connector}${op}${name}  ${dur}${offset}${status}${spanCount}`);
+  lines.push(`${prefix}${connector}${op}${desc || name}  ${dur}${offset}${status}${spanCount}`);
 
   const kids = children.get(span.span_id ?? "") ?? [];
   // Sort children by timestamp

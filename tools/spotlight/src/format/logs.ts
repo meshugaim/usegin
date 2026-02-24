@@ -36,9 +36,19 @@ export function formatLogs(
   for (const log of logs) {
     const time = formatTime(log.timestamp);
     const id = log.event_id?.substring(0, 8) ?? "--------";
-    const platform = log.platform ?? "";
 
-    lines.push(`${c.blue}log${c.reset}  ${id}  ${time}  ${platform}`);
+    // Show level + message if available
+    const level = log.log_level ?? "info";
+    const levelColor = level === "error" ? c.red : level === "warn" ? c.yellow : c.blue;
+    const msg = log.log_message ?? "";
+
+    if (msg) {
+      // Truncate long messages to keep the list scannable
+      const truncated = msg.length > 120 ? msg.substring(0, 117) + "..." : msg;
+      lines.push(`${levelColor}${level}${c.reset}  ${id}  ${time}  ${truncated}`);
+    } else {
+      lines.push(`${levelColor}${level}${c.reset}  ${id}  ${time}`);
+    }
 
     if (log.transaction) {
       lines.push(dim(`  transaction: ${log.transaction}`));

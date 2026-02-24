@@ -38,9 +38,16 @@ export function formatErrors(
     const id = err.event_id?.substring(0, 8) ?? "????????";
     const platform = err.platform ?? "";
 
-    lines.push(`${c.red}error${c.reset}  ${id}  ${time}  ${platform}`);
+    // Show exception type + message if available, otherwise just metadata
+    const excType = err.exception_type ? `${c.yellow}${err.exception_type}${c.reset}` : "";
+    const excMsg = err.exception_value ?? "";
 
-    // Show whatever fields are available
+    if (excType || excMsg) {
+      lines.push(`${c.red}error${c.reset}  ${id}  ${time}  ${excType}${excType && excMsg ? ": " : ""}${excMsg}`);
+    } else {
+      lines.push(`${c.red}error${c.reset}  ${id}  ${time}  ${platform}`);
+    }
+
     if (err.transaction) {
       lines.push(dim(`  transaction: ${err.transaction}`));
     }
