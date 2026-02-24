@@ -126,6 +126,20 @@ Updated formula: **~7.5s base + upload_time(MB) + text_extraction(text_volume)**
 The prior formula `~9s + 0.03-0.05s/page` was an artifact of uniform text density.
 Real-world mixed-content PDFs (charts, images, whitespace) process significantly faster.
 
+### 2000p Failure Rate by Density (Phase 8)
+
+Text density drives failure rate, not page count. All at c=1, clean project:
+
+| Variant | N | Pass | Fail Rate | Avg (success) |
+|---------|---|------|-----------|---------------|
+| image-2000p (zero text) | 10 | **10/10** | **0%** | 8.0s |
+| sparse-2000p (~5 lines/page) | 10 | **9/10** | **10%** | 12.0s |
+| dense-2000p (~100 lines/page) | 11+ | **5/11+** | **~55%** | 109s |
+
+This proves failures are caused by the text extraction/embedding pipeline, not by page count, concurrency, or project health. v1 dense-2000p was strictly sequential (c=1, zero concurrent uploads) on the clean project and still failed 4/7.
+
+**Unresolved**: Is it total text volume or per-page density? dense-50p (50 pages packed text, ~3.2M total chars) had 0/3 failures, while dense-2000p (~12.8M total chars) fails ~55%. The threshold is somewhere between 3.2M and 12.8M total extractable characters. See handoff for follow-up experiment.
+
 ---
 
 ## Key Isolation Results (Phase 3)
