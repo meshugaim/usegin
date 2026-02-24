@@ -1,9 +1,16 @@
 # GFS Store Shared Overhead — Who Shares What?
 
 ## Current State
-Phase: complete | Status: final (post-judgment extension completed)
+Phase: complete | Status: final (superseded in part)
 Last checkpoint: Cross-key experiment + documentation review resolved the key boundary question
 Process: Read SKILL → read whiteboard → note-to-self → spawn phase manager → distill → update
+
+> **Note (2026-02-24):** The "per-API-key" bottleneck finding below has been **superseded**
+> by the upload failure matrix research (`.claude/research/gfs-upload-failure-matrix/`).
+> With 4 keys across 2 projects (162+ uploads), the bottleneck was proven to be
+> **per-GCP-project**, not per-key. The cross-key experiment here used keys on different
+> projects, which appeared to show per-key isolation but actually showed per-project isolation.
+> Key rotation does nothing. The query/delete independence findings remain valid.
 
 ## Driving Question
 
