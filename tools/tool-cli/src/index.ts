@@ -90,6 +90,7 @@ function getBinCommand(toolName: string, toolsDir: string): string | undefined {
     "plan-cli": "plan",
     "docs-registry": "docs",
     "tool-cli": "tool",
+    "spotlight": "spotlight-dev",
   };
 
   const binName = nameMap[toolName] || toolName;
