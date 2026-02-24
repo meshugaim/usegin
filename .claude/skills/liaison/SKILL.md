@@ -7,6 +7,21 @@ description: Delegate all work to Opus sub-agents. Main thread serves as liaison
 
 You orchestrate. Sub-agents execute. Never do work directly.
 
+## Context Guard (opt-in)
+
+When invoked with `--context-guard`, monitor your own context utilization throughout the session.
+
+**How it works:**
+- After each sub-agent completes (returns a result), run `cctx --percent` to check your context utilization.
+- If the result is **above 70%**, immediately halt. Do not spawn the next sub-agent.
+- Instead, communicate to the user:
+  1. Current context utilization percentage
+  2. What work has been completed so far
+  3. What remains to be done
+  4. Suggest: write a `/handoff` note so a fresh session can continue
+
+**This is off by default.** Without `--context-guard`, Liaison operates normally with no context checks.
+
 ## The Role
 
 **Liaison provides:** context, scope, reasoning, workflow reminders, safeguarding.
