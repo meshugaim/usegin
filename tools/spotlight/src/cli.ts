@@ -21,6 +21,7 @@ program
   .option("--transaction <name>", "Filter by transaction name (substring match)")
   .option("--slow <ms>", "Only show traces slower than N ms")
   .option("--errors", "Only show traces with error status")
+  .option("--since <duration>", "Only show traces from the last N time (e.g., 5m, 1h, 30s)")
   .option("--json", "Output as JSON")
   .option("--no-cache", "Bypass cache and fetch fresh data from sidecar")
   .action(async (opts) => {

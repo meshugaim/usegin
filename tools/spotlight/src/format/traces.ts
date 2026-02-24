@@ -6,8 +6,21 @@ interface TracesOptions {
   op?: string;
   transaction?: string;
   slow?: string;
+  since?: string;
   errors?: boolean;
   json?: boolean;
+}
+
+/** Parse a duration string like "5m", "1h", "30s" into milliseconds */
+function parseDuration(s: string): number | null {
+  const match = s.match(/^(\d+)(s|m|h)$/);
+  if (!match) return null;
+  const n = parseInt(match[1], 10);
+  const unit = match[2];
+  if (unit === "s") return n * 1_000;
+  if (unit === "m") return n * 60_000;
+  if (unit === "h") return n * 3_600_000;
+  return null;
 }
 
 /** Deduplicate: group spans by trace_id, keep the root (no parent) or longest */
@@ -54,6 +67,13 @@ export function formatTraces(
   if (opts.errors) {
     traces = traces.filter((t) => t.status !== "ok");
   }
+  if (opts.since) {
+    const ms = parseDuration(opts.since);
+    if (ms) {
+      const cutoff = Date.now() - ms;
+      traces = traces.filter((t) => new Date(t.timestamp).getTime() >= cutoff);
+    }
+  }
 
   // Sort by timestamp descending (most recent first)
   traces.sort(
@@ -91,19 +111,6 @@ export function formatTraces(
     lines.push(
       dim(`  ${id}  ${spans}  ${time}  ${t.platform ?? ""}`)
     );
-  }
-
-  // Progressive disclosure hints
-  lines.push("");
-  lines.push(dim("Drill in:  spotlight-dev trace <id>        # span tree for a trace"));
-  if (!opts.transaction) {
-    lines.push(dim("By route:  spotlight-dev traces --transaction workspaces"));
-  }
-  if (!opts.op) {
-    lines.push(dim("By op:     spotlight-dev traces --op http.server"));
-  }
-  if (!opts.slow) {
-    lines.push(dim("Slow only: spotlight-dev traces --slow 1000  # >1s"));
   }
 
   return lines.join("\n");
