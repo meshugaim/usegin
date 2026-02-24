@@ -68,6 +68,13 @@ export function formatTraceDetail(
       `${spans.length} transactions  ${totalChildSpans} child spans  ${totalDuration}ms total  ${firstTime}  ${platforms.join(", ")}`
     )
   );
+
+  // Show web vitals / measurements from the root span (pageload, navigation)
+  const measurements = extractMeasurements(spans);
+  if (measurements.length) {
+    lines.push(dim(`Measurements: ${measurements.join("  ")}`));
+  }
+
   lines.push("");
 
   // Render tree with offsets
@@ -139,6 +146,39 @@ function renderSpan(
     const childPrefix = prefix + (prefix === "" ? "" : isLast ? "   " : "│  ");
     renderSpan(kids[i], childPrefix, i === kids.length - 1, children, lines, traceStart);
   }
+}
+
+/** Extract measurement.* fields from all spans, format as readable labels */
+function extractMeasurements(spans: SpotlightEvent[]): string[] {
+  const result: string[] = [];
+  // Friendly names for known measurement keys
+  const labels: Record<string, string> = {
+    "measurement.ttfb": "TTFB",
+    "measurement.ttfb.requestTime": "Request Time",
+    "measurement.fcp": "FCP",
+    "measurement.lcp": "LCP",
+    "measurement.fid": "FID",
+    "measurement.cls": "CLS",
+    "measurement.inp": "INP",
+    "measurement.connection.rtt": "RTT",
+  };
+
+  for (const span of spans) {
+    for (const [key, value] of Object.entries(span)) {
+      if (key.startsWith("measurement.") && typeof value === "number") {
+        const label = labels[key] ?? key.replace("measurement.", "");
+        // CLS is unitless, everything else is ms
+        const formatted = key === "measurement.cls"
+          ? `${label}=${value.toFixed(3)}`
+          : `${label}=${Math.round(value)}ms`;
+        // Avoid duplicates
+        if (!result.some((r) => r.startsWith(label + "="))) {
+          result.push(formatted);
+        }
+      }
+    }
+  }
+  return result;
 }
 
 function formatTime(ts: string): string {
