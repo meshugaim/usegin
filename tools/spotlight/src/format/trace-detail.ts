@@ -143,7 +143,10 @@ function renderSpan(
   );
 
   for (let i = 0; i < kids.length; i++) {
-    const childPrefix = prefix + (prefix === "" ? "" : isLast ? "   " : "│  ");
+    // First-level children (prefix="") need indentation to show hierarchy
+    const childPrefix = prefix === ""
+      ? "  "
+      : prefix + (isLast ? "   " : "│  ");
     renderSpan(kids[i], childPrefix, i === kids.length - 1, children, lines, traceStart);
   }
 }
