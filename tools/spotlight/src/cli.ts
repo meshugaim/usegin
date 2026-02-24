@@ -74,6 +74,25 @@ program
     console.log(formatLogs(events, opts));
   });
 
+// --- status ---
+
+program
+  .command("status")
+  .description("Check Spotlight sidecar connection and buffer summary")
+  .action(async () => {
+    const { buffer } = await fetchEvents("all", { noCache: true });
+    const age = buffer.oldest ? formatAge(buffer.oldest) : null;
+    const newest = buffer.newest ? formatAge(buffer.newest) : null;
+
+    console.log(`Sidecar:  \x1b[32mconnected\x1b[0m  (localhost:8969)`);
+    console.log(`Buffer:   ${buffer.total} events (${buffer.traces} traces, ${buffer.errors} errors, ${buffer.logs} logs)`);
+    if (age) console.log(`Oldest:   ${age} ago`);
+    if (newest) console.log(`Newest:   ${newest} ago`);
+    if (buffer.total === 0) {
+      console.log(`\n\x1b[2mNo events yet. Interact with the app to generate traces.\x1b[0m`);
+    }
+  });
+
 // --- help ---
 
 program.addHelpText(
