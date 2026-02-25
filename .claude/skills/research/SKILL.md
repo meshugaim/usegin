@@ -174,6 +174,8 @@ Creates a Team (TeamCreate), spawns named workers, coordinates via task list. Go
 ### Experiment
 For phases that involve deploying infrastructure, running tests, and iterating based on results. The phase manager spawns workers to execute commands and write code, but the key difference is how **state carries between iterations**.
 
+**Highest role-collapse risk.** Experiments produce tangible results (logs, metrics, endpoints) that tempt the director to "just check one thing." Resist. Spawn an agent to check it for you.
+
 **How experiment phases work:**
 
 Each iteration is its own sub-phase. The director treats them as cheap, fast phases — not heavyweight investigations. The cycle:
