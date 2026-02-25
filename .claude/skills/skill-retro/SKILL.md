@@ -7,39 +7,56 @@ description: Evaluate how well skills were followed in a session. Reads skill la
 
 You evaluate how well skills were followed in a session. You don't evaluate the work output — you evaluate the process.
 
-## How It Works
+## Step 1: Scan for Skills
 
-1. **Identify which skills were used** in the session. Look for skill invocations, orchestration patterns (whiteboard, phase managers, liaison mode), or ask the user which skills to retro.
+Scan the session for skill usage. Look for:
+- Explicit skill invocations (`/liaison`, `/build-orchestrate`, `/research`, `/ralph`)
+- Orchestration patterns (whiteboard files, phase managers, liaison delegation, ralph loop)
+- Skill references in agent prompts ("use the writing-specs skill", "run in liaison mode")
 
-2. **For each skill used**, read its lab file at `.claude/skill-lab/<skill-name>.md`. The lab file contains:
-   - **Intent** — what the skill is supposed to achieve
-   - **Success Signals** — checklist of what a good session looks like
-   - **Retro Guide** — specific evaluation steps for this skill
+Cross-reference against available lab files:
+```bash
+ls .claude/skill-lab/
+```
 
-3. **Follow the Retro Guide.** Each skill has its own evaluation process. The guide tells you what to look for, in what order, and what counts as a problem.
+Only skills with a lab file can be retroed. If a skill was used but has no lab file, note it in your summary — it may need one.
 
-4. **Evaluate against Success Signals.** Go through the checklist. Mark each signal as pass/fail with brief evidence.
+## Step 2: Scope with User
 
-5. **Write findings** to the Retros section of the lab file.
+**If exactly 1 skill detected:** Use it. Skip to Step 3.
 
-6. **Surface actionable items.** If a finding is concrete enough to become a skill improvement, flag it in your summary. The user decides whether to create a Linear issue or let it ferment in the Ideas section.
+**If 2+ skills detected:** Present the list and ask the user to select which to retro:
 
-## What You Evaluate
+> "I found these skills were used in this session: [list]. Which should I retro? (all / select specific ones)"
 
-**Process, not output.** You don't judge whether the research answer was correct or the build was successful. You judge whether the skill's process was followed — delegation discipline, whiteboard hygiene, context budget, pre-phase hooks.
+Use `AskUserQuestion` for this. Let the user multi-select.
 
-**The director thread, not subagents.** Skills govern the director. Subagent behavior is outside scope unless it reveals a gap in the skill's instructions (e.g., "the skill doesn't tell the director what to do when a subagent returns garbage").
+## Step 3: Retro Mode
 
-## Reading the Session
+Always ask the user, regardless of how many skills were scoped:
 
-You need access to the session to evaluate it. The user will either:
-- Point you to a session transcript or log
-- Summarize what happened
-- Tell you to look at the current conversation history
+> "How should I run this retro?
+> - **collaborative** — I'll share findings as I go, we discuss together
+> - **autonomous** — I'll do the full retro and commit the results, you review after"
 
-If you don't have enough information to evaluate a signal, mark it as **"unable to assess"** with a note on what you'd need.
+Use `AskUserQuestion`. This determines whether you pause for discussion or run to completion.
 
-## Writing Retro Entries
+**Collaborative mode:** After evaluating each skill, present findings to the user before writing to the lab file. Discuss suggestions. The user may add context, disagree with a verdict, or surface observations you missed. Write the entry after alignment.
+
+**Autonomous mode:** Evaluate all scoped skills, write entries to lab files, commit the changes, and present a summary. The user reviews the committed retro entries and can amend.
+
+## Step 4: Evaluate
+
+For each scoped skill, read its lab file at `.claude/skill-lab/<skill-name>.md`. The lab file contains:
+- **Intent** — what the skill is supposed to achieve
+- **Success Signals** — checklist of what a good session looks like
+- **Retro Guide** — specific evaluation steps for this skill
+
+**Follow the Retro Guide.** Each skill has its own evaluation process. The guide tells you what to look for, in what order, and what counts as a problem.
+
+**Evaluate against Success Signals.** Go through the checklist. Mark each signal as pass/fail with brief evidence.
+
+## Step 5: Write Findings
 
 Write entries to `.claude/skill-lab/<skill-name>.md` in the Retros section using this format:
 
@@ -58,6 +75,27 @@ Write entries to `.claude/skill-lab/<skill-name>.md` in the Retros section using
 - **worked well** — success signals mostly pass, no collapse events, minor issues at most
 - **partially followed** — some signals pass, some fail. Director followed the spirit but broke rules in places.
 - **collapsed** — director abandoned the orchestration model. Did work directly, read phase files, loaded skills, etc.
+
+## Step 6: Surface Actionable Items
+
+If a finding is concrete enough to become a skill improvement, flag it in your summary. The user decides whether to create a Linear issue or let it ferment in the Ideas section of the lab file.
+
+In **autonomous mode**, commit the lab file changes before presenting the summary.
+
+## What You Evaluate
+
+**Process, not output.** You don't judge whether the research answer was correct or the build was successful. You judge whether the skill's process was followed — delegation discipline, whiteboard hygiene, context budget, pre-phase hooks.
+
+**The director thread, not subagents.** Skills govern the director. Subagent behavior is outside scope unless it reveals a gap in the skill's instructions (e.g., "the skill doesn't tell the director what to do when a subagent returns garbage").
+
+## Reading the Session
+
+You need access to the session to evaluate it. The user will either:
+- Point you to a session transcript or log
+- Summarize what happened
+- Tell you to look at the current conversation history
+
+If you don't have enough information to evaluate a signal, mark it as **"unable to assess"** with a note on what you'd need.
 
 ## Cross-Cutting Observations
 
