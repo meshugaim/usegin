@@ -9,18 +9,20 @@ Turn specs into working software through vertical slices, TDD, and continuous al
 
 **Companion to:** `writing-specs` skill.
 
+**When to use this vs alternatives:** This skill is for human-collaborative implementation — the user is present, guiding priorities, and making decisions. For autonomous execution of well-understood work, consider `cell` or `teamwork`. For pure TDD loops on isolated modules, consider `worker-reviewer`.
+
 ## Core Principles
 
-| Principle                  | Why                                                                                        |
-| -------------------------- | ------------------------------------------------------------------------------------------ |
-| **Orient first**           | Read the spec, explore the code, identify risks before touching anything.                  |
-| **Vertical slices**        | End-to-end functionality over horizontal layers. Get to prod fast.                         |
-| **No upfront master plan** | Only plan the next step. Discover as you go.                                               |
-| **TDD**                    | Tests first. Start local, verify the slice works, push to prod, verify on prod.            |
-| **User in the loop**       | Ask questions, verify alignment, summarize often.                                          |
-| **Small iterations**       | Short cycles, small commits, frequent checkpoints.                                         |
-| **Self-verification**      | Get into feedback loops to verify your own work (run tests, check UI, hit endpoints).      |
-| **Feature toggles**        | Use them to get incomplete work to prod safely.                                            |
+| Principle              | Why                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| **Orient first**       | Read the spec, explore the code, identify risks before touching anything.             |
+| **Vertical slices**    | End-to-end functionality over horizontal layers. Get to prod fast.                    |
+| **Sketch the path**    | Rough-order your slices upfront. Commit only to the next one. Revise as you learn.    |
+| **TDD by default**     | Tests first for most work. Known exceptions exist — see "When to Skip TDD" below.    |
+| **Ask when surprised** | Don't gate every step on approval. Do raise a flag when reality diverges from plan.   |
+| **Small iterations**   | Short cycles, small commits, frequent checkpoints.                                    |
+| **Self-verification**  | Verify your own work before asking the user. See "Self-Verification" below.           |
+| **Feature toggles**    | Use them to get incomplete work to prod safely.                                       |
 
 ## Orient
 
@@ -44,21 +46,34 @@ Follow the breadcrumbs from the spec — referenced files, modules, database tab
 
 ### 3. Identify risks and unknowns
 
-Before proposing a slice, surface anything that could derail implementation:
+Before proposing slices, surface anything that could derail implementation:
 
 - Ambiguities in the spec
 - Gaps between what the spec assumes and what the code actually looks like
 - Areas you don't understand yet
+- Missing test infrastructure (see "Test Infrastructure" below)
 
 ### 4. Share your understanding
 
 Use `AskUserQuestion` to present:
 
 - **Summary**: 2-3 sentences on what the spec is asking for
-- **Approach**: How you'd decompose it (rough slice ideas, not a full plan)
+- **Slice sketch**: Rough ordered list of slices you see (explicitly marked as "will change as we learn")
 - **Risks/questions**: Anything unclear or concerning
 
-Only proceed to slicing after the user confirms your understanding.
+Only proceed to implementation after the user confirms your understanding.
+
+## Slice Sketch
+
+After orienting, produce a lightweight plan — a rough ordered list of slices. This is not a commitment. It's a shared map that helps:
+
+- **Coherence** — slices fit together because you've thought about the whole before starting any part
+- **Seams** — you identify where slices connect (shared types, API contracts, DB schema) and design clean interfaces between them
+- **Risk ordering** — you can sequence riskiest-first deliberately, not accidentally
+
+Update the sketch as you go. After completing each slice, revisit: does the remaining plan still make sense? Share changes with the user.
+
+**The sketch lives in the Linear parent issue description.** Update it via `plan update` as slices are completed or reordered.
 
 ## Progress Tracking
 
@@ -70,20 +85,19 @@ Track progress in Linear via sub-issues and issue updates. See `plan align` for 
 
 ## Workflow
 
-Guidelines, not a strict process. Adapt to the situation — see "When to Deviate" below.
+Guidelines, not a strict process. Adapt to the situation.
 
-| Step                    | What                                                        | Notes                                                                                   |
-| ----------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Pick a slice**        | Propose the smallest vertical slice to user. Get alignment. | See "Slicing Heuristics" below.                                                         |
-| **Plan tests first**    | Discuss with the user which tests to write.                 | Use `AskUserQuestion` to confirm test approach before writing code.                     |
-| **Write failing tests** | Write the tests. Watch them fail.                           | TDD. Tests first, implementation second.                                                |
-| **Implement**           | Write minimal code to pass tests.                           | Only what's needed to make tests green.                                                 |
-| **Self-verify**         | Run tests, check UI, hit endpoints.                         | Use `manual-testing-by-agent` skill for UI verification.                                |
-| **Checkpoint**          | Summarize progress. Ask user if still aligned.              | Do this often.                                                                          |
-| **Commit & push**       | Commit after each slice. Don't accumulate uncommitted work. | Small commits, pushed frequently.                                                       |
-| **Update Linear**       | Record decisions, close slice issue.                        | Keep issues current.                                                                    |
-| **Check context**       | Run `cctx` to assess context window usage.                  | If getting full, create a handoff. See "Context Management" below.                      |
-| **Repeat**              | Propose next slice. Ask: "Right size? Go smaller?"          | Continuous alignment.                                                                   |
+| Step                    | What                                                        | Notes                                                                  |
+| ----------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Pick a slice**        | Take the next slice from your sketch.                       | See "Slicing Heuristics" below.                                        |
+| **Check the seams**     | How does this slice connect to previous and future slices?  | Design interfaces deliberately. Don't let slices drift apart.          |
+| **Write failing tests** | Write tests first. Watch them fail.                         | See "TDD" section for approach and known exceptions.                   |
+| **Implement**           | Write minimal code to pass tests.                           | Only what's needed to make tests green.                                |
+| **Self-verify**         | Run tests, check UI, hit endpoints.                         | See "Self-Verification" below.                                         |
+| **Commit & push**       | Commit after each slice. Don't accumulate uncommitted work. | Small commits, pushed frequently.                                      |
+| **Update Linear**       | Record decisions, close slice issue.                        | Keep issues current.                                                   |
+| **Checkpoint**          | Summarize what you did. Propose next slice.                 | See "Checkpoints" below.                                               |
+| **Check context**       | Run `cctx` to assess context window usage.                  | If getting full, create a handoff. See "Context Management" below.     |
 
 ### Slicing Heuristics
 
@@ -94,11 +108,13 @@ A good slice is:
 | **End-to-end** | Touches all layers needed (DB → API → UI), not just one |
 | **Independently shippable** | Works on its own, even if the feature is incomplete |
 | **Demonstrable** | You can show it working to the user |
-| **Small enough to hold in your head** | If you can't describe it in one sentence, split it |
+| **Right-sized** | One migration max. Finishable and self-verifiable within ~30 minutes of work. If you can't describe it in one sentence, split it |
 
 **Decomposition approach:** Start from the user-facing behavior and work backward. "User can see X" is a better slice than "Add database table for X."
 
 **Ordering:** Prefer slices that reduce uncertainty first — the riskiest or least-understood part of the spec, not the easiest.
+
+**Coherence between slices:** Before starting a slice, consider how it connects to what came before and what comes after. Shared types, API contracts, and DB schema are the seams — get them right early. If a later slice will need a different shape than what you're building now, adjust now rather than refactoring later.
 
 ### Feature Toggles
 
@@ -108,7 +124,7 @@ Before each slice, ask:
 - Can incomplete work be safely deployed?
 - Do we need to gradually roll out?
 
-If yes to any, add a feature toggle. Discuss strategy with user via `AskUserQuestion`. See the `feature-toggles` skill for implementation patterns.
+If yes to any, add a feature toggle. See the `feature-toggles` skill for implementation patterns.
 
 ## Commit Often
 
@@ -122,42 +138,31 @@ Default to committing. When in doubt, commit.
 | About to start something risky | Commit current state first |
 | Moving to next task            | Commit first, then proceed |
 
-## TDD is Non-Negotiable
+## TDD
 
-**Every slice needs tests BEFORE implementation.**
+Tests first is the strong default. Write tests before implementation for every slice, unless it falls into a known exception below.
 
-### Pre-Implementation Checklist
-
-Before writing any code for a slice:
+### The Loop
 
 1. **Consider feature toggle** — Does this slice need one? (See "Feature Toggles" above)
-2. **Draft a test plan** — List what tests you'll write (unit + integration, backend + frontend as applicable)
-3. **Use `AskUserQuestion`** — Present the test plan, get explicit approval
-4. **Write tests** — After user approves
-5. **Watch tests fail** — Confirms they're actually testing something
-6. **Implement** — Minimal code to make tests pass
+2. **Write tests** — Unit + integration, backend + frontend as applicable
+3. **Watch tests fail** — Confirms they're actually testing something
+4. **Implement** — Minimal code to make tests pass
+5. **Self-verify** — Run all tests, check nothing else broke
 
-**Example `AskUserQuestion` for pre-implementation approval:**
-```
-Before implementing this slice, I need your approval:
+### When to Skip TDD
 
-**Feature Toggle:** Not needed - this is additive and won't break existing functionality.
+| Situation | What to do instead |
+| --- | --- |
+| Config/infra changes (env vars, CI, deps) | Just verify the change works |
+| Pure CSS/styling tweaks | Visual verification with `manual-testing-by-agent` |
+| Spike/exploration to answer a question | Skip tests entirely, discard the code, restart with TDD once you know the answer |
 
-**Testing Approach:**
+These aren't loopholes — they're cases where TDD genuinely doesn't apply. For everything else, tests first.
 
-Backend:
-- Unit tests for the new service function (success + error cases)
-- Mock Supabase client to test in isolation
+### Test Infrastructure
 
-Frontend:
-- Component test to verify prop is passed correctly
-- Integration test via playwright-cli to verify end-to-end flow
-
-**What I won't test (and why):**
-- Existing dashboard chat - already covered, just manual regression check
-
-Does this approach sound right?
-```
+Sometimes the first slice isn't a feature — it's setting up the test harness. A new integration test setup, a missing fixture pattern, a test utility that doesn't exist yet. This is a valid first slice. Acknowledge it, track it in Linear, and get it done before moving to feature slices.
 
 ### Red Flags — Stop and Add Tests
 
@@ -167,40 +172,53 @@ Does this approach sound right?
 - "The backend is tested, frontend doesn't need tests" — **Both need tests.**
 - "Tests are passing" but you only tested happy path — **Add error case tests.**
 
-## When to Deviate
+## When Things Go Wrong
 
-The workflow above is the default. Here's when to adapt:
+Implementation rarely goes exactly to plan. Here's how to handle common problems:
 
-| Situation | Adaptation |
+| Situation | Action |
 | --- | --- |
-| Config/infra changes (env vars, CI, deps) | Skip TDD — just verify the change works |
-| Pure CSS/styling tweaks | Visual verification over unit tests. Use `manual-testing-by-agent` |
-| Spike/exploration to answer a question | Skip tests entirely, but discard the code and restart with TDD once you know the answer |
-| Slice turned out bigger than expected | Stop. Commit what works. Re-slice the remainder. Tell the user |
-| Spec is wrong or incomplete | Stop implementing. Surface the gap to the user. Update the spec before continuing |
-| Architectural problem discovered | Stop. Discuss with user. May need to revisit earlier slices |
-| User says "just do it, skip the ceremony" | Respect it. Drop the `AskUserQuestion` gates, keep TDD |
+| Slice turned out bigger than expected | Stop. Commit what works. Re-slice the remainder. Tell the user. |
+| Spec is wrong or incomplete | Stop implementing. Surface the gap to the user. Update the spec before continuing. |
+| Architectural problem discovered | Stop. Discuss with user. May need to revisit earlier slices. |
+| Push rejected by pre-push hooks | Fix the issue (lint, test failure). Never bypass with `--no-verify` without user approval. |
+| Tests pass locally but CI fails | Read CI logs (`fetching-ci-logs` skill). Fix the root cause — don't just make CI pass. |
+| A committed slice turns out to be wrong | Don't panic. Feature toggles protect prod. Fix forward with a new slice, or revert if the fix is non-trivial. Discuss with user. |
+| Unexpected codebase state (unfamiliar patterns, stale code, broken assumptions) | **Raise a flag.** Use `AskUserQuestion` to surface what you found. Don't silently work around it. |
+
+## Asking Questions
+
+Don't ask for permission at every step. Do ask when it matters.
+
+**Always ask (via `AskUserQuestion`):**
+
+- During orient — to confirm your understanding and slice sketch
+- When reality diverges from the plan — something unexpected in the code, a spec ambiguity, a risk you didn't anticipate
+- When you need to make a design decision that affects future slices
+- When a slice fails or needs to be re-scoped
+
+**Don't ask:**
+
+- For routine test plans on straightforward slices — just write the tests
+- For confirmation before every commit
+- To propose the next slice when it's obvious from the sketch
+
+**The principle:** Ask when you're surprised or when you're making a decision the user should know about. Don't ask when you're just following the plan.
 
 ## Checkpoints
 
-Checkpoint often. Use `AskUserQuestion` to stay aligned.
-
-**When to checkpoint:**
-- After completing a slice
-- Before starting something new
-- When uncertain about direction
-- When pace feels off
+Checkpoint after completing each slice. Keep it concise — focus on decisions made, not implementation details.
 
 **What to cover:**
 
 | Type      | Examples                                                |
 | --------- | ------------------------------------------------------- |
 | Summary   | "Here's what I just did..."                             |
-| Alignment | "Does this match what you expected?"                    |
-| Next step | "I'm thinking we do X next. Sound right?"               |
-| Meta      | "Should we take smaller steps?" "Is this pace working?" |
+| Seams     | "This connects to the next slice via..."                |
+| Next step | "Next up from the sketch: X. Still makes sense?"        |
+| Surprises | "I noticed Y, which might affect the remaining plan..." |
 
-Keep summaries concise. Focus on decisions made, not implementation details.
+If nothing is surprising and the next slice is obvious, the checkpoint can be two sentences in your commit message summary. Save `AskUserQuestion` for when you genuinely need input.
 
 ## Context Management
 
@@ -221,7 +239,7 @@ This is non-negotiable. When context reaches 70%:
 
 1. **Finish what you're doing** — complete the current slice if close, or commit what works and note what's left
 2. **Do not start a new slice**
-3. **Update Linear** — close completed slice issues, update parent issue with current state
+3. **Update Linear** — close completed slice issues, update parent issue with current state and remaining slice sketch
 4. **Create handoff** — use `/handoff` to create a handoff note (it handles format and transcript export)
 5. **Tell the user** — explain that context is full and they should start a new session with `/handoff --continue` to pick up where you left off
 
@@ -229,8 +247,19 @@ The next session will orient from the handoff note and `plan show`.
 
 ## Self-Verification
 
-Get into feedback loops to verify your own work before asking the user.
+Verify your own work before asking the user. Don't wait to be told something is broken — catch it yourself.
 
-Run tests, check UI visually, hit endpoints, check logs, build locally — whatever makes sense for the change. Use the `manual-testing-by-agent` skill for browser-based verification.
+**By change type:**
 
-Don't wait for the user to tell you something is broken. Catch it yourself.
+| Change | How to verify |
+| --- | --- |
+| API endpoint | Hit the endpoint, check response shape and status codes |
+| UI component | Screenshot with `playwright-cli`, compare to spec expectations |
+| DB migration | Run `migration up`, query the schema to confirm it's correct |
+| Data flow | Trace a value from input to output — write to DB, read it back, check the UI |
+| Styling | Visual check with `manual-testing-by-agent` |
+| Bug fix | Reproduce the bug first, confirm the fix resolves it, check for regressions |
+
+**General:** Run the full test suite after each slice, not just the tests you wrote. Regressions hide in unexpected places.
+
+Use the `manual-testing-by-agent` skill for any browser-based verification.
