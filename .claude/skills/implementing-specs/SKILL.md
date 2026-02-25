@@ -184,6 +184,7 @@ Implementation rarely goes exactly to plan. Here's how to handle common problems
 | Push rejected by pre-push hooks | Fix the issue (lint, test failure). Never bypass with `--no-verify` without user approval. |
 | Tests pass locally but CI fails | Read CI logs (`fetching-ci-logs` skill). Fix the root cause — don't just make CI pass. |
 | A committed slice turns out to be wrong | Don't panic. Feature toggles protect prod. Fix forward with a new slice, or revert if the fix is non-trivial. Discuss with user. |
+| Current slice needs something from a future slice | Pull the minimal dependency forward into the current slice, or reorder the sketch. Don't build throwaway stubs — they become tech debt. Tell the user about the reorder. |
 | Unexpected codebase state (unfamiliar patterns, stale code, broken assumptions) | **Raise a flag.** Use `AskUserQuestion` to surface what you found. Don't silently work around it. |
 
 ## Asking Questions
@@ -261,5 +262,7 @@ Verify your own work before asking the user. Don't wait to be told something is 
 | Bug fix | Reproduce the bug first, confirm the fix resolves it, check for regressions |
 
 **General:** Run the full test suite after each slice, not just the tests you wrote. Regressions hide in unexpected places.
+
+**Composed behavior:** Periodically — and always after the final slice — verify the feature end-to-end as a user would experience it. Individual slices passing their own tests doesn't guarantee the assembled feature works. Step back and test the full flow.
 
 Use the `manual-testing-by-agent` skill for any browser-based verification.
