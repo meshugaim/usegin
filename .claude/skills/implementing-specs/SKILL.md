@@ -71,7 +71,7 @@ After orienting, produce a lightweight plan — a rough ordered list of slices. 
 - **Seams** — you identify where slices connect (shared types, API contracts, DB schema) and design clean interfaces between them
 - **Risk ordering** — you can sequence riskiest-first deliberately, not accidentally
 
-Update the sketch as you go. After completing each slice, revisit: does the remaining plan still make sense? Share changes with the user.
+Update the sketch as you go. After completing each slice, revisit: does the remaining plan still make sense? When discoveries lead you to add, remove, or reorder slices, tell the user — this is exactly the kind of surprise worth surfacing.
 
 **The sketch lives in the Linear parent issue description.** Update it via `plan update` as slices are completed or reordered.
 
@@ -90,7 +90,7 @@ Guidelines, not a strict process. Adapt to the situation.
 | Step                    | What                                                        | Notes                                                                  |
 | ----------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
 | **Pick a slice**        | Take the next slice from your sketch.                       | See "Slicing Heuristics" below.                                        |
-| **Check the seams**     | How does this slice connect to previous and future slices?  | Design interfaces deliberately. Don't let slices drift apart.          |
+| **Check the seams**     | How does this slice connect to previous and future slices?  | Review shared types, API contracts, DB schema at boundaries.           |
 | **Write failing tests** | Write tests first. Watch them fail.                         | See "TDD" section for approach and known exceptions.                   |
 | **Implement**           | Write minimal code to pass tests.                           | Only what's needed to make tests green.                                |
 | **Self-verify**         | Run tests, check UI, hit endpoints.                         | See "Self-Verification" below.                                         |
@@ -243,7 +243,7 @@ This is non-negotiable. When context reaches 70%:
 4. **Create handoff** — use `/handoff` to create a handoff note (it handles format and transcript export)
 5. **Tell the user** — explain that context is full and they should start a new session with `/handoff --continue` to pick up where you left off
 
-The next session will orient from the handoff note and `plan show`.
+The next session will orient from the handoff note and `plan show`. It should re-read the slice sketch from the parent issue and validate it still makes sense — things may have changed on main, or the user may have new priorities.
 
 ## Self-Verification
 
