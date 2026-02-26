@@ -44,6 +44,10 @@ just vais-ui       # Next.js UI only
 | Python  | 8000  | 58000 | 58100| 58200|
 | Next.js | 3000  | 63000 | 63100| 63200|
 
+## Access Control
+- Current: 1 DataStore per project, `access_level: ANY()` metadata filter for internal/external
+- **Review (2026-02-26):** Same pattern as VRAG — physical separation (multiple DataStores per access level) is possible but wasn't considered. VAIS also has native `acl_info` ACLs (requires Google Identity federation — impractical for us). See [`access-control-across-products.md`](../access-control-across-products.md) for full analysis.
+
 ## Architecture
 - One DataStore per project (VAIS-native, metadata filtering via `ANY()`)
 - Heading-aware chunking via `includeAncestorHeadings`
