@@ -1,45 +1,65 @@
 # VAIS Prototype — Whiteboard (COMPLETE)
 
 ## Final State
-Phase: DONE | All 5 phases complete
-ENG-2096 closed. All 10 sub-issues (ENG-2099 through ENG-2108) closed.
+Phase: DONE | Full build + separation + sanity test complete
+ENG-2096 closed. All sub-issues closed.
 
 ## What Was Built
 
-### Python Services (`agent_api/vais/`)
-- `config.py` — GCP settings, path builders, feature gate
-- `types.py` — 9 Pydantic models, 2 enums
-- `store_service.py` — lazy DataStore + Engine creation via LROs
-- `schema_service.py` — idempotent metadata schema setup
-- `document_service.py` — upload (inline <1MB / GCS >=1MB), delete, list
-- `search_service.py` — CHUNKS mode search with ANY() filtering
-- `sync_worker.py` — background poller with atomic SKIP LOCKED claiming
-- `api/vais.py` — 5 FastAPI endpoints
+### Standalone Python API (`python-services/vais_server.py`)
+- FastAPI app on **port 58200**
+- Imports services from `agent_api/vais/` (zero duplication)
+- CORS for localhost:63200 and localhost:3000
+- VAIS sync worker in lifespan (gated by `VAIS_SYNC_ENABLED`)
+- Health endpoint at `/health`
 
-### Database (Supabase Migration)
-- `vais_stores`, `vais_documents`, `vais_document_versions`, `vais_sync_events`
-- `vais_sync_status` enum
-- `claim_pending_vais_sync`, `claim_pending_vais_deletion` RPCs
-- Prototype RLS policies
-
-### UI (`nextjs-app/app/(app)/admin/vais/`)
-- `/admin/vais/` — index page with navigation
-- `/admin/vais/search/` — search playground (query, entity_type, access_level, filters, chunk results)
+### Standalone Next.js UI (port 63200)
+- Reuses main Next.js app on dedicated port
+- `NEXT_PUBLIC_VAIS_API_URL=http://localhost:58200` for direct API calls
+- `/admin/vais/` — index page
+- `/admin/vais/search/` — search playground (query, entity_type, access_level, filters, chunks)
 - `/admin/vais/files/` — file manager (upload, list, delete, sync status)
-- `/api/vais/[...path]/` — proxy route to Python API
 
-### Architecture
-- One DataStore per project (VAIS-native, not GFS multi-store pattern)
-- Metadata filtering via `ANY()` syntax for access control
+### Python Services (`agent_api/vais/`)
+- config, types, store_service, schema_service, document_service, search_service, sync_worker
+- API router at `agent_api/api/vais.py`
+
+### Database (`vais_prototype` schema)
+- Own PostgreSQL schema, fully isolated
+- `vais_stores`, `vais_documents`, `vais_document_versions`, `vais_sync_events`
+- RPCs: `claim_pending_vais_sync`, `claim_pending_vais_deletion`
+
+### Startup
+```bash
+just vais          # Start both (Python API + Next.js UI)
+just vais-kill     # Stop both
+just vais-status   # Check status
+just vais-api      # Python API only
+just vais-ui       # Next.js UI only
+```
+
+## Port Allocation
+| Service | Human | Agent | VRAG | VAIS |
+|---------|-------|-------|------|------|
+| Python  | 8000  | 58000 | 58100| 58200|
+| Next.js | 3000  | 63000 | 63100| 63200|
+
+## Architecture
+- One DataStore per project (VAIS-native, metadata filtering via `ANY()`)
 - Heading-aware chunking via `includeAncestorHeadings`
-- Fully standalone — zero coupling to production GFS code
+- Zero coupling to main app or GFS code
+- Own DB schema (`vais_prototype`)
+- Own servers on dedicated ports
 
-## Commits (10 slices + 1 QA fix)
-456bb51f, b5b08866, 93e92a76, 47c9fca3, e2cb32f9, 47609bf1, 4edc417d, d8595b5a, ed3b4b2d, 770ffbce
+## Sanity Test Results (All PASS)
+- API health, store creation, upload, list, search, UI routes, delete — all verified
+- Sync stays `pending` without GCP creds (expected for local)
 
 ## Quality Log
-- Research: PASS
-- Design: PASS (UI routing corrected to /admin/vais/)
-- Spec: PASS (10 Linear sub-issues)
-- Implementation: PASS (10 commits, 1265 unit tests pass)
-- QA: PASS (lint, types, imports, isolation, admin gating, no secrets)
+- Phase 1 Research: PASS
+- Phase 2 Design: PASS
+- Phase 3 Spec: PASS
+- Phase 4 Implementation: PASS (10 slices)
+- Phase 5 QA: PASS
+- Phase 6 Separation: PASS (3 commits + justfile fix)
+- Phase 6 Sanity Test: PASS (9/9 checks)
