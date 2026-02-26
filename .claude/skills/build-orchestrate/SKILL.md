@@ -16,6 +16,7 @@ Breaking any one means you've collapsed from director to worker.
 3. **I instruct agents to be concise.** Every agent gets: "Return a summary of max 10 lines. Write detailed output to `[phase file path]`. I will only read your summary."
 4. **Every check = a subagent.** Verifying the app? Subagent. Reviewing a spec? Subagent. Checking if code matches the design? Subagent. I never look at anything directly.
 5. **I never load skills.** I never call `Skill: liaison` or `Skill: app-sanity-test` or any other skill. I tell a subagent which skill to use. Loading a skill makes me adopt its role.
+6. **Every phase gets a reviewer.** No exceptions — not even "the spec is short" or "it's just Linear issues." Spawn a reviewer agent after every phase. The spec phase is the most commonly skipped and the most costly to skip (bugs compound downstream).
 
 **Self-check before every action:** "Am I about to do something other than read/write the whiteboard, write a note-to-self, or spawn an agent?" If yes — stop. Delegate instead.
 
@@ -189,6 +190,8 @@ Verification is not a phase — it's an axis that runs alongside the build.
 2. **Iteration = feedback + re-spawn.** Don't ask the same agent to keep going. Spawn fresh with specific feedback about what to fix.
 3. **Log every iteration** on the whiteboard quality log. "Iteration 2: spec lacked error states, re-spawned with explicit list."
 4. **Passing doesn't mean perfect.** It means good enough to unblock the next phase. Note known limitations on the whiteboard.
+
+**Spec review is the highest-leverage review.** A bug in the spec becomes a bug in implementation becomes a bug in QA. Two sessions in a row, skipping the spec reviewer led to QA-caught bugs that were spec-level issues (e.g., UNIQUE constraint blocking re-upload after soft-delete). The cost of a 30-second reviewer agent is trivial compared to a QA iteration.
 
 ## Context Hygiene
 
