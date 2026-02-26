@@ -1,7 +1,7 @@
 # VAIS Prototype — Whiteboard (COMPLETE)
 
 ## Final State
-Phase: DONE | Full build + separation + sanity test complete
+Phase: DONE | All phases complete including date filter fix
 ENG-2096 closed. All sub-issues closed.
 
 ## What Was Built
@@ -55,10 +55,6 @@ just vais-ui       # Next.js UI only
 - Own DB schema (`vais_prototype`)
 - Own servers on dedicated ports
 
-## Sanity Test Results (All PASS)
-- API health, store creation, upload, list, search, UI routes, delete — all verified
-- Sync stays `pending` without GCP creds (expected for local)
-
 ## Quality Log
 - Phase 1 Research: PASS
 - Phase 2 Design: PASS
@@ -67,3 +63,17 @@ just vais-ui       # Next.js UI only
 - Phase 5 QA: PASS
 - Phase 6 Separation: PASS (3 commits + justfile fix)
 - Phase 6 Sanity Test: PASS (9/9 checks)
+- Phase 7 Date Filter Fix: PASS (GCS JSONL import, metadata now filterable)
+
+## Phase 7: Date Filter Fix (2026-02-26)
+
+**Root Cause**: Three cascading bugs in the GCS upload path:
+1. `data_schema="content"` + post-import `update_document()` stores metadata but VAIS never indexes it for filtering
+2. `_update_document_metadata` passed `allow_missing` as a kwarg instead of on `UpdateDocumentRequest` (silently caught TypeError)
+3. GCS blob deleted before metadata update could reference it
+
+**Fix**: Replaced two-step GCS upload with single-step JSONL document import (`data_schema="document"`). Both content (base64) and structData are in one atomic JSONL file. Also fixed `list_vais_documents` proto-plus access and preserved native types in search results.
+
+**Verification**: project_id filter (1 result), uploaded_at range (1 result), future date (0 results) — all correct.
+
+See `.claude/research/vais-prototype/phase-07-date-filter-fix.md` for full details.
