@@ -1,31 +1,37 @@
 # VRAG Prototype — Whiteboard (COMPLETE)
 
 ## Current State
-Phase: DONE | All 7 slices implemented, QA passed, bug fixed, issues closed.
+Phase: DONE | Fully separated, E2E tested, QA passed.
 
-## What Was Built
-Standalone Vertex RAG Engine prototype (ENG-2098) — full file search chain: upload → sync → search → chunk retrieval.
+## Ports
+- VRAG Python API: 58100
+- VRAG Next.js UI: 63100
 
-### Commits (8 total)
-1. ENG-2111: DB migration — `vrag_prototype` schema, 4 tables, 2 RPCs, triggers, storage bucket
-2. ENG-2112: VragCorpusService + VragFileService (Vertex RAG SDK wrappers)
-3. ENG-2113: VragSearchService (Supabase pre-filter + retrieval_query)
-4. ENG-2114: FastAPI router, 5 endpoints, Pydantic models
-5. ENG-2115: VragSyncWorker background task, gated on VRAG_SYNC_WORKER_ENABLED
-6. ENG-2116: Admin /admin/rag — project selector, corpus status, file manager
-7. ENG-2117: Admin /admin/rag/search — query form, filters, chunk results
-8. Bug fix: reset sync_status on new version upload
+## How to Run
+```bash
+just vrag          # Start both (API + UI)
+just vrag-api      # Python API only (port 58100)
+just vrag-ui       # Next.js UI only (port 63100)
+just vrag-kill     # Stop both
+```
 
-### Architecture
-- **DB**: `vrag_prototype` schema — corpora, files, file_versions, sync_events
-- **Python**: `agent_api/vrag/` — corpus_service, file_service, search_service, sync_worker, routes, models
-- **Frontend**: `/admin/rag` (file management) + `/admin/rag/search` (semantic search UI)
-- **Key pattern**: 1 corpus per project, Supabase pre-filter → rag_file_ids → retrieval_query()
+Prerequisites: `gcloud auth application-default login --project effi-vertex-experiment`, `VRAG_SYNC_WORKER_ENABLED=true`
 
-### Quality Log
+## E2E Test Results
+- Health endpoint: PASS
+- Files endpoint: PASS
+- Corpus creation (GCP): PASS
+- File upload + Supabase Storage: PASS
+- Sync worker → Vertex RAG Engine (~7s): PASS
+- Search → raw chunks with scores: PASS
+- Next.js UI pages: PASS
+- Code review: PASS (lint clean, types clean, fully isolated)
+
+## Quality Log
 - Phase 1 Research: PASS
 - Phase 2 Design: PASS
-- Phase 3 Spec: ITERATE→PASS (3 fixes)
-- Phase 4 Implementation: All 7 slices committed
-- Phase 5 QA: ITERATE→PASS (1 bug fixed: version re-upload sync)
-- Final: 1265 unit tests pass, lint clean, zero coupling to production GFS
+- Phase 3 Spec: ITERATE→PASS
+- Phase 4 Implementation: PASS (7 slices)
+- Phase 5 QA: ITERATE→PASS (1 bug fixed)
+- Phase 6 Separation: PASS
+- Phase 7 E2E + QA: PASS (full chain verified end-to-end)
