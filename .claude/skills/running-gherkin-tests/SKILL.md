@@ -7,7 +7,7 @@ description: This skill executes Gherkin feature files using playwright-cli. Tri
 
 Execute Gherkin feature files step-by-step using `playwright-cli`.
 
-**Prerequisites:** Environment running (`just supabase-start && just dev`) and auth state generated (`bun scripts/pw-auth.ts`).
+**Prerequisites:** Environment running (`just supabase-start && just agent-dev`) and auth state generated (`bun scripts/pw-auth.ts`).
 
 ## Feature Files
 
@@ -29,7 +29,7 @@ Feature files live in `tests/e2e/*.feature` and `tests/exploratory/topics/`. Rea
 
 | Gherkin step | playwright-cli command |
 |---|---|
-| Navigate to URL | `bunx playwright-cli goto http://localhost:3000/path` |
+| Navigate to URL | `bunx playwright-cli goto http://localhost:63000/path` |
 | See page state | `bunx playwright-cli snapshot` |
 | Type into input | `bunx playwright-cli fill <ref> "text"` |
 | Click element | `bunx playwright-cli click <ref>` |
@@ -42,7 +42,7 @@ For `auth.feature` scenario "Sign in with magic link as owner":
 
 ```gherkin
 Given I am on the sign-in page
-→ bunx playwright-cli goto http://localhost:3000/sign-in
+→ bunx playwright-cli goto http://localhost:63000/sign-in
 
 When I enter "owner@test.local" in the email field
 → bunx playwright-cli snapshot  # find the textbox ref

@@ -13,9 +13,9 @@ Browser testing and iterative UI development using `playwright-cli`.
 # 1. Environment (creates .env files)
 bun set-env --supabase local --urls codespaces  # or --urls localhost / --urls gitpod
 
-# 2. Start services
+# 2. Start services (agent-dev uses ports 63000/58000, won't conflict with human's `just dev`)
 just supabase-start
-just dev
+just agent-dev
 
 # 3. Generate auth state
 bun scripts/pw-auth.ts                          # owner@test.local → local-auth.json
@@ -24,7 +24,7 @@ bun scripts/pw-auth.ts internal@test.local       # other users
 # 4. Open browser and authenticate
 bunx playwright-cli open
 bunx playwright-cli state-load local-auth.json
-bunx playwright-cli goto http://localhost:3000
+bunx playwright-cli goto http://localhost:63000
 ```
 
 ---
@@ -121,13 +121,15 @@ docker exec -i supabase_db_ona-test-mvp psql -U postgres -c \
 
 ## Local URLs
 
-| Service | URL |
-|---------|-----|
-| Next.js App | `http://localhost:3000` |
-| Python API | `http://localhost:8000` |
-| Supabase API | `http://127.0.0.1:54321` |
-| Supabase Studio | `http://127.0.0.1:54323` |
-| Mailpit (emails) | `http://127.0.0.1:54324` |
+| Service | Agent URL (`just agent-dev`) | Human URL (`just dev`) |
+|---------|-----|-----|
+| Next.js App | `http://localhost:63000` | `http://localhost:3000` |
+| Python API | `http://localhost:58000` | `http://localhost:8000` |
+| Supabase API | `http://127.0.0.1:54321` | (same) |
+| Supabase Studio | `http://127.0.0.1:54323` | (same) |
+| Mailpit (emails) | `http://127.0.0.1:54324` | (same) |
+
+**Agents should always use `just agent-dev`** (ports 63000/58000) to avoid conflicting with the human's dev server. Use `just agent-dev-status` to check if it's running, `just agent-dev-kill` to stop.
 
 In Codespaces/Gitpod, use `localhost` URLs — `playwright-cli` runs locally, not in Docker.
 

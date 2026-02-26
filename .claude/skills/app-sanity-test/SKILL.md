@@ -17,7 +17,7 @@ Start by running `playwright-cli --help` to familiarize yourself with available 
 | Staging | `https://staging.askeffi.ai` | `staging` | `staging-auth.json` |
 | Production | `https://app.askeffi.ai` | `production` | `production-auth.json` |
 
-**Local uses port 63000** (not 3000) to avoid conflicting with the developer's own `just dev` instance. The sanity agent gets its own isolated processes.
+**Local uses port 63000** (not 3000) to avoid conflicting with the developer's own `just dev` instance. Agents use `just agent-dev` for isolated processes.
 
 ---
 
@@ -71,7 +71,7 @@ Local requires services to be running. Walk through each step, confirming with t
 
 1. **set-env**: Run `bun set-env` idempotently. Ask the user to confirm the env config is correct (supabase local, urls matching their setup — codespaces/gitpod/localhost).
 2. **Supabase**: Ask if Supabase is running or needs to be started/restarted (`just supabase-start`).
-3. **App**: Start the **sanity instance** with `just sanity-up`. This runs Next.js on port 63000 and Python API on port 58000 — isolated from the developer's `just dev` on ports 3000/8000. When done, clean up with `just sanity-down`.
+3. **App**: Start the agent dev instance with `just agent-dev`. This runs Next.js on port 63000 and Python API on port 58000 — isolated from the developer's `just dev` on ports 3000/8000. Check status with `just agent-dev-status`. When done, clean up with `just agent-dev-kill`.
 
 #### Staging / Production
 
