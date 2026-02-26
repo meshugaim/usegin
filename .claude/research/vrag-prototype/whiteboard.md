@@ -1,36 +1,38 @@
-# VRAG Prototype — Whiteboard (COMPLETE)
+# VRAG Prototype — Whiteboard
 
-## How to Run
-```bash
-just vrag          # Start both (API on 58100, UI on 63100)
-```
-- UI: http://localhost:63100/rag (files) + http://localhost:63100/rag/search (search)
-- API: http://localhost:58100
+## Current State
+Phase: 10 Debug date_epoch filtering | Status: starting | Iteration: 1
+Last checkpoint: User reports date_epoch filter breaks search. Files uploaded via UI don't have date_epoch. Need to reproduce via browser, debug, fix.
+Next: Spawn agent to start servers, upload files via browser, test filters, find root cause, fix.
 
-## Architecture
-- `vrag-ui/` — standalone Next.js app (port 63100)
-- `python-services/vrag_server.py` — standalone FastAPI app (port 58100)
-- `vrag_prototype` Supabase schema
+## Auto-Inject (survives compaction — read this every time you re-orient)
+Process: Re-read skill (§Pre-Phase Hook) → read whiteboard → note-to-self (§Note-to-Self) → spawn agent → read summary only → update whiteboard
+Role: I am the director. I NEVER do work myself — not checking, not reviewing, not fixing, not reading code. Every action = a subagent. If I'm about to do it myself, I stop and delegate. (§Hard Rules, §Role Collapse)
+Output: Tell every agent "return ≤10 line summary; write details to phase file." I read summaries, never details. If unclear, spawn a follow-up agent to clarify — don't read the source. (§Agent Output Protocol)
+Verification: Spawn sanity-check agents at phase boundaries AND between phases for continuous confidence. Not just in QA. (§Continuous Verification)
 
-## Filter System (AIP-160)
-- Full AIP-160 syntax: `key = "value"`, `key > N`, AND/OR compounds
-- 21 filter keys across 3 entity types (file/email/email_attachment)
-- Polymorphic `email_id` key (resolves to different columns per entity type)
-- TEXT[] array containment, boolean coercion, entity_type validation
-- Parser: `aip160_parser.py`, Registry: `filter_keys.py`
-- 57 unit tests covering parser + query builder
+## Problem Statement
+User workflow: search with query → gets results → adds `date_epoch > 1700000000` filter → gets 0 results.
+Files uploaded via UI don't have `date_epoch` populated → any date filter excludes them (NULL fails all comparisons).
+This is a real usability bug: the filter system advertises `date_epoch` but it's never set on uploaded files.
 
-## Ports (tell ENG-2096 to avoid)
+## Likely Root Cause
+- `date_epoch` is NULL on all UI-uploaded files
+- SQL `date_epoch > X` excludes NULLs (NULL is not > anything)
+- Fix: auto-populate `date_epoch` with upload timestamp (epoch seconds) when not explicitly provided
+
+## Plan
+1. Start servers, upload a file via browser (playwright), verify it's searchable
+2. Add date_epoch filter, confirm it breaks
+3. Check DB to confirm date_epoch is NULL
+4. Fix: auto-populate date_epoch on upload
+5. Backfill existing files
+6. Test again
+7. Commit
+
+## Ports
 - 58100 — VRAG Python API
 - 63100 — VRAG Next.js UI
 
-## Access Control
-- Current: 1 corpus per project, Supabase pre-filter + `rag_file_ids` for internal/external
-- **Review (2026-02-26):** The "1 corpus" decision conflated filtering correctness with isolation architecture. Physical separation (multiple corpora per access level) is possible — no product limitation prevents it. See [`access-control-across-products.md`](../access-control-across-products.md) for full analysis.
-
 ## Quality Log
-- Phases 1-8: All PASS (base prototype + separation)
-- Phase 9.1 Research: PASS — complete GFS filter key mapping
-- Phase 9.2 Design: ITERATE→PASS (fixed email_id dual mapping)
-- Phase 9.4 Implementation: PASS — 7 slices committed
-- Phase 9.5 QA: PASS — 57/57 filter tests, 1333/1333 full suite, runtime API tests pass
+- Phases 1-9: All PASS
