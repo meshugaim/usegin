@@ -24,6 +24,10 @@ just vrag          # Start both (API on 58100, UI on 63100)
 - 58100 — VRAG Python API
 - 63100 — VRAG Next.js UI
 
+## Access Control
+- Current: 1 corpus per project, Supabase pre-filter + `rag_file_ids` for internal/external
+- **Review (2026-02-26):** The "1 corpus" decision conflated filtering correctness with isolation architecture. Physical separation (multiple corpora per access level) is possible — no product limitation prevents it. See [`access-control-across-products.md`](../access-control-across-products.md) for full analysis.
+
 ## Quality Log
 - Phases 1-8: All PASS (base prototype + separation)
 - Phase 9.1 Research: PASS — complete GFS filter key mapping
