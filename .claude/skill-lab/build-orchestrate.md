@@ -25,6 +25,7 @@ When retroing a session that used this skill, a good session looks like:
 - [ ] Skill was re-read at every phase boundary (Pre-Phase Hook step 1)
 - [ ] Implementation phase used a liaison sub-orchestrator, not direct workers
 - [ ] QA phase used a tester agent with a testing skill, not director checking
+- [ ] QA agent briefing included auth flow, dev server ports, and sequential-only constraint
 
 ## Known Limitations
 

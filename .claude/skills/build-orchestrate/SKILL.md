@@ -183,6 +183,7 @@ Verification is not a phase — it's an axis that runs alongside the build.
 **Output:** Agent writes results to phase file, returns ≤10 line summary.
 **Quality gate:** All specified behaviors verified. No regressions.
 **Iterate if:** Bugs found. File them, send to implementation for fix, re-QA.
+**Briefing template:** "Use `/manual-testing-by-agent` (or `/app-sanity-test`). Auth: `bun scripts/pw-auth.ts`, then `auth-check local-auth.json`, then `playwright-cli state-load local-auth.json`. Dev servers on ports 63000/58000. Prefer `snapshot` over `screenshot`. QA agents run sequentially — never parallel (single browser instance)."
 
 ## Iteration Rules
 
