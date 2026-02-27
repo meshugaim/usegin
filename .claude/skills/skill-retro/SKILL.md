@@ -14,12 +14,12 @@ Scan the session for skill usage. Look for:
 - Orchestration patterns (whiteboard files, phase managers, liaison delegation, ralph loop)
 - Skill references in agent prompts ("use the writing-specs skill", "run in liaison mode")
 
-Cross-reference against available lab files:
+Cross-reference against available lab directories:
 ```bash
 ls .claude/skill-lab/
 ```
 
-Only skills with a lab file can be retroed. If a skill was used but has no lab file, note it in your summary — it may need one.
+Only skills with a lab directory (containing `lab.md`) can be retroed. If a skill was used but has no lab, note it in your summary — it may need one.
 
 ## Step 2: Scope with User
 
@@ -47,10 +47,12 @@ Use `AskUserQuestion`. This determines whether you pause for discussion or run t
 
 ## Step 4: Evaluate
 
-For each scoped skill, read its lab file at `.claude/skill-lab/<skill-name>.md`. The lab file contains:
+For each scoped skill, read its lab file at `.claude/skill-lab/<skill-name>/lab.md`. The lab file contains:
 - **Intent** — what the skill is supposed to achieve
 - **Success Signals** — checklist of what a good session looks like
 - **Retro Guide** — specific evaluation steps for this skill
+
+Optionally, scan previous retros at `.claude/skill-lab/<skill-name>/retros/` to spot recurring patterns.
 
 **Follow the Retro Guide.** Each skill has its own evaluation process. The guide tells you what to look for, in what order, and what counts as a problem.
 
@@ -58,7 +60,7 @@ For each scoped skill, read its lab file at `.claude/skill-lab/<skill-name>.md`.
 
 ## Step 5: Write Findings
 
-Write entries to `.claude/skill-lab/<skill-name>.md` in the Retros section using this format:
+Write entries to `.claude/skill-lab/<skill-name>/retros/YYYY-MM-DD-<slug>.md` using this format:
 
 ```markdown
 ### YYYY-MM-DD — [session-id or short description]
@@ -78,9 +80,9 @@ Write entries to `.claude/skill-lab/<skill-name>.md` in the Retros section using
 
 ## Step 6: Surface Actionable Items
 
-If a finding is concrete enough to become a skill improvement, flag it in your summary. The user decides whether to create a Linear issue or let it ferment in the Ideas section of the lab file.
+If a finding is concrete enough to become a skill improvement, flag it in your summary. The user decides whether to create a Linear issue or let it ferment in the Ideas section of the lab's `lab.md`.
 
-In **autonomous mode**, commit the lab file changes before presenting the summary.
+In **autonomous mode**, commit the retro file before presenting the summary.
 
 ## What You Evaluate
 
@@ -99,7 +101,7 @@ If you don't have enough information to evaluate a signal, mark it as **"unable 
 
 ## Cross-Cutting Observations
 
-Sometimes you'll notice patterns that span multiple skills — e.g., "the auto-inject block worked well in both research and build-orchestrate." Write these as an Idea/Note in the lab file of the primary skill, and reference the other skill.
+Sometimes you'll notice patterns that span multiple skills — e.g., "the auto-inject block worked well in both research and build-orchestrate." Write these as an Idea/Note in the `lab.md` of the primary skill, and reference the other skill.
 
 If the observation is truly cross-cutting (about the skill system itself, not any single skill), note it in your summary to the user. They'll decide where it belongs.
 
@@ -108,4 +110,4 @@ If the observation is truly cross-cutting (about the skill system itself, not an
 - **Don't evaluate work quality.** Whether the code works or the research answer is right is not your concern.
 - **Don't modify the skill.** You observe and record. Improvements to the skill text are a separate action.
 - **Don't create Linear issues.** Flag actionable items in your summary. The user decides what becomes work.
-- **Don't read the skill itself (SKILL.md) for evaluation criteria.** The lab file has everything you need. The skill text is the "baked" instructions — you evaluate against the lab file's Success Signals and Retro Guide.
+- **Don't read the skill itself (SKILL.md) for evaluation criteria.** The `lab.md` has everything you need. The skill text is the "baked" instructions — you evaluate against the lab's Success Signals and Retro Guide.
