@@ -71,22 +71,19 @@ bunx playwright-cli state-load local-auth.json
 
 The script generates a fresh Supabase session via admin API. Tokens expire in 1 hour — re-run to refresh.
 
-### Option 2: Magic Link via Mailpit
+### Option 2: OTP Sign-In via Mailpit
 
 For testing the actual sign-in flow, or when `pw-auth.ts` isn't available:
 
-1. Navigate to `/sign-in`, fill email, click submit
-2. Get the magic link:
+1. Navigate to `/sign-in`, fill email, click "Send code"
+2. Wait 2 seconds, then extract the 6-digit OTP code from Mailpit:
    ```bash
-   curl -s "http://127.0.0.1:54324/api/v1/messages" | \
-     jq -r '.messages[0].ID' | \
-     xargs -I {} curl -s "http://127.0.0.1:54324/api/v1/message/{}" | \
-     grep -oP 'http://127.0.0.1:54321/auth/v1/verify\?[^"\\]+' | \
-     head -1 | sed 's/\\u0026/\&/g'
+   MSG_ID=$(curl -s "http://127.0.0.1:54324/api/v1/messages" | jq -r '.messages[0].ID') && \
+     curl -s "http://127.0.0.1:54324/api/v1/message/$MSG_ID" | jq -r '.Text' | grep -oP '^\d{6}$'
    ```
-3. Navigate to the URL with `goto`
+3. Fill the code into the "Verification code" input, click "Verify"
 
-Magic links expire in ~60 seconds. The Mailpit API method is fastest.
+OTP codes expire quickly — extract and enter within a few seconds of sending.
 
 ---
 
@@ -153,7 +150,7 @@ just supabase-reset
 |-------|----------|
 | Redirected to sign-in | Auth expired — re-run `bun scripts/pw-auth.ts` and `state-load` |
 | `playwright-cli open` fails | Run `npx playwright install chrome` to install browser |
-| Magic link expired | Use Mailpit API (see Option 2 above) |
+| OTP code expired | Resend and extract quickly (see Option 2 above) |
 | Page loads empty | Check console errors: look at `.playwright-cli/console-*.log` |
 | Screenshot command fails | Use `screenshot --filename /path/to/file.png` (not positional) |
 

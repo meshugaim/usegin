@@ -112,25 +112,23 @@ playwright-cli state-load local-auth.json
 
 For other local test users: `bun scripts/pw-auth.ts internal@test.local`, etc.
 
-If `pw-auth.ts` fails, fall back to magic link via Inbucket:
+If `pw-auth.ts` fails, fall back to OTP sign-in via Inbucket:
 
-1. Navigate to `/sign-in`, fill email, click submit
-2. Extract magic link from Inbucket:
+1. Navigate to `/sign-in`, fill email, click "Send code"
+2. Wait 2 seconds, then extract the 6-digit OTP code from Inbucket:
    ```bash
-   curl -s "http://127.0.0.1:54324/api/v1/messages" | \
-     jq -r '.messages[0].ID' | \
-     xargs -I {} curl -s "http://127.0.0.1:54324/api/v1/message/{}" | \
-     grep -oP 'http://127.0.0.1:54321/auth/v1/verify\?[^"\\]+' | \
-     head -1 | sed 's/\\u0026/\&/g'
+   MSG_ID=$(curl -s "http://127.0.0.1:54324/api/v1/messages" | jq -r '.messages[0].ID') && \
+     curl -s "http://127.0.0.1:54324/api/v1/message/$MSG_ID" | jq -r '.Text' | grep -oP '^\d{6}$'
    ```
-3. Navigate to the extracted URL
+3. Fill the code into the "Verification code" input, click "Verify"
+4. OTP codes expire quickly — extract and enter within a few seconds
 
 **Staging / Production** (one-time human in the loop):
 
 1. Use `AskUserQuestion` to ask which email to sign in with. Offer the user's known email (e.g., from a previous auth session or context) as the default option — "Other" lets them type a different one.
-2. Navigate to `/sign-in`, fill email, click "Send magic link"
-3. Ask the user to paste the magic link URL (plain text — don't use `AskUserQuestion` for this, just ask and wait for their response)
-4. Navigate to the magic link URL to complete sign-in
+2. Navigate to `/sign-in`, fill email, click "Send code"
+3. Ask the user to paste the 6-digit code from their email (plain text — don't use `AskUserQuestion` for this, just ask and wait for their response)
+4. Fill the code into the "Verification code" input, click "Verify"
 5. Save state for reuse:
    ```bash
    playwright-cli state-save <env>-auth.json
