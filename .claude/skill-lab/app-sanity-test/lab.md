@@ -30,7 +30,7 @@ The skill is NOT a test framework. It's a structured manual-testing workflow wit
 
 - **Single browser instance** — sequential sub-agents are slow. A full sanity test (basic + 4 deeper areas) can take 20-30 minutes of wall time.
 - **No programmatic pass/fail** — sub-agents report findings in prose. There's no structured test result format.
-- **Auth is fragile** — magic links expire, rate limiting is real, and the skill has a detailed auth flow because getting it wrong is painful.
+- **Auth is fragile** — OTP codes expire, rate limiting is real, and the skill has a detailed auth flow because getting it wrong is painful.
 - **Sub-agent snapshot discipline is trust-based** — the skill tells agents to snapshot before interacting, but there's no enforcement mechanism.
 - **Change-to-test mapping is manual** — the skill surfaces recent changes, but mapping "what changed" to "what to test" is left to the main thread's judgment.
 - **No regression tracking** — findings from one sanity test don't carry forward to the next. Each run starts fresh.
@@ -45,7 +45,7 @@ Was the auth flow clean? Specifically:
 - Was `auth-check` called before `state-load`?
 - If expired, did it skip straight to fresh sign-in (no loading stale tokens)?
 - Was auth state saved after successful sign-in?
-- For staging/production: was the user asked for their email and the magic link?
+- For staging/production: was the user asked for their email and the OTP code?
 
 ### 3. Check change analysis
 Were recent changes surfaced to the user? Was the git diff appropriate for the environment? Did the deeper test areas connect to the actual changes?

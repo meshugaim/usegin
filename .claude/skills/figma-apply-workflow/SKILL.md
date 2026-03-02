@@ -17,7 +17,7 @@ For documenting differences without implementation plans, use `/figma-diff` inst
 
 ```
 1. Navigate to http://localhost:3000/sign-in
-2. Enter a valid email and complete magic link auth
+2. Enter a valid email and complete OTP auth
 3. Verify you see actual content (workspaces, projects, etc.)
 4. ONLY THEN proceed with taking screenshots
 ```

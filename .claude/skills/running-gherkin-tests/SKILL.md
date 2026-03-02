@@ -38,7 +38,7 @@ Feature files live in `tests/e2e/*.feature` and `tests/exploratory/topics/`. Rea
 
 ## Example Execution
 
-For `auth.feature` scenario "Sign in with magic link as owner":
+For `auth.feature` scenario "Sign in with OTP as owner":
 
 ```gherkin
 Given I am on the sign-in page
@@ -48,15 +48,16 @@ When I enter "owner@test.local" in the email field
 → bunx playwright-cli snapshot  # find the textbox ref
 → bunx playwright-cli fill <ref> "owner@test.local"
 
-And I click the "Send magic link" button
+And I click the "Send code" button
 → bunx playwright-cli click <ref>
 
 Then I should see "Check your email..."
 → bunx playwright-cli snapshot  # verify text in output
 
-When I open the magic link from Mailpit
-→ curl Mailpit API to get link (see manual-testing-by-agent skill)
-→ bunx playwright-cli goto <magic-link-url>
+When I enter the OTP code from Mailpit
+→ curl Mailpit API to get OTP code (see manual-testing-by-agent skill)
+→ bunx playwright-cli fill <ref> "<otp-code>"
+→ bunx playwright-cli click <verify-button-ref>
 
 Then I should be redirected to the dashboard
 → bunx playwright-cli snapshot  # verify URL and content
