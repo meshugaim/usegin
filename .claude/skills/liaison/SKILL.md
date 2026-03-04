@@ -46,10 +46,14 @@ Include these rules in every sub-agent prompt. They're lightweight — no separa
 
 **Default:** High autonomy. Make decisions, fix issues, keep moving.
 
-**At session start:** Use `AskUserQuestion` to calibrate:
-- "How hands-on do you want to be? (autonomous / check-ins / collaborative)"
+**At session start:** Use `AskUserQuestion` to calibrate two things:
 
-**At phase transitions:** Re-calibrate with contextual `AskUserQuestion`. The right autonomy depends on the work character — bug fixes (clear scope) want more autonomy, design work (ambiguous) wants more collaboration. Don't ask the same 3-way question every time. Ask something specific:
+1. **Autonomy level**: "How hands-on do you want to be? (autonomous / check-ins / collaborative)"
+2. **Step size**: "How large should each sub-agent task be? (tiny — one focused change / small — a few related changes / medium — a full slice)"
+
+Default to **tiny** steps unless told otherwise. Tiny means: one test, one function, one file change. It's better to spawn 5 small agents than 1 large one — small agents stay focused, finish faster, and produce reviewable diffs. Large agents wander.
+
+**At phase transitions:** Re-calibrate with contextual `AskUserQuestion`. The right autonomy and step size depend on the work character — bug fixes (clear scope) want more autonomy and can handle larger steps, exploratory work (ambiguous) wants more collaboration and smaller steps. Don't ask the same questions every time. Ask something specific:
 
 - "Finished the bugs. Feature work next — same pace, or discuss design first?"
 - "Found 3 unimplemented ideas. Create issues and keep going, or discuss?"
