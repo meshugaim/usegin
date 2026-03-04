@@ -6,7 +6,7 @@ args: "[sha]"
 
 # Investigate CI Failure
 
-Structured investigation of CI failures using context files written by `ci-watcher`.
+Structured investigation of CI failures. You are an investigator, not a fixer. Your job is to understand what happened, assess confidence, and present findings. The user decides what happens next.
 
 ## When to Use
 
@@ -15,69 +15,103 @@ Structured investigation of CI failures using context files written by `ci-watch
 - "investigate the CI failure"
 - "why did CI fail on <sha>"
 
-## Investigation Protocol
+## Hard Rules
 
-### 1. Load the failure context
+1. **Never write code or apply fixes** until the user explicitly approves
+2. **Never start deep research** (step 2) without user approval, unless you're confident it's a production code issue that needs it
+3. **Be honest about certainty** — "I don't know" is a valid answer
+4. **Stay concise** — the user wants orientation, not a novel
+
+## Step 1: Orient (always runs)
+
+This step is fast. Read, look, classify, report.
+
+### 1a. Load failure context
 
 ```bash
-# The SHA comes from the skill argument, or find the most recent failure
+# SHA from skill argument, or most recent failure
 ls -t .claude/ci-failures/*.md | head -1
 ```
 
-Read the failure context file at `.claude/ci-failures/<sha>.md`. This contains:
-- Which workflows failed vs passed
-- `gh run view --log-failed` output (last 80 lines per failed workflow)
-- Commit diff (stat + full)
-- GitHub Actions run URLs
+Read `.claude/ci-failures/<sha>.md`. It contains: workflow results, failed log output (tail 80 lines per workflow), commit diff (stat + full), run URLs.
 
-### 2. Parse the failure
+### 1b. Look at the code
 
-From the log output, identify:
-- **Which workflow(s)** failed (e.g., `nextjs-unit-tests`, `python-unit-tests`, `lint-and-type-check`)
-- **Which test(s)** failed — extract test file paths and test names
-- **The error message** — the actual assertion failure or runtime error
+Read the failing test files. Read the changed production code (from the diff). Understand what the test asserts and what the code does.
 
-### 3. Read the failing tests
+Don't just read the error message — read the actual test and the actual code it exercises. This is where understanding comes from.
 
-Read the test files that failed. Understand what they assert and why they might break.
+### 1c. Classify
 
-### 4. Correlate with the commit diff
+Determine which category this falls into:
 
-The failure context includes the commit diff. Map the failures to the changes:
-- Did the commit change code that the failing test covers?
-- Did the commit change a type/interface that breaks downstream?
-- Did the commit add new code without updating related tests?
-- Is it a lint/format issue from the commit?
+| Category | Meaning | Example |
+|---|---|---|
+| **Test issue** | Production behavior is correct, test is wrong or outdated | Test asserts old return format after intentional API change |
+| **Production code issue** | The commit broke real behavior | Changed a function signature, forgot a caller |
+| **Infra/environment** | Not caused by this commit | CI runner OOM, flaky network, dependency mirror down |
 
-### 5. Identify root cause
+### 1d. Assess certainty
 
-Determine the most likely cause:
-- **Direct breakage**: commit changed behavior that the test asserts
-- **Missing update**: commit added/changed code but didn't update tests
-- **Type error**: commit changed types that break compile
-- **Lint/format**: commit introduced style violations
-- **Flaky test**: failure is unrelated to the commit (check if test has history of flaking)
+Be honest:
 
-### 6. Present findings
+- **Clear** — you can point at the exact line. The diff changed X, the test asserts Y, they conflict.
+- **Likely** — strong signal but you'd want to confirm. E.g., type change rippled but you haven't traced every caller.
+- **Unclear** — multiple possible causes, or the failure doesn't obviously connect to the diff.
 
-Summarize clearly:
-- What failed and why (1-2 sentences)
-- The root cause with file:line references
-- Suggested fix
+### 1e. Report to user
 
-Then stay interactive — the user may want to discuss, ask for a fix, or dismiss.
+Present a structured report:
 
-### 7. Fix if asked
+```
+## CI Failure: <sha>
 
-If the user asks to fix:
-1. Make the fix
-2. Run the relevant test suite locally to verify
-3. Commit with a message referencing the original commit: `fix: <description> (broken by <sha>)`
+**Category**: test issue / production code / infra
+**Certainty**: clear / likely / unclear
+
+**What failed**: <workflow name> — <test name or error>
+**Why**: <1-2 sentences connecting the diff to the failure>
+**Evidence**: <file:line references, specific assertions, specific code changes>
+
+**Suggestion**: <one of the options below>
+```
+
+Suggestions (pick one):
+- **Quick fix** — describe what to change (don't write code). E.g., "update the assertion in `foo.test.ts:42` to expect the new return type"
+- **Explore further** — you need more context. Say what you'd look at and why.
+- **User decision needed** — you're genuinely unsure. Present what you know and ask.
+
+### After Step 1
+
+**Stop here.** Wait for the user. They may:
+- Ask you to fix it (now you can write code)
+- Ask you to explore further (now you enter step 2)
+- Dismiss it ("that's expected, close the issue")
+- Ask questions
+
+## Step 2: Deeper exploration (conditional)
+
+Only enter step 2 when:
+- User explicitly asks to explore further, **OR**
+- You assessed "likely production code issue" + "unclear" certainty → you may self-escalate
+
+### How step 2 works
+
+1. **Show the step 1 report** to the user (if not already shown)
+2. **Say what you're investigating** and that you're running it in background
+3. **Spawn focused subagents** (1-3, each with a narrow scope):
+   - Sentry: `sentry error search '...' --project <slug>` / `sentry trace search`
+   - Railway logs: `railway-dev logs --errors --since <window>`
+   - Code tracing: read specific callers/dependencies of the changed code
+4. **Keep the main thread available** — show a brief line per subagent as they complete
+5. **Synthesize** once subagents return — update the report with new evidence
+
+After step 2, present updated findings and wait for user decision again. Do not proceed to fixes.
 
 ## Tips
 
-- The failure context file already has log output — don't re-fetch from GitHub unless you need more detail
+- The failure context file has log output already — don't re-fetch from GitHub unless you need more than the tail 80 lines
 - If the commit has a `Claude-Session` trailer, you may have been forked from that session and already have context
-- Check `git log --oneline -5` to see if someone already pushed a fix
-- For lint failures, `bun run lint` and `bun run typecheck` reproduce locally
-- For unit test failures, `bun test <file>` or `uv run pytest <file>` reproduces locally
+- `git log --oneline -5` — check if someone already pushed a fix
+- Reproduce locally: `bun test <file>`, `uv run pytest <file>`, `bun run lint`, `bun run typecheck`
+- For Sentry: `python-services` maps to project slug `python-fastapi`, `nextjs-app` stays as-is
