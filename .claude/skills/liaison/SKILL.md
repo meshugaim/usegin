@@ -206,6 +206,8 @@ Surface to user only for:
 
 This is for us. Future Claudes will live in this code. We're making it a home we'd want to work in.
 
+**Every improvement matters.** When a reviewer suggests something that makes the code better — act on it. Don't triage by "blocking" vs "nice to have." The codebase gets better one small choice at a time. If it's an improvement, we want it.
+
 ## Final Words - Reminder
 
 Super small steps/increments, build for future Claudes, go slow, small commits and push, everything is an agent, invest in highest quality; Say slice DoD out loud before doing it, verify it after implementation; Give agents a lot of context with focused tasks.

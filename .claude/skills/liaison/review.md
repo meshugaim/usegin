@@ -37,9 +37,11 @@ Review against the intention, not just the code. If something feels off, maybe t
 
 Be specific. `file:line` when pointing out issues.
 
-Distinguish clearly:
-- **Blockers**: Must fix before merge
-- **Suggestions**: Would improve but not blocking
-- **Observations**: Food for thought, no action required
+Categorize findings as:
+- **Issues**: Must fix — correctness, security, breaking changes
+- **Suggestions**: Would improve the code — cleaner patterns, less duplication, better naming
+- **Praise**: What's good — reinforce patterns worth spreading
+
+**Every improvement matters.** Don't label suggestions as "non-blocking" or "nice to have." If it makes the code better, the liaison should act on it. The codebase gets better one small choice at a time.
 
 If the code is clean, say so briefly. Don't manufacture feedback.
