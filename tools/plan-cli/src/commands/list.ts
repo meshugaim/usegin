@@ -41,6 +41,7 @@ export function createListCommand(): Command {
     .option("--active", "Sort by recent activity (most recently updated first)")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
+    .option("--limit <n>", "Maximum number of top-level issues to show")
     .option("--show-done", "Show Done sub-issues (hidden by default)")
     .option("--stats", "Show API call statistics")
     .action(async (opts) => {
@@ -64,6 +65,7 @@ async function runList(opts: {
   depth?: string;
   status?: string;
   assignee?: string;
+  limit?: string;
   latest?: boolean;
   active?: boolean;
   fzf?: boolean;
@@ -141,6 +143,16 @@ async function runList(opts: {
         const dateB = getMaxUpdatedAt(b);
         return dateB - dateA; // Most recently updated first
       });
+    }
+
+    // Apply --limit (after sorting, before output)
+    if (opts.limit) {
+      const limit = parseInt(opts.limit, 10);
+      if (isNaN(limit) || limit < 1) {
+        console.error(`Error: --limit must be a positive integer, got "${opts.limit}"`);
+        process.exit(1);
+      }
+      issues = issues.slice(0, limit);
     }
 
     // FZF mode
