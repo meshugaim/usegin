@@ -7,7 +7,7 @@
  *
  * Requirements:
  * - tmux (must be in a tmux session)
- * - ci-watcher on PATH
+ * - tools/bin/ci-watcher in the repo
  * - gh CLI authenticated
  *
  * Exits 0 always — never blocks the tool result. CI watching is best-effort.
@@ -67,10 +67,13 @@ async function main() {
     process.exit(0);
   }
 
-  // Need ci-watcher on PATH
-  const which = await $`command -v ci-watcher`.quiet().nothrow();
-  if (which.exitCode !== 0) {
-    console.error("ci-watcher: skipped — ci-watcher not on PATH");
+  // Resolve ci-watcher path relative to repo root
+  const repoRoot = await $`git rev-parse --show-toplevel`.quiet().nothrow();
+  if (repoRoot.exitCode !== 0) process.exit(0);
+  const ciWatcher = `${repoRoot.stdout.toString().trim()}/tools/bin/ci-watcher`;
+  const exists = await Bun.file(ciWatcher).exists();
+  if (!exists) {
+    console.error("ci-watcher: skipped — tools/bin/ci-watcher not found");
     process.exit(0);
   }
 
@@ -94,7 +97,7 @@ async function main() {
     : "0";
 
   // Spawn in detached tmux session
-  const result = await $`tmux new-session -d -s ci-watch-${shortSha} -e TMUX_PARENT_SESSION=${mainSession} ci-watcher ${sha}`.quiet().nothrow();
+  const result = await $`tmux new-session -d -s ci-watch-${shortSha} -e TMUX_PARENT_SESSION=${mainSession} ${ciWatcher} ${sha}`.quiet().nothrow();
   if (result.exitCode === 0) {
     console.error(`ci-watcher: started for ${shortSha}`);
   }
