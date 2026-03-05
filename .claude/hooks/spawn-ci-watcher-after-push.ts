@@ -21,9 +21,9 @@ interface PostToolInput {
     command?: string;
   };
   tool_response?: {
-    exit_code?: number;
     stdout?: string;
     stderr?: string;
+    interrupted?: boolean;
   };
 }
 
@@ -41,15 +41,11 @@ async function pushTargetsMain(command: string): Promise<boolean> {
 }
 
 async function main() {
-  const raw = await Bun.stdin.text();
-
-  // Debug: dump raw input to file so we can inspect the actual format
-  const debugFile = "/tmp/ci-watcher-hook-debug.json";
-  await Bun.write(debugFile, raw);
+  const input = await Bun.stdin.text();
 
   let toolInput: PostToolInput;
   try {
-    toolInput = JSON.parse(raw);
+    toolInput = JSON.parse(input);
   } catch {
     process.exit(0);
   }
@@ -59,13 +55,10 @@ async function main() {
   const command = toolInput.tool_input.command;
   if (!command || !GIT_PUSH.test(command)) process.exit(0);
 
-  // Dump again — we matched a git push, log what we see
-  await Bun.write("/tmp/ci-watcher-hook-push.json", JSON.stringify(toolInput, null, 2));
-
-  // Only act on successful pushes — if tool_response is missing, assume success
-  // (PostToolUse only fires for successful tool calls)
-  const exitCode = toolInput.tool_response?.exit_code;
-  if (exitCode !== undefined && exitCode !== 0) process.exit(0);
+  // PostToolUse only fires for successful tool calls, and tool_response
+  // does not include exit_code — it has stdout/stderr/interrupted.
+  // If interrupted, skip.
+  if (toolInput.tool_response?.interrupted) process.exit(0);
 
   if (!(await pushTargetsMain(command))) process.exit(0);
 
