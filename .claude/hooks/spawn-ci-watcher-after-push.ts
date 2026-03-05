@@ -41,11 +41,15 @@ async function pushTargetsMain(command: string): Promise<boolean> {
 }
 
 async function main() {
-  const input = await Bun.stdin.text();
+  const raw = await Bun.stdin.text();
+
+  // Debug: dump raw input to file so we can inspect the actual format
+  const debugFile = "/tmp/ci-watcher-hook-debug.json";
+  await Bun.write(debugFile, raw);
 
   let toolInput: PostToolInput;
   try {
-    toolInput = JSON.parse(input);
+    toolInput = JSON.parse(raw);
   } catch {
     process.exit(0);
   }
@@ -55,9 +59,13 @@ async function main() {
   const command = toolInput.tool_input.command;
   if (!command || !GIT_PUSH.test(command)) process.exit(0);
 
-  // Only act on successful pushes
+  // Dump again — we matched a git push, log what we see
+  await Bun.write("/tmp/ci-watcher-hook-push.json", JSON.stringify(toolInput, null, 2));
+
+  // Only act on successful pushes — if tool_response is missing, assume success
+  // (PostToolUse only fires for successful tool calls)
   const exitCode = toolInput.tool_response?.exit_code;
-  if (exitCode !== 0) process.exit(0);
+  if (exitCode !== undefined && exitCode !== 0) process.exit(0);
 
   if (!(await pushTargetsMain(command))) process.exit(0);
 
