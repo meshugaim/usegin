@@ -108,7 +108,7 @@ A good slice is:
 | **End-to-end** | Touches all layers needed (DB → API → UI), not just one |
 | **Independently shippable** | Works on its own, even if the feature is incomplete |
 | **Demonstrable** | You can show it working to the user |
-| **Right-sized** | One migration max. Finishable and self-verifiable within ~30 minutes of work. If you can't describe it in one sentence, split it |
+| **Right-sized** | One migration max. Implementable in a single agent session without context pressure. If you can't describe it in one sentence, split it |
 
 **Decomposition approach:** Start from the user-facing behavior and work backward. "User can see X" is a better slice than "Add database table for X."
 
