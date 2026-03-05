@@ -31,6 +31,9 @@
 - Auth flow improvement: this session used `auth-check` CLI cleanly, and killed stale daemons before opening browser — cleaner than the previous session.
 
 **Suggestions:**
-- Include auth file path in sub-agent prompts even when auth is already loaded. The skill is explicit about this, and agents may need it if the browser state resets mid-test.
-- Include reference to `manual-testing-by-agent` skill in sub-agent prompts — the skill says to, and it provides useful playwright-cli patterns the agents might not know.
-- The "feature toggles respected" signal could use a stronger instruction. The main thread didn't mention toggles in any sub-agent prompt. The Data tab agent happened to discover and toggle flags on its own — this worked out but was unguided.
+
+1. **Sub-agent prompts missing auth file + skill reference.** The skill lists 7 items each sub-agent should receive (URL, auth file, mission, playwright-cli, testing loop, snapshot instruction, manual-testing-by-agent reference). In practice, prompts are composed mission-first and the checklist items get skipped. Two options discussed:
+   - **Template block in the skill** — a literal copy-pasteable prompt template with `{placeholders}`. Blanks stare at you; harder to skip than a prose bullet list. Low maintenance, no moving parts.
+   - **`sanity-prompt` CLI tool** — generates complete sub-agent prompts from args (`--url`, `--auth`, `--mission`). Would resolve both missing auth file (#1) and missing skill reference (#2) programmatically. But adds a moving part for a problem that hasn't recurred across retros yet. Discussed with user — consensus: start with the template block, build the CLI if the next retro still flags it.
+
+2. **Feature toggles need explicit handling.** The skill says "focus on the default path" but doesn't tell sub-agents to check toggle state or toggle on features relevant to their test area. In this session, the Data tab agent discovered browser flags on its own and toggled "Email Exclusion" — unguided but effective. The skill should instruct the main thread to: (a) check current toggle state at `/toggles` before Phase B, (b) identify which toggles are relevant to each test area, (c) include toggle instructions in sub-agent prompts (which to enable, which to leave default). → **Skill change made** — added toggle annotations to section 5.

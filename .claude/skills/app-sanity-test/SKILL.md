@@ -149,7 +149,13 @@ After auth is established, delegate all testing to Opus sub-agents. Each sub-age
 - Instruction to `snapshot` before every interaction
 - Reference to the `manual-testing-by-agent` skill for playwright-cli details
 
-**Feature toggles:** Focus on the **default path** of each toggle (what users actually see). Features behind toggles that are off by default may be under construction — skip unless the user specifically asks.
+**Feature toggles:** Before spawning Phase B agents, check toggle state:
+
+1. Navigate to `<app-url>/toggles` and snapshot to see all browser flags and their current values
+2. For each approved test area, identify which toggles are relevant (e.g., "Email Exclusion" for data/email testing, "Data Tab" for file management)
+3. Include toggle instructions in each sub-agent prompt: which toggles to enable at `/toggles` before testing, and which to leave at default
+4. Features behind toggles that are **off by default** should still be tested if the test area covers them — the sub-agent enables the toggle, tests the feature, then moves on
+5. If a toggle-gated feature is clearly under construction (broken UI, placeholder content), note it in findings rather than reporting as a bug
 
 #### Phase A: Basic Sanity (Must-Pass)
 
