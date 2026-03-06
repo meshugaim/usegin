@@ -7,7 +7,7 @@ description: This skill guides implementation from spec documents. Triggered by 
 
 Turn specs into working software through vertical slices, TDD, and continuous alignment.
 
-**Companion to:** `writing-specs` skill.
+**Pipeline:** `writing-specs` → `slicing-specs` → **`implementing-specs`** (you are here)
 
 **When to use this vs alternatives:** This skill is for human-collaborative implementation — the user is present, guiding priorities, and making decisions. For autonomous execution of well-understood work, consider `cell` or `teamwork`. For pure TDD loops on isolated modules, consider `worker-reviewer`.
 
@@ -28,13 +28,20 @@ Turn specs into working software through vertical slices, TDD, and continuous al
 
 Before writing any code, build a mental model of the work.
 
-### 1. Read the spec
+### 1. Read the spec and check for slices
 
 ```bash
 plan show <spec-issue-id> --tree   # Spec + sub-issues + graph context
 ```
 
 Read the full spec. Internalize scope, constraints, and open questions. If the spec lives in a file (`docs/specs/`), read that too.
+
+**Check if slices already exist.** If `slicing-specs` has already run, the parent issue will have a slice map and sub-issues with acceptance criteria and verification expectations. In that case:
+- The sub-issues are your slice sketch — don't create a new one
+- Read each sub-issue to understand scope, criteria, seams, and suggested test levels
+- Skip to step 4 (share your understanding) with the existing slices as your plan
+
+If no sub-issues exist, you'll create the slice sketch yourself (see "Slice Sketch" below).
 
 ### 2. Explore the codebase
 
@@ -58,7 +65,7 @@ Before proposing slices, surface anything that could derail implementation:
 Use `AskUserQuestion` to present:
 
 - **Summary**: 2-3 sentences on what the spec is asking for
-- **Slice sketch**: Rough ordered list of slices you see (explicitly marked as "will change as we learn")
+- **Slice plan**: The existing sub-issues (if pre-sliced) or a rough ordered list of slices you see (explicitly marked as "will change as we learn")
 - **Risks/questions**: Anything unclear or concerning
 
 Only proceed to implementation after the user confirms your understanding.
@@ -145,10 +152,11 @@ Tests first is the strong default. Write tests before implementation for every s
 ### The Loop
 
 1. **Consider feature toggle** — Does this slice need one? (See "Feature Toggles" above)
-2. **Write tests** — Unit + integration, backend + frontend as applicable
-3. **Watch tests fail** — Confirms they're actually testing something
-4. **Implement** — Minimal code to make tests pass
-5. **Self-verify** — Run all tests, check nothing else broke
+2. **Read verification expectations** — If the slice has a Verification section (from `slicing-specs`), use it to guide test choices. It tells you *what* to test and at *which level* (unit, integration-db, integration-browser, etc.). You decide the implementation: mocks, fixtures, test structure. See `docs/testing/README.md` for the full test type matrix.
+3. **Write tests** — At the levels indicated by the verification expectations. If no expectations exist, default to unit + integration as applicable.
+4. **Watch tests fail** — Confirms they're actually testing something
+5. **Implement** — Minimal code to make tests pass
+6. **Self-verify** — Run all tests, check nothing else broke
 
 ### When to Skip TDD
 
@@ -223,7 +231,17 @@ If nothing is surprising and the next slice is obvious, the checkpoint can be tw
 
 ## Context Management
 
-Long implementations exhaust context. Proactively manage this.
+Long implementations exhaust context. Proactively manage this. The goal: any session can pick up where the last one left off using only Linear issues and handoff notes — no in-context memory required.
+
+### Linear as Source of Truth
+
+Linear is the durable memory that survives across sessions. Keep it current:
+
+- **Close slice issues** immediately when a slice is done (`plan close <id>`)
+- **Update the parent issue's slice map** with completion status after each slice
+- **Add notes to slice issues** when you discover something the next session should know
+
+A new session should be able to run `plan show <spec-issue-id> --tree` and immediately see: which slices are done, which is next, and what the current state is. If that's not clear from Linear alone, something is missing.
 
 ### After Each Slice
 
@@ -231,20 +249,77 @@ Run `cctx` to check context usage.
 
 | Context State | Action |
 | ------------- | ------ |
-| Under 70% | Continue to next slice |
-| **70%+ — hard stop** | **Do not start new work.** Finalize current slice, then create a handoff (see below) |
+| Under 65% | Continue to next slice |
+| **65%+ — do not start a new slice** | Finalize current work, then hand off (see below) |
 
-### At 70%: Finalize and Hand Off
+The threshold is 65%, not higher. Starting a new slice at 67% risks hitting 85%+ if the slice has complications — leaving no room for a clean handoff.
 
-This is non-negotiable. When context reaches 70%:
+### Slice Lifecycle
 
-1. **Finish what you're doing** — complete the current slice if close, or commit what works and note what's left
+A slice progresses through specific states. Knowing the exact state is critical for handoffs.
+
+| State | What's true | Linear status |
+|-------|------------|---------------|
+| **Pending** | Not started | Pending |
+| **Tests written** | Failing tests exist, no implementation yet | In Progress |
+| **Implemented** | Tests passing, code written | In Progress |
+| **Verified** | Self-verified (tests + manual checks), ready to push | In Progress |
+| **Done** | Pushed, issue closed | Done |
+
+**"Done" means all of the above:** coded, tested, self-verified, pushed, issue closed. If any step is missing, the slice is still in progress.
+
+When handing off mid-slice, record the exact state — the next agent needs to know whether to write tests, implement, verify, or just push.
+
+### At 65%: Finalize and Hand Off
+
+This is non-negotiable. When context reaches 65%:
+
+1. **Finish the current slice if you can** — if you're close to "done" (verified, just needs push), finish it. If not, commit what works.
 2. **Do not start a new slice**
-3. **Update Linear** — close completed slice issues, update parent issue with current state and remaining slice sketch
-4. **Create handoff** — use `/handoff` to create a handoff note (it handles format and transcript export)
-5. **Tell the user** — explain that context is full and they should start a new session with `/handoff --continue` to pick up where you left off
+3. **Update Linear** — close completed slice issues, keep in-progress slices marked as In Progress, update parent issue slice map
+4. **Create handoff** — use `/handoff` with the structure below
 
-The next session will orient from the handoff note and `plan show`. It should re-read the slice sketch from the parent issue and validate it still makes sense — things may have changed on main, or the user may have new priorities.
+### Handoff Structure for Spec Implementation
+
+The standard handoff format applies, but for spec implementation the "What's Pending" section must be precise about slice state:
+
+```markdown
+## Spec Progress
+
+Parent spec: ENG-XXX
+Slice map: [link or inline summary]
+
+### Completed Slices
+- ENG-111: [title] — Done (pushed, closed)
+- ENG-222: [title] — Done (pushed, closed)
+
+### Current Slice
+- ENG-333: [title]
+- **State:** [tests written / implemented / verified]
+- **What's left:** [specific — e.g., "RLS integration tests pass, need to implement the API endpoint and UI component"]
+- **Files touched so far:** [list]
+
+### Remaining Slices
+- ENG-444: [title] — Pending
+- ENG-555: [title] — Pending
+
+### Discoveries
+- [Anything that affects remaining slices — seam changes, spec gaps, risks found]
+```
+
+This structure lets the next agent skip re-reading completed slices and jump straight to the exact point where work stopped.
+
+### Resuming After Handoff
+
+The next session (whether started manually via `/handoff-continue` or automatically) should:
+
+1. Read the handoff note
+2. Run `plan show <spec-issue-id> --tree` to see current state in Linear
+3. Verify the handoff matches Linear — if they disagree, Linear wins (it's the source of truth)
+4. If resuming a mid-slice handoff: read the slice issue, check what code exists, pick up from the recorded state
+5. If starting a new slice: read the slice's sub-issue for acceptance criteria and verification expectations
+
+**The key insight:** because slices are self-contained sub-issues with their own acceptance criteria, a new session doesn't need the full history of previous sessions. It needs: which slice am I on, what state is it in, what are its criteria, and what seams connect it to completed slices. Linear + handoff provide all of this.
 
 ## Self-Verification
 
@@ -266,3 +341,13 @@ Verify your own work before asking the user. Don't wait to be told something is 
 **Composed behavior:** Periodically — and always after the final slice — verify the feature end-to-end as a user would experience it. Individual slices passing their own tests doesn't guarantee the assembled feature works. Step back and test the full flow.
 
 Use the `manual-testing-by-agent` skill for any browser-based verification.
+
+## After All Slices
+
+When the last slice is complete:
+
+1. **Update Linear** — close the last slice issue, update the parent spec's slice map to show all slices done
+2. **Cross-slice verification** — check anything marked "end-to-end verification — after all slices" in the spec's acceptance criteria. These are behaviors that only work once all pieces are assembled.
+3. **Run the full test suite** — all tests, not just the ones from this session
+4. **Commit and push** — final state should be clean, all tests green
+5. **Signal completion** — update the parent spec issue to reflect that implementation is done. The spec's acceptance criteria and verification expectations now serve as the checklist for the verification agent downstream.
