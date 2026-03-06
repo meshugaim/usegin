@@ -84,15 +84,15 @@ const rawEffort = (input as any).effort?.level;
 function resolveEffort(val: unknown): { label: string; color: string } | null {
   if (typeof val === "string") {
     const map: Record<string, { label: string; color: string }> = {
-      max: { label: "max", color: GREEN },
-      high: { label: "max", color: GREEN },
+      max: { label: "high", color: GREEN },
+      high: { label: "high", color: GREEN },
       medium: { label: "med", color: YELLOW },
       low: { label: "low", color: RED },
     };
     return map[val] ?? null;
   }
   if (typeof val === "number") {
-    if (val >= 200) return { label: "max", color: GREEN };
+    if (val >= 200) return { label: "high", color: GREEN };
     if (val >= 100) return { label: "med", color: YELLOW };
     return { label: "low", color: RED };
   }
