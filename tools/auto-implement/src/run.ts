@@ -50,23 +50,22 @@ export interface RunResult {
 export interface RunDeps {
   spawnClaude: (prompt: string) => Promise<{ sessionId: string; exitCode: number; stdout: string }>;
   confirm: (message: string) => Promise<boolean>;
+  checkSpecComplete: (specId: string) => Promise<boolean>;
   log: (message: string) => void;
 }
 
 /**
- * Get the latest handoff file's real path and mtime.
+ * Get the latest handoff symlink's mtime (follows symlink to real file).
  * Returns null if no handoff exists.
  */
-async function getHandoffState(): Promise<{ path: string; mtimeMs: number } | null> {
+async function getHandoffState(): Promise<{ mtimeMs: number } | null> {
   try {
-    // Resolve the symlink to get the actual file
-    const realPath = await Bun.file(HANDOFF_LATEST).exists()
-      ? HANDOFF_LATEST
-      : null;
-    if (!realPath) return null;
+    const exists = await Bun.file(HANDOFF_LATEST).exists();
+    if (!exists) return null;
 
+    // stat follows symlinks, so this gives us the real file's mtime
     const stats = await stat(HANDOFF_LATEST);
-    return { path: realPath, mtimeMs: stats.mtimeMs };
+    return { mtimeMs: stats.mtimeMs };
   } catch {
     return null;
   }
@@ -216,9 +215,21 @@ export async function autoImplement(
     }
 
     // Handle signals
-    if (signal === "complete") {
+    //
+    // Detection priority:
+    // 1. Explicit COMPLETE signal in stdout → done
+    // 2. No signal but all Linear slices closed → done (agent forgot the signal)
+    // 3. Handoff signal or handoff file updated → next session
+    // 4. Nothing → stop (something broke)
+
+    const isComplete = signal === "complete" || (
+      signal !== "handoff" && await deps.checkSpecComplete(specId)
+    );
+
+    if (isComplete) {
+      const via = signal === "complete" ? "signal" : "linear-check";
       deps.log("");
-      deps.log("All slices complete!");
+      deps.log(`All slices complete! (detected via ${via})`);
       await appendEvent(runDir, {
         timestamp: new Date().toISOString(),
         event: "completion_detected",
@@ -226,13 +237,14 @@ export async function autoImplement(
         specId,
         sessionNumber: i,
         totalSessions,
+        details: `detected_via=${via}`,
       });
       await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "complete");
       return { runId, runDir, totalSessions, outcome: "complete" };
     }
 
     if (signal === "none" && !handoffUpdated) {
-      // No signal and no handoff — something went wrong
+      // No signal, no handoff, not complete in Linear — something went wrong
       deps.log("");
       deps.log("No handoff or completion signal detected. Stopping.");
       deps.log("Check the session log for details.");

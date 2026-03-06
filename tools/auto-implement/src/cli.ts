@@ -94,6 +94,35 @@ async function confirm(message: string): Promise<boolean> {
   });
 }
 
+/**
+ * Check if a spec's implementation is complete by inspecting Linear.
+ * Returns true if the parent issue has children and ALL children are Done.
+ * Returns false if no children, or any child is not Done, or on error.
+ */
+async function checkSpecComplete(specId: string): Promise<boolean> {
+  try {
+    const proc = Bun.spawn(["plan", "show", specId, "--tree", "--json"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stdout = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0) return false;
+
+    const data = JSON.parse(stdout);
+    const children: Array<{ status?: string }> = data.children || [];
+    if (children.length === 0) return false;
+
+    return children.every((child) => {
+      const status = (child.status || "").toLowerCase();
+      return status === "done" || status === "closed" || status === "completed";
+    });
+  } catch {
+    return false;
+  }
+}
+
 function log(message: string): void {
   console.log(message);
 }
@@ -128,7 +157,7 @@ program
         maxSessions,
         pause: options.pause,
       },
-      { spawnClaude, confirm, log }
+      { spawnClaude, confirm, checkSpecComplete, log }
     );
 
     log("");
