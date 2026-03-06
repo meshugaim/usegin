@@ -47,6 +47,8 @@ Don't write yet. Just understand.
 
 Use `AskUserQuestion` to clarify until aligned on what needs spec'd.
 
+Include in your questions: **Does this feature need a feature toggle?** Breaking changes, incomplete work that will be deployed incrementally, or gradual rollouts all need one. Catching this early affects slicing (toggle skeleton becomes an infrastructure slice) and verification (toggle must be enabled before testing). See the `feature-toggles` skill for when toggles apply.
+
 ### 3. Propose Sections
 
 Present section outline. Get approval or adjust.

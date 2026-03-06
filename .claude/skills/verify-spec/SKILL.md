@@ -7,9 +7,9 @@ description: Verify a completed spec's implementation against its acceptance cri
 
 Systematically verify a completed spec's implementation against its acceptance criteria — through automated test checks and targeted manual testing via sub-agents.
 
-**Pipeline:** `writing-specs` → `slicing-specs` → `implementing-specs` → **`verify-spec`** (you are here)
+**Pipeline:** `writing-specs` → `slicing-specs` → `implementing-specs` (via `auto-implement` CLI) → **`verify-spec`** (you are here)
 
-**Prerequisites:** All slices are done (closed in Linear), tests are passing, code is pushed.
+**Prerequisites:** All slices are done (closed in Linear), tests are passing, code is pushed. Typically triggered after `auto-implement` completes with outcome `complete`, or after manual implementation finishes.
 
 ## Workflow Overview
 
@@ -62,6 +62,18 @@ AC-3: Chat works with 0 files, 1 file, and 100+ files
 ```
 
 This checklist is your scorecard throughout the process.
+
+### Identify Cross-Slice Criteria
+
+Check the spec's acceptance criteria and slice map for items marked "end-to-end verification — after all slices." These are criteria that only work once all slices are assembled — they couldn't be verified per-slice during implementation.
+
+Mark them in your checklist:
+
+```
+AC-7: User creates project, connects Linear, and chats about tasks — full flow [CROSS-SLICE]
+```
+
+Cross-slice criteria are verified last, after all per-slice criteria pass. If a cross-slice criterion fails, the root cause likely spans multiple slices — note this in the bug report.
 
 ## 2. Environment & Auth
 
@@ -209,6 +221,9 @@ Present the full verification checklist to the user:
 
 ### Blocked (1/10)
 - AC-9: Admin panel shows usage stats — BLOCKED (no admin access in staging)
+
+### Cross-Slice (verified last)
+- AC-7: Full end-to-end flow — PASS
 ```
 
 ### File Bug Issues

@@ -108,20 +108,14 @@ Guidelines, not a strict process. Adapt to the situation.
 
 ### Slicing Heuristics
 
-A good slice is:
+If you're creating your own slice sketch (no pre-existing sub-issues from `slicing-specs`), see the `slicing-specs` skill for the full decomposition approach — good slice qualities, ordering priorities, infrastructure slices, and edge cases.
 
-| Quality | Test |
-| --- | --- |
-| **End-to-end** | Touches all layers needed (DB → API → UI), not just one |
-| **Independently shippable** | Works on its own, even if the feature is incomplete |
-| **Demonstrable** | You can show it working to the user |
-| **Right-sized** | One migration max. Implementable in a single agent session without context pressure. If you can't describe it in one sentence, split it |
+**Quick reference for mid-implementation decisions:**
 
-**Decomposition approach:** Start from the user-facing behavior and work backward. "User can see X" is a better slice than "Add database table for X."
-
-**Ordering:** Prefer slices that reduce uncertainty first — the riskiest or least-understood part of the spec, not the easiest.
-
-**Coherence between slices:** Before starting a slice, consider how it connects to what came before and what comes after. Shared types, API contracts, and DB schema are the seams — get them right early. If a later slice will need a different shape than what you're building now, adjust now rather than refactoring later.
+- Start from user-facing behavior, work backward ("User can see X" > "Add database table for X")
+- Reduce uncertainty first — riskiest slice before easiest
+- Check seams between slices — shared types, API contracts, DB schema. Get them right early rather than refactoring later
+- Right-sized: one migration max, implementable in a single agent session without context pressure
 
 ### Feature Toggles
 
@@ -289,6 +283,17 @@ If you reach 70% (missed the 60% window or current slice ran long):
 3. **Update Linear** — mark current slice state accurately
 4. **Write handoff** — use the structure below, be extra precise about what's mid-flight
 5. **Exit** — do not do anything else after writing the handoff
+
+### Auto-Implement Mode
+
+When run via the `auto-implement` CLI (headless `claude -p` sessions), output these exact signals so the outer loop knows what happened:
+
+| Signal | When | What it does |
+|---|---|---|
+| `AUTO_IMPLEMENT_HANDOFF` | After writing a handoff (60%+ context or natural stopping point) | Outer loop spawns a fresh session that reads the handoff |
+| `AUTO_IMPLEMENT_COMPLETE` | After all slices are done and cross-slice verification passes | Outer loop stops — implementation is finished |
+
+Output each signal on its own line in stdout. The auto-implement CLI also checks Linear as a fallback (all child issues Done = complete), but explicit signals are more reliable.
 
 ### Handoff Structure for Spec Implementation
 
