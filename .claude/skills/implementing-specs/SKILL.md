@@ -249,10 +249,11 @@ Run `cctx` to check context usage.
 
 | Context State | Action |
 | ------------- | ------ |
-| Under 65% | Continue to next slice |
-| **65%+ — do not start a new slice** | Finalize current work, then hand off (see below) |
+| Under 60% | Continue to next slice |
+| **60%+ — do not start a new slice** | Finish current slice if close to done, otherwise commit what works and hand off |
+| **70%+ — MUST handoff NOW** | Non-negotiable. Stop immediately. Commit, update Linear, write handoff, exit. No "let me just finish this." |
 
-The threshold is 65%, not higher. Starting a new slice at 67% risks hitting 85%+ if the slice has complications — leaving no room for a clean handoff.
+The 60% threshold is conservative by design. Starting a new slice at 62% risks hitting 80%+ if the slice has complications — leaving no room for a clean handoff. The 70% hard stop exists because handoff itself consumes context (reading state, writing the note, updating Linear).
 
 ### Slice Lifecycle
 
@@ -270,14 +271,24 @@ A slice progresses through specific states. Knowing the exact state is critical 
 
 When handing off mid-slice, record the exact state — the next agent needs to know whether to write tests, implement, verify, or just push.
 
-### At 65%: Finalize and Hand Off
+### At 60%+: Wrap Up Current Slice
 
-This is non-negotiable. When context reaches 65%:
+When context reaches 60%:
 
-1. **Finish the current slice if you can** — if you're close to "done" (verified, just needs push), finish it. If not, commit what works.
+1. **Finish the current slice if you're close** — if verified and just needs push, finish it. Otherwise commit what works.
 2. **Do not start a new slice**
 3. **Update Linear** — close completed slice issues, keep in-progress slices marked as In Progress, update parent issue slice map
 4. **Create handoff** — use `/handoff` with the structure below
+
+### At 70%+: Emergency Handoff
+
+If you reach 70% (missed the 60% window or current slice ran long):
+
+1. **Stop immediately** — do not continue implementing
+2. **Commit whatever compiles** — even partial work, with a clear commit message about the state
+3. **Update Linear** — mark current slice state accurately
+4. **Write handoff** — use the structure below, be extra precise about what's mid-flight
+5. **Exit** — do not do anything else after writing the handoff
 
 ### Handoff Structure for Spec Implementation
 

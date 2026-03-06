@@ -1,0 +1,297 @@
+/**
+ * Core auto-implement loop.
+ *
+ * Runs sequential claude -p sessions, each following the implementing-specs skill.
+ * Sessions communicate via handoff files. The loop stops when:
+ * - Agent outputs AUTO_IMPLEMENT_COMPLETE
+ * - Agent fails to produce a handoff or completion signal
+ * - Max sessions reached
+ * - User cancels (--pause mode)
+ */
+
+import { stat } from "fs/promises";
+import { join } from "path";
+import { buildPrompt } from "./prompt";
+import {
+  appendEvent,
+  generateRunId,
+  getRunDir,
+  type ManifestEvent,
+} from "./manifest";
+
+const HANDOFF_DIR = "/workspaces/test-mvp/.claude/handoffs";
+const HANDOFF_LATEST = join(HANDOFF_DIR, "latest.md");
+
+const SIGNAL_HANDOFF = "AUTO_IMPLEMENT_HANDOFF";
+const SIGNAL_COMPLETE = "AUTO_IMPLEMENT_COMPLETE";
+
+export interface AutoImplementOptions {
+  specId: string;
+  maxSessions: number;
+  pause: boolean;
+}
+
+export interface SessionResult {
+  sessionId: string;
+  exitCode: number;
+  stdout: string;
+  durationSeconds: number;
+  handoffFile: string | null;
+  signal: "handoff" | "complete" | "none";
+}
+
+export interface RunResult {
+  runId: string;
+  runDir: string;
+  totalSessions: number;
+  outcome: "complete" | "max_sessions" | "no_signal" | "error" | "user_cancelled";
+}
+
+export interface RunDeps {
+  spawnClaude: (prompt: string) => Promise<{ sessionId: string; exitCode: number; stdout: string }>;
+  confirm: (message: string) => Promise<boolean>;
+  log: (message: string) => void;
+}
+
+/**
+ * Get the latest handoff file's real path and mtime.
+ * Returns null if no handoff exists.
+ */
+async function getHandoffState(): Promise<{ path: string; mtimeMs: number } | null> {
+  try {
+    // Resolve the symlink to get the actual file
+    const realPath = await Bun.file(HANDOFF_LATEST).exists()
+      ? HANDOFF_LATEST
+      : null;
+    if (!realPath) return null;
+
+    const stats = await stat(HANDOFF_LATEST);
+    return { path: realPath, mtimeMs: stats.mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Detect which signal the agent output
+ */
+function detectSignal(stdout: string): "handoff" | "complete" | "none" {
+  if (stdout.includes(SIGNAL_COMPLETE)) return "complete";
+  if (stdout.includes(SIGNAL_HANDOFF)) return "handoff";
+  return "none";
+}
+
+/**
+ * Find the newest handoff file (not the symlink, the actual timestamped file)
+ */
+async function findNewestHandoff(): Promise<string | null> {
+  const glob = new Bun.Glob("handoff_*.md");
+  let newest: { path: string; mtimeMs: number } | null = null;
+
+  for await (const path of glob.scan({ cwd: HANDOFF_DIR })) {
+    const fullPath = join(HANDOFF_DIR, path);
+    const stats = await stat(fullPath);
+    if (!newest || stats.mtimeMs > newest.mtimeMs) {
+      newest = { path: fullPath, mtimeMs: stats.mtimeMs };
+    }
+  }
+
+  return newest?.path ?? null;
+}
+
+/**
+ * Run the auto-implement loop
+ */
+export async function autoImplement(
+  options: AutoImplementOptions,
+  deps: RunDeps
+): Promise<RunResult> {
+  const { specId, maxSessions, pause } = options;
+  const runId = generateRunId(specId);
+  const runDir = getRunDir(runId);
+
+  deps.log(`Auto-implement run: ${runId}`);
+  deps.log(`Spec: ${specId}`);
+  deps.log(`Max sessions: ${maxSessions}`);
+  deps.log(`Pause between sessions: ${pause}`);
+  deps.log(`Run directory: ${runDir}`);
+  deps.log("");
+
+  // Record run start
+  await appendEvent(runDir, {
+    timestamp: new Date().toISOString(),
+    event: "run_started",
+    runId,
+    specId,
+    maxSessions,
+  });
+
+  let totalSessions = 0;
+
+  for (let i = 1; i <= maxSessions; i++) {
+    // Snapshot handoff state before session
+    const handoffBefore = await getHandoffState();
+
+    deps.log(`--- Session ${i}/${maxSessions} ---`);
+
+    const prompt = buildPrompt({
+      specId,
+      sessionNumber: i,
+      maxSessions,
+      runId,
+      runDir,
+    });
+
+    // Record session start
+    await appendEvent(runDir, {
+      timestamp: new Date().toISOString(),
+      event: "session_started",
+      runId,
+      specId,
+      sessionNumber: i,
+    });
+
+    const startTime = Date.now();
+    let result: { sessionId: string; exitCode: number; stdout: string };
+
+    try {
+      result = await deps.spawnClaude(prompt);
+    } catch (err) {
+      deps.log(`Session ${i} failed to spawn: ${err}`);
+      await appendEvent(runDir, {
+        timestamp: new Date().toISOString(),
+        event: "session_failed",
+        runId,
+        specId,
+        sessionNumber: i,
+        details: String(err),
+      });
+      await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "error");
+      return { runId, runDir, totalSessions, outcome: "error" };
+    }
+
+    const durationSeconds = Math.round((Date.now() - startTime) / 1000);
+    totalSessions++;
+
+    // Detect signal from output
+    const signal = detectSignal(result.stdout);
+
+    // Check if handoff file was updated
+    const handoffAfter = await getHandoffState();
+    const handoffUpdated =
+      handoffAfter &&
+      (!handoffBefore || handoffAfter.mtimeMs > handoffBefore.mtimeMs);
+    const handoffFile = handoffUpdated
+      ? await findNewestHandoff()
+      : null;
+
+    // Record session completion
+    await appendEvent(runDir, {
+      timestamp: new Date().toISOString(),
+      event: result.exitCode === 0 ? "session_completed" : "session_failed",
+      runId,
+      specId,
+      sessionNumber: i,
+      sessionId: result.sessionId,
+      durationSeconds,
+      exitCode: result.exitCode,
+      handoffFile,
+      totalSessions,
+      details: `signal=${signal}`,
+    });
+
+    deps.log("");
+    deps.log(`Session ${i} finished (${durationSeconds}s, exit=${result.exitCode}, signal=${signal})`);
+
+    if (handoffFile) {
+      deps.log(`Handoff written: ${handoffFile}`);
+      await appendEvent(runDir, {
+        timestamp: new Date().toISOString(),
+        event: "handoff_detected",
+        runId,
+        specId,
+        sessionNumber: i,
+        handoffFile,
+      });
+    }
+
+    // Handle signals
+    if (signal === "complete") {
+      deps.log("");
+      deps.log("All slices complete!");
+      await appendEvent(runDir, {
+        timestamp: new Date().toISOString(),
+        event: "completion_detected",
+        runId,
+        specId,
+        sessionNumber: i,
+        totalSessions,
+      });
+      await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "complete");
+      return { runId, runDir, totalSessions, outcome: "complete" };
+    }
+
+    if (signal === "none" && !handoffUpdated) {
+      // No signal and no handoff — something went wrong
+      deps.log("");
+      deps.log("No handoff or completion signal detected. Stopping.");
+      deps.log("Check the session log for details.");
+      await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "no_signal");
+      return { runId, runDir, totalSessions, outcome: "no_signal" };
+    }
+
+    // If we have more sessions to go, optionally pause
+    if (i < maxSessions && pause) {
+      await appendEvent(runDir, {
+        timestamp: new Date().toISOString(),
+        event: "pause_waiting",
+        runId,
+        specId,
+        sessionNumber: i,
+      });
+
+      deps.log("");
+      const shouldContinue = await deps.confirm(
+        `Session ${i} complete. Continue to session ${i + 1}?`
+      );
+
+      if (!shouldContinue) {
+        deps.log("User cancelled.");
+        await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "user_cancelled");
+        return { runId, runDir, totalSessions, outcome: "user_cancelled" };
+      }
+
+      await appendEvent(runDir, {
+        timestamp: new Date().toISOString(),
+        event: "pause_resumed",
+        runId,
+        specId,
+        sessionNumber: i,
+      });
+    }
+  }
+
+  deps.log("");
+  deps.log(`Max sessions (${maxSessions}) reached.`);
+  await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "max_sessions");
+  return { runId, runDir, totalSessions, outcome: "max_sessions" };
+}
+
+async function recordRunEnd(
+  runDir: string,
+  runId: string,
+  specId: string,
+  totalSessions: number,
+  maxSessions: number,
+  outcome: string
+): Promise<void> {
+  await appendEvent(runDir, {
+    timestamp: new Date().toISOString(),
+    event: outcome === "complete" ? "run_completed" : "run_stopped",
+    runId,
+    specId,
+    totalSessions,
+    maxSessions,
+    details: `outcome=${outcome}`,
+  });
+}
