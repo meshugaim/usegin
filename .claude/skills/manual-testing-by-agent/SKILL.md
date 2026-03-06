@@ -21,7 +21,10 @@ just agent-dev
 bun scripts/pw-auth.ts                          # owner@test.local → local-auth.json
 bun scripts/pw-auth.ts internal@test.local       # other users
 
-# 4. Open browser and authenticate
+# 4. Initialize workspace (idempotent — detects Chrome, creates .playwright/ sentinel)
+bunx playwright-cli install
+
+# 5. Open browser and authenticate
 bunx playwright-cli open
 bunx playwright-cli state-load local-auth.json
 bunx playwright-cli goto http://localhost:63000
@@ -149,7 +152,7 @@ just supabase-reset
 | Issue | Solution |
 |-------|----------|
 | Redirected to sign-in | Auth expired — re-run `bun scripts/pw-auth.ts` and `state-load` |
-| `playwright-cli open` fails | Run `npx playwright install chrome` to install browser |
+| `playwright-cli open` fails | Run `playwright-cli install` (detects Chrome or installs Chromium) |
 | OTP code expired | Resend and extract quickly (see Option 2 above) |
 | Page loads empty | Check console errors: look at `.playwright-cli/console-*.log` |
 | Screenshot command fails | Use `screenshot --filename /path/to/file.png` (not positional) |

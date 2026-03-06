@@ -77,7 +77,17 @@ Local requires services to be running. Walk through each step, confirming with t
 
 No setup needed — the app is already deployed. Skip to auth.
 
-### 4. Authentication
+### 4. Browser Preflight
+
+Before any browser interaction, ensure playwright-cli is ready:
+
+```bash
+playwright-cli install
+```
+
+This is idempotent — it creates the `.playwright/` workspace sentinel and verifies Chrome is available. If Chrome is missing, it installs Chromium as a fallback. Without this step, `open` may fail with "Chromium distribution 'chrome' is not found."
+
+### 5. Authentication
 
 #### Try Existing Session First
 
@@ -134,7 +144,7 @@ If `pw-auth.ts` fails, fall back to OTP sign-in via Inbucket:
    playwright-cli state-save <env>-auth.json
    ```
 
-### 5. Testing via Sub-Agents
+### 6. Testing via Sub-Agents
 
 **The main thread orchestrates. Sub-agents do the browser work.**
 
@@ -186,7 +196,7 @@ Example areas:
 
 Agents have freedom to explore beyond their assigned area if something looks off.
 
-### 6. Report
+### 7. Report
 
 After all sub-agents complete, summarize findings to the user:
 
