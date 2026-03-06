@@ -78,10 +78,35 @@ const modelEmoji = modelName.includes("opus")
       ? pick(["😵‍💫", "🫠", "😅", "🤔", "😬", "🥴"])
       : "🤖";
 
+// Effort level from patched CLI input (see node_modules patch + scripts/patch-claude-statusline.sh)
+// h88() can return a string ("low"|"medium"|"high"|"max") or a number (0-255)
+const rawEffort = (input as any).effort?.level;
+function resolveEffort(val: unknown): { label: string; color: string } | null {
+  if (typeof val === "string") {
+    const map: Record<string, { label: string; color: string }> = {
+      max: { label: "max", color: GREEN },
+      high: { label: "max", color: GREEN },
+      medium: { label: "med", color: YELLOW },
+      low: { label: "low", color: RED },
+    };
+    return map[val] ?? null;
+  }
+  if (typeof val === "number") {
+    if (val >= 200) return { label: "max", color: GREEN };
+    if (val >= 100) return { label: "med", color: YELLOW };
+    return { label: "low", color: RED };
+  }
+  return null;
+}
+const effortResolved = resolveEffort(rawEffort);
+const effortDisplay = effortResolved
+  ? ` ${effortResolved.color}${effortResolved.label}${RESET}`
+  : ` ${DIM}effort:--${RESET}`;
+
 if (modelName.includes("opus")) {
-  parts.push(`${modelEmoji} ${GREEN}${input.model.display_name}${RESET}`);
+  parts.push(`${modelEmoji} ${GREEN}${input.model.display_name}${RESET}${effortDisplay}`);
 } else {
-  parts.push(`${modelEmoji} ${BOLD_BLACK_ON_YELLOW}${input.model.display_name}${RESET}`);
+  parts.push(`${modelEmoji} ${BOLD_BLACK_ON_YELLOW}${input.model.display_name}${RESET}${effortDisplay}`);
 }
 
 if (git) parts.push(git);
