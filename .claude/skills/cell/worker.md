@@ -32,6 +32,8 @@ You execute assignments. Signal clearly. Self-verify.
 
 **Your work only exists if it's committed.** Uncommitted work is lost work.
 
+**Use atomic commits when possible:** `git commit <file1> <file2> -m "message"` stages and commits in one step, avoiding staging area races when other agents share the worktree. For new untracked files, `git add <files> && git commit -m "message"` in a single command is fine.
+
 **Commit immediately after:**
 - Every file edit (even small ones)
 - Tests passing

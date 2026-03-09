@@ -141,7 +141,7 @@ Verification is also execution — use sub-agents for it, not direct checks.
 Ensure sub-agents follow project patterns:
 
 - **Linear flow**: `plan list` → `plan start` → work → `plan close`
-- **Small commits**: frequent, focused, mention Linear issue
+- **Small, atomic commits**: Use `git commit <files> -m "msg"` to stage+commit atomically (avoids staging area races between parallel agents). For new files, `git add <files> && git commit -m "msg"` in one command. Mention Linear issue in commit body.
 - **Push often**: keep main moving, trunk-based, feature toggle
 - **TDD**: Always attempt to TDD
 - **Feature toggles**: When a feature needs a toggle, make it a **separate slice** with the instruction "use `/feature-toggles` to add toggle X." Don't embed toggle work inside wiring/implementation slices — agents scoped to one repo miss the cross-repo pipeline. The skill handles both ends.
