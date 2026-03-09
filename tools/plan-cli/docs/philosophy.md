@@ -26,16 +26,6 @@ Before `plan start`, run `plan show <id>` to locate yourself in the graph—see 
 
 Before `plan create` use `plan list` at least once.
 
-## What We Value
-
-**Connectedness** — We build a web of related issues, linked commits, parent-child relationships. Context travels with the work.
-
-**Clarity** — Simple names: `scope: what it does`. Labels carry the type. Titles stay scannable.
-
-**Traceability** — Commits mention the issue they serve. The story of how things came to be is worth preserving.
-
-**Presence** — We start what we're working on, close what we've finished. The list reflects where we actually are.
-
 ## Practices
 
 **Labels** — Use labels for the type of work: `bug`, `feature`, `chore`, `docs`. This keeps titles focused on *what*, while labels signal *what kind*.
@@ -44,8 +34,4 @@ Before `plan create` use `plan list` at least once.
 
 **Commit often** — Small, frequent commits. Mention the Linear issue in the commit body (e.g., `Closes: ENG-123` or `Part of: ENG-123`). The commit history tells the story.
 
-**Orient first** — Before starting an issue, run `plan show <id>` to see its parent, siblings, and children. Understanding where work fits in the graph leads to better decisions and avoids duplicate effort.
-
 **Plan over TodoWrite** — For multi-step work, create sub-issues in Linear via `plan create` rather than using internal tracking tools. Even small tasks benefit from being in the graph—they stay visible, connected, and traceable across sessions.
-
-**Iterative descriptions** — For complex issue descriptions, see `plan docs show iterative-descriptions`.
