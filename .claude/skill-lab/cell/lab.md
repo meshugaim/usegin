@@ -96,9 +96,14 @@ Did the spawner run the full test suite after all workers finished? Was a review
 - Sequential-by-default (from liaison's ENG-1624 lesson) applies even more strongly to cell, because cell workers commit autonomously. Parallel workers on the same branch is a recipe for the exact chaos seen in ENG-2606.
 - Batch sizing guidance is missing from the skill itself. Consider adding: "For mechanical migrations, cap at 8-10 files per worker. For feature work, 1 slice = 1 worker."
 - A pre-flight check ("verify one worker commits correctly before launching the rest") would have caught the isolation failure in ENG-2606 immediately. Consider adding to spawner.md.
+- **`crun` cannot run inside Claude Code sessions.** The `CLAUDECODE` env var check blocks nested launches. Round 2 (same day) hit this when trying `crun --cwd $(worktree path ...)` — all 5 workers failed. Fallback was `Agent` tool with `isolation: "worktree"`, which worked but bypasses the skill's prescribed tooling. `crun` needs a fix (unset CLAUDECODE, or `--force` flag) for the skill to work as designed.
+- **`Agent` tool worktrees don't guarantee branch isolation.** In round 2, 4/5 workers committed directly to main despite being in Agent-managed worktrees. Only 1 worker committed to its worktree branch. This was harmless (zero file overlap) but is a latent risk. The skill should document this behavior.
+- **Batch sizing of 3-8 files per worker works well.** Round 2 used this range and all 5 workers completed without context exhaustion (vs. round 1's 15-30 files where 3/4 hit limits).
+- **Scope-creep in worker prompts needs explicit prohibition.** "Do NOT touch any files outside your N-file list" wasn't enough — 2 workers still created unsolicited docs/CI commits. Consider: "Do NOT create new files. Do NOT modify files outside your list. Do NOT add documentation, refactor CI, or improve anything beyond your assignment."
 
 ## Changelog
 
 | Date | Change | Motivation |
 |---|---|---|
 | 2026-03-09 | Lab created | ENG-2606 session: parallel workers without cell skill caused contamination, overwrites, and data loss |
+| 2026-03-09 | Round 2 retro added | Same task, skill invoked properly this time. `crun` blocked by nested-session check, fell back to Agent tool. Much better outcomes (0 overlap, 0 contamination, all workers completed) |
