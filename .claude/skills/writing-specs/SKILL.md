@@ -53,12 +53,11 @@ Include in your questions: **Does this feature need a feature toggle?** Breaking
 
 Present section outline. Get approval or adjust.
 
-**Acceptance Criteria and Verification Expectations are always the final two sections.** They come last because they synthesize everything discussed in earlier sections. By the time you reach them, the requirements and constraints are clear, making it easier to write precise, testable criteria.
+**Acceptance Criteria is always the final section.** It comes last because it synthesizes everything discussed in earlier sections. By the time you reach it, the requirements and constraints are clear, making it easier to write precise, testable criteria.
 
 The outline should always end with:
 - ... (feature-specific sections)
 - Acceptance Criteria
-- Verification Expectations
 
 ### 4. Write Section by Section
 
@@ -84,57 +83,79 @@ For each section:
 
 If other thoughts require changes to previous sections: edit them, `plan update`, then continue.
 
+### 5. After the Spec is Complete
+
+After all sections are approved and pushed to Linear, use `AskUserQuestion` to ask:
+
+> **Should we recommend that the implementer slice this into vertical slices before implementing?**
+> For features with 3+ acceptance criteria or that touch multiple layers (DB + API + UI), slicing helps. For small, focused features, the implementer can go straight to implementation.
+
+If yes, append a note to the Linear issue description:
+
+```
+## Implementation Note
+
+This spec is recommended to be sliced into vertical slices before implementing.
+Use the `slicing-specs` skill (`/slice`) to decompose into ordered sub-issues.
+```
+
 ## Required Sections
 
 Every spec must include these sections. The order and grouping of other sections is flexible, but these are non-negotiable.
 
 ### Acceptance Criteria
 
-Define what "done" means for the feature as a whole. These are the conditions that must be true before the feature is considered complete.
+Define what "done" means and how to verify it. Each criterion is a testable statement paired with a test level — this tells the implementer *what* to test and roughly *where*, without prescribing *how*.
 
-Write them as informal, testable statements. Each criterion should be verifiable — if you can't tell whether it's true or false by looking at the app, it's too vague.
+Don't prescribe test implementation — the implementer decides mocks, fixtures, and test structure. Just specify the behavior and the level.
 
-**Good criteria:**
-- "User sees an error toast when save fails with a network error"
-- "Deleted projects no longer appear in the project list or search results"
-- "Chat works with 0 files, 1 file, and 100+ files attached to the project"
+**Format as a numbered table:**
+
+| # | Criterion | Level |
+|---|-----------|-------|
+| 1 | User sees error toast when save fails with a network error | integration-browser |
+| 2 | Only workspace members can see the project | integration-db |
+| 3 | Chat works with 0 files, 1 file, and 100+ files | integration-llm |
+| 4 | Card layout matches Figma on mobile and desktop | visual |
+
+**Available levels:**
+
+| Level | When to use |
+|-------|-------------|
+| **unit** | Pure logic, transformations, validation rules |
+| **integration-db** | Data access, RLS policies, service layer |
+| **integration-browser** | UI flows, routing, auth states |
+| **integration-llm** | Agent behavior, streaming, SDK contracts |
+| **e2e** | Critical user journeys, cross-service flows |
+| **visual** | Styling, layout, animations (manual/screenshot check) |
+
+Reference `docs/testing/README.md` for the full test type matrix.
+
+**Writing good criteria:**
+- Cover happy path, error cases, and edge cases
+- Include cross-cutting concerns: permissions, empty states, limits
+- Each criterion should be verifiable — if you can't tell whether it's true or false, it's too vague
+- If a criterion feels too big, it probably maps to multiple vertical slices — that's fine at the spec level
+- Criteria that span multiple slices: mark as "after all slices" so the verification agent checks them at the end
 
 **Bad criteria:**
 - "The feature works correctly" (not testable)
 - "Performance is good" (not measurable without a threshold)
 - "Error handling is robust" (what errors? what handling?)
 
-**Tips:**
-- Cover happy path, error cases, and edge cases
-- Include cross-cutting concerns: permissions, empty states, limits
-- If a criterion feels too big, it probably maps to multiple vertical slices — that's fine at the spec level, the slicing skill will decompose it later
+## Recommended Patterns
 
-### Verification Expectations
+These are not required sections, but specs that include them consistently produce better downstream results.
 
-Define *how* each acceptance criterion should be verified, and at roughly what level. This section is written for two audiences: the implementing agent (who writes the tests) and the verification agent (who checks the work at the end).
+**Reference files per section.** Each section can include a small table of file paths relevant to that section. Eliminates "where does this go?" for implementers.
 
-Don't prescribe test implementation — the implementer decides mocks, fixtures, and test structure. Do specify *what* needs automated tests vs. visual verification, and at what level of the test pyramid.
+**Scope clarity.** If the spec touches a concept, it's either in scope or explicitly out. No middle ground. Use a short In/Out table or a "Non-goals" list with reasons for each exclusion.
 
-| Level | When to specify | Example |
-|-------|----------------|---------|
-| **Unit** | Pure logic, transformations, validation rules | "Slug generation handles unicode, spaces, and collisions" |
-| **Integration (DB)** | Data access, RLS policies, service layer | "Only workspace members can see the project" |
-| **Integration (Browser)** | UI flows, routing, auth states | "Form shows validation errors inline without page reload" |
-| **Integration (LLM)** | Agent behavior, streaming, SDK contracts | "Chat endpoint streams SSE events with correct format" |
-| **E2E** | Critical user journeys, cross-service flows | "User creates project, uploads file, and chats — full flow" |
-| **Visual/Manual** | Styling, layout, animations | "Card layout matches Figma on mobile and desktop" |
+**"What Doesn't Change."** When a feature modifies existing behavior, state the invariants the implementation must preserve. This prevents regression anxiety and makes the blast radius visible.
 
-Reference `docs/testing/README.md` for the full test type matrix when choosing levels.
+**Decisions made.** When open questions are resolved during spec writing, record them: question, answer, rationale. Prevents re-litigating settled decisions.
 
-**Format each expectation as:**
-
-> **What:** [behavior to verify]
-> **Level:** [unit / integration-db / integration-browser / integration-llm / e2e / visual]
-> **Notes:** [context for implementer — known edge cases, related existing tests, etc.]
-
-The "Notes" field is optional — use it when there's something non-obvious the implementer should know.
-
-**Criteria that span multiple slices:** Some acceptance criteria can only be fully verified after multiple slices land. Mark these as "end-to-end verification — after all slices" so the verification agent knows to check them at the end, not per-slice.
+**Keep research out of the spec body.** Reference experiment files by path instead of inlining findings. The spec is for decisions and requirements, not a journal of investigation.
 
 ## Spec Style
 
@@ -145,20 +166,33 @@ The "Notes" field is optional — use it when there's something non-obvious the 
 | Focused           | Bloat           |
 | Tables over prose | Walls of text   |
 
+## Self-Check Before Finalizing
+
+Before marking the spec complete, verify these — they are the most common gaps found in an audit of 21 specs:
+
+| Check | Question |
+|-------|----------|
+| AC completeness | Does every in-scope behavior have a numbered criterion? |
+| Error coverage | Do ACs cover what happens when things fail, not just when they succeed? |
+| All code paths | If the feature touches multiple paths (upload, sync, email), does each path have an AC? |
+| Test levels | Does every AC have a level assigned? |
+| Scope clarity | Is every feature clearly in or out? No ambiguous "future" items in the main body? |
+| Decisions resolved | Are there zero "TBD" items? Each either resolved or tracked as a separate spike? |
+
 ## Downstream: How the Spec Gets Used
 
 This spec feeds into a pipeline. Writing it well makes everything downstream better.
 
 | Stage | What happens | What it reads from the spec |
 |-------|-------------|-----------------------------|
-| **Slicing** | Spec is decomposed into vertical slices, each a Linear sub-issue | Acceptance criteria → per-slice criteria |
+| **Slicing** | Spec is decomposed into vertical slices, each a Linear sub-issue | Acceptance criteria → per-slice criteria + test levels |
 | **Implementing** | Each slice is built with TDD | Per-slice criteria → what tests to write and at what level |
-| **Verification** | A verification agent systematically checks the finished work | Acceptance criteria + verification expectations → structured QA pass |
+| **Verification** | A verification agent systematically checks the finished work | Acceptance criteria → structured QA pass |
 
-The acceptance criteria are the contract between these stages. Write them with all three consumers in mind:
+The acceptance criteria table is the contract between these stages. Write each criterion with all three consumers in mind:
 
-**For the slicer:** Criteria should be decomposable. Each criterion should map to one or a few slices. If a criterion is too tangled to slice, it needs to be broken down further in the spec itself.
+**For the slicer:** Criteria should be decomposable. Each criterion should map to one or a few slices. If a criterion is too tangled to slice, break it down further in the spec.
 
-**For the implementer:** Verification expectations should give enough signal to choose the right test type and level, without dictating implementation. "Only workspace members can see the project" tells the implementer to write an RLS integration test without prescribing the fixture setup.
+**For the implementer:** The test level gives enough signal to choose the right test type without dictating implementation. "Only workspace members can see the project" at `integration-db` tells the implementer to write an RLS test without prescribing fixtures.
 
-**For the verification agent:** Acceptance criteria should be directly checkable by an agent with browser access but no implementation context. Write them as observable behaviors: "User sees X when Y happens." Avoid criteria that require reading code or database state to verify — if the verification agent can't confirm it through the UI or API, it belongs in the verification expectations as an automated test, not as something to manually check.
+**For the verification agent:** Criteria should be directly checkable as observable behaviors: "User sees X when Y happens." If it can only be verified by reading code, it belongs as an automated test (indicated by the level column), not as something to manually check.

@@ -78,7 +78,32 @@ Write entries to `.claude/skill-lab/<skill-name>/retros/YYYY-MM-DD-<slug>.md` us
 - **partially followed** — some signals pass, some fail. Director followed the spirit but broke rules in places.
 - **collapsed** — director abandoned the orchestration model. Did work directly, read phase files, loaded skills, etc.
 
-## Step 6: Surface Actionable Items
+## Step 6: Check for Spec Retro Opportunity
+
+After completing the skill retro, check whether the session implemented a spec. Look for:
+- References to a spec issue (e.g., `plan show ENG-XXX`)
+- Use of `implementing-specs` or `slicing-specs` skills
+- Slice issues with a parent spec
+
+If a spec was implemented, ask the user via `AskUserQuestion`:
+
+> **Should I also run a spec retro — evaluating the spec you implemented from?**
+> This uses the writing-specs lab's implementer perspective: "knowing what you know now, how good was the spec?"
+>
+> Options:
+> 1. **Yes, after the skill retro** — finish the skill retro first, then I'll do the spec retro separately
+> 2. **Yes, do both now** — I'll do the spec retro right after (still one at a time)
+> 3. **No** — skip the spec retro
+
+If yes (option 1 or 2):
+- Read the writing-specs lab at `.claude/skill-lab/writing-specs/lab.md` — use the **Implementer Perspective** section
+- Evaluate the spec against the implementer success signals and retro guide
+- Write findings to `.claude/skill-lab/writing-specs/retros/implementer/YYYY-MM-DD-<spec-slug>.md`
+- Use the same retro entry format (verdict, key observations, suggestions)
+
+Even when the user says "do both," always complete and present the skill retro first, then do the spec retro as a separate evaluation. Never merge them.
+
+## Step 7: Surface Actionable Items
 
 If a finding is concrete enough to become a skill improvement, flag it in your summary. The user decides whether to create a Linear issue or let it ferment in the Ideas section of the lab's `lab.md`.
 
