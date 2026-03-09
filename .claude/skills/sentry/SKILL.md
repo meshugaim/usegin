@@ -165,5 +165,6 @@ sentry events show NEXTJS-APP-123 --json | jq '.stacktrace'
 
 ## See Also
 
-- [working-with-sentry skill](../working-with-sentry/SKILL.md) - SDK configuration and GitHub integration
+- [Production Incident Debug Runbook](../../../docs/runbooks/incident-debug.md) — investigation procedure, service→project mapping, span operations, key signals
+- [working-with-sentry skill](../working-with-sentry/SKILL.md) — SDK configuration and GitHub integration
 - [Sentry CLI Documentation](https://docs.sentry.io/cli/)

@@ -115,3 +115,4 @@ After step 2, present updated findings and wait for user decision again. Do not 
 - `git log --oneline -5` — check if someone already pushed a fix
 - Reproduce locally: `bun test <file>`, `uv run pytest <file>`, `bun run lint`, `bun run typecheck`
 - For Sentry: `python-services` maps to project slug `python-fastapi`, `nextjs-app` stays as-is
+- For production incidents, see [Production Incident Debug Runbook](../../docs/runbooks/incident-debug.md) — full investigation procedure, span operations, key signals
