@@ -34,18 +34,51 @@ function getDocsOverview(): string {
   return lines.join("\n");
 }
 
+function getCompactCli(): string {
+  return [
+    "## CLI Quick Reference",
+    "",
+    "Run `plan --help` for full command reference. Common patterns:",
+    "",
+    "```",
+    'plan create "scope: title" --parent <id> --label feature',
+    "plan show <id> --tree",
+    "plan start <id>",
+    "plan close <id>",
+    "plan update <id> --comment \"text\"",
+    "```",
+  ].join("\n");
+}
+
+function getCompactDocs(): string {
+  return [
+    "## Docs",
+    "",
+    "Run `plan docs` to browse embedded documentation (iterative descriptions, workflow philosophy, and more).",
+  ].join("\n");
+}
+
 export function createAlignCommand(): Command {
   const cmd = new Command("align")
     .description("Output collaboration norms and workflow philosophy")
-    .action((_options, command) => {
+    .option("--compact", "Shorter output for injection into agent context")
+    .action((options, command) => {
       console.log(getPhilosophyContent());
-      console.log("\n---\n");
-      command.parent?.outputHelp();
 
-      const docsOverview = getDocsOverview();
-      if (docsOverview) {
+      if (options.compact) {
+        console.log("");
+        console.log(getCompactCli());
+        console.log("");
+        console.log(getCompactDocs());
+      } else {
         console.log("\n---\n");
-        console.log(docsOverview);
+        command.parent?.outputHelp();
+
+        const docsOverview = getDocsOverview();
+        if (docsOverview) {
+          console.log("\n---\n");
+          console.log(docsOverview);
+        }
       }
     });
 
