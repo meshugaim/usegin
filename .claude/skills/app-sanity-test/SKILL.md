@@ -234,6 +234,7 @@ Key commands:
 
 ## Tips
 
+- **Always run `playwright-cli` from the repo root** (`/workspaces/test-mvp`). The daemon uses a cwd-based hash to find the browser — if cwd differs between commands, you get "browser not open" errors.
 - Prefer `snapshot` over `screenshot` — more token-efficient, shows element refs for interaction
 - Always `snapshot` before interacting — refs change between page states
 - After Effi responds, wait a few seconds (`sleep 3-5`) before snapshotting — streaming takes time

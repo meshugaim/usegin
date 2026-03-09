@@ -161,6 +161,7 @@ just supabase-reset
 
 ## Tips
 
+- **Always run `playwright-cli` from the repo root** (`/workspaces/test-mvp`). The daemon uses a cwd-based hash to find the browser — if cwd differs between commands, you get "browser not open" errors.
 - Prefer `snapshot` over `screenshot` — more token-efficient, shows accessibility tree
 - Use `state-save` to checkpoint browser state mid-session
 - Session data in `.playwright-cli/` is gitignored
