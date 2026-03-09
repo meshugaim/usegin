@@ -55,7 +55,7 @@
 
 **Suggestions:**
 
-1. **`crun` nested-session blocker needs a fix.** The `CLAUDECODE` env var check prevents `crun` from working inside Claude Code sessions. This is the fundamental reason the skill's prescribed tooling couldn't be used. Options: (a) `crun` unsets `CLAUDECODE` before launching, (b) `crun` has a `--force` flag, (c) document that `Agent` tool is the fallback when inside Claude Code.
+1. **`crun` fundamentally cannot work inside Claude Code.** `crun` wraps `claude -p`, which launches a new Claude Code process. But Claude Code sets the `CLAUDECODE` env var, and new instances refuse to start when they detect it ("cannot be launched inside another Claude Code session — nested sessions share runtime resources and will crash all active sessions"). This is a safety check, not a bug — nested processes sharing runtime would crash. It means `crun`, the cell skill's prescribed spawning tool, cannot work when the spawner is itself a Claude Code session. The `Agent` tool works because it spawns subagents within the same process. But Agent-spawned workers don't use `crun`/`worktree` CLI tooling, yielding weaker isolation (4/5 workers committed to main instead of worktree branches). Options: (a) `crun` unsets `CLAUDECODE` before launching, (b) `crun` adds `--force` flag, (c) skill officially supports `Agent` tool as first-class alternative.
 
 2. **Worker scope-creep prevention.** Add to worker prompts: "Do NOT create documentation, refactor CI, or make improvements beyond your assigned files." Two workers added unsolicited commits. The shared prompt file mentioned "Do NOT touch any files outside your N-file list" but workers still created new files.
 
