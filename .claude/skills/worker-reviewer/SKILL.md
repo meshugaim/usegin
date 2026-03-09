@@ -2,6 +2,12 @@
 name: worker-reviewer
 description: TDD loop with tight worker-reviewer coordination
 triggers: ["/wr", "/worker-reviewer"]
+hooks:
+  PreToolUse:
+    - matcher: "Write"
+      hooks:
+        - type: command
+          command: "bun tools/worker-reviewer-experiment/hooks/validate-submission.ts"
 ---
 
 # Worker-Reviewer TDD Loop
