@@ -78,9 +78,9 @@ const modelEmoji = modelName.includes("opus")
       ? pick(["😵‍💫", "🫠", "😅", "🤔", "😬", "🥴"])
       : "🤖";
 
-// Effort level from patched CLI input (see node_modules patch + scripts/patch-claude-statusline.sh)
-// h88() can return a string ("low"|"medium"|"high"|"max") or a number (0-255)
-const rawEffort = (input as any).effort?.level;
+// Effort level from CLAUDE_CODE_EFFORT_LEVEL env var.
+// Initial value set by launch command; kept in sync on Shift+Tab via patched CLI.
+const rawEffort = Bun.env.CLAUDE_CODE_EFFORT_LEVEL;
 function resolveEffort(val: unknown): { label: string; color: string } | null {
   if (typeof val === "string") {
     const map: Record<string, { label: string; color: string }> = {
