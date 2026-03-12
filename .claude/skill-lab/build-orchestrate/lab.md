@@ -12,6 +12,15 @@ Success means: a full build lifecycle (research → design → spec → implemen
 
 When retroing a session that used this skill, a good session looks like:
 
+### Correctness (highest priority)
+- [ ] Test plan existed before implementation started (from spec, prior session, or created with user)
+- [ ] No test assertions were deleted or weakened without orchestrator approval
+- [ ] Every implementation phase had a test-integrity reviewer checking `git diff -- '*/tests/*'`
+- [ ] Deferred items are tracked and visible (skipped tests on whiteboard, not silently removed)
+- [ ] "Tests pass" was verified by reviewer, not just reported by implementer
+- [ ] Implementation agents received the Test Integrity Rules and Pass/Stop/Defer instructions
+
+### Delegation (process discipline)
 - [ ] Director never used Grep, Glob, Edit, or Bash
 - [ ] Director never read files other than the whiteboard and the skill itself
 - [ ] Director never loaded a skill into its own context (no `Skill:` calls)
@@ -19,6 +28,8 @@ When retroing a session that used this skill, a good session looks like:
 - [ ] Every note-to-self includes the "Role check" circuit breaker line
 - [ ] Every phase agent was instructed to return a ≤10 line summary
 - [ ] Every phase had a reviewer agent (not reviewed by director)
+
+### Orchestration (whiteboard + flow)
 - [ ] Whiteboard stayed under 200 lines
 - [ ] Auto-Inject block present at top of whiteboard, unmodified
 - [ ] Recovery block (Current State) updated at every phase boundary
@@ -72,3 +83,4 @@ Were sanity-check agents spawned between phases? Or was verification deferred en
 | 2026-02-25 | Renamed "Director's Creed" → "Hard Rules" | Simpler, more direct language. |
 | 2026-02-27 | Added QA agent briefing template to skill | QA agents lacked practical setup instructions (auth, ports, sequential constraint). |
 | 2026-02-27 | Restructured lab: split retros into individual files under `retros/` | Single file grew to 37KB after 4 retros. Stable reference material buried under growing history. |
+| 2026-03-12 | Added Priority Hierarchy, Correctness Rules (#7-10), Test-Integrity Review, Pass/Stop/Defer framework, Implementation Agent Instructions template, updated Auto-Inject (5→6 lines), updated Workflow diagram | GFS Sync Unification retro: 14 regressions shipped because subagents deleted/weakened tests and director had no mechanism to catch it. Skill optimized for flow over correctness. |
