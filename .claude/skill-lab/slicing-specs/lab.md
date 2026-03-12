@@ -12,10 +12,10 @@ Success means: slices that an implementer can pick up one at a time, in order, w
 
 Like `writing-specs`, this lab evaluates from two vantage points:
 
-| Perspective | When to trigger | What it evaluates | Retros go in |
-|---|---|---|---|
-| **Slicer** | After slicing is complete | Did the process produce good slices? (decomposition quality, ordering, descriptions) | `retros/slicer/` |
-| **Implementer** | After implementation is complete (or multiple slices done) | Did the slices serve the implementer well? (hindsight evaluation) | `retros/implementer/` |
+| Perspective     | When to trigger                                            | What it evaluates                                                                    | Retros go in          |
+| --------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------- |
+| **Slicer**      | After slicing is complete                                  | Did the process produce good slices? (decomposition quality, ordering, descriptions) | `retros/slicer/`      |
+| **Implementer** | After implementation is complete (or multiple slices done) | Did the slices serve the implementer well? (hindsight evaluation)                    | `retros/implementer/` |
 
 The slicer perspective evaluates the slicing session itself. The implementer perspective evaluates the slices' quality with the benefit of having built from them.
 
@@ -139,6 +139,6 @@ plan show <slice-issue-id>         # Individual slice as-written vs as-implement
 
 ## Changelog
 
-| Date | Change | Motivation |
-|---|---|---|
+| Date       | Change                                             | Motivation                                                                                                                                                                    |
+| ---------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-03-11 | Lab created with slicer + implementer perspectives | Pipeline gap: writing-specs had a lab, slicing-specs and implementing-specs did not. Created to enable retros on the slicing process and the quality of slice decompositions. |

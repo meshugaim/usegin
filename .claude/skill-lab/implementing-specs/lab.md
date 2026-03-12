@@ -120,44 +120,21 @@ Count collapse events in the retro entry. A single collapse in an otherwise good
 
 ---
 
-## Auto-Implement Mode
-
-When implementing-specs runs inside the auto-implement CLI (headless `claude -p` sessions), additional signals matter:
-
-### Success Signals (auto-implement only)
-
-- [ ] `AUTO_IMPLEMENT_HANDOFF` signal was output after writing a handoff
-- [ ] `AUTO_IMPLEMENT_COMPLETE` signal was output after all slices were done
-- [ ] Handoff was written to a file the outer loop can read
-- [ ] Linear state is consistent with the signal (if COMPLETE, all child issues are Done)
-
-### Retro Guide (auto-implement extension)
-
-After evaluating the session's process discipline (above), check:
-
-1. **Signal correctness** — Did the session output the right signal at the right time? A handoff without the signal means the outer loop doesn't know to spawn a new session. A COMPLETE signal with remaining slices means premature termination.
-2. **Handoff continuity** — If this was a mid-chain session (not the first or last), did the handoff leave enough context for the next session to continue without re-reading the spec? Could the next session pick up from Linear + handoff alone?
-3. **Chain efficiency** — Across the full auto-implement chain, how many sessions did it take per slice? More than one session per slice (on average) suggests sizing or context management problems.
-
-Auto-implement retros should evaluate individual sessions *and* the chain as a whole. Individual session retros use the standard retro guide above. Chain-level evaluation is a cross-cutting concern — note it in the retro entry's observations.
-
----
-
 ## Known Limitations
 
 - **TDD red flags are subjective.** "I'll add tests later" is a red flag in the skill, but the retro agent is reading a transcript — the agent may have had a valid reason that isn't captured. Mark as "unable to assess" if context is insufficient.
 - **Context thresholds are approximate.** `cctx` output may not be in the transcript. If the retro agent can't determine context levels, note it rather than guessing.
 - **Self-verification quality is hard to assess from transcripts.** The retro agent can see *that* verification happened but not always *how thorough* it was. Focus on whether it happened at all, not its depth.
-- **The skill is for human-collaborative implementation.** Auto-implement mode adapts it for headless use, but the core skill assumes a human is present. Some signals (checkpoints, `AskUserQuestion`) naturally look different in auto-implement mode.
+- **The skill is for human-collaborative implementation.** When running inside auto-implement (headless), some signals (checkpoints, `AskUserQuestion`) naturally don't apply. The auto-implement lab evaluates the chain-level concerns; this lab evaluates the single-session process. See `.claude/skill-lab/auto-implement/lab.md`.
 
 ## Ideas / Notes
 
 - The session f35a8b4f (Linear integration, slices 1-2) is the first session to retro against this lab. It showed a clear post-handoff collapse event — worth tracking whether this is a recurring pattern.
 - **Pipeline retro:** This lab evaluates the implementing-specs module in isolation. A separate pipeline-level retro should integrate insights across writing-specs → slicing-specs → implementing-specs → verify-spec before making changes to any individual skill. See the slicing-specs lab for the same note.
-- Consider whether the auto-implement section should be its own lab. It evaluates a different thing (the outer loop + session chain) and has its own success signals. Currently bundled here because auto-implement runs implementing-specs internally.
 
 ## Changelog
 
 | Date | Change | Motivation |
 |---|---|---|
 | 2026-03-11 | Lab created with process perspective + auto-implement extension | Pipeline gap: first two skills had labs, implementing-specs did not. Session f35a8b4f showed clear process signals worth tracking (orient quality, context management, post-handoff collapse). |
+| 2026-03-12 | Extracted auto-implement into its own lab | Auto-implement evaluates the session chain (multi-session orchestration), not individual session discipline. Different unit of evaluation deserves its own lab. |
