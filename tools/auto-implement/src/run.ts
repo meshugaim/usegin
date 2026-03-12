@@ -7,6 +7,11 @@
  * - Agent fails to produce a handoff or completion signal
  * - Max sessions reached
  * - User cancels (--pause mode)
+ *
+ * When the post-commit hook detects high context utilization, it kills the
+ * Claude process and writes a rotation signal. This loop detects the signal,
+ * spawns a handoff writer agent to capture the killed session's state, then
+ * continues with the next session.
  */
 
 import { stat } from "fs/promises";
@@ -18,6 +23,7 @@ import {
   getRunDir,
   type ManifestEvent,
 } from "./manifest";
+import type { RotationSignal } from "../hooks/lifecycle";
 
 const HANDOFF_DIR = "/workspaces/test-mvp/.claude/handoffs";
 const HANDOFF_LATEST = join(HANDOFF_DIR, "latest.md");
@@ -56,7 +62,13 @@ export interface SpawnContext {
 }
 
 export interface RunDeps {
-  spawnClaude: (prompt: string, context: SpawnContext) => Promise<{ sessionId: string; exitCode: number; stdout: string }>;
+  spawnClaude: (prompt: string, context: SpawnContext) => Promise<{
+    sessionId: string;
+    exitCode: number;
+    stdout: string;
+    rotation: RotationSignal | null;
+  }>;
+  spawnHandoffWriter: (killedSessionId: string, specId: string) => Promise<{ exitCode: number }>;
   confirm: (message: string) => Promise<boolean>;
   checkSpecComplete: (specId: string) => Promise<boolean>;
   log: (message: string) => void;
@@ -159,7 +171,7 @@ export async function autoImplement(
     });
 
     const startTime = Date.now();
-    let result: { sessionId: string; exitCode: number; stdout: string };
+    let result: { sessionId: string; exitCode: number; stdout: string; rotation: RotationSignal | null };
 
     try {
       result = await deps.spawnClaude(prompt, {
@@ -189,6 +201,9 @@ export async function autoImplement(
     // Detect signal from output
     const signal = detectSignal(result.stdout);
 
+    // Check for rotation signal (post-commit hook killed Claude due to high context)
+    const rotation = result.rotation;
+
     // Check if handoff file was updated
     const handoffAfter = await getHandoffState();
     const handoffUpdated =
@@ -210,7 +225,9 @@ export async function autoImplement(
       exitCode: result.exitCode,
       handoffFile,
       totalSessions,
-      details: `signal=${signal}`,
+      details: rotation
+        ? `signal=rotation context=${rotation.context_percent}%`
+        : `signal=${signal}`,
     });
 
     deps.log("");
@@ -228,42 +245,103 @@ export async function autoImplement(
       });
     }
 
-    // Handle signals
-    //
-    // Detection priority:
-    // 1. Explicit COMPLETE signal in stdout → done
-    // 2. No signal but all Linear slices closed → done (agent forgot the signal)
-    // 3. Handoff signal or handoff file updated → next session
-    // 4. Nothing → stop (something broke)
-
-    const isComplete = signal === "complete" || (
-      signal !== "handoff" && await deps.checkSpecComplete(specId)
-    );
-
-    if (isComplete) {
-      const via = signal === "complete" ? "signal" : "linear-check";
-      deps.log("");
-      deps.log(`All slices complete! (detected via ${via})`);
+    // Handle rotation: post-commit hook killed Claude due to context pressure.
+    // Spawn a handoff writer to capture state, then continue to next session.
+    if (rotation) {
+      deps.log(`Context rotation detected: ${rotation.context_percent}% (killed session ${rotation.killed_session_id})`);
       await appendEvent(runDir, {
         timestamp: new Date().toISOString(),
-        event: "completion_detected",
+        event: "rotation_detected",
         runId,
         specId,
         sessionNumber: i,
-        totalSessions,
-        details: `detected_via=${via}`,
+        sessionId: rotation.killed_session_id,
+        details: `context=${rotation.context_percent}%`,
       });
-      await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "complete");
-      return { runId, runDir, totalSessions, outcome: "complete" };
-    }
 
-    if (signal === "none" && !handoffUpdated) {
-      // No signal, no handoff, not complete in Linear — something went wrong
-      deps.log("");
-      deps.log("No handoff or completion signal detected. Stopping.");
-      deps.log("Check the session log for details.");
-      await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "no_signal");
-      return { runId, runDir, totalSessions, outcome: "no_signal" };
+      // Spawn handoff writer if no handoff was already written
+      if (!handoffUpdated) {
+        deps.log("Spawning handoff writer...");
+        await appendEvent(runDir, {
+          timestamp: new Date().toISOString(),
+          event: "handoff_writer_started",
+          runId,
+          specId,
+          sessionNumber: i,
+          sessionId: rotation.killed_session_id,
+        });
+
+        try {
+          const writerResult = await deps.spawnHandoffWriter(
+            rotation.killed_session_id,
+            specId,
+          );
+          await appendEvent(runDir, {
+            timestamp: new Date().toISOString(),
+            event: writerResult.exitCode === 0 ? "handoff_writer_completed" : "handoff_writer_failed",
+            runId,
+            specId,
+            sessionNumber: i,
+            exitCode: writerResult.exitCode,
+          });
+          if (writerResult.exitCode === 0) {
+            deps.log("Handoff writer completed.");
+          } else {
+            deps.log(`Handoff writer exited with code ${writerResult.exitCode} — continuing anyway.`);
+          }
+        } catch (err) {
+          deps.log(`Handoff writer failed: ${err} — continuing anyway.`);
+          await appendEvent(runDir, {
+            timestamp: new Date().toISOString(),
+            event: "handoff_writer_failed",
+            runId,
+            specId,
+            sessionNumber: i,
+            details: String(err),
+          });
+        }
+      }
+
+      // Rotation is treated as a handoff — continue to next session
+      // (skip completion/no-signal checks below)
+    } else {
+      // Handle signals (non-rotation path)
+      //
+      // Detection priority:
+      // 1. Explicit COMPLETE signal in stdout → done
+      // 2. No signal but all Linear slices closed → done (agent forgot the signal)
+      // 3. Handoff signal or handoff file updated → next session
+      // 4. Nothing → stop (something broke)
+
+      const isComplete = signal === "complete" || (
+        signal !== "handoff" && await deps.checkSpecComplete(specId)
+      );
+
+      if (isComplete) {
+        const via = signal === "complete" ? "signal" : "linear-check";
+        deps.log("");
+        deps.log(`All slices complete! (detected via ${via})`);
+        await appendEvent(runDir, {
+          timestamp: new Date().toISOString(),
+          event: "completion_detected",
+          runId,
+          specId,
+          sessionNumber: i,
+          totalSessions,
+          details: `detected_via=${via}`,
+        });
+        await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "complete");
+        return { runId, runDir, totalSessions, outcome: "complete" };
+      }
+
+      if (signal === "none" && !handoffUpdated) {
+        // No signal, no handoff, not complete in Linear — something went wrong
+        deps.log("");
+        deps.log("No handoff or completion signal detected. Stopping.");
+        deps.log("Check the session log for details.");
+        await recordRunEnd(runDir, runId, specId, totalSessions, maxSessions, "no_signal");
+        return { runId, runDir, totalSessions, outcome: "no_signal" };
+      }
     }
 
     // If we have more sessions to go, optionally pause

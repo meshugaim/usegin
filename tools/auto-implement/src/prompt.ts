@@ -14,6 +14,11 @@ export interface PromptOptions {
   runDir: string;
 }
 
+export interface HandoffWriterPromptOptions {
+  killedSessionId: string;
+  specId: string;
+}
+
 /**
  * Build the prompt for a fresh implementing-specs session.
  *
@@ -90,4 +95,62 @@ When ALL slices are done (parent spec fully implemented):
 6. Continue implementation
 7. Hand off when context thresholds are reached
 `;
+}
+
+/**
+ * Build the prompt for a handoff writer agent.
+ *
+ * This is a focused, low-context task: read the killed session's transcript,
+ * cross-reference with git log and Linear state, and write a handoff note.
+ * The handoff writer does NOT implement anything — it only captures state.
+ */
+export function buildHandoffWriterPrompt(options: HandoffWriterPromptOptions): string {
+  const { killedSessionId, specId } = options;
+
+  return `
+## Handoff Writer — Context Rotation Recovery
+
+A previous implementing session (${killedSessionId}) was killed by the post-commit hook
+because context utilization exceeded the threshold. Your job is to write a handoff note
+capturing its state so the next session can continue seamlessly.
+
+**You are NOT implementing anything.** You are only writing a handoff note.
+
+## Steps
+
+1. Read the killed session's transcript:
+   \`\`\`
+   session ${killedSessionId} --timeline
+   \`\`\`
+
+2. Check recent git activity to see what was committed:
+   \`\`\`
+   git log --oneline -20
+   \`\`\`
+
+3. Check Linear state to see which slices are done/in-progress:
+   \`\`\`
+   plan show ${specId} --tree
+   \`\`\`
+
+4. Check for any uncommitted work:
+   \`\`\`
+   git status
+   git diff --stat
+   \`\`\`
+
+5. If there is uncommitted work that looks complete, commit and push it.
+
+6. Write the handoff using \`/handoff\`. Include:
+   - What slice was being worked on
+   - What's done (committed)
+   - What's in progress (uncommitted changes, if any)
+   - What the next session should pick up
+   - Any blockers or issues encountered
+
+7. After writing the handoff, output exactly:
+   \`\`\`
+   AUTO_IMPLEMENT_HANDOFF
+   \`\`\`
+`.trim();
 }

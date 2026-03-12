@@ -22,13 +22,21 @@ import { generateSessionId } from "../../crun/src/run";
 import { ProgressMonitor } from "./progress";
 import { isTmuxAvailable, spawnClaudeInTmux, getTmuxSessionName } from "./tmux";
 import { runWatch } from "./watch";
+import { buildHandoffWriterPrompt } from "./prompt";
+import {
+  installHooks,
+  removeHooks,
+  updatePid,
+  readRotationSignal,
+  type RotationSignal,
+} from "../hooks/lifecycle";
 
 /** Whether tmux spawning is enabled for this run (resolved at startup) */
 let useTmux = false;
 
 /**
  * Spawn a headless Claude session using the piped approach (original behavior).
- * Returns session ID, exit code, and captured stdout.
+ * Returns exit code and captured stdout. Updates the lifecycle context with the real PID.
  */
 async function spawnClaudePiped(
   prompt: string,
@@ -59,6 +67,9 @@ async function spawnClaudePiped(
     }
   );
 
+  // Update lifecycle context with real PID (for post-commit hook to kill on rotation)
+  updatePid(proc.pid);
+
   // Stream stderr to console, capture stdout
   const stdoutChunks: string[] = [];
 
@@ -87,14 +98,22 @@ async function spawnClaudePiped(
 }
 
 /**
- * Spawn a Claude session with progress monitoring.
+ * Spawn a Claude session with lifecycle hooks and progress monitoring.
+ * Installs hook guards before the session and removes them after.
  * Uses tmux when available, falls back to piped approach.
  */
 async function spawnClaude(
   prompt: string,
   context: SpawnContext
-): Promise<{ sessionId: string; exitCode: number; stdout: string }> {
+): Promise<{ sessionId: string; exitCode: number; stdout: string; rotation: RotationSignal | null }> {
   const sessionId = await generateSessionId();
+
+  // Install lifecycle hooks (PID=0 placeholder, updated after spawn)
+  installHooks({
+    sessionId,
+    specId: context.specId,
+    claudePid: "0",
+  });
 
   // Start progress monitor
   const monitor = new ProgressMonitor({
@@ -104,6 +123,7 @@ async function spawnClaude(
   await monitor.start(sessionId);
 
   let result: { exitCode: number; stdout: string } | null = null;
+  let rotation: RotationSignal | null = null;
 
   try {
     if (useTmux) {
@@ -120,9 +140,14 @@ async function spawnClaude(
       result = await spawnClaudePiped(prompt, sessionId);
     }
   } finally {
+    // Read rotation signal BEFORE lifecycle cleanup (remove deletes it)
+    rotation = readRotationSignal();
+
     // Detect signal for the progress monitor's end message
     let signal = "error";
-    if (result) {
+    if (rotation) {
+      signal = "rotation";
+    } else if (result) {
       signal = result.stdout.includes("AUTO_IMPLEMENT_COMPLETE")
         ? "complete"
         : result.stdout.includes("AUTO_IMPLEMENT_HANDOFF")
@@ -130,13 +155,35 @@ async function spawnClaude(
           : "none";
     }
     monitor.stop(result?.exitCode ?? 1, signal);
+
+    // Remove lifecycle hooks (git hooks, PreToolUse guard, context file, rotation signal)
+    removeHooks();
   }
 
   return {
     sessionId,
     exitCode: result!.exitCode,
     stdout: result!.stdout,
+    rotation,
   };
+}
+
+/**
+ * Spawn a handoff writer agent after context rotation.
+ * This is a lightweight Claude session that reads the killed session's
+ * transcript, cross-references git log and Linear, and writes a handoff note.
+ */
+async function spawnHandoffWriter(
+  killedSessionId: string,
+  specId: string
+): Promise<{ exitCode: number }> {
+  const prompt = buildHandoffWriterPrompt({ killedSessionId, specId });
+  const sessionId = await generateSessionId();
+
+  log(`  Handoff writer session: ${sessionId.slice(0, 8)}`);
+
+  const { exitCode } = await spawnClaudePiped(prompt, sessionId);
+  return { exitCode };
 }
 
 /**
@@ -229,7 +276,7 @@ program
         maxSessions,
         pause: options.pause,
       },
-      { spawnClaude, confirm, checkSpecComplete, log }
+      { spawnClaude, spawnHandoffWriter, confirm, checkSpecComplete, log }
     );
 
     log("");

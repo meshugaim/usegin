@@ -5,10 +5,13 @@
  * Installs and removes the hook guards for auto-implement sessions.
  * Called by auto-implement at session start/end.
  *
- * Usage:
+ * Usage (CLI):
  *   bun lifecycle.ts install --session-id <id> --spec-id <id> --claude-pid <pid>
  *   bun lifecycle.ts remove
  *   bun lifecycle.ts status
+ *
+ * Usage (programmatic):
+ *   import { installHooks, removeHooks, updatePid, readRotationSignal } from "./lifecycle";
  */
 
 import { existsSync, unlinkSync, writeFileSync, readFileSync, chmodSync } from "fs";
@@ -20,6 +23,7 @@ const GIT_HOOKS_DIR = resolve(ROOT, ".git/hooks");
 const CLAUDE_SETTINGS_LOCAL = resolve(ROOT, ".claude/settings.local.json");
 const HOOKS_DIR = resolve(import.meta.dirname);
 const CONTEXT_FILE = "/tmp/auto-impl-context.json";
+const ROTATION_FILE = "/tmp/auto-impl-rotation.json";
 
 // Paths of hooks we manage
 const MANAGED_HOOKS = {
@@ -27,13 +31,49 @@ const MANAGED_HOOKS = {
   postCommit: resolve(GIT_HOOKS_DIR, "post-commit"),
 };
 
-interface InstallOptions {
+export interface InstallOptions {
   sessionId: string;
   specId: string;
   claudePid: string;
 }
 
-function install(options: InstallOptions) {
+export interface RotationSignal {
+  reason: string;
+  killed_session_id: string;
+  spec_id: string;
+  context_percent: number;
+  timestamp: string;
+}
+
+/**
+ * Read the rotation signal file if present.
+ * Returns null if no signal exists or it can't be parsed.
+ */
+export function readRotationSignal(): RotationSignal | null {
+  try {
+    if (!existsSync(ROTATION_FILE)) return null;
+    return JSON.parse(readFileSync(ROTATION_FILE, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Update the claude_pid in the context file.
+ * Called after spawning the Claude process to set the real PID.
+ */
+export function updatePid(pid: number): void {
+  try {
+    if (!existsSync(CONTEXT_FILE)) return;
+    const ctx = JSON.parse(readFileSync(CONTEXT_FILE, "utf-8"));
+    ctx.claude_pid = pid;
+    writeFileSync(CONTEXT_FILE, JSON.stringify(ctx, null, 2));
+  } catch {
+    // Best-effort — don't break the session over this
+  }
+}
+
+export function installHooks(options: InstallOptions) {
   const { sessionId, specId, claudePid } = options;
 
   console.log("Installing auto-implement hook guards...");
@@ -105,7 +145,7 @@ function install(options: InstallOptions) {
   console.log("\nAll hooks installed. Auto-implement guards are active.");
 }
 
-function remove() {
+export function removeHooks() {
   console.log("Removing auto-implement hook guards...");
 
   // 1. Remove git hooks
@@ -154,10 +194,9 @@ function remove() {
   }
 
   // 4. Remove rotation signal if present
-  const rotationFile = "/tmp/auto-impl-rotation.json";
-  if (existsSync(rotationFile)) {
-    unlinkSync(rotationFile);
-    console.log(`  ✓ Removed rotation signal: ${rotationFile}`);
+  if (existsSync(ROTATION_FILE)) {
+    unlinkSync(ROTATION_FILE);
+    console.log(`  ✓ Removed rotation signal: ${ROTATION_FILE}`);
   }
 
   console.log("\nAll hooks removed. Auto-implement guards are inactive.");
@@ -200,9 +239,8 @@ function status() {
   }
 
   // Check rotation signal
-  const rotationFile = "/tmp/auto-impl-rotation.json";
-  if (existsSync(rotationFile)) {
-    const rot = JSON.parse(readFileSync(rotationFile, "utf-8"));
+  if (existsSync(ROTATION_FILE)) {
+    const rot = JSON.parse(readFileSync(ROTATION_FILE, "utf-8"));
     console.log(`\n  ⚠ Rotation signal present: killed session ${rot.killed_session_id} at ${rot.context_percent}%`);
   }
 }
@@ -217,12 +255,12 @@ program
   .requiredOption("--session-id <id>", "Claude session ID")
   .requiredOption("--spec-id <id>", "Linear spec/issue ID")
   .requiredOption("--claude-pid <pid>", "Claude process PID")
-  .action(install);
+  .action(installHooks);
 
 program
   .command("remove")
   .description("Remove all hook guards")
-  .action(remove);
+  .action(removeHooks);
 
 program
   .command("status")

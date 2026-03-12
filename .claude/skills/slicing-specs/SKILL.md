@@ -182,6 +182,12 @@ Sometimes the first slice isn't a feature — it's setting up what other slices 
 
 This is a valid slice. Give it its own sub-issue. Don't bury infrastructure setup inside a feature slice — it obscures scope and makes the feature slice too big.
 
+**TDD skip label:** Infrastructure slices that don't contain testable implementation logic (e.g., pure migrations, config files, type definitions) should be labeled `tdd:skip`. This tells the auto-implement pre-commit TDD gate to allow commits without test files. Add the label when creating the sub-issue:
+
+```bash
+plan create "infra: add shared types for widget" --parent <spec-id> --label chore --label tdd:skip
+```
+
 ## Edge Cases
 
 **Spec has only 1-2 acceptance criteria:** The feature might be small enough that slicing is unnecessary. Tell the user — they may want to skip straight to `implementing-specs`.
