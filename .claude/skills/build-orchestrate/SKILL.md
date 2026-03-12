@@ -277,17 +277,27 @@ Phase agent → Reviewer agent → Fix agent (if needed) → Re-review agent
 
 ### Test-Integrity Review (mandatory for implementation phases)
 
-After every implementation phase, the reviewer agent has two jobs:
+After every implementation phase, the reviewer agent has three jobs:
 
-1. **Code review** — does the change match the spec? Is the code correct?
-2. **Test integrity audit** — run `git diff -- '*/tests/*'` and classify every test change:
+**1. Code review** — does the change match the spec? Is the code correct?
+
+**2. Test file audit** — run `git diff -- '*/tests/*'` and classify every test change:
    - **CLEAN**: No test files modified
    - **JUSTIFIED**: Test setup updated for mechanical schema changes (renames, column moves). Assertion values unchanged.
    - **VIOLATION**: Assertion deleted, weakened (exact → fuzzy), no-op'd, or hardcoded to match a shortcut
 
 A VIOLATION blocks the next phase. The orchestrator must investigate — spawn a fix agent to restore the test and fix the code, or escalate to the user if the behavior change is intentional.
 
-**Why this matters:** In the GFS Sync Unification (2026-03-12), subagents deleted 7 test assertions and weakened 7 more to hide regressions. All reported "tests pass." Without a test-integrity reviewer, 14 regressions shipped. The diff doesn't lie — summaries do.
+**3. Behavioral change audit** — review the code diff (not just tests) for signs of unintended behavioral change:
+
+- **Every removal needs justification.** If the diff shows something removed — a WHERE clause, a function call, an error handler, a guard check — verify it's intentional and part of the task. Unexplained removals are the strongest regression signal.
+- **Replacements are higher risk than modifications.** `CREATE OR REPLACE FUNCTION`, full function rewrites, overwriting a file — the agent owns the ENTIRE new definition, not just the part they changed. Compare the new definition against the *current* state (not the old migration the agent based it on). Flag anything present in the current definition that's absent in the replacement.
+- **"Pre-existing" is a claim, not a fact.** If the agent reported test failures as "pre-existing" or "unrelated," flag it. The orchestrator should verify — a test that was passing before this work and failing after is a regression, even if the test file wasn't touched.
+- **Scope check.** If the task was "add X to function Y," verify the diff shows ONLY X added. If the agent rewrote the whole function, check that nothing else changed. The diff between old and new should contain only the intended change.
+
+**Why this matters:** In the GFS Sync Unification (2026-03-12), agents introduced two classes of regression:
+1. *Test manipulation* — deleted 7 assertions, weakened 7 more to hide behavioral changes. Caught by test file audit.
+2. *Silent filter loss* — `CREATE OR REPLACE FUNCTION` on claim RPCs carried forward an older definition, silently dropping an `is_excluded` filter added by a later migration. The agent labeled the resulting test failures as "pre-existing." Caught only by behavioral change audit — the test files were never touched.
 
 ## Workflow
 
