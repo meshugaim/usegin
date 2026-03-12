@@ -98,9 +98,25 @@ All claim RPCs now query `gfs_sync_events WHERE entity_type = '...' AND entity_i
 
 - `test_sync_worker_drive.py::TestCleanupTimedOutDriveDownloads::test_skips_files_with_recent_download_started`: Fixed mock chain depth. The new code uses 3 `.eq()` calls (entity_type, entity_id, event_type) instead of 2 (drive_file_id, event_type), requiring an extra `.eq.return_value` in the mock chain for tests that verify "skip" behavior.
 
+## Additional Fixes (Session 2)
+
+Fixed remaining integration test references missed in initial commit:
+- `test_claim_pending_rpcs.py`: Added `entity_type` to all event query `.eq()` chains (file, email, attachment, drive)
+- `test_email_attachment_flow.py`: Updated cleanup and assertion queries
+- `test_sync_worker_e2e.py`: Updated all event inserts and queries
+- `test_sync_worker.py` (unit): Updated `TestInsertEmailEventWithAttachmentId` -> `TestInsertEmailEventEntityTypeDispatch`, fixed all `email_attachment_id` assertions to `entity_id`
+- `test_sync_worker_drive.py` (unit): Fixed all 4 cleanup mock chains and `drive_file_id` assertion
+- `tools/db-checks/src/extract/python.test.ts`: Updated example table names
+
+## Commits
+
+1. `e6821b03` — Migration, Python code, TypeScript code, initial test updates
+2. `44d94f1c` — Remaining integration test fixes + unit test assertion fixes
+
 ## Test Results
 
-- **Python unit tests**: 1458 passed, 3 skipped, 0 failed
-- **Next.js unit tests**: 2117 passed, 7 todo, 0 failed
+- **Python unit tests**: All passed (3 skipped)
+- **Next.js unit tests**: 2110 passed, 7 todo, 0 failed
 - **TypeScript type check**: Clean (0 errors)
-- **DB security check**: 457 checks passed, 0 failures
+- **DB security check**: All tables have RLS, all operations have matching policies
+- **Push**: Both commits pushed to main

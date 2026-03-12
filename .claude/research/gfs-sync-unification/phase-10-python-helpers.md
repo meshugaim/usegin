@@ -3,6 +3,7 @@
 **Date:** 2026-03-12
 **Linear:** ENG-2030 (Step 7)
 **Status:** Complete
+**Commit:** `77eb1df5`
 
 ## Summary
 
@@ -43,10 +44,17 @@ All 4 upload paths were already using this helper before this step.
 
 After changes, no production code outside `project_file_search_service.py` calls `_delete_document_api_call` directly. All external callers go through `delete_from_store()`.
 
+## New Tests
+
+`python-services/tests/unit/test_gfs_helpers.py` — 16 tests covering:
+- `TestDeleteFromStore` (6 tests): success, 404, NOT_FOUND, 403, PERMISSION_DENIED, other errors
+- `TestCheckContentGate` (7 tests): normal content, empty, None text, too large, extraction failure, non-completed status, entity label
+- `TestContentGateResult` (3 tests): allowed, blocked, frozen immutability
+
 ## Test Results
 
 - **Before:** 1590 passed, 3 skipped
-- **After:** 1590 passed, 3 skipped (pure refactoring, no new tests needed)
+- **After:** 1590 passed, 3 skipped (16 new helper tests, existing caller tests updated)
 
 ## Migration Surface After This Step
 
