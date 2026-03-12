@@ -47,8 +47,16 @@ export interface RunResult {
   outcome: "complete" | "max_sessions" | "no_signal" | "error" | "user_cancelled";
 }
 
+export interface SpawnContext {
+  sessionNumber: number;
+  maxSessions: number;
+  runDir: string;
+  runId: string;
+  specId: string;
+}
+
 export interface RunDeps {
-  spawnClaude: (prompt: string) => Promise<{ sessionId: string; exitCode: number; stdout: string }>;
+  spawnClaude: (prompt: string, context: SpawnContext) => Promise<{ sessionId: string; exitCode: number; stdout: string }>;
   confirm: (message: string) => Promise<boolean>;
   checkSpecComplete: (specId: string) => Promise<boolean>;
   log: (message: string) => void;
@@ -154,7 +162,13 @@ export async function autoImplement(
     let result: { sessionId: string; exitCode: number; stdout: string };
 
     try {
-      result = await deps.spawnClaude(prompt);
+      result = await deps.spawnClaude(prompt, {
+        sessionNumber: i,
+        maxSessions,
+        runDir,
+        runId,
+        specId,
+      });
     } catch (err) {
       deps.log(`Session ${i} failed to spawn: ${err}`);
       await appendEvent(runDir, {

@@ -6,27 +6,34 @@
  *   auto-implement ENG-123              # Run up to 10 sessions
  *   auto-implement ENG-123 --pause      # Confirm between sessions
  *   auto-implement ENG-123 --max 5      # Limit to 5 sessions
+ *   auto-implement ENG-123 --no-tmux    # Force piped mode (no tmux)
  *   auto-implement list                 # List previous runs
  *   auto-implement show <run-id>        # Show run manifest
+ *   auto-implement watch <run-id>       # Live dashboard for a running run
  */
 
 import { Command } from "commander";
 import { createInterface } from "readline";
-import { autoImplement } from "./run";
-import { readManifest, getRunsDir, getRunDir } from "./manifest";
+import { autoImplement, type SpawnContext } from "./run";
+import { readManifest, getRunsDir } from "./manifest";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import { generateSessionId } from "../../crun/src/run";
+import { ProgressMonitor } from "./progress";
+import { isTmuxAvailable, spawnClaudeInTmux, getTmuxSessionName } from "./tmux";
+import { runWatch } from "./watch";
+
+/** Whether tmux spawning is enabled for this run (resolved at startup) */
+let useTmux = false;
 
 /**
- * Spawn a headless Claude session with the given prompt.
+ * Spawn a headless Claude session using the piped approach (original behavior).
  * Returns session ID, exit code, and captured stdout.
  */
-async function spawnClaude(
-  prompt: string
-): Promise<{ sessionId: string; exitCode: number; stdout: string }> {
-  const sessionId = await generateSessionId();
-
+async function spawnClaudePiped(
+  prompt: string,
+  sessionId: string
+): Promise<{ exitCode: number; stdout: string }> {
   // Remove API key env vars to force OAuth (same as crun)
   const env = { ...process.env };
   delete env.ANTHROPIC_API_KEY;
@@ -74,9 +81,61 @@ async function spawnClaude(
   const exitCode = await proc.exited;
 
   return {
-    sessionId,
     exitCode,
     stdout: stdoutChunks.join(""),
+  };
+}
+
+/**
+ * Spawn a Claude session with progress monitoring.
+ * Uses tmux when available, falls back to piped approach.
+ */
+async function spawnClaude(
+  prompt: string,
+  context: SpawnContext
+): Promise<{ sessionId: string; exitCode: number; stdout: string }> {
+  const sessionId = await generateSessionId();
+
+  // Start progress monitor
+  const monitor = new ProgressMonitor({
+    sessionNumber: context.sessionNumber,
+    maxSessions: context.maxSessions,
+  });
+  await monitor.start(sessionId);
+
+  let result: { exitCode: number; stdout: string } | null = null;
+
+  try {
+    if (useTmux) {
+      const tmuxName = getTmuxSessionName(context.sessionNumber);
+      log(`  tmux session: ${tmuxName} (attach with: tmux attach -t ${tmuxName})`);
+
+      result = await spawnClaudeInTmux({
+        prompt,
+        sessionId,
+        sessionNumber: context.sessionNumber,
+        runDir: context.runDir,
+      });
+    } else {
+      result = await spawnClaudePiped(prompt, sessionId);
+    }
+  } finally {
+    // Detect signal for the progress monitor's end message
+    let signal = "error";
+    if (result) {
+      signal = result.stdout.includes("AUTO_IMPLEMENT_COMPLETE")
+        ? "complete"
+        : result.stdout.includes("AUTO_IMPLEMENT_HANDOFF")
+          ? "handoff"
+          : "none";
+    }
+    monitor.stop(result?.exitCode ?? 1, signal);
+  }
+
+  return {
+    sessionId,
+    exitCode: result!.exitCode,
+    stdout: result!.stdout,
   };
 }
 
@@ -141,11 +200,24 @@ program
   .argument("<spec-id>", "Linear issue ID for the spec (e.g., ENG-123)")
   .option("--max <n>", "Maximum sessions to run", "10")
   .option("--pause", "Confirm between sessions", false)
-  .action(async (specId: string, options: { max: string; pause: boolean }) => {
+  .option("--no-tmux", "Disable tmux session spawning (use piped mode)")
+  .action(async (specId: string, options: { max: string; pause: boolean; tmux: boolean }) => {
     const maxSessions = parseInt(options.max, 10);
     if (isNaN(maxSessions) || maxSessions < 1) {
       console.error("--max must be a positive integer");
       process.exit(1);
+    }
+
+    // Resolve tmux availability
+    if (options.tmux) {
+      useTmux = await isTmuxAvailable();
+      if (useTmux) {
+        log("tmux detected — sessions will spawn in tmux panes");
+      } else {
+        log("tmux not available — using piped mode");
+      }
+    } else {
+      log("tmux disabled — using piped mode");
     }
 
     // Normalize spec ID (add ENG- prefix if just a number)
@@ -252,6 +324,20 @@ program
 
       console.log(parts.join("  "));
     }
+  });
+
+// Watch command: live dashboard
+program
+  .command("watch <run-id>")
+  .description("Live dashboard for monitoring a running auto-implement run")
+  .option("--interval <seconds>", "Refresh interval in seconds", "10")
+  .action(async (runId: string, options: { interval: string }) => {
+    const intervalMs = parseInt(options.interval, 10) * 1000;
+    if (isNaN(intervalMs) || intervalMs < 1000) {
+      console.error("--interval must be a positive number (seconds)");
+      process.exit(1);
+    }
+    await runWatch({ runId, intervalMs });
   });
 
 program.parse();

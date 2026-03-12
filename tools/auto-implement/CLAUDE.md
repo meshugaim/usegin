@@ -8,8 +8,10 @@ Outer loop for spec implementation across multiple fresh Claude sessions.
 auto-implement ENG-123              # Run up to 10 sessions
 auto-implement ENG-123 --pause      # Confirm between sessions
 auto-implement ENG-123 --max 5      # Limit to 5 sessions
+auto-implement ENG-123 --no-tmux    # Force piped mode (no tmux)
 auto-implement list                 # List previous runs
 auto-implement show <run-id>        # Show run manifest
+auto-implement watch <run-id>       # Live dashboard for a running run
 ```
 
 ## How It Works
@@ -29,8 +31,19 @@ The agent outputs these markers in stdout:
 
 ## Observability
 
-Each run creates a directory at `~/.auto-implement/runs/<run-id>/`:
+**CLI progress output:** While sessions run, timestamped progress lines print to stderr:
+- Session start/end with session ID and duration
+- Heartbeats every 30s showing elapsed time
+- Git commit detection with push status
+- Handoff file detection
+
+**tmux sessions:** When tmux is available, each session spawns in a named tmux pane (`auto-impl-1`, `auto-impl-2`, etc.). Attach with `tmux attach -t auto-impl-1` to see the full TUI. Use `--no-tmux` to disable.
+
+**Watch dashboard:** Run `auto-implement watch <run-id>` for a live auto-refreshing dashboard showing session status, current slice, context %, recent commits, and tool activity.
+
+**Run directory:** Each run creates a directory at `~/.auto-implement/runs/<run-id>/`:
 - `manifest.jsonl` — JSONL log of all events (session starts, completions, handoffs, durations)
+- `session-N/` — tmux capture files (prompt, stdout, exit code) when using tmux mode
 
 Handoff files are preserved at `.claude/handoffs/handoff_YYYYMMDD_HHMMSS.md` (timestamped, never overwritten).
 
