@@ -113,7 +113,7 @@ OTP codes expire quickly — extract and enter within a few seconds of sending.
 The `/admin/gfs` page requires users in the `admins` table. Seed data does NOT add admins.
 
 ```bash
-docker exec -i supabase_db_ona-test-mvp psql -U postgres -c \
+docker exec -i supabase_db_test-mvp psql -U postgres -c \
   "INSERT INTO admins (user_id) VALUES ('11111111-1111-1111-1111-111111111111') ON CONFLICT DO NOTHING;"
 ```
 
@@ -139,7 +139,7 @@ In Codespaces/Gitpod, use `localhost` URLs — `playwright-cli` runs locally, no
 
 ```bash
 # Run SQL
-docker exec -i supabase_db_ona-test-mvp psql -U postgres -c "SELECT * FROM feature_toggles;"
+docker exec -i supabase_db_test-mvp psql -U postgres -c "SELECT * FROM feature_toggles;"
 
 # Reset database (destructive — re-run pw-auth.ts after)
 just supabase-reset
