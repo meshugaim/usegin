@@ -115,19 +115,33 @@ When delegating to implementation agents, be explicit about things they'll other
 
 ## Verifying Definition of Done
 
-Don't trust implementation agents blindly. After each phase:
+Don't trust implementation agents blindly. After each slice:
 
 1. Spawn a **verification agent** with the DoD criteria
-2. Verifier runs empirical checks (commands, file contents)
+2. Verifier checks two dimensions: **forward** (did you build what was asked?) and **backward** (did you break anything that wasn't asked?)
 3. Verifier reports PASS or FAIL with details
-4. Only proceed to next phase on PASS
+4. Only proceed to next slice on PASS
 
 ```
-Implementation agent → completes → Verification agent → PASS → Next phase
+Implementation agent → completes → Verification agent → PASS → Next slice
                                                       → FAIL → Fix or escalate
 ```
 
 Verification is also execution — use sub-agents for it, not direct checks.
+
+### Forward verification (DoD)
+
+Did the worker build what was asked? Check empirical criteria (tests pass, file contents, commands succeed) and non-empirical criteria (code quality, pattern adherence).
+
+### Backward verification (no-regression)
+
+Did the worker break anything that existed? The verifier checks the diff for three things:
+
+1. **Test integrity.** Run `git diff -- '*/tests/*'`. Flag any deleted assertions, weakened expectations (exact → fuzzy), or tests skipped without a reason. Test assertions encode existing behavior — removing them is removing the safety net.
+2. **Unrelated behavioral changes.** Run `git diff`. If the task was "add X to function Y" and the diff touches function Z, flag it. Changes outside the slice's scope need justification.
+3. **Unexplained removals.** Any removed guard, filter, WHERE clause, error handler, or safety check needs a justification tied to the task. Removals are the strongest regression signal — they're easy to miss in a large diff and expensive to discover later.
+
+If the verifier finds a VIOLATION: the liaison does NOT commit. Spawn a fix agent to restore the removed behavior and fix the code properly, or escalate to the user if the change is intentional.
 
 **Making verifiers effective:**
 

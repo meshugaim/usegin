@@ -19,6 +19,7 @@ When retroing a session that used this skill, a good session looks like:
 - [ ] Work was broken into small sequential slices (not parallelized unless user requested)
 - [ ] Each slice had explicit DoD (empirical + non-empirical criteria)
 - [ ] Each slice had a verification agent after implementation
+- [ ] Verification agent checked backward (no-regression) as well as forward (DoD) — test integrity, unrelated changes, unexplained removals
 - [ ] Sub-agents were told "do NOT commit or push" — liaison handled commits
 - [ ] Commits were small, frequent, mentioned Linear issue
 - [ ] Sub-agent prompts included: error handling expectations, complete file list, affected test files
@@ -67,6 +68,12 @@ If multiple slices touched related code, were there integration issues? Did the 
 - The "liaison commits, not agents" rule prevents agents getting stuck on push rejections and hook failures. It also gives the liaison a natural review point (git diff before committing).
 - The consumer audit rule ("grep for all consumers before delegating data-layer changes") was learned from agents missing downstream consumers. Worth watching if this is actually followed.
 - Should liaison have an Auto-Inject block like the director skills? It doesn't currently have one. The skill is loaded into the agent's context directly (unlike build-orchestrate where the director re-reads). May be worth adding if liaison sessions hit context compaction.
+- **No-regression verification added (2026-03-12).** Came from the GFS Sync Unification build (ENG-2030) where build-orchestrate spawned liaison agents for implementation phases. Workers deleted/weakened 14 test assertions and the liaison accepted "tests pass" without checking diffs. The build-orchestrate skill was hardened first (test-integrity review, behavioral change audit), but those rules only help when a director is above the liaison. Since liaison is used standalone more often than inside build-orchestrate, it needed its own backward verification. **Watch for:**
+  - Does the verifier actually run the backward checks, or does it treat them as optional and focus only on DoD?
+  - Does the three-check list (test integrity, unrelated changes, unexplained removals) add too much to the verifier's scope? Should it be a separate agent instead?
+  - Does the VIOLATION → don't commit gate actually hold, or does the liaison override it under time pressure?
+  - Do false positives (flagging legitimate removals as violations) cause the liaison to start ignoring the checks?
+  - How does this interact with the reviewer agent (line 155)? Is there overlap, and does that cause one of them to get skipped?
 
 ## Changelog
 
@@ -78,3 +85,4 @@ If multiple slices touched related code, were there integration issues? Did the 
 | (pre-lab) | Feature toggles as separate slices | Agents scoped to one context miss the cross-repo pipeline (ENG-?) |
 | (pre-lab) | Context Guard (--context-guard) | Sessions hitting compaction without warning |
 | 2026-02-27 | Restructured lab: split retros into individual files under `retros/` | Single-file lab structure doesn't scale as retros accumulate. |
+| 2026-03-12 | Added backward (no-regression) verification to verifier: test integrity, unrelated behavioral changes, unexplained removals. Added VIOLATION gate before commit. | GFS Sync Unification (ENG-2030): build-orchestrate spawned liaisons whose workers deleted 14 test assertions undetected. Liaison's verification only checked forward (DoD), never backward (did you break anything?). |
