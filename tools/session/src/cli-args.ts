@@ -263,3 +263,39 @@ export function parseResumeArgs(args: string[]): ResumeArgs {
 
   return result;
 }
+
+// =============================================================================
+// FORK ARGS
+// =============================================================================
+
+export interface ForkArgs {
+  sessionId: string;
+  dryRun: boolean;
+  help: boolean;
+}
+
+/**
+ * Parse arguments for `session fork <id>`.
+ *
+ * Accepts a single positional session ID argument, --dry-run, and --help.
+ * The session ID can be a full UUID, a short prefix, or a file path.
+ */
+export function parseForkArgs(args: string[]): ForkArgs {
+  const result: ForkArgs = {
+    sessionId: "",
+    dryRun: false,
+    help: false,
+  };
+
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      result.help = true;
+    } else if (arg === "--dry-run") {
+      result.dryRun = true;
+    } else if (!arg.startsWith("-")) {
+      result.sessionId = arg;
+    }
+  }
+
+  return result;
+}
