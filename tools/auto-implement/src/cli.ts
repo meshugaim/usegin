@@ -26,6 +26,7 @@ import {
   removeHooks,
   updatePid,
   readRotationSignal,
+  readAgentSignal,
   type RotationSignal,
 } from "../hooks/lifecycle";
 import { ActivityWriter } from "./activity";
@@ -46,9 +47,11 @@ async function spawnClaudePiped(
   activityWriter?: ActivityWriter
 ): Promise<{ exitCode: number; stdout: string }> {
   // Remove API key env vars to force OAuth (same as crun)
+  // Remove CLAUDECODE to allow spawning from within an existing Claude session
   const env = { ...process.env };
   delete env.ANTHROPIC_API_KEY;
   delete env.CLAUDE_API_KEY;
+  delete env.CLAUDECODE;
 
   const args = [
     "bun",
@@ -151,27 +154,25 @@ async function spawnClaude(
 
   let result: { exitCode: number; stdout: string } | null = null;
   let rotation: RotationSignal | null = null;
+  let agentSignal: ReturnType<typeof readAgentSignal> = null;
 
   try {
     result = await spawnClaudePiped(prompt, sessionId, writer);
   } finally {
-    // Read rotation signal BEFORE lifecycle cleanup (remove deletes it)
+    // Read signals BEFORE lifecycle cleanup (removeHooks deletes signal files)
     rotation = readRotationSignal();
+    agentSignal = readAgentSignal();
 
     // Detect signal for the progress monitor's end message
     let signal = "error";
     if (rotation) {
       signal = "rotation";
     } else if (result) {
-      signal = result.stdout.includes("AUTO_IMPLEMENT_COMPLETE")
-        ? "complete"
-        : result.stdout.includes("AUTO_IMPLEMENT_HANDOFF")
-          ? "handoff"
-          : "none";
+      signal = agentSignal?.signal ?? "none";
     }
     monitor.stop(result?.exitCode ?? 1, signal);
 
-    // Remove lifecycle hooks (git hooks, PreToolUse guard, context file, rotation signal)
+    // Remove lifecycle hooks (git hooks, PreToolUse guard, context file, signal files)
     removeHooks();
   }
 
@@ -180,6 +181,7 @@ async function spawnClaude(
     exitCode: result!.exitCode,
     stdout: result!.stdout,
     rotation,
+    agentSignal,
   };
 }
 
@@ -263,7 +265,8 @@ program
   .description("Run auto-implement on a spec (e.g., auto-implement run ENG-123)")
   .option("--max <n>", "Maximum sessions to run", "10")
   .option("--pause", "Confirm between sessions", false)
-  .action(async (specId: string, options: { max: string; pause: boolean }) => {
+  .option("--test", "Test mode — minimal prompt to validate multi-session loop", false)
+  .action(async (specId: string, options: { max: string; pause: boolean; test: boolean }) => {
     const maxSessions = parseInt(options.max, 10);
     if (isNaN(maxSessions) || maxSessions < 1) {
       console.error("--max must be a positive integer");
@@ -278,6 +281,7 @@ program
         specId: normalizedSpecId,
         maxSessions,
         pause: options.pause,
+        test: options.test,
       },
       { spawnClaude, spawnHandoffWriter, confirm, checkSpecComplete, log }
     );

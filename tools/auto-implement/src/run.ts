@@ -16,25 +16,23 @@
 
 import { stat } from "fs/promises";
 import { join } from "path";
-import { buildPrompt } from "./prompt";
+import { buildPrompt, buildTestPrompt } from "./prompt";
 import {
   appendEvent,
   generateRunId,
   getRunDir,
   type ManifestEvent,
 } from "./manifest";
-import type { RotationSignal } from "../hooks/lifecycle";
+import { clearAgentSignal, type RotationSignal, type AgentSignal } from "../hooks/lifecycle";
 
 const HANDOFF_DIR = "/workspaces/test-mvp/.claude/handoffs";
 const HANDOFF_LATEST = join(HANDOFF_DIR, "latest.md");
-
-const SIGNAL_HANDOFF = "AUTO_IMPLEMENT_HANDOFF";
-const SIGNAL_COMPLETE = "AUTO_IMPLEMENT_COMPLETE";
 
 export interface AutoImplementOptions {
   specId: string;
   maxSessions: number;
   pause: boolean;
+  test?: boolean;
 }
 
 export interface SessionResult {
@@ -67,6 +65,7 @@ export interface RunDeps {
     exitCode: number;
     stdout: string;
     rotation: RotationSignal | null;
+    agentSignal: AgentSignal | null;
   }>;
   spawnHandoffWriter: (killedSessionId: string, specId: string) => Promise<{ exitCode: number }>;
   confirm: (message: string) => Promise<boolean>;
@@ -89,15 +88,6 @@ async function getHandoffState(): Promise<{ mtimeMs: number } | null> {
   } catch {
     return null;
   }
-}
-
-/**
- * Detect which signal the agent output
- */
-function detectSignal(stdout: string): "handoff" | "complete" | "none" {
-  if (stdout.includes(SIGNAL_COMPLETE)) return "complete";
-  if (stdout.includes(SIGNAL_HANDOFF)) return "handoff";
-  return "none";
 }
 
 /**
@@ -125,7 +115,7 @@ export async function autoImplement(
   options: AutoImplementOptions,
   deps: RunDeps
 ): Promise<RunResult> {
-  const { specId, maxSessions, pause } = options;
+  const { specId, maxSessions, pause, test: testMode } = options;
   const runId = generateRunId(specId);
   const runDir = getRunDir(runId);
 
@@ -156,13 +146,11 @@ export async function autoImplement(
 
     deps.log(`--- Session ${i}/${maxSessions} ---`);
 
-    const prompt = buildPrompt({
-      specId,
-      sessionNumber: i,
-      maxSessions,
-      runId,
-      runDir,
-    });
+    // Clear any stale signal file from previous session
+    clearAgentSignal();
+
+    const promptOpts = { specId, sessionNumber: i, maxSessions, runId, runDir };
+    const prompt = testMode ? buildTestPrompt(promptOpts) : buildPrompt(promptOpts);
 
     // Record session start
     await appendEvent(runDir, {
@@ -174,7 +162,7 @@ export async function autoImplement(
     });
 
     const startTime = Date.now();
-    let result: { sessionId: string; exitCode: number; stdout: string; rotation: RotationSignal | null };
+    let result: { sessionId: string; exitCode: number; stdout: string; rotation: RotationSignal | null; agentSignal: AgentSignal | null };
 
     try {
       result = await deps.spawnClaude(prompt, {
@@ -201,8 +189,8 @@ export async function autoImplement(
     const durationSeconds = Math.round((Date.now() - startTime) / 1000);
     totalSessions++;
 
-    // Detect signal from output
-    const signal = detectSignal(result.stdout);
+    // Read signal captured by spawnClaude (read before removeHooks deleted the file)
+    const signal: "handoff" | "complete" | "none" = result.agentSignal?.signal ?? "none";
 
     // Check for rotation signal (post-commit hook killed Claude due to high context)
     const rotation = result.rotation;

@@ -20,6 +20,31 @@ export interface HandoffWriterPromptOptions {
 }
 
 /**
+ * Build a minimal test prompt for validating the multi-session loop.
+ * The agent does trivial work, writes the handoff/complete signal file, and exits.
+ */
+export function buildTestPrompt(options: PromptOptions): string {
+  const { sessionNumber, maxSessions, runId } = options;
+
+  // Last session signals complete, earlier sessions signal handoff
+  const isLast = sessionNumber >= maxSessions;
+  const signal = isLast ? "complete" : "handoff";
+
+  return `
+## Auto-Implement Test Mode — Session ${sessionNumber}/${maxSessions} (${runId})
+
+This is a test run to validate multi-session loop mechanics. Do the following:
+
+1. Print: "Test session ${sessionNumber} starting"
+2. Run: date
+3. Run: echo '{"signal":"${signal}"}' > /tmp/auto-impl-signal.json
+4. Print: "Test session ${sessionNumber} complete — ${signal} signal written"
+
+Do NOT do any implementation work. Just execute the 4 steps above exactly as shown.
+`.trim();
+}
+
+/**
  * Build the prompt for a fresh implementing-specs session.
  *
  * Session 1 gets an "orient first" prompt.
@@ -53,9 +78,9 @@ When handing off (at 60%+ or when a natural stopping point):
 1. Commit and push all work
 2. Update Linear issues (close completed slices, update parent slice map)
 3. Run \`/handoff\` to write the handoff note
-4. After writing the handoff, output exactly this on its own line:
-   \`\`\`
-   AUTO_IMPLEMENT_HANDOFF
+4. Signal the outer loop by writing the signal file:
+   \`\`\`bash
+   echo '{"signal":"handoff"}' > /tmp/auto-impl-signal.json
    \`\`\`
 
 ## Completion Protocol
@@ -64,9 +89,9 @@ When ALL slices are done (parent spec fully implemented):
 
 1. Run cross-slice verification (full test suite, end-to-end check)
 2. Update the parent spec issue to mark implementation complete
-3. Output exactly this on its own line:
-   \`\`\`
-   AUTO_IMPLEMENT_COMPLETE
+3. Signal the outer loop by writing the signal file:
+   \`\`\`bash
+   echo '{"signal":"complete"}' > /tmp/auto-impl-signal.json
    \`\`\`
 `.trim();
 
@@ -148,9 +173,9 @@ capturing its state so the next session can continue seamlessly.
    - What the next session should pick up
    - Any blockers or issues encountered
 
-7. After writing the handoff, output exactly:
-   \`\`\`
-   AUTO_IMPLEMENT_HANDOFF
+7. Signal the outer loop by writing the signal file:
+   \`\`\`bash
+   echo '{"signal":"handoff"}' > /tmp/auto-impl-signal.json
    \`\`\`
 `.trim();
 }

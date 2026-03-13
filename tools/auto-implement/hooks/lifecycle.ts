@@ -24,6 +24,7 @@ const CLAUDE_SETTINGS_LOCAL = resolve(ROOT, ".claude/settings.local.json");
 const HOOKS_DIR = resolve(import.meta.dirname);
 const CONTEXT_FILE = "/tmp/auto-impl-context.json";
 const ROTATION_FILE = "/tmp/auto-impl-rotation.json";
+const SIGNAL_FILE = "/tmp/auto-impl-signal.json";
 
 // Paths of hooks we manage
 const MANAGED_HOOKS = {
@@ -55,6 +56,41 @@ export function readRotationSignal(): RotationSignal | null {
     return JSON.parse(readFileSync(ROTATION_FILE, "utf-8"));
   } catch {
     return null;
+  }
+}
+
+export interface AgentSignal {
+  signal: "handoff" | "complete";
+}
+
+/**
+ * Read the agent signal file if present.
+ * The agent writes {"signal":"handoff"} or {"signal":"complete"} to this file
+ * instead of outputting magic strings to stdout (which caused false positives
+ * when prompt/documentation text containing the signal strings appeared in
+ * stream-json output).
+ */
+export function readAgentSignal(): AgentSignal | null {
+  try {
+    if (!existsSync(SIGNAL_FILE)) return null;
+    const data = JSON.parse(readFileSync(SIGNAL_FILE, "utf-8"));
+    if (data.signal === "handoff" || data.signal === "complete") {
+      return data as AgentSignal;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove the agent signal file (call before each session to avoid stale signals).
+ */
+export function clearAgentSignal(): void {
+  try {
+    if (existsSync(SIGNAL_FILE)) unlinkSync(SIGNAL_FILE);
+  } catch {
+    // Best-effort
   }
 }
 
@@ -197,6 +233,12 @@ export function removeHooks() {
   if (existsSync(ROTATION_FILE)) {
     unlinkSync(ROTATION_FILE);
     console.log(`  ✓ Removed rotation signal: ${ROTATION_FILE}`);
+  }
+
+  // 5. Remove agent signal file if present
+  if (existsSync(SIGNAL_FILE)) {
+    unlinkSync(SIGNAL_FILE);
+    console.log(`  ✓ Removed agent signal: ${SIGNAL_FILE}`);
   }
 
   console.log("\nAll hooks removed. Auto-implement guards are inactive.");

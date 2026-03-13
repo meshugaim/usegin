@@ -36,9 +36,14 @@ Installed per-session via `hooks/lifecycle.ts`. All local-only (`.git/hooks/`, `
 
 ## Exit Signals
 
-The agent outputs these markers in stdout:
-- `AUTO_IMPLEMENT_HANDOFF` — session handed off, start next session
-- `AUTO_IMPLEMENT_COMPLETE` — all slices done, stop loop
+The agent writes a JSON signal file to `/tmp/auto-impl-signal.json`:
+- `{"signal":"handoff"}` — session handed off, start next session
+- `{"signal":"complete"}` — all slices done, stop loop
+
+The outer loop reads this file after each session to determine the next action.
+Previously, signal detection searched stdout for magic strings, but this caused
+false positives when prompt/documentation text containing the strings appeared
+in stream-json output.
 
 ## Observability
 
