@@ -205,7 +205,24 @@ export class ActivityWriter {
     };
     await this.writeEvent(event);
 
-    return `${ts()} \x1b[36m${name.padEnd(6)}\x1b[0m ${detail}`;
+    // Build output lines — header + optional inline content
+    const lines: string[] = [];
+    lines.push(`${ts()} \x1b[36m${name.padEnd(6)}\x1b[0m ${detail}`);
+
+    // Show Edit diffs inline
+    if (name === "Edit" && input) {
+      const diffLines = formatEditDiff(input);
+      if (diffLines) lines.push(diffLines);
+    }
+
+    // Show Write content preview
+    if (name === "Write" && input?.content) {
+      const content = String(input.content);
+      const lineCount = content.split("\n").length;
+      lines.push(`\x1b[2m         ${lineCount} lines written\x1b[0m`);
+    }
+
+    return lines.join("\n");
   }
 
   private async handleToolResult(
@@ -216,23 +233,31 @@ export class ActivityWriter {
     const name = this.pendingToolCalls.get(toolUseId) || "unknown";
     this.pendingToolCalls.delete(toolUseId);
 
-    // Only show errors in the terminal — successful results are noise
-    if (!isError) return null;
-
-    const content = typeof block.content === "string"
-      ? block.content.slice(0, 120)
-      : "";
+    const content = normalizeResultContent(block.content);
 
     const event: ToolResultEvent = {
       ts: new Date().toISOString(),
       type: "tool_result",
       name,
       isError,
-      detail: content,
+      detail: content.slice(0, 200),
     };
     await this.writeEvent(event);
 
-    return `${ts()} \x1b[31m${name} ERROR\x1b[0m ${content}`;
+    // Always show errors
+    if (isError) {
+      return `${ts()} \x1b[31m${name} ERROR\x1b[0m ${content.slice(0, 120)}`;
+    }
+
+    // Show Bash output (truncated, indented)
+    if (name === "Bash" && content.length > 0) {
+      const outputLines = content.split("\n").slice(0, 8);
+      const truncated = content.split("\n").length > 8 ? `\n\x1b[2m         ... (${content.split("\n").length} lines total)\x1b[0m` : "";
+      const formatted = outputLines.map((l) => `\x1b[2m         ${l.slice(0, 120)}\x1b[0m`).join("\n");
+      return formatted + truncated;
+    }
+
+    return null;
   }
 
   private async handleText(
@@ -244,12 +269,12 @@ export class ActivityWriter {
     // Only show substantial text (skip short acknowledgments)
     if (text.length < 20) return null;
 
-    const preview = text.slice(0, 150).replace(/\n/g, " ");
+    const preview = text.slice(0, 300).replace(/\n/g, " ");
 
     const event: TextEvent = {
       ts: new Date().toISOString(),
       type: "text",
-      preview,
+      preview: preview.slice(0, 150),
     };
     await this.writeEvent(event);
 
@@ -503,4 +528,45 @@ function shortPath(fullPath: string): string {
   const parts = fullPath.split("/");
   if (parts.length <= 3) return fullPath;
   return parts.slice(-3).join("/");
+}
+
+/**
+ * Format an Edit tool call's diff for inline display.
+ * Shows removed/added lines, truncated for large edits.
+ */
+function formatEditDiff(input: Record<string, unknown>): string | null {
+  const oldStr = String(input.old_string || "");
+  const newStr = String(input.new_string || "");
+  if (!oldStr && !newStr) return null;
+
+  const oldLines = oldStr.split("\n");
+  const newLines = newStr.split("\n");
+  const totalLines = oldLines.length + newLines.length;
+
+  // For large edits, just show summary
+  if (totalLines > 20) {
+    return `\x1b[2m         ${oldLines.length} lines → ${newLines.length} lines\x1b[0m`;
+  }
+
+  const diffParts: string[] = [];
+  for (const line of oldLines) {
+    diffParts.push(`\x1b[31m         - ${line.slice(0, 120)}\x1b[0m`);
+  }
+  for (const line of newLines) {
+    diffParts.push(`\x1b[32m         + ${line.slice(0, 120)}\x1b[0m`);
+  }
+  return diffParts.join("\n");
+}
+
+/**
+ * Normalize tool result content to a string.
+ */
+function normalizeResultContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((b) => (typeof b === "object" && b && "text" in b ? String((b as { text: string }).text) : JSON.stringify(b)))
+      .join("\n");
+  }
+  return String(content ?? "");
 }
