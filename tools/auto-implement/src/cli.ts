@@ -61,9 +61,9 @@ async function spawnClaudePiped(
     sessionId,
   ];
 
-  // Use stream-json for real-time observability
+  // Use stream-json for real-time observability (requires --verbose with -p)
   if (activityWriter) {
-    args.push("--output-format", "stream-json");
+    args.push("--verbose", "--output-format", "stream-json");
   }
 
   const proc = Bun.spawn(args, {
