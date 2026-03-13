@@ -163,13 +163,15 @@ Phases are a living plan, not a fixed roadmap. Update the whiteboard as the plan
 
 A phase manager is focused on ONE research question. They spawn workers, synthesize findings, and return results. They die after the phase — no state to carry.
 
+**Agent vs Team Member:** Agent subagents **cannot spawn further agents** — the Agent tool is not available inside subagents. If a phase manager needs to delegate to workers, it must be a **TeamCreate team member** (a full Claude Code process with all tools). Use Agent for simple focused tasks that don't need to nest. Use TeamCreate when the phase manager itself needs to orchestrate.
+
 **Three weights — choose per phase:**
 
 ### Lightweight
-A single Task agent (subagent_type: "general-purpose") that uses the Task tool to spawn a few workers. Good for focused questions: "read these files and identify the pattern", "search for how X is implemented", "check if Y is documented."
+A single Agent (subagent_type: "general-purpose") for focused questions: "read these files and identify the pattern", "search for how X is implemented", "check if Y is documented." Cannot spawn sub-workers.
 
 ### Heavy
-Creates a Team (TeamCreate), spawns named workers, coordinates via task list. Good for multi-faceted investigation: "trace the auth flow across frontend and backend", "gather evidence from code, docs, logs, and production."
+Creates a Team (TeamCreate), spawns named workers, coordinates via task list. Good for multi-faceted investigation: "trace the auth flow across frontend and backend", "gather evidence from code, docs, logs, and production." Team members can spawn their own Agent sub-workers.
 
 ### Experiment
 For phases that involve deploying infrastructure, running tests, and iterating based on results. The phase manager spawns workers to execute commands and write code, but the key difference is how **state carries between iterations**.

@@ -214,6 +214,12 @@ Verification is not a phase — it's an axis that runs alongside the build.
 
 **Spec review is the highest-leverage review.** A bug in the spec becomes a bug in implementation becomes a bug in QA. Two sessions in a row, skipping the spec reviewer led to QA-caught bugs that were spec-level issues (e.g., UNIQUE constraint blocking re-upload after soft-delete). The cost of a 30-second reviewer agent is trivial compared to a QA iteration.
 
+## Agent vs Team Member
+
+Agent subagents **cannot spawn further agents** — the Agent tool is not available inside subagents. If a phase agent needs to delegate (e.g., a liaison spawning workers), it must be a **TeamCreate team member**, which is a full Claude Code process with all tools including Agent.
+
+This doesn't mean always use TeamCreate. Use Agent for simple, focused tasks. Use TeamCreate only when the phase agent itself needs to orchestrate — i.e., when it needs to nest.
+
 ## Context Hygiene
 
 - **Main thread = thin orchestrator.** You read the whiteboard, write notes-to-self, make phase decisions, update the whiteboard. That's it.

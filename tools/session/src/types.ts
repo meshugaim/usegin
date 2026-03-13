@@ -810,6 +810,30 @@ export interface ParsedSubagent {
   spawnedBy?: string;
 }
 
+/**
+ * A team member spawned via TeamCreate + Agent tool.
+ *
+ * Team members are separate Claude Code processes with their own session files.
+ * Unlike subagents (which are embedded in the parent session), team members have
+ * independent context windows and full tool access.
+ */
+export interface TeamMemberInfo {
+  /** Agent name (e.g., "nester", "researcher") */
+  name: string;
+  /** Team name (e.g., "nesting-test") */
+  teamName: string;
+  /** Session ID of the team member's own session */
+  sessionId: SessionId;
+  /** Number of turns in the team member's session */
+  turns: number;
+  /** Number of subagents spawned by this team member */
+  subagentCount: number;
+  /** Timestamp of first entry */
+  startTimestamp?: string;
+  /** Timestamp of last entry */
+  endTimestamp?: string;
+}
+
 export interface RewindInfo {
   fromUuid: EntryUuid; // The UUID we rewound from
   abandonedBranchUuids: EntryUuid[]; // UUIDs of messages on the abandoned branch
@@ -873,6 +897,8 @@ export interface ParsedSession {
   compactions: CompactionEvent[];
   gitCommits?: GitCommit[]; // Commits from git history (richer data, preferred when available)
   queuedMessages?: QueuedMessage[]; // User messages sent while agent was mid-turn
+  /** Team members spawned via TeamCreate. Separate sessions linked by team name. */
+  teamMembers?: TeamMemberInfo[];
   slug?: string; // Human-readable session name (e.g., "gleaming-fluttering-torvalds")
   summary?: string; // Session summary from type:"summary" line
   /** Timestamp of the first entry in the session (ISO 8601) */

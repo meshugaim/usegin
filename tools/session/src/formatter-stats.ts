@@ -14,6 +14,7 @@
 import type { ParsedSession } from "./types";
 import { computeStats } from "./stats";
 import type { SessionStats, SubagentSummary, TurnDurationStats, CompactionStats } from "./stats";
+import type { TeamMemberInfo } from "./types";
 import { formatCost as formatCostUsd } from "./pricing";
 import { truncate, formatTokenCount } from "./format-utils";
 
@@ -59,6 +60,7 @@ export function formatStats(
   appendSection(lines, formatTokenStatsSection(stats));
   appendSection(lines, formatToolsSection(stats, showHints));
   appendSection(lines, formatSubagentsSection(stats, showHints));
+  appendSection(lines, formatTeamMembersSection(stats, showHints));
   appendSection(lines, formatRewindsSection(stats, showHints));
   appendSection(lines, formatGitSection(stats, showHints));
 
@@ -359,6 +361,52 @@ function formatSubagentLine(index: number, sub: SubagentSummary): string {
   }
 
   return ` ${String(index).padStart(2)}. ${idShort}${desc}   ${parts.join("  ")}${parentTag}`;
+}
+
+// ============================================================================
+// SECTION: TEAM MEMBERS
+// ============================================================================
+
+function formatTeamMembersSection(
+  stats: SessionStats,
+  showHints: boolean
+): string[] {
+  if (!stats.teamMembers || stats.teamMembers.length === 0) return [];
+
+  const lines: string[] = [];
+  lines.push(sectionHeader(`Team Members (${stats.teamMembers.length})`));
+
+  for (const member of stats.teamMembers) {
+    lines.push(formatTeamMemberLine(member));
+  }
+
+  if (showHints) {
+    const lastIndex = lines.length - 1;
+    lines[lastIndex] = lines[lastIndex]! + padHint("(session <id> --stats)");
+  }
+
+  return lines;
+}
+
+function formatTeamMemberLine(member: TeamMemberInfo): string {
+  const sessionShort = String(member.sessionId).slice(0, 8);
+  const parts = [`${member.turns} turns`];
+
+  if (member.subagentCount > 0) {
+    const noun = member.subagentCount === 1 ? "subagent" : "subagents";
+    parts.push(`${member.subagentCount} ${noun}`);
+  }
+
+  if (member.startTimestamp && member.endTimestamp) {
+    const startMs = new Date(member.startTimestamp).getTime();
+    const endMs = new Date(member.endTimestamp).getTime();
+    const delta = endMs - startMs;
+    if (!Number.isNaN(delta) && delta >= 0) {
+      parts.push(formatDuration(delta));
+    }
+  }
+
+  return `  ${member.name} (${member.teamName})  ${sessionShort}  ${parts.join("  ")}`;
 }
 
 // ============================================================================

@@ -10,6 +10,7 @@ import type {
   AssistantEntry,
   ParsedSession,
   ParsedSubagent,
+  TeamMemberInfo,
   Turn,
   TokenUsage,
   ToolCall,
@@ -239,6 +240,20 @@ export async function parseSession(
       debug
     );
     debugLog(debug, `Found ${session.subagents.length} subagent(s)`, stepStart);
+
+    // Discover team members by scanning tool results for team spawns
+    stepStart = Date.now();
+    debugLog(debug, "Discovering team members...");
+    const teamNames = extractTeamNames(session.turns);
+    if (teamNames.size > 0) {
+      session.teamMembers = await discoverTeamMembers(
+        jsonlPath,
+        session.sessionId,
+        teamNames,
+        debug,
+      );
+      debugLog(debug, `Found ${session.teamMembers.length} team member(s) across ${teamNames.size} team(s)`, stepStart);
+    }
   }
 
   return session;
@@ -983,6 +998,161 @@ function parseTurn(
     ...(tokenUsage ? { tokenUsage } : {}),
     isOnCurrentBranch: true, // Will be updated by detectRewinds
   };
+}
+
+// ============================================================================
+// TEAM MEMBER DISCOVERY
+// ============================================================================
+
+/**
+ * Extract team names from tool results in the session.
+ *
+ * Looks for Agent tool results that contain "team_name:" (team member spawns)
+ * and TeamCreate results that contain "team_name" (team creation).
+ * Returns a set of team names this session is the lead for.
+ */
+function extractTeamNames(turns: Turn[]): Set<string> {
+  const teamNames = new Set<string>();
+
+  for (const turn of turns) {
+    for (const tr of turn.toolResults) {
+      // Agent spawn result: "team_name: nesting-test"
+      const agentMatch = tr.content.match(/team_name:\s*(\S+)/);
+      if (agentMatch) {
+        teamNames.add(agentMatch[1]!);
+      }
+      // TeamCreate result: JSON with "team_name": "nesting-test"
+      const createMatch = tr.content.match(/"team_name":\s*"([^"]+)"/);
+      if (createMatch) {
+        teamNames.add(createMatch[1]!);
+      }
+    }
+  }
+
+  return teamNames;
+}
+
+/**
+ * Discover team member sessions by scanning sibling JSONL files.
+ *
+ * Team members are separate sessions in the same directory. Their first JSONL
+ * entry contains `teamName` and `agentName` fields. We match them by teamName
+ * against the teams this session created.
+ */
+async function discoverTeamMembers(
+  mainSessionPath: string,
+  mainSessionId: string,
+  teamNames: Set<string>,
+  debug: boolean = false,
+): Promise<TeamMemberInfo[]> {
+  if (teamNames.size === 0) return [];
+
+  const dir = dirname(mainSessionPath);
+  const mainFilename = basename(mainSessionPath);
+  const members: TeamMemberInfo[] = [];
+
+  try {
+    const files = await readdir(dir);
+    // Only check UUID-shaped JSONL files (not agent-*.jsonl subagent files)
+    const sessionFiles = files.filter(
+      (f) => f.endsWith(".jsonl") && !f.startsWith("agent-") && f !== mainFilename,
+    );
+
+    for (const file of sessionFiles) {
+      const filePath = join(dir, file);
+      try {
+        const content = await readJsonlContent(filePath);
+        const firstNewline = content.indexOf("\n");
+        const firstLine = firstNewline > 0 ? content.slice(0, firstNewline) : content;
+        if (!firstLine.trim()) continue;
+
+        const firstEntry = JSON.parse(firstLine);
+        const entryTeamName = firstEntry.teamName as string | undefined;
+        const entryAgentName = firstEntry.agentName as string | undefined;
+        const entrySessionId = (firstEntry.sessionId ?? firstEntry.session_id) as string | undefined;
+
+        if (!entryTeamName || !teamNames.has(entryTeamName)) continue;
+        // Skip the lead's own session
+        if (entrySessionId === mainSessionId) continue;
+
+        // Count turns and subagents by scanning lines
+        let turnCount = 0;
+        let subagentCount = 0;
+        let startTs: string | undefined;
+        let endTs: string | undefined;
+        const lines = content.split("\n").filter((l: string) => l.trim());
+        for (const line of lines) {
+          try {
+            const entry = JSON.parse(line);
+            const ts = entry.timestamp as string | undefined;
+            if (ts) {
+              if (!startTs) startTs = ts;
+              endTs = ts;
+            }
+            if (entry.type === "user" || entry.type === "assistant") {
+              turnCount++;
+            }
+          } catch {
+            // skip malformed lines
+          }
+        }
+
+        // Count subagent files for this team member's session
+        if (entrySessionId) {
+          const agentFiles = files.filter(
+            (f) => f.startsWith("agent-") && f.endsWith(".jsonl"),
+          );
+          for (const af of agentFiles) {
+            try {
+              const agentContent = await readJsonlContent(join(dir, af));
+              const agentFirstLine = agentContent.slice(0, agentContent.indexOf("\n") || agentContent.length);
+              const agentEntry = JSON.parse(agentFirstLine);
+              if (agentEntry.sessionId === entrySessionId) {
+                subagentCount++;
+              }
+            } catch {
+              // skip
+            }
+          }
+          // Also check nested layout
+          const sessionBasename = basename(file, ".jsonl");
+          const nestedDir = join(dir, sessionBasename, "subagents");
+          try {
+            const nestedFiles = await readdir(nestedDir);
+            subagentCount += nestedFiles.filter(
+              (f) => f.startsWith("agent-") && f.endsWith(".jsonl"),
+            ).length;
+          } catch {
+            // no nested dir
+          }
+        }
+
+        members.push({
+          name: entryAgentName || "unknown",
+          teamName: entryTeamName,
+          sessionId: asSessionId(entrySessionId || file.replace(".jsonl", "")),
+          turns: turnCount,
+          subagentCount,
+          ...(startTs ? { startTimestamp: startTs } : {}),
+          ...(endTs ? { endTimestamp: endTs } : {}),
+        });
+
+        debugLog(debug, `Found team member: ${entryAgentName} (team: ${entryTeamName}, session: ${entrySessionId})`);
+      } catch {
+        // skip files that can't be parsed
+      }
+    }
+  } catch (error) {
+    debugLog(debug, `Could not scan for team members in ${dir}: ${(error as Error).message}`);
+  }
+
+  // Sort by start timestamp
+  members.sort((a, b) => {
+    if (!a.startTimestamp || !b.startTimestamp) return 0;
+    return a.startTimestamp.localeCompare(b.startTimestamp);
+  });
+
+  return members;
 }
 
 /**

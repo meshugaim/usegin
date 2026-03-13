@@ -5,7 +5,7 @@
  * Feed the result into a formatter for display.
  */
 
-import type { ParsedSession, ParsedSubagent, Turn, ToolCall, AgentId, TokenUsage, TokenStats, CompactionEvent } from "./types";
+import type { ParsedSession, ParsedSubagent, TeamMemberInfo, Turn, ToolCall, AgentId, TokenUsage, TokenStats, CompactionEvent } from "./types";
 import { getToolCallInput } from "./types";
 import type { GitCommit } from "./git-commits";
 import { getModelPricing, getContextWindowSize, estimateCost } from "./pricing";
@@ -41,6 +41,8 @@ export interface SessionStats {
   turnCount: { total: number; user: number; assistant: number };
   toolCounts: Record<string, number>; // tool name -> call count, sorted by count desc
   subagentSummaries: SubagentSummary[];
+  /** Team members spawned via TeamCreate (separate sessions) */
+  teamMembers?: TeamMemberInfo[];
   commitCount: number;
   /** Rich commit data from git history, when available */
   gitCommits?: GitCommit[];
@@ -494,6 +496,9 @@ export function computeStats(session: ParsedSession): SessionStats {
     },
     toolCounts,
     subagentSummaries,
+    ...(session.teamMembers && session.teamMembers.length > 0
+      ? { teamMembers: session.teamMembers }
+      : {}),
     commitCount,
     ...(hasGitCommits ? { gitCommits: session.gitCommits } : {}),
     rewindCount: session.rewinds.length,
