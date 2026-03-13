@@ -42,17 +42,29 @@ The agent outputs these markers in stdout:
 
 ## Observability
 
-**CLI progress output:** While sessions run, timestamped progress lines print to stderr:
-- Session start/end with session ID and duration
-- Heartbeats every 30s showing elapsed time
-- Git commit detection with push status
-- Handoff file detection
+Sessions run with `--output-format stream-json` for real-time visibility.
 
-**Watch dashboard:** Run `auto-implement watch <run-id>` for a live auto-refreshing dashboard showing session status, current slice, context %, recent commits, and tool activity.
+**Main terminal (real-time):** Compact one-line summaries stream to stderr as the agent works:
+- Tool calls with input summaries (e.g., `Read auth.ts`, `Bash git status`)
+- Context % updates when usage changes significantly
+- Error highlights from failed tool calls
+- Session result with duration and cost
+- Text output previews (agent reasoning/status)
 
-**Run directory:** Each run creates a directory at `~/.auto-implement/runs/<run-id>/`:
-- `manifest.jsonl` — JSONL log of all events (session starts, completions, handoffs, durations)
-- `session-N/` — tmux capture files (prompt, stdout, exit code) when using tmux mode
+**Watch dashboard:** `auto-implement watch <run-id>` shows a live auto-refreshing summary:
+- Session status, slice progress, context %, recent commits
+- Recent activity feed from the activity log
+- Hint for full narrative view via `session --stream`
+
+**Full narrative view:** For the complete interactive-style transcript:
+```bash
+tail -f ~/.auto-implement/runs/<run-id>/stream.jsonl | session --stream
+```
+
+**Run directory:** Each run creates `~/.auto-implement/runs/<run-id>/`:
+- `manifest.jsonl` — JSONL log of run-level events (session starts, completions, handoffs, durations)
+- `activity.jsonl` — Compact activity events (tool calls, context %, results) for the watch dashboard
+- `stream.jsonl` — Raw `stream-json` output for `session --stream` compatibility
 
 Handoff files are preserved at `.claude/handoffs/handoff_YYYYMMDD_HHMMSS.md` (timestamped, never overwritten).
 

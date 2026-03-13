@@ -28,51 +28,72 @@ import {
   readRotationSignal,
   type RotationSignal,
 } from "../hooks/lifecycle";
+import { ActivityWriter } from "./activity";
 
 /**
- * Spawn a headless Claude session using the piped approach (original behavior).
- * Returns exit code and captured stdout. Updates the lifecycle context with the real PID.
+ * Spawn a headless Claude session with stream-json output.
+ *
+ * Uses `--output-format stream-json` to get real-time JSONL events from
+ * Claude CLI. When an ActivityWriter is provided, it parses events and
+ * prints compact summaries to stderr (like running interactively).
+ *
+ * Returns exit code and captured stdout. Updates the lifecycle context
+ * with the real PID.
  */
 async function spawnClaudePiped(
   prompt: string,
-  sessionId: string
+  sessionId: string,
+  activityWriter?: ActivityWriter
 ): Promise<{ exitCode: number; stdout: string }> {
   // Remove API key env vars to force OAuth (same as crun)
   const env = { ...process.env };
   delete env.ANTHROPIC_API_KEY;
   delete env.CLAUDE_API_KEY;
 
-  const proc = Bun.spawn(
-    [
-      "bun",
-      "run",
-      "--bun",
-      "claude",
-      "-p",
-      "--dangerously-skip-permissions",
-      "--session-id",
-      sessionId,
-    ],
-    {
-      stdin: new TextEncoder().encode(prompt),
-      stdout: "pipe",
-      stderr: "pipe",
-      cwd: "/workspaces/test-mvp",
-      env,
-    }
-  );
+  const args = [
+    "bun",
+    "run",
+    "--bun",
+    "claude",
+    "-p",
+    "--dangerously-skip-permissions",
+    "--session-id",
+    sessionId,
+  ];
+
+  // Use stream-json for real-time observability
+  if (activityWriter) {
+    args.push("--output-format", "stream-json");
+  }
+
+  const proc = Bun.spawn(args, {
+    stdin: new TextEncoder().encode(prompt),
+    stdout: "pipe",
+    stderr: "pipe",
+    cwd: "/workspaces/test-mvp",
+    env,
+  });
 
   // Update lifecycle context with real PID (for post-commit hook to kill on rotation)
   updatePid(proc.pid);
 
-  // Stream stderr to console, capture stdout
+  // Capture stdout; when activityWriter is present, parse events and
+  // print summaries to stderr instead of dumping raw JSON to stdout.
   const stdoutChunks: string[] = [];
 
   const streamOut = (async () => {
     for await (const chunk of proc.stdout) {
       const text = new TextDecoder().decode(chunk);
-      process.stdout.write(text);
       stdoutChunks.push(text);
+
+      if (activityWriter) {
+        const summaries = await activityWriter.processChunk(text);
+        for (const line of summaries) {
+          process.stderr.write(line + "\n");
+        }
+      } else {
+        process.stdout.write(text);
+      }
     }
   })();
 
@@ -84,6 +105,15 @@ async function spawnClaudePiped(
   })();
 
   await Promise.all([streamOut, streamErr]);
+
+  // Flush remaining buffered data
+  if (activityWriter) {
+    const final = await activityWriter.flush();
+    for (const line of final) {
+      process.stderr.write(line + "\n");
+    }
+  }
+
   const exitCode = await proc.exited;
 
   return {
@@ -116,11 +146,14 @@ async function spawnClaude(
   });
   await monitor.start(sessionId);
 
+  // Create activity writer for real-time observability
+  const writer = new ActivityWriter(context.runDir);
+
   let result: { exitCode: number; stdout: string } | null = null;
   let rotation: RotationSignal | null = null;
 
   try {
-    result = await spawnClaudePiped(prompt, sessionId);
+    result = await spawnClaudePiped(prompt, sessionId, writer);
   } finally {
     // Read rotation signal BEFORE lifecycle cleanup (remove deletes it)
     rotation = readRotationSignal();

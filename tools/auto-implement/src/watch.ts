@@ -1,14 +1,14 @@
 /**
  * auto-implement watch — dashboard for monitoring a running auto-implement run.
  *
- * Reads manifest, git state, session JSONL, and Linear to show a compact
+ * Reads manifest, git state, activity log, and Linear to show a compact
  * auto-refreshing summary of what's happening.
  */
 
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
-import { homedir } from "os";
-import { readManifest, getRunsDir, getRunDir, type ManifestEvent } from "./manifest";
+import { readManifest, getRunsDir, type ManifestEvent } from "./manifest";
+import { readLatestContext, readRecentActivity } from "./activity";
 
 const REPO_DIR = "/workspaces/test-mvp";
 
@@ -146,15 +146,9 @@ async function gatherData(runDir: string, runId: string): Promise<DashboardData>
   // Current slice from Linear (best effort)
   const currentSlice = await getCurrentSlice(specId);
 
-  // Context % from session JSONL (best effort)
-  const contextPercent = currentSession?.sessionId
-    ? await getContextPercent(currentSession.sessionId)
-    : null;
-
-  // Recent activity from session JSONL
-  const recentActivity = currentSession?.sessionId
-    ? await getRecentActivity(currentSession.sessionId)
-    : [];
+  // Context % and recent activity from activity log
+  const contextPercent = await readLatestContext(runDir);
+  const recentActivity = await readRecentActivity(runDir);
 
   // Run outcome
   const runOutcome = endEvent?.details?.replace("outcome=", "") ?? null;
@@ -242,6 +236,7 @@ function formatDashboard(data: DashboardData): string {
 
   lines.push("");
   lines.push(`Updated: ${new Date().toTimeString().slice(0, 8)} | Ctrl+C to exit`);
+  lines.push(`Full view: tail -f ${data.runId ? `~/.auto-implement/runs/${data.runId}/stream.jsonl` : "stream.jsonl"} | session --stream`);
 
   return lines.join("\n") + "\n";
 }
@@ -324,131 +319,10 @@ async function getCurrentSlice(specId: string): Promise<string | null> {
   }
 }
 
-/**
- * Read context % from a Claude session's JSONL file.
- * Looks for token usage in recent entries.
- */
-async function getContextPercent(sessionId: string): Promise<string | null> {
-  try {
-    // Claude stores session JSONL at ~/.claude/projects/<project-key>/<session-id>.jsonl
-    const claudeDir = join(homedir(), ".claude", "projects", "-workspaces-test-mvp");
-    const jsonlPath = join(claudeDir, `${sessionId}.jsonl`);
-
-    const file = Bun.file(jsonlPath);
-    if (!(await file.exists())) return null;
-
-    const text = await file.text();
-    const lines = text.trim().split("\n").filter(Boolean);
-
-    // Read from the end to find the most recent token usage
-    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 50); i--) {
-      try {
-        const entry = JSON.parse(lines[i]);
-        // Look for costSoFar or tokenUsage patterns
-        if (entry.costSoFar !== undefined && entry.contextTokens !== undefined) {
-          const used = entry.contextTokens;
-          const max = entry.maxContextTokens || 200_000;
-          const percent = Math.round((used / max) * 100);
-          return `${percent}% (${formatTokens(used)} / ${formatTokens(max)})`;
-        }
-        // Alternative: look for usage in message entries
-        if (entry.usage?.input_tokens) {
-          // Rough estimate from cumulative input tokens
-          const used = entry.usage.input_tokens;
-          const max = 200_000;
-          const percent = Math.round((used / max) * 100);
-          return `~${percent}%`;
-        }
-      } catch {
-        // Skip malformed lines
-      }
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Get recent tool call activity from session JSONL.
- */
-async function getRecentActivity(
-  sessionId: string
-): Promise<Array<{ time: string; type: string; detail: string }>> {
-  try {
-    const claudeDir = join(homedir(), ".claude", "projects", "-workspaces-test-mvp");
-    const jsonlPath = join(claudeDir, `${sessionId}.jsonl`);
-
-    const file = Bun.file(jsonlPath);
-    if (!(await file.exists())) return [];
-
-    const text = await file.text();
-    const lines = text.trim().split("\n").filter(Boolean);
-
-    const activities: Array<{ time: string; type: string; detail: string }> = [];
-
-    // Read last ~100 lines for recent activity
-    const start = Math.max(0, lines.length - 100);
-    for (let i = start; i < lines.length; i++) {
-      try {
-        const entry = JSON.parse(lines[i]);
-        const activity = extractActivity(entry);
-        if (activity) {
-          activities.push(activity);
-        }
-      } catch {
-        // Skip malformed
-      }
-    }
-
-    // Return most recent entries
-    return activities.slice(-8);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Extract a human-readable activity from a JSONL entry.
- */
-function extractActivity(
-  entry: Record<string, unknown>
-): { time: string; type: string; detail: string } | null {
-  // Look for tool_use content blocks
-  if (entry.type === "assistant" && Array.isArray(entry.content)) {
-    for (const block of entry.content as Array<Record<string, unknown>>) {
-      if (block.type === "tool_use") {
-        const name = String(block.name || "tool");
-        const input = block.input as Record<string, unknown> | undefined;
-        const timestamp = entry.timestamp
-          ? new Date(entry.timestamp as string).toTimeString().slice(0, 5)
-          : "??:??";
-
-        let detail = "";
-        switch (name) {
-          case "Edit":
-          case "Read":
-          case "Write":
-            detail = String(input?.file_path || "").split("/").pop() || "";
-            break;
-          case "Bash":
-            detail = String(input?.command || "").slice(0, 60);
-            break;
-          case "Grep":
-            detail = `"${String(input?.pattern || "").slice(0, 40)}"`;
-            break;
-          default:
-            detail = name;
-        }
-
-        return { time: timestamp, type: name, detail };
-      }
-    }
-  }
-
-  return null;
-}
+// Context % and recent activity are now read from the activity log
+// via readLatestContext() and readRecentActivity() from ./activity.ts.
+// The raw stream-json is also saved to <runDir>/stream.jsonl for
+// full narrative view via: tail -f stream.jsonl | session --stream
 
 function formatElapsed(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -460,7 +334,3 @@ function formatElapsed(ms: number): string {
   return `${hours}h${remainingMin}min`;
 }
 
-function formatTokens(n: number): string {
-  if (n >= 1000) return `${Math.round(n / 1000)}K`;
-  return String(n);
-}
