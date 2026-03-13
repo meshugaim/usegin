@@ -79,10 +79,10 @@ while IFS= read -r file; do
     impl_files="$impl_files$file"$'\n'
     continue
   fi
-  # Components with logic (not pure UI — we gate .tsx in component dirs)
+  # Components/logic in app directory (not route files which are thin wrappers)
   if echo "$file" | grep -qE '^nextjs-app/app/.*\.tsx?$' && echo "$file" | grep -qvE '(layout|page|loading|error|not-found)\.tsx$'; then
-    # Skip route files (page.tsx, layout.tsx etc.) — these are thin wrappers
-    :
+    impl_files="$impl_files$file"$'\n'
+    continue
   fi
   # Lib modules
   if echo "$file" | grep -qE '^nextjs-app/(lib|hooks|components)/.*\.(ts|tsx)$'; then

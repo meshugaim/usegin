@@ -143,14 +143,46 @@ Default to committing. When in doubt, commit.
 
 Tests first is the strong default. Write tests before implementation for every slice, unless it falls into a known exception below.
 
+**IMPORTANT: The TDD order guard (PreToolUse hook) enforces this during auto-implement sessions. If you try to write an implementation file before writing a test file, the Write/Edit tool will be BLOCKED. This is not a suggestion — it is structurally enforced.**
+
 ### The Loop
+
+For each slice, follow this exact sequence:
 
 1. **Consider feature toggle** — Does this slice need one? (See "Feature Toggles" above)
 2. **Read verification expectations** — If the slice has a Verification section (from `slicing-specs`), use it to guide test choices. It tells you *what* to test and at *which level* (unit, integration-db, integration-browser, etc.). You decide the implementation: mocks, fixtures, test structure. See `docs/testing/README.md` for the full test type matrix.
-3. **Write tests** — At the levels indicated by the verification expectations. If no expectations exist, default to unit + integration as applicable.
-4. **Watch tests fail** — Confirms they're actually testing something
-5. **Implement** — Minimal code to make tests pass
-6. **Self-verify** — Run all tests, check nothing else broke
+3. **Design the test** — Before writing ANY code, decide: what test file, what test cases, what assertions? This is your first code action after orient.
+4. **Write the test file FIRST** — Create the test file and write failing tests. This MUST happen before touching any implementation file.
+5. **Run the tests — watch them fail** — Confirms they're actually testing something. If they pass without implementation, your tests are wrong.
+6. **Implement** — Minimal code to make tests pass. Now you can write the implementation files.
+7. **Self-verify** — Run all tests, check nothing else broke.
+
+### Concrete Example
+
+Slice: "Add API endpoint to list Linear projects"
+
+```
+Step 3 (design): I need a test that hits GET /api/linear/projects and expects a 200 with project data.
+         Test file: python-services/tests/integration/db/test_linear_api.py
+         Test level: integration-db (hits real endpoint + database)
+
+Step 4 (write test):
+  # python-services/tests/integration/db/test_linear_api.py
+  async def test_list_linear_projects_returns_projects(client, test_world):
+      response = await client.get("/api/linear/projects", headers=auth_headers)
+      assert response.status_code == 200
+      data = response.json()
+      assert "projects" in data
+
+Step 5 (watch fail): Run test → 404 Not Found (endpoint doesn't exist yet). Good.
+
+Step 6 (implement):
+  # python-services/agent_api/api/linear.py
+  @router.get("/projects")
+  async def list_projects(...): ...
+
+Step 7 (verify): Run test → 200 OK. Run full suite → all green.
+```
 
 ### When to Skip TDD
 
@@ -159,8 +191,9 @@ Tests first is the strong default. Write tests before implementation for every s
 | Config/infra changes (env vars, CI, deps) | Just verify the change works |
 | Pure CSS/styling tweaks | Visual verification with `manual-testing-by-agent` |
 | Spike/exploration to answer a question | Skip tests entirely, discard the code, restart with TDD once you know the answer |
+| DB migrations (schema-only, no logic) | Tests come with the implementation code that uses the schema |
 
-These aren't loopholes — they're cases where TDD genuinely doesn't apply. For everything else, tests first.
+These aren't loopholes — they're cases where TDD genuinely doesn't apply. For everything else, tests first. If the slice's Linear issue has the `tdd:skip` label, the pre-commit TDD gate is also skipped.
 
 ### Test Infrastructure
 
@@ -168,11 +201,12 @@ Sometimes the first slice isn't a feature — it's setting up the test harness. 
 
 ### Red Flags — Stop and Add Tests
 
-- "I'll add tests later" — **Stop. Write tests now.**
+- "I'll add tests later" — **Stop. Write tests now.** (The TDD order guard will block you anyway.)
 - "It's just a small change" — **Small changes still need tests.**
 - "I tested it manually" — **Write an automated test for it.**
 - "The backend is tested, frontend doesn't need tests" — **Both need tests.**
 - "Tests are passing" but you only tested happy path — **Add error case tests.**
+- "Let me just write the implementation first, I know what the tests should be" — **No. Write the test file first, then implement.** This is the whole point of TDD — the test drives the design.
 
 ## When Things Go Wrong
 
@@ -286,14 +320,21 @@ If you reach 70% (missed the 60% window or current slice ran long):
 
 ### Auto-Implement Mode
 
-When run via the `auto-implement` CLI (headless `claude -p` sessions), output these exact signals so the outer loop knows what happened:
+When run via the `auto-implement` CLI (headless `claude -p` sessions), write a signal file so the outer loop knows what happened:
 
-| Signal | When | What it does |
+| Signal | When | Command |
 |---|---|---|
-| `AUTO_IMPLEMENT_HANDOFF` | After writing a handoff (60%+ context or natural stopping point) | Outer loop spawns a fresh session that reads the handoff |
-| `AUTO_IMPLEMENT_COMPLETE` | After all slices are done and cross-slice verification passes | Outer loop stops — implementation is finished |
+| Handoff | After writing a handoff (60%+ context or natural stopping point) | `echo '{"signal":"handoff"}' > /tmp/auto-impl-signal.json` |
+| Complete | After all slices are done and cross-slice verification passes | `echo '{"signal":"complete"}' > /tmp/auto-impl-signal.json` |
 
-Output each signal on its own line in stdout. The auto-implement CLI also checks Linear as a fallback (all child issues Done = complete), but explicit signals are more reliable.
+The outer loop reads `/tmp/auto-impl-signal.json` after each session. It also checks Linear as a fallback (all child issues Done = complete), but explicit signals are more reliable.
+
+**Enforcement hooks active during auto-implement sessions:**
+- **TDD order guard** — Blocks writing implementation files until a test file has been written since the last commit
+- **Commit frequency guard** — Blocks Write/Edit when >4 uncommitted files
+- **Pre-commit TDD gate** — Rejects commits with implementation files but no test files
+- **Pre-commit size gate** — Rejects commits with >8 staged files
+- **Post-commit rotation** — Kills session at >65% context, outer loop spawns fresh session
 
 ### Handoff Structure for Spec Implementation
 

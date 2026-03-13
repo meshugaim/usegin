@@ -25,6 +25,7 @@ const HOOKS_DIR = resolve(import.meta.dirname);
 const CONTEXT_FILE = "/tmp/auto-impl-context.json";
 const ROTATION_FILE = "/tmp/auto-impl-rotation.json";
 const SIGNAL_FILE = "/tmp/auto-impl-signal.json";
+const TDD_STATE_FILE = "/tmp/auto-impl-tdd-state.json";
 
 // Paths of hooks we manage
 const MANAGED_HOOKS = {
@@ -158,8 +159,8 @@ export function installHooks(options: InstallOptions) {
   const existingHooks = (localSettings.hooks as Record<string, unknown[]>) || {};
   const existingPreToolUse = (existingHooks.PreToolUse as unknown[]) || [];
 
-  // Add our guard (tagged so we can find it for removal)
-  const guardHook = {
+  // Add our guards (tagged so we can find them for removal)
+  const commitFrequencyGuard = {
     matcher: "Write|Edit",
     hooks: [
       {
@@ -170,9 +171,20 @@ export function installHooks(options: InstallOptions) {
     _autoImplement: true, // marker for removal
   };
 
+  const tddOrderGuard = {
+    matcher: "Write|Edit",
+    hooks: [
+      {
+        type: "command",
+        command: `bun "${resolve(HOOKS_DIR, "tdd-order-guard.ts")}"`,
+      },
+    ],
+    _autoImplement: true, // marker for removal
+  };
+
   localSettings.hooks = {
     ...existingHooks,
-    PreToolUse: [...existingPreToolUse, guardHook],
+    PreToolUse: [...existingPreToolUse, tddOrderGuard, commitFrequencyGuard],
   };
 
   writeFileSync(CLAUDE_SETTINGS_LOCAL, JSON.stringify(localSettings, null, 2));
@@ -239,6 +251,12 @@ export function removeHooks() {
   if (existsSync(SIGNAL_FILE)) {
     unlinkSync(SIGNAL_FILE);
     console.log(`  ✓ Removed agent signal: ${SIGNAL_FILE}`);
+  }
+
+  // 6. Remove TDD state file if present
+  if (existsSync(TDD_STATE_FILE)) {
+    unlinkSync(TDD_STATE_FILE);
+    console.log(`  ✓ Removed TDD state: ${TDD_STATE_FILE}`);
   }
 
   console.log("\nAll hooks removed. Auto-implement guards are inactive.");
