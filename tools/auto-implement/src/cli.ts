@@ -6,10 +6,9 @@
  *   auto-implement run ENG-123              # Run up to 10 sessions
  *   auto-implement run ENG-123 --pause      # Confirm between sessions
  *   auto-implement run ENG-123 --max 5      # Limit to 5 sessions
- *   auto-implement run ENG-123 --no-tmux    # Force piped mode (no tmux)
- *   auto-implement list                 # List previous runs
- *   auto-implement show <run-id>        # Show run manifest
- *   auto-implement watch <run-id>       # Live dashboard for a running run
+ *   auto-implement list                     # List previous runs
+ *   auto-implement show <run-id>            # Show run manifest
+ *   auto-implement watch <run-id>           # Live dashboard for a running run
  */
 
 import { Command } from "commander";
@@ -20,7 +19,6 @@ import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import { generateSessionId } from "../../crun/src/run";
 import { ProgressMonitor } from "./progress";
-import { isTmuxAvailable, spawnClaudeInTmux, getTmuxSessionName } from "./tmux";
 import { runWatch } from "./watch";
 import { buildHandoffWriterPrompt } from "./prompt";
 import {
@@ -30,9 +28,6 @@ import {
   readRotationSignal,
   type RotationSignal,
 } from "../hooks/lifecycle";
-
-/** Whether tmux spawning is enabled for this run (resolved at startup) */
-let useTmux = false;
 
 /**
  * Spawn a headless Claude session using the piped approach (original behavior).
@@ -100,7 +95,6 @@ async function spawnClaudePiped(
 /**
  * Spawn a Claude session with lifecycle hooks and progress monitoring.
  * Installs hook guards before the session and removes them after.
- * Uses tmux when available, falls back to piped approach.
  */
 async function spawnClaude(
   prompt: string,
@@ -108,7 +102,7 @@ async function spawnClaude(
 ): Promise<{ sessionId: string; exitCode: number; stdout: string; rotation: RotationSignal | null }> {
   const sessionId = await generateSessionId();
 
-  // Install lifecycle hooks (PID=0 placeholder, updated after spawn)
+  // Install lifecycle hooks (PID=0 placeholder, updated after spawn in spawnClaudePiped)
   installHooks({
     sessionId,
     specId: context.specId,
@@ -126,19 +120,7 @@ async function spawnClaude(
   let rotation: RotationSignal | null = null;
 
   try {
-    if (useTmux) {
-      const tmuxName = getTmuxSessionName(context.sessionNumber);
-      log(`  tmux session: ${tmuxName} (attach with: tmux attach -t ${tmuxName})`);
-
-      result = await spawnClaudeInTmux({
-        prompt,
-        sessionId,
-        sessionNumber: context.sessionNumber,
-        runDir: context.runDir,
-      });
-    } else {
-      result = await spawnClaudePiped(prompt, sessionId);
-    }
+    result = await spawnClaudePiped(prompt, sessionId);
   } finally {
     // Read rotation signal BEFORE lifecycle cleanup (remove deletes it)
     rotation = readRotationSignal();
@@ -248,24 +230,11 @@ program
   .description("Run auto-implement on a spec (e.g., auto-implement run ENG-123)")
   .option("--max <n>", "Maximum sessions to run", "10")
   .option("--pause", "Confirm between sessions", false)
-  .option("--no-tmux", "Disable tmux session spawning (use piped mode)")
-  .action(async (specId: string, options: { max: string; pause: boolean; tmux: boolean }) => {
+  .action(async (specId: string, options: { max: string; pause: boolean }) => {
     const maxSessions = parseInt(options.max, 10);
     if (isNaN(maxSessions) || maxSessions < 1) {
       console.error("--max must be a positive integer");
       process.exit(1);
-    }
-
-    // Resolve tmux availability
-    if (options.tmux) {
-      useTmux = await isTmuxAvailable();
-      if (useTmux) {
-        log("tmux detected — sessions will spawn in tmux panes");
-      } else {
-        log("tmux not available — using piped mode");
-      }
-    } else {
-      log("tmux disabled — using piped mode");
     }
 
     // Normalize spec ID (add ENG- prefix if just a number)

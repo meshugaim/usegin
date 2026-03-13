@@ -8,7 +8,6 @@ Outer loop for spec implementation across multiple fresh Claude sessions.
 auto-implement run ENG-123              # Run up to 10 sessions
 auto-implement run ENG-123 --pause      # Confirm between sessions
 auto-implement run ENG-123 --max 5      # Limit to 5 sessions
-auto-implement run ENG-123 --no-tmux    # Force piped mode (no tmux)
 auto-implement list                     # List previous runs
 auto-implement show <run-id>            # Show run manifest
 auto-implement watch <run-id>           # Live dashboard for a running run
@@ -48,8 +47,6 @@ The agent outputs these markers in stdout:
 - Heartbeats every 30s showing elapsed time
 - Git commit detection with push status
 - Handoff file detection
-
-**tmux sessions:** When tmux is available, each session spawns in a named tmux pane (`auto-impl-1`, `auto-impl-2`, etc.). Attach with `tmux attach -t auto-impl-1` to see the full TUI. Use `--no-tmux` to disable.
 
 **Watch dashboard:** Run `auto-implement watch <run-id>` for a live auto-refreshing dashboard showing session status, current slice, context %, recent commits, and tool activity.
 
