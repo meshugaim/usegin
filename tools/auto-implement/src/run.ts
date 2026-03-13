@@ -135,8 +135,8 @@ export async function autoImplement(
   deps.log(`Pause between sessions: ${pause}`);
   deps.log(`Run directory: ${runDir}`);
   deps.log("");
-  deps.log(`Live dashboard (run in another terminal):`);
-  deps.log(`  auto-implement watch ${runId}`);
+  deps.log(`Dashboard:  auto-implement watch ${runId}`);
+  deps.log(`Full view:  tail -f ${runDir}/stream.jsonl | session --stream`);
   deps.log("");
 
   // Record run start

@@ -14,7 +14,7 @@ const REPO_DIR = "/workspaces/test-mvp";
 
 interface WatchOptions {
   runId: string;
-  /** Refresh interval in ms (default: 10000) */
+  /** Refresh interval in ms (default: 3000) */
   intervalMs?: number;
 }
 
@@ -46,7 +46,7 @@ interface DashboardData {
  * Run the watch dashboard loop.
  */
 export async function runWatch(options: WatchOptions): Promise<void> {
-  const { runId, intervalMs = 10_000 } = options;
+  const { runId, intervalMs = 3_000 } = options;
 
   // Resolve run directory
   const runsDir = getRunsDir();
