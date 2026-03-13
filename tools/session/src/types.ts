@@ -804,6 +804,10 @@ export interface ParsedSubagent {
   startTimestamp?: string;
   /** Aggregated token usage across all assistant turns in this subagent. */
   tokenUsage?: TokenUsage;
+  /** AgentId of the agent that spawned this subagent ("main" if spawned by the top-level session) */
+  parentAgentId?: AgentId | "main";
+  /** Tool name used to spawn this subagent (e.g., "Agent", "Task") */
+  spawnedBy?: string;
 }
 
 export interface RewindInfo {

@@ -69,6 +69,10 @@ export interface SubagentSummary {
   durationMs?: number;
   /** Aggregated token usage across all assistant turns in this subagent */
   tokenUsage?: TokenUsage;
+  /** AgentId of the agent that spawned this subagent ("main" if spawned by the top-level session) */
+  parentAgentId?: AgentId | "main";
+  /** Tool name used to spawn this subagent (e.g., "Agent", "Task") */
+  spawnedBy?: string;
 }
 
 // ============================================================================
@@ -119,33 +123,80 @@ function totalToolCalls(turns: Turn[]): number {
  * 2. The first assistant turn's text, truncated to 80 characters
  * 3. Empty string as last resort
  */
-function buildSubagentDescription(
+interface SubagentSpawnInfo {
+  description: string;
+  parentAgentId: AgentId | "main";
+  spawnedBy: string;
+}
+
+/**
+ * Find who spawned a subagent by searching tool results for its agentId.
+ *
+ * Searches the main session turns first, then all other subagent turns.
+ * Returns the description, parent agent ID, and spawning tool name.
+ */
+function findSubagentSpawnInfo(
   subagent: ParsedSubagent,
-  mainTurns: Turn[]
-): string {
-  // Try matching via Task tool call results in the main session
-  // Look through user turns for tool results that mention this agentId
-  for (const turn of mainTurns) {
-    for (const tr of turn.toolResults) {
-      if (tr.content.includes(String(subagent.agentId))) {
-        // Found the result — now find the corresponding Task tool call
-        const matchingTurn = mainTurns.find((t) =>
-          t.toolCalls.some((tc) => tc.id === tr.toolUseId)
-        );
-        if (matchingTurn) {
-          const taskCall = matchingTurn.toolCalls.find(
-            (tc) => tc.id === tr.toolUseId
+  mainTurns: Turn[],
+  allSubagents: ParsedSubagent[]
+): SubagentSpawnInfo | null {
+  // Search a set of turns for the tool_result that contains this agentId,
+  // then trace back to the tool_use that spawned it
+  const searchTurns = (turns: Turn[], sourceAgentId: AgentId | "main"): SubagentSpawnInfo | null => {
+    for (const turn of turns) {
+      for (const tr of turn.toolResults) {
+        if (tr.content.includes(String(subagent.agentId))) {
+          // Found the result — now find the corresponding tool call
+          const matchingTurn = turns.find((t) =>
+            t.toolCalls.some((tc) => tc.id === tr.toolUseId)
           );
-          if (taskCall) {
-            const taskInput = getToolCallInput("Task", taskCall);
-            if (taskInput) {
-              return truncate(taskInput.prompt || taskInput.description, 80);
+          if (matchingTurn) {
+            const spawnCall = matchingTurn.toolCalls.find(
+              (tc) => tc.id === tr.toolUseId
+            );
+            if (spawnCall) {
+              const toolName = spawnCall.name;
+              // Try Agent input first, then Task input
+              const agentInput = getToolCallInput("Agent", spawnCall);
+              const taskInput = getToolCallInput("Task", spawnCall);
+              const input = agentInput || taskInput;
+              const description = input
+                ? truncate(input.prompt || input.description, 80)
+                : "";
+              return {
+                description,
+                parentAgentId: sourceAgentId,
+                spawnedBy: toolName,
+              };
             }
           }
         }
       }
     }
+    return null;
+  };
+
+  // Search main session first
+  const mainResult = searchTurns(mainTurns, "main" as AgentId | "main");
+  if (mainResult) return mainResult;
+
+  // Search other subagents (for 3-layer patterns where a subagent spawned this one)
+  for (const other of allSubagents) {
+    if (other.agentId === subagent.agentId) continue;
+    const subResult = searchTurns(other.turns, other.agentId);
+    if (subResult) return subResult;
   }
+
+  return null;
+}
+
+function buildSubagentDescription(
+  subagent: ParsedSubagent,
+  mainTurns: Turn[],
+  allSubagents: ParsedSubagent[]
+): string {
+  const spawnInfo = findSubagentSpawnInfo(subagent, mainTurns, allSubagents);
+  if (spawnInfo) return spawnInfo.description;
 
   // Fallback: first assistant turn text
   const firstAssistant = subagent.turns.find((t) => t.role === "assistant");
@@ -177,9 +228,11 @@ function computeDurationMs(
  */
 function summarizeSubagent(
   subagent: ParsedSubagent,
-  mainTurns: Turn[]
+  mainTurns: Turn[],
+  allSubagents: ParsedSubagent[]
 ): SubagentSummary {
-  const description = buildSubagentDescription(subagent, mainTurns);
+  const spawnInfo = findSubagentSpawnInfo(subagent, mainTurns, allSubagents);
+  const description = spawnInfo?.description ?? buildSubagentDescription(subagent, mainTurns, allSubagents);
   const toolCallCount = totalToolCalls(subagent.turns);
 
   const firstTs = subagent.startTimestamp ?? subagent.turns[0]?.timestamp;
@@ -193,6 +246,7 @@ function summarizeSubagent(
     toolCalls: toolCallCount,
     ...(durationMs !== undefined ? { durationMs } : {}),
     ...(subagent.tokenUsage ? { tokenUsage: subagent.tokenUsage } : {}),
+    ...(spawnInfo ? { parentAgentId: spawnInfo.parentAgentId, spawnedBy: spawnInfo.spawnedBy } : {}),
   };
 }
 
@@ -409,7 +463,7 @@ export function computeStats(session: ParsedSession): SessionStats {
     (sub) => !String(sub.agentId).startsWith("acompact-")
   );
   const subagentSummaries = visibleSubagents.map((sub) =>
-    summarizeSubagent(sub, session.turns)
+    summarizeSubagent(sub, session.turns, session.subagents)
   );
 
   // Prefer git-history commits over regex-extracted commits when available

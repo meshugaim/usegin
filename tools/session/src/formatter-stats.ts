@@ -350,7 +350,15 @@ function formatSubagentLine(index: number, sub: SubagentSummary): string {
     }
   }
 
-  return ` ${String(index).padStart(2)}. ${idShort}${desc}   ${parts.join("  ")}`;
+  // Show parent lineage: who spawned this agent and with what tool
+  let parentTag = "";
+  if (sub.parentAgentId) {
+    const parentId = sub.parentAgentId === "main" ? "main" : String(sub.parentAgentId).slice(0, 8);
+    const tool = sub.spawnedBy ?? "?";
+    parentTag = `  ←${parentId}(${tool})`;
+  }
+
+  return ` ${String(index).padStart(2)}. ${idShort}${desc}   ${parts.join("  ")}${parentTag}`;
 }
 
 // ============================================================================
