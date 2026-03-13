@@ -245,26 +245,29 @@ function status() {
   }
 }
 
-const program = new Command()
-  .name("lifecycle")
-  .description("Auto-implement hook lifecycle manager");
+// CLI entry point — only runs when executed directly (not when imported)
+if (import.meta.main) {
+  const program = new Command()
+    .name("lifecycle")
+    .description("Auto-implement hook lifecycle manager");
 
-program
-  .command("install")
-  .description("Install all hook guards")
-  .requiredOption("--session-id <id>", "Claude session ID")
-  .requiredOption("--spec-id <id>", "Linear spec/issue ID")
-  .requiredOption("--claude-pid <pid>", "Claude process PID")
-  .action(installHooks);
+  program
+    .command("install")
+    .description("Install all hook guards")
+    .requiredOption("--session-id <id>", "Claude session ID")
+    .requiredOption("--spec-id <id>", "Linear spec/issue ID")
+    .requiredOption("--claude-pid <pid>", "Claude process PID")
+    .action(installHooks);
 
-program
-  .command("remove")
-  .description("Remove all hook guards")
-  .action(removeHooks);
+  program
+    .command("remove")
+    .description("Remove all hook guards")
+    .action(removeHooks);
 
-program
-  .command("status")
-  .description("Show hook guard status")
-  .action(status);
+  program
+    .command("status")
+    .description("Show hook guard status")
+    .action(status);
 
-program.parse();
+  program.parse();
+}

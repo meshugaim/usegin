@@ -5,13 +5,13 @@ Outer loop for spec implementation across multiple fresh Claude sessions.
 ## Usage
 
 ```bash
-auto-implement ENG-123              # Run up to 10 sessions
-auto-implement ENG-123 --pause      # Confirm between sessions
-auto-implement ENG-123 --max 5      # Limit to 5 sessions
-auto-implement ENG-123 --no-tmux    # Force piped mode (no tmux)
-auto-implement list                 # List previous runs
-auto-implement show <run-id>        # Show run manifest
-auto-implement watch <run-id>       # Live dashboard for a running run
+auto-implement run ENG-123              # Run up to 10 sessions
+auto-implement run ENG-123 --pause      # Confirm between sessions
+auto-implement run ENG-123 --max 5      # Limit to 5 sessions
+auto-implement run ENG-123 --no-tmux    # Force piped mode (no tmux)
+auto-implement list                     # List previous runs
+auto-implement show <run-id>            # Show run manifest
+auto-implement watch <run-id>           # Live dashboard for a running run
 ```
 
 ## How It Works
