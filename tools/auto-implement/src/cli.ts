@@ -390,4 +390,68 @@ program
     await runWatch({ runId, intervalMs });
   });
 
+// Stream command: full narrative view via session --stream
+program
+  .command("stream [run-id]")
+  .description("Stream full session transcript (defaults to latest/running run)")
+  .action(async (runId?: string) => {
+    const runsDir = getRunsDir();
+    let targetDir: string;
+
+    try {
+      const entries = await readdir(runsDir);
+      if (entries.length === 0) {
+        console.error("No runs found.");
+        process.exit(1);
+      }
+
+      if (runId) {
+        const match = entries.find((e) => e === runId || e.startsWith(runId));
+        if (!match) {
+          console.error(`No run found matching: ${runId}`);
+          process.exit(1);
+        }
+        targetDir = join(runsDir, match);
+      } else {
+        // Pick the latest run (entries are timestamp-based)
+        entries.sort();
+        targetDir = join(runsDir, entries[entries.length - 1]);
+      }
+    } catch {
+      console.error("No runs directory found.");
+      process.exit(1);
+    }
+
+    const streamPath = join(targetDir, "stream.jsonl");
+    const file = Bun.file(streamPath);
+    if (!(await file.exists())) {
+      console.error(`No stream file found at ${streamPath}`);
+      console.error("The run may have started before streaming was enabled.");
+      process.exit(1);
+    }
+
+    // Spawn: tail -f stream.jsonl | session --stream --tool-output
+    const tail = Bun.spawn(["tail", "-f", streamPath], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const session = Bun.spawn(["session", "--stream", "--tool-output"], {
+      stdin: tail.stdout,
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+
+    // Forward signals to children for clean exit
+    const cleanup = () => {
+      tail.kill();
+      session.kill();
+      process.exit(0);
+    };
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
+
+    await session.exited;
+  });
+
 program.parse();
