@@ -65,15 +65,15 @@ Follow the \`implementing-specs\` skill. This is your primary guide.
 
 ## Context Thresholds (non-negotiable)
 
-- **Under 60%**: Continue to next slice
-- **60%+**: Do NOT start a new slice. Finish current if close, otherwise commit and hand off.
-- **70%+**: MUST hand off immediately. No exceptions.
+- **Under 50%**: Continue to next slice
+- **50%+**: Do NOT start a new slice. Finish current if close, otherwise commit and hand off.
+- **60%+**: MUST hand off immediately. No exceptions.
 
-Check context with \`cctx\` after each slice and before starting a new one.
+Check context with \`cctx\` after each slice and after each commit.
 
 ## Handoff Protocol
 
-When handing off (at 60%+ or when a natural stopping point):
+When handing off (at 50%+ or when a natural stopping point):
 
 1. Commit and push all work
 2. Update Linear issues (close completed slices, update parent slice map)

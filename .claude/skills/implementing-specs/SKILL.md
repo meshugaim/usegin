@@ -277,11 +277,11 @@ Run `cctx` to check context usage.
 
 | Context State | Action |
 | ------------- | ------ |
-| Under 60% | Continue to next slice |
-| **60%+ — do not start a new slice** | Finish current slice if close to done, otherwise commit what works and hand off |
-| **70%+ — MUST handoff NOW** | Non-negotiable. Stop immediately. Commit, update Linear, write handoff, exit. No "let me just finish this." |
+| Under 50% | Continue to next slice |
+| **50%+ — do not start a new slice** | Finish current slice if close to done, otherwise commit what works and hand off |
+| **60%+ — MUST handoff NOW** | Non-negotiable. Stop immediately. Commit, update Linear, write handoff, exit. No "let me just finish this." |
 
-The 60% threshold is conservative by design. Starting a new slice at 62% risks hitting 80%+ if the slice has complications — leaving no room for a clean handoff. The 70% hard stop exists because handoff itself consumes context (reading state, writing the note, updating Linear).
+The 50% threshold is conservative by design. Starting a new slice at 52% risks hitting 70%+ if the slice has complications — leaving no room for a clean handoff. The 60% hard stop exists because handoff itself consumes context (reading state, writing the note, updating Linear). At 65%, the post-commit hook will kill the process as a last resort.
 
 ### Slice Lifecycle
 
@@ -299,18 +299,18 @@ A slice progresses through specific states. Knowing the exact state is critical 
 
 When handing off mid-slice, record the exact state — the next agent needs to know whether to write tests, implement, verify, or just push.
 
-### At 60%+: Wrap Up Current Slice
+### At 50%+: Wrap Up Current Slice
 
-When context reaches 60%:
+When context reaches 50%:
 
 1. **Finish the current slice if you're close** — if verified and just needs push, finish it. Otherwise commit what works.
 2. **Do not start a new slice**
 3. **Update Linear** — close completed slice issues, keep in-progress slices marked as In Progress, update parent issue slice map
 4. **Create handoff** — use `/handoff` with the structure below
 
-### At 70%+: Emergency Handoff
+### At 60%+: Emergency Handoff
 
-If you reach 70% (missed the 60% window or current slice ran long):
+If you reach 60% (missed the 50% window or current slice ran long):
 
 1. **Stop immediately** — do not continue implementing
 2. **Commit whatever compiles** — even partial work, with a clear commit message about the state
@@ -324,7 +324,7 @@ When run via the `auto-implement` CLI (headless `claude -p` sessions), write a s
 
 | Signal | When | Command |
 |---|---|---|
-| Handoff | After writing a handoff (60%+ context or natural stopping point) | `echo '{"signal":"handoff"}' > /tmp/auto-impl-signal.json` |
+| Handoff | After writing a handoff (50%+ context or natural stopping point) | `echo '{"signal":"handoff"}' > /tmp/auto-impl-signal.json` |
 | Complete | After all slices are done and cross-slice verification passes | `echo '{"signal":"complete"}' > /tmp/auto-impl-signal.json` |
 
 The outer loop reads `/tmp/auto-impl-signal.json` after each session. It also checks Linear as a fallback (all child issues Done = complete), but explicit signals are more reliable.
