@@ -65,9 +65,9 @@ Follow the \`implementing-specs\` skill. This is your primary guide.
 
 ## Context Thresholds (non-negotiable)
 
-- **Under 20%**: Continue to next slice
-- **20%+**: Do NOT start a new slice. Finish current if close, otherwise commit and hand off.
-- **25%+**: MUST hand off immediately. No exceptions.
+- **Under 60%**: Continue to next slice
+- **60%+**: Do NOT start a new slice. Finish current if close, otherwise commit and hand off.
+- **70%+**: MUST hand off immediately. No exceptions.
 
 Check context with \`cctx\` after each slice and before starting a new one.
 
