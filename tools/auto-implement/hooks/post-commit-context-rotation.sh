@@ -17,7 +17,7 @@ set -uo pipefail
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-CONTEXT_THRESHOLD=65
+CONTEXT_THRESHOLD=30
 CONTEXT_FILE="/tmp/auto-impl-context.json"
 TOOLS_DIR="$(git rev-parse --show-toplevel)/tools"
 

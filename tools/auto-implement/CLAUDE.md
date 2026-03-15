@@ -35,7 +35,7 @@ Installed per-session via `hooks/lifecycle.ts`. All local-only (`.git/hooks/`, `
 - **Pre-commit size gate** — Rejects commits with >8 staged files
 - **Post-commit context rotation** — Checks `cctx` after every commit, kills Claude at >65% context, writes rotation signal
 
-Additionally, `git commit --no-verify` is blocked by the global pre-bash hook to prevent bypassing pre-commit guards.
+Additionally, `git commit --no-verify` is blocked by the pre-bash hook during auto-implement sessions (when `/tmp/auto-impl-context.json` exists) to prevent bypassing pre-commit guards.
 
 ## Exit Signals
 
