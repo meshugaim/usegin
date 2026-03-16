@@ -52,7 +52,7 @@ async function resolvePrompt(options: RunOptions): Promise<string> {
 
 async function launchAgent(worktreePath: string, prompt: string): Promise<void> {
   // Launch claude in the worktree directory, blocking until it exits
-  await $`bun --cwd=${worktreePath} run --bun claude --dangerously-skip-permissions -p ${prompt}`;
+  await $`bun --cwd=${worktreePath} run --bun claude --dangerously-skip-permissions --model ${"opus[1m]"} --effort high -p ${prompt}`;
 }
 
 async function run(worktreeName: string, options: RunOptions): Promise<void> {
@@ -71,7 +71,7 @@ async function run(worktreeName: string, options: RunOptions): Promise<void> {
     } else {
       console.log(`  1. Using existing worktree: .worktrees/${worktreeName}`);
     }
-    console.log(`  2. Launch: cd .worktrees/${worktreeName} && bun run --bun claude --dangerously-skip-permissions -p "..."`);
+    console.log(`  2. Launch: cd .worktrees/${worktreeName} && bun run --bun claude --dangerously-skip-permissions --model 'opus[1m]' --effort high -p "..."`);
     console.log(`  3. Block until agent completes`);
     if (!options.keepWorktree && !exists) {
       console.log(`  4. Cleanup: worktree destroy ${worktreeName}`);

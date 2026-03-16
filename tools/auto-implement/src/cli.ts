@@ -62,6 +62,8 @@ async function spawnClaudePiped(
     "--dangerously-skip-permissions",
     "--model",
     "claude-opus-4-6[1m]",
+    "--effort",
+    "high",
     "--session-id",
     sessionId,
   ];
