@@ -5,8 +5,16 @@
 import type { TokenUsage, ContextInfo } from "./types";
 import { basename } from "path";
 
-/** Known context window sizes by model */
+/** Known context window sizes by model.
+ *
+ * Opus 4.6 and Sonnet 4.6 default to 1M because we always launch
+ * with the [1m] suffix (auto-implement, bun c, etc).  The API
+ * strips the suffix from the model name in responses, so we can't
+ * detect it from the JSONL — we just default to the larger window.
+ */
 const CONTEXT_WINDOWS: Record<string, number> = {
+  "claude-opus-4-6": 1000000,
+  "claude-sonnet-4-6": 1000000,
   "claude-opus-4-5-20251101": 200000,
   "claude-sonnet-4-5-20250514": 200000,
   "claude-sonnet-4-20250514": 200000,
