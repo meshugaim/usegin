@@ -153,7 +153,7 @@ These are not required sections, but specs that include them consistently produc
 
 **"What Doesn't Change."** When a feature modifies existing behavior, state the invariants the implementation must preserve. This prevents regression anxiety and makes the blast radius visible.
 
-**Decisions made.** When open questions are resolved during spec writing, record them: question, answer, rationale. Prevents re-litigating settled decisions.
+**Decisions & Alternatives.** When open questions are resolved during spec writing, record them as a table: decision, alternatives considered, rationale. This captures not just *what* was decided but *what was rejected and why* — preventing re-litigating settled decisions and giving future readers the reasoning behind the path chosen. Especially valuable for specs where multiple approaches were explored (e.g., auth strategies, data model choices, architecture boundaries).
 
 **Keep research out of the spec body.** Reference experiment files by path instead of inlining findings. The spec is for decisions and requirements, not a journal of investigation.
 
