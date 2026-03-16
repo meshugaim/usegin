@@ -5,25 +5,21 @@ description: Run and iterate on Playwright e2e tests. Triggered by phrases like 
 
 # Running E2E Tests
 
-Read `tests/e2e/CLAUDE.md` first — it has the full local setup ritual.
+Read `tests/e2e/CLAUDE.md` first — it has the full setup guide.
 
 ## Quick steps
 
-1. `just agent-dev-kill` — free up ports (e2e uses 63000/58000)
-2. `e2e build` — build Next.js with correct env vars (**required**, don't skip)
-3. `e2e up` — start Supabase + Next.js + Python API
-4. `e2e run -- tests/foo.spec.ts` — run tests
-5. `e2e restore` — restore dev DB snapshot
-6. `e2e down` — stop e2e services
-7. `just agent-dev` — restart agent dev servers
+1. `e2e run -- tests/foo.spec.ts` — builds if stale, starts services if needed, runs tests
+2. `e2e restore` — restore dev DB snapshot
+3. `e2e down` — stop e2e services
+
+E2E uses dedicated ports (65000/59000) that don't conflict with agent-dev.
 
 For AI-dependent tests (GFS sync, chat): `E2E_REAL_GEMINI_KEY=true e2e run -- ...`
 
 ## Troubleshooting
 
-- **"Services not running"** → run `e2e up` first
-- **Port conflict / EADDRINUSE** → `just agent-dev-kill` then retry
-- **Chat proxy connects to wrong port** → you skipped `e2e build`
+- **"Build is stale"** from `e2e up` → run `e2e run` (handles build automatically) or `e2e build` first
 - **Test skipped** → check credential gates (`E2E_REAL_GEMINI_KEY`, Claude credentials)
 
 Run `e2e --help` or `e2e docs` for full CLI documentation.
