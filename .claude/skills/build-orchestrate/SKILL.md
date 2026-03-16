@@ -1,6 +1,16 @@
 ---
 name: build-orchestrate
 description: Multi-phase build orchestration with whiteboard. Director manages a full lifecycle (research → design → spec → implement → QA) through typed phases. Triggered by "/build-orchestrate" or when re-orienting between phases of a long build task.
+hooks:
+  PreToolUse:
+    - matcher: "Agent"
+      hooks:
+        - type: command
+          command: "bun .claude/skills/build-orchestrate/require-leaf-flag.ts"
+    - matcher: "Task"
+      hooks:
+        - type: command
+          command: "bun .claude/skills/build-orchestrate/require-leaf-flag.ts"
 ---
 
 # Build Orchestrate
@@ -190,8 +200,9 @@ Verification is not a phase — it's an axis that runs alongside the build.
 **Iterate if:** Spec is vague, missing sections, or doesn't match the design. Send feedback, re-spawn.
 
 ### Implementation Phase
-**Shape:** Spawn a **liaison orchestrator** — a general-purpose opus agent. Tell it to use `/liaison` mode. It decomposes into slices, spawns workers, commits, pushes. You manage it with check-ins and verification agents (§Continuous Verification).
-**Agents:** general-purpose (opus) as the liaison orchestrator. It spawns its own workers.
+**Shape:** Use **TeamCreate** to spawn a liaison orchestrator, then **Agent(team_name=...)** to add it as a team member. Tell it to use `/liaison` mode. The liaison is a full Claude session — it can spawn its own workers via Agent. This is how 3-layer orchestration works: you (director) → liaison (team member) → workers (Agent subagents).
+**Agents:** TeamCreate team member (opus) as the liaison orchestrator. It spawns its own workers.
+**Why TeamCreate:** Agent subagents cannot spawn further agents (the Agent tool is unavailable inside them). A liaison that needs to delegate MUST be a TeamCreate member. This hook enforces it — bare Agent calls are blocked unless marked `[leaf]`.
 **Output:** Agent commits code, returns ≤10 line summary of what was built — including a status line and test modification disclosure (see §Implementation Agent Instructions below).
 **Quality gate:** Tests pass WITHOUT weakened assertions, reviewer confirms test integrity, matches the spec. No scope creep.
 **Iterate if:** Build failures, spec drift, quality issues, or test integrity violations. Send specific feedback.
@@ -214,11 +225,14 @@ Verification is not a phase — it's an axis that runs alongside the build.
 
 **Spec review is the highest-leverage review.** A bug in the spec becomes a bug in implementation becomes a bug in QA. Two sessions in a row, skipping the spec reviewer led to QA-caught bugs that were spec-level issues (e.g., UNIQUE constraint blocking re-upload after soft-delete). The cost of a 30-second reviewer agent is trivial compared to a QA iteration.
 
-## Agent vs Team Member
+## Spawning Convention: `[leaf]` vs TeamCreate
 
-Agent subagents **cannot spawn further agents** — the Agent tool is not available inside subagents. If a phase agent needs to delegate (e.g., a liaison spawning workers), it must be a **TeamCreate team member**, which is a full Claude Code process with all tools including Agent.
+A skill hook blocks bare Agent calls. Every spawn requires a conscious choice:
 
-This doesn't mean always use TeamCreate. Use Agent for simple, focused tasks. Use TeamCreate only when the phase agent itself needs to orchestrate — i.e., when it needs to nest.
+- **TeamCreate + Agent(team_name=...)** — for orchestrators that spawn their own workers (liaison, research director). These are full Claude sessions with all tools.
+- **Agent with `[leaf]` in description** — for simple tasks that don't need to spawn sub-agents (reviewers, verifiers, readers). Example: `description: "[leaf] Code review Slice 1"`.
+
+The hook enforces this. If you forget `[leaf]` on a bare Agent call, it blocks with a reminder.
 
 ## Context Hygiene
 
@@ -336,4 +350,4 @@ Create whiteboard with goal, scope, phase map, Auto-Inject block
 Final whiteboard = project record
 ```
 
-**The director's only tools:** Read, Write (whiteboard only), Task (spawn agents), text output (notes-to-self). If you find yourself using Edit, Grep, Glob, Bash, or any Skill — you've collapsed a level. Stop and delegate.
+**The director's only tools:** Read, Write (whiteboard only), Agent with `[leaf]` (spawn leaf agents), TeamCreate + Agent(team_name) (spawn orchestrators), SendMessage (communicate with team members), text output (notes-to-self). If you find yourself using Edit, Grep, Glob, Bash, or any Skill — you've collapsed a level. Stop and delegate.
