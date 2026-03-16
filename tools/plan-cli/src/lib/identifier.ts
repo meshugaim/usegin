@@ -13,7 +13,7 @@ function isNumericId(id: string): boolean {
 /**
  * Get the team key from environment or use default
  */
-function getTeamKey(): string {
+export function getTeamKey(): string {
   return process.env.PLAN_TEAM ?? DEFAULT_TEAM_KEY;
 }
 

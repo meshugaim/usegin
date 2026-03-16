@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { getTeamKey } from "../lib/identifier";
 
 export function createLabelsCommand(): Command {
   const cmd = new Command("labels")
@@ -30,28 +31,17 @@ async function runLabels(opts: {
   try {
     const client = new LinearClient({ apiKey });
 
-    // Get team (optional - for team-specific labels)
-    const teamKey = opts.team ?? process.env.PLAN_TEAM;
-    let teamId: string | undefined;
-    let teamName: string | undefined;
-
-    if (teamKey) {
-      const team = await client.getTeamByKey(teamKey);
-      if (!team) {
-        const teams = await client.getAllTeams();
-        const available = teams.map((t) => t.key).join(", ");
-        console.error(`Error: Team "${teamKey}" not found. Available teams: ${available}`);
-        process.exit(1);
-      }
-      teamId = team.id;
-      teamName = team.name;
-    } else {
-      const defaultTeam = await client.getDefaultTeam();
-      if (defaultTeam) {
-        teamId = defaultTeam.id;
-        teamName = defaultTeam.name;
-      }
+    // Get team — always resolves (PLAN_TEAM env var or "ENG" default)
+    const teamKey = opts.team ?? getTeamKey();
+    const team = await client.getTeamByKey(teamKey);
+    if (!team) {
+      const teams = await client.getAllTeams();
+      const available = teams.map((t) => t.key).join(", ");
+      console.error(`Error: Team "${teamKey}" not found. Available teams: ${available}`);
+      process.exit(1);
     }
+    const teamId = team.id;
+    const teamName = team.name;
 
     // Get team labels
     const teamLabels = teamId ? await client.getLabelsForTeam(teamId) : [];

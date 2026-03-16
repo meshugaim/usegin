@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
-import { normalizeIssueId } from "../lib/identifier";
+import { normalizeIssueId, getTeamKey } from "../lib/identifier";
 
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
@@ -74,7 +74,7 @@ async function runCreate(
   try {
     const client = new LinearClient({ apiKey });
 
-    const team = opts.team ?? process.env.PLAN_TEAM;
+    const team = opts.team ?? getTeamKey();
 
     const { issue, missingLabels } = await client.createIssue({
       title,
