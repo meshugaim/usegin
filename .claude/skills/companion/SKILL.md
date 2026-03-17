@@ -32,29 +32,38 @@ Gold standard:
 - Following `.claude/skills/liaison/SKILL.md`
 - Calibration: sequential execution, tiny steps, DoD before every delegation
 - Agents commit and push their own work
-- Always state DoD out loud before spawning a worker
+- State DoD out loud before spawning a worker
 ```
 
 Give the companion a name (e.g., `name: "companion"` or `name: "process-companion"`) so you can resume it later via `SendMessage`.
 
+### Blocking vs non-blocking
+
+Calibrate with the user at spawn time:
+
+- **Blocking** — check-ins run in the foreground. You wait for the companion's response before continuing. Best when the feedback loop is tight and you want to act on feedback immediately.
+- **Non-blocking** — companion runs in the background. You continue working and read its feedback when it arrives. Best for longer-running work where you don't want to pause.
+
+Either way, the companion is spawned once and resumed via `SendMessage` for subsequent check-ins.
+
 ## Resuming
 
-**Default: resume the companion** between check-ins. This gives it persistent context — it can track patterns across check-ins ("this is the third time you skipped verification").
+**Resume the companion** between check-ins via `SendMessage`. This is the core pattern — it gives the companion persistent context so it can track patterns across check-ins ("this is the third time you skipped verification").
 
 ```
 SendMessage to: "companion"
 "Check in. Review what I've done since your last check-in."
 ```
 
-**If context gets large**, spawn a fresh companion instead. You lose history but stay effective for point-in-time checks.
+Don't spawn a fresh companion for each check-in. Resume the existing one. If context gets too large, then spawn fresh — but that's the exception, not the norm.
 
 ## When to Check In
 
-The cadence is up to you. Common patterns:
+Calibrate the cadence with the user at spawn time. Common patterns:
 
 - **After every sub-agent completes** — thorough, catches drift early
 - **At phase transitions** — balanced
-- **Every N slices or commits** — lightweight
+- **Every N cycles or commits** — lightweight (e.g., every 2-3 TDD cycles)
 - **When you feel uncertain** — on-demand
 
 A hook can remind you to check in (e.g., after sub-agent completion). The companion doesn't control its own cadence.

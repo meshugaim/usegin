@@ -15,11 +15,13 @@ If the gold standard is unclear or missing, your first response should be: "What
 
 ## How to Observe
 
-Read the parent's session:
+Read the parent's session using the `session` CLI (available on PATH — it is NOT `claude session`):
 
-```
+```bash
 session <parent-session-id>
 ```
+
+Useful flags: `--full` for complete transcript, `--show-tools` to include tool calls, `--subagents` for sub-agent internals. Run `session --help` for more.
 
 **First check-in:** Scan the full session.
 **Subsequent check-ins:** Focus on what happened since your last check-in. You remember previous check-ins (you're resumed, not spawned fresh).
