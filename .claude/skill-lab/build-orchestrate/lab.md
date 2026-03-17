@@ -78,6 +78,7 @@ See [`what-we-learned.md`](what-we-learned.md) — comprehensive audit of all 7 
 - Experiment: could the Auto-Inject block be even shorter (2 lines instead of 4) without losing effectiveness? Or does brevity lose the § references that make it useful?
 - The "Continuous Verification" section was added based on a user's build-orchestrate prompt that ran QA as a parallel axis, not just a final phase. Worth watching whether agents actually spawn verification agents mid-build or skip it.
 - Should the skill have a "phase skip" guidance? E.g., "if the user hands you a complete spec, skip research and design, start at implementation."
+- Auto-inject session notes (from whiteboard) may be redundant with the whiteboard read itself. The skill rules part is the useful bit — role circuit breaker. The session notes part adds nothing beyond what the director reads from the whiteboard at phase boundaries. Consider making the hook inject only skill rules, keeping session-specific state in the whiteboard. (Observed in 2026-03-17 greet-tool and ping-tool test sessions.)
 
 ## Changelog
 

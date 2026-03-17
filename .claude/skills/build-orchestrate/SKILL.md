@@ -89,14 +89,15 @@ The **whiteboard** is your central artifact. It accumulates direction, decisions
 ## Artifacts
 
 ```
-.claude/research/<project-slug>/
-  whiteboard.md           — direction + decisions + state (THE artifact)
-  phase-01-research.md    — phase findings
-  phase-02-design.md      — design explorations
-  phase-03-spec.md        — spec draft or link to Linear
-  phase-04-implement.md   — implementation log
-  phase-05-qa.md          — QA results
-  ...
+.claude/builds/<project-slug>/
+  whiteboard.md           — direction + decisions + state (THE artifact, committed)
+  phases/                 — ephemeral phase files (gitignored)
+    phase-01-research.md  — phase findings
+    phase-02-design.md    — design explorations
+    phase-03-spec.md      — spec draft or link to Linear
+    phase-04-implement.md — implementation log
+    phase-05-qa.md        — QA results
+    ...
 ```
 
 ## The Whiteboard
@@ -131,7 +132,7 @@ Verification: Spawn sanity-check agents at phase boundaries AND between phases f
 
 The `Auto-Inject` section of your whiteboard is automatically injected into your context after every agent/team return. Write session-specific reminders here — they'll re-orient you between phases without manual re-reading. Update the `Current State` lines at every phase boundary and iteration. The `Auto-Inject` lines are permanent — never edit them.
 
-**After creating the whiteboard,** register it for auto-injection by writing `.claude/active-build.json` with `{"whiteboard": "<path-to-your-whiteboard>"}` (e.g., `{"whiteboard": ".claude/research/my-project/whiteboard.md"}`). This enables automatic re-orientation after every agent return.
+**After creating the whiteboard,** register it for auto-injection by writing `.claude/builds/active.json` with `{"whiteboard": "<path-to-your-whiteboard>"}` (e.g., `{"whiteboard": ".claude/builds/my-project/whiteboard.md"}`). This enables automatic re-orientation after every agent return.
 
 ## Pre-Phase Hook (Mandatory)
 
