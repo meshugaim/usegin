@@ -35,8 +35,10 @@ When retroing a session that used this skill, a good session looks like:
 - [ ] Recovery block (Current State) updated at every phase boundary
 - [ ] Skill was re-read at every phase boundary (Pre-Phase Hook step 1)
 - [ ] Implementation phase used a liaison orchestrator, not direct workers
+- [ ] QA phase executed — not skipped, not "covered by unit tests"
 - [ ] QA phase used a tester agent with a testing skill, not director checking
 - [ ] QA agent briefing included auth flow, dev server ports, and sequential-only constraint
+- [ ] For frontend builds: QA agent did real browser testing (not just curl/unit), comparing app vs design source (Storybook/Figma)
 
 ## Known Limitations
 
@@ -45,6 +47,7 @@ When retroing a session that used this skill, a good session looks like:
 - **No mid-phase intervention guidance.** If a phase agent is taking too long or going off-track, the skill doesn't say what to do. The director has to wait for results.
 - **Skill length.** At ~250 lines, the skill is long. After context compaction, the re-read consumes meaningful context. The Auto-Inject block mitigates this but doesn't replace the full re-read.
 - **No guidance on phase ordering.** The skill lists phase types but doesn't guide when to skip phases (e.g., skip design if the spec is already clear).
+- **QA phase gets skipped under momentum.** Two consecutive sessions (2026-03-17) skipped or weakened QA after clean implementation passes. The director treats "all tests pass + reviewer CLEAN" as completion, forgetting the QA phase on the whiteboard. Frontend builds are especially vulnerable — unit tests can't verify visual fidelity.
 
 ## Retro Guide
 
@@ -89,3 +92,4 @@ See [`what-we-learned.md`](what-we-learned.md) — comprehensive audit of all 7 
 | 2026-02-27 | Added QA agent briefing template to skill | QA agents lacked practical setup instructions (auth, ports, sequential constraint). |
 | 2026-02-27 | Restructured lab: split retros into individual files under `retros/` | Single file grew to 37KB after 4 retros. Stable reference material buried under growing history. |
 | 2026-03-12 | Added Priority Hierarchy, Correctness Rules (#7-10), Test-Integrity Review, Pass/Stop/Defer framework, Implementation Agent Instructions template, updated Auto-Inject (5→6 lines), updated Workflow diagram | GFS Sync Unification retro: 14 regressions shipped because subagents deleted/weakened tests and director had no mechanism to catch it. Skill optimized for flow over correctness. |
+| 2026-03-17 | Added QA completion + frontend browser testing to Success Signals. Added QA momentum skip to Known Limitations. | Two consecutive sessions skipped QA after clean implementation passes. "Tests pass" momentum overrides the phase map. Frontend visual ACs left unverified. |

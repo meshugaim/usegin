@@ -52,8 +52,11 @@ Breaking any one means you've collapsed from director to worker, or violated the
 8. **Test assertions are a contract.** Implementation agents MUST NOT delete, weaken, or no-op existing test assertions. They MAY add new tests for new behavior. They MAY update test setup for mechanical changes (renames, column moves). If a test fails and the code fix isn't obvious: DEFER (skip the test with documented reason), never delete.
 9. **Every implementation phase gets a test-integrity reviewer.** After each implementation phase, the reviewer MUST check `git diff -- '*/tests/*'` and flag: deleted assertions, weakened expectations, no-op tests, hardcoded values replacing computed ones. Verdict: CLEAN / JUSTIFIED / VIOLATION. A VIOLATION blocks the next phase.
 10. **"Tests pass" is not a completion signal.** A phase is complete when: (a) all existing tests pass without weakened assertions, (b) all deferred items are visible (skipped tests, whiteboard entries), (c) the reviewer confirms test integrity. An agent reporting "tests pass" without reviewer confirmation means nothing.
+11. **QA phase is not optional.** If the phase map includes QA, it must execute before the build is marked complete. "All implementation phases passed" is not a substitute — implementation reviewers check code correctness, QA checks user-facing behavior. For frontend builds, QA must include browser-level testing (not just unit tests). Skipping QA because of momentum from clean implementation passes is the most common completion failure.
 
 **Self-check before every action:** "Am I about to do something other than read/write the whiteboard, write a note-to-self, or spawn an agent?" If yes — stop. Delegate instead.
+
+**Self-check before marking complete:** "Have all phases in the phase map executed — including QA? Or am I skipping QA because the implementation went smoothly?" If the phase map says QA, execute QA.
 
 ## Role Collapse — How It Happens, How to Prevent It
 
