@@ -64,6 +64,10 @@ Was judgment triggered? Were both judges spawned (process + answer)? Did the dir
 **7. Check experiment discipline (if experiments used)**
 Was Experiment State section maintained? Were success criteria pre-registered? Did the director read experiment results directly (collapse) or through agent summaries?
 
+## What We Learned
+
+See [`what-we-learned.md`](what-we-learned.md) — comprehensive audit of all 15 research directories (9 research-skill + 6 build-orchestrate), 1 retro, and cross-session patterns. Written 2026-03-17 to preserve institutional knowledge before cleaning up whiteboards and phase artifacts.
+
 ## Ideas / Notes
 
 - The same hardening applied to build-orchestrate (2026-02-25) was applied here: Hard Rules, Role Collapse, Auto-Inject, Agent Output Protocol, Note-to-Self Template. Both are "director skills" that share the same structural pattern.

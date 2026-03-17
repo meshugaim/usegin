@@ -68,6 +68,10 @@ Did every phase have a reviewer agent? Were iterations logged on the whiteboard?
 **6. Check continuous verification**
 Were sanity-check agents spawned between phases? Or was verification deferred entirely to the QA phase?
 
+## What We Learned
+
+See [`what-we-learned.md`](what-we-learned.md) — comprehensive audit of all 7 sessions (Feb 25 — Mar 17), 31 phase artifacts, and 15 research directories. Written 2026-03-17 to preserve institutional knowledge before cleaning up phase artifacts and whiteboards.
+
 ## Ideas / Notes
 
 - The hardening added on 2026-02-25 (Hard Rules, Role Collapse, Auto-Inject) was motivated by a user prompt that had to manually reinforce every rule the skill already contained. The skill said the right things but agents didn't follow them — the instructions read as advice, not constraints.
