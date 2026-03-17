@@ -131,6 +131,9 @@ Count collapse events in the retro entry. A single collapse in an otherwise good
 
 - The session f35a8b4f (Linear integration, slices 1-2) is the first session to retro against this lab. It showed a clear post-handoff collapse event — worth tracking whether this is a recurring pattern.
 - **Pipeline retro:** This lab evaluates the implementing-specs module in isolation. A separate pipeline-level retro should integrate insights across writing-specs → slicing-specs → implementing-specs → verify-spec before making changes to any individual skill. See the slicing-specs lab for the same note.
+- **TDD order guard is the fix.** Three sessions tell the story: 2026-03-12 (TDD collapse, no hooks), 2026-03-13 (TDD collapse, TDD gate exists but only checks at commit time), 2026-03-16 (TDD pass, PreToolUse hook blocks implementation files before test files). The structural enforcement works. The pre-commit gate alone was insufficient — agents write implementation then tests then commit together, defeating it. The PreToolUse hook that tracks file creation order within the session is the correct enforcement point.
+- **1M context eliminates context management as a concern.** The 2026-03-16 session used 19.4% of 1M for 3 slices. The context thresholds (50%/60%/65%) were designed for 200K and are now irrelevant for Opus 1M sessions. Consider recalibrating to absolute remaining-token thresholds or simply removing the hard stops for 1M sessions.
+- **`cctx` fragility is a cross-cutting concern.** Also noted in the auto-implement lab. The hardcoded lookup table broke context management for 1M models. Both the agent's self-checks and the post-commit rotation hook relied on `cctx`.
 
 ## Changelog
 

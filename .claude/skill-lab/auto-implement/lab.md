@@ -106,9 +106,12 @@ Evaluate in this order:
 
 ## Ideas / Notes
 
-- No auto-implement runs have been retroed yet. The Linear integration spec (ENG-2004) is being implemented manually (human-collaborative) for now. The first auto-implement retro will come when a spec is run through the CLI end-to-end.
 - **Pipeline retro:** Auto-implement sits at the orchestration layer above the pipeline skills. A pipeline retro should consider: does auto-implement reveal problems that belong in implementing-specs (session-level) vs problems that belong here (chain-level)? The boundary: if fixing the problem means changing how a single session behaves → implementing-specs lab. If fixing the problem means changing how sessions chain together → this lab.
 - Consider adding a `--retro` flag to the CLI that automatically triggers a skill-retro after a run completes.
+- **Opus 1M may obsolete multi-session chaining.** The 2026-03-16 run completed 3 slices in 1 session at 19.4% context. For specs with ≤7 slices, a single Opus 1M session is sufficient. Multi-session chaining (handoffs, signal detection, session rotation) may only be needed for very large specs. This changes the value proposition of auto-implement: less about session management, more about hook enforcement and observability.
+- **Signal file approach works.** The structured `{"signal":"complete"}` file at `/tmp/auto-impl-signal.json` resolved the false-completion detection bug from run 6 (2026-03-13). No ambiguity, no false positives from prompt text in stdout. Keep this as the primary signal mechanism.
+- **Default model should be Opus 1M.** The two-line change from Sonnet 200K to Opus 1M transformed auto-implement from non-functional (6 failed runs) to single-session completion. The cost increase (~$20 for 35 min) is justified by the massive efficiency gain and elimination of multi-session failure modes.
+- **`cctx` fragility is a cross-cutting concern.** Also noted in the implementing-specs lab. The hardcoded lookup table broke the post-commit rotation hook — it would have killed the Opus 1M session at 13% real context (reported as 65%). Fix: auto-detect context window from model ID suffix or API metadata.
 
 ## Changelog
 
