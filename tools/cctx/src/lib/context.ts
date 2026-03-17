@@ -5,13 +5,7 @@
 import type { TokenUsage, ContextInfo } from "./types";
 import { basename } from "path";
 
-/** Known context window sizes by model.
- *
- * Opus 4.6 and Sonnet 4.6 default to 1M because we always launch
- * with the [1m] suffix (auto-implement, bun c, etc).  The API
- * strips the suffix from the model name in responses, so we can't
- * detect it from the JSONL — we just default to the larger window.
- */
+/** Known context window sizes by model (exact match). */
 const CONTEXT_WINDOWS: Record<string, number> = {
   "claude-opus-4-6": 1000000,
   "claude-sonnet-4-6": 1000000,
@@ -19,9 +13,17 @@ const CONTEXT_WINDOWS: Record<string, number> = {
   "claude-sonnet-4-5-20250514": 200000,
   "claude-sonnet-4-20250514": 200000,
   "claude-haiku-4-5-20250514": 200000,
-  // Fallback for unknown models
-  default: 200000,
 };
+
+/**
+ * Model family prefixes that default to 1M context.
+ * When the API returns a model ID not in the exact-match table
+ * (e.g. a new dated variant like claude-opus-4-6-20260401),
+ * we match by prefix to avoid defaulting to 200K.
+ */
+const FAMILY_1M_PREFIXES = ["claude-opus-4-6", "claude-sonnet-4-6"];
+
+const DEFAULT_CONTEXT_WINDOW = 200000;
 
 interface MessageUsage {
   input_tokens?: number;
@@ -40,10 +42,24 @@ interface ParsedLine {
 }
 
 /**
- * Get context window size for a model
+ * Get context window size for a model.
+ *
+ * Resolution order:
+ * 1. Exact match in CONTEXT_WINDOWS
+ * 2. Prefix match against FAMILY_1M_PREFIXES (handles new dated variants)
+ * 3. Default (200K)
  */
 export function getContextWindow(model: string): number {
-  return CONTEXT_WINDOWS[model] ?? CONTEXT_WINDOWS.default;
+  if (CONTEXT_WINDOWS[model] !== undefined) {
+    return CONTEXT_WINDOWS[model];
+  }
+
+  // Prefix match for model families known to support 1M
+  if (FAMILY_1M_PREFIXES.some((prefix) => model.startsWith(prefix))) {
+    return 1000000;
+  }
+
+  return DEFAULT_CONTEXT_WINDOW;
 }
 
 /**

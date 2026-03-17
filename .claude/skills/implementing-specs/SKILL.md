@@ -273,15 +273,15 @@ A new session should be able to run `plan show <spec-issue-id> --tree` and immed
 
 ### After Each Slice
 
-Run `cctx` to check context usage.
+Run `cctx` to check context usage. Thresholds use **remaining tokens**, not percentages — this works correctly for both 200K and 1M context windows.
 
-| Context State | Action |
-| ------------- | ------ |
-| Under 50% | Continue to next slice |
-| **50%+ — do not start a new slice** | Finish current slice if close to done, otherwise commit what works and hand off |
-| **60%+ — MUST handoff NOW** | Non-negotiable. Stop immediately. Commit, update Linear, write handoff, exit. No "let me just finish this." |
+| Remaining Tokens | Action |
+| ---------------- | ------ |
+| **> 200K remaining** | Continue to next slice |
+| **100K–200K remaining — do not start a new slice** | Finish current slice if close to done, otherwise commit what works and hand off |
+| **< 100K remaining — MUST handoff NOW** | Non-negotiable. Stop immediately. Commit, update Linear, write handoff, exit. No "let me just finish this." |
 
-The 50% threshold is conservative by design. Starting a new slice at 52% risks hitting 70%+ if the slice has complications — leaving no room for a clean handoff. The 60% hard stop exists because handoff itself consumes context (reading state, writing the note, updating Linear). At 65%, the post-commit hook will kill the process as a last resort.
+The 200K threshold is conservative by design. Starting a new slice with 180K remaining risks exhausting context if the slice has complications — leaving no room for a clean handoff. The 100K hard stop exists because handoff itself consumes context (reading state, writing the note, updating Linear). At the post-commit hook threshold (< 75K remaining), the process is killed as a last resort.
 
 ### Slice Lifecycle
 
@@ -299,18 +299,18 @@ A slice progresses through specific states. Knowing the exact state is critical 
 
 When handing off mid-slice, record the exact state — the next agent needs to know whether to write tests, implement, verify, or just push.
 
-### At 50%+: Wrap Up Current Slice
+### At 100K–200K remaining: Wrap Up Current Slice
 
-When context reaches 50%:
+When remaining context drops below 200K:
 
 1. **Finish the current slice if you're close** — if verified and just needs push, finish it. Otherwise commit what works.
 2. **Do not start a new slice**
 3. **Update Linear** — close completed slice issues, keep in-progress slices marked as In Progress, update parent issue slice map
 4. **Create handoff** — use `/handoff` with the structure below
 
-### At 60%+: Emergency Handoff
+### At < 100K remaining: Emergency Handoff
 
-If you reach 60% (missed the 50% window or current slice ran long):
+If remaining context drops below 100K (missed the 200K window or current slice ran long):
 
 1. **Stop immediately** — do not continue implementing
 2. **Commit whatever compiles** — even partial work, with a clear commit message about the state
@@ -324,7 +324,7 @@ When run via the `auto-implement` CLI (headless `claude -p` sessions), write a s
 
 | Signal | When | Command |
 |---|---|---|
-| Handoff | After writing a handoff (50%+ context or natural stopping point) | `echo '{"signal":"handoff"}' > /tmp/auto-impl-signal.json` |
+| Handoff | After writing a handoff (< 200K remaining or natural stopping point) | `echo '{"signal":"handoff"}' > /tmp/auto-impl-signal.json` |
 | Complete | After all slices are done and cross-slice verification passes | `echo '{"signal":"complete"}' > /tmp/auto-impl-signal.json` |
 
 The outer loop reads `/tmp/auto-impl-signal.json` after each session. It also checks Linear as a fallback (all child issues Done = complete), but explicit signals are more reliable.
@@ -334,7 +334,7 @@ The outer loop reads `/tmp/auto-impl-signal.json` after each session. It also ch
 - **Commit frequency guard** — Blocks Write/Edit when >4 uncommitted files
 - **Pre-commit TDD gate** — Rejects commits with implementation files but no test files
 - **Pre-commit size gate** — Rejects commits with >8 staged files
-- **Post-commit rotation** — Kills session at >65% context, outer loop spawns fresh session
+- **Post-commit rotation** — Kills session when < 75K tokens remaining, outer loop spawns fresh session
 
 ### Handoff Structure for Spec Implementation
 

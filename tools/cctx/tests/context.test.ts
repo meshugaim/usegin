@@ -10,8 +10,19 @@ describe("getContextWindow", () => {
     expect(getContextWindow("claude-sonnet-4-5-20250514")).toBe(200000);
   });
 
+  it("returns 1M for current-gen models", () => {
+    expect(getContextWindow("claude-opus-4-6")).toBe(1000000);
+    expect(getContextWindow("claude-sonnet-4-6")).toBe(1000000);
+  });
+
+  it("returns 1M for future dated variants via prefix match", () => {
+    expect(getContextWindow("claude-opus-4-6-20260401")).toBe(1000000);
+    expect(getContextWindow("claude-sonnet-4-6-20260601")).toBe(1000000);
+  });
+
   it("returns default for unknown models", () => {
     expect(getContextWindow("unknown-model")).toBe(200000);
+    expect(getContextWindow("claude-haiku-5-0")).toBe(200000);
   });
 });
 

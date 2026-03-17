@@ -47,7 +47,11 @@ Don't write yet. Just understand.
 
 Use `AskUserQuestion` to clarify until aligned on what needs spec'd.
 
-Include in your questions: **Does this feature need a feature toggle?** Breaking changes, incomplete work that will be deployed incrementally, or gradual rollouts all need one. Catching this early affects slicing (toggle skeleton becomes an infrastructure slice) and verification (toggle must be enabled before testing). See the `feature-toggles` skill for when toggles apply.
+Include in your questions:
+
+- **Does this feature need a feature toggle?** Breaking changes, incomplete work that will be deployed incrementally, or gradual rollouts all need one. Catching this early affects slicing (toggle skeleton becomes an infrastructure slice) and verification (toggle must be enabled before testing). See the `feature-toggles` skill for when toggles apply.
+
+- **For integrations: does the scoping model match how users actually organize their data?** When a spec introduces a scoping/filtering concept (which projects/folders/channels/teams the feature can see), validate the concept against a real account — not just the API documentation. Ask: "Do users actually use [the entity we plan to scope by]?" If the integration has a spike slice, include scoping validation in it. *Lesson learned: ENG-2004 (Linear integration) designed project-based scoping, but 0 of 2,120 real issues were assigned to Linear projects — all were organized by teams. The entire scoping model had to be reworked post-implementation.*
 
 ### 3. Propose Sections
 
@@ -178,6 +182,7 @@ Before marking the spec complete, verify these — they are the most common gaps
 | Test levels | Does every AC have a level assigned? |
 | Scope clarity | Is every feature clearly in or out? No ambiguous "future" items in the main body? |
 | Decisions resolved | Are there zero "TBD" items? Each either resolved or tracked as a separate spike? |
+| Scoping validated | If the spec introduces a scoping/filtering model, was it validated against a real account? |
 
 ## Downstream: How the Spec Gets Used
 

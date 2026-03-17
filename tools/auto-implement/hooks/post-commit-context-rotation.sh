@@ -17,7 +17,9 @@ set -uo pipefail
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-CONTEXT_THRESHOLD=65
+# Rotate when fewer than this many tokens remain.
+# Works correctly for both 200K and 1M context windows.
+REMAINING_TOKEN_THRESHOLD=75000
 CONTEXT_FILE="/tmp/auto-impl-context.json"
 TOOLS_DIR="$(git rev-parse --show-toplevel)/tools"
 
@@ -39,33 +41,34 @@ if [ -z "$session_id" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Check context utilization
+# Check context utilization (remaining tokens)
 # ---------------------------------------------------------------------------
-percent_raw=$("$TOOLS_DIR/bin/cctx" "$session_id" --percent 2>/dev/null || echo "")
+kv_raw=$("$TOOLS_DIR/bin/cctx" "$session_id" --kv 2>/dev/null || echo "")
 
-if [ -z "$percent_raw" ]; then
+if [ -z "$kv_raw" ]; then
   echo "[post-commit] Could not read context for session $session_id — skipping" >&2
   exit 0
 fi
 
-# Strip the % sign and convert to integer
-percent=$(echo "$percent_raw" | sed 's/%//' | cut -d'.' -f1)
+# Extract remaining tokens and utilization percent from key-value output
+remaining=$(echo "$kv_raw" | grep '^remaining_tokens=' | cut -d'=' -f2)
+percent=$(echo "$kv_raw" | grep '^utilization_percent=' | cut -d'=' -f2)
 
-if [ -z "$percent" ] || ! [[ "$percent" =~ ^[0-9]+$ ]]; then
-  echo "[post-commit] Could not parse context percent: '$percent_raw' — skipping" >&2
+if [ -z "$remaining" ] || ! [[ "$remaining" =~ ^[0-9]+$ ]]; then
+  echo "[post-commit] Could not parse remaining tokens from cctx — skipping" >&2
   exit 0
 fi
 
-echo "[post-commit] Context utilization: ${percent}% (threshold: ${CONTEXT_THRESHOLD}%)" >&2
+echo "[post-commit] Remaining: ${remaining} tokens (${percent} used), rotate when < ${REMAINING_TOKEN_THRESHOLD} remaining" >&2
 
-if [ "$percent" -le "$CONTEXT_THRESHOLD" ]; then
+if [ "$remaining" -ge "$REMAINING_TOKEN_THRESHOLD" ]; then
   exit 0
 fi
 
 # ---------------------------------------------------------------------------
-# Context is over threshold — kill and rotate
+# Context is low — kill and rotate
 # ---------------------------------------------------------------------------
-echo "[post-commit] Context at ${percent}% (>${CONTEXT_THRESHOLD}%) — rotating session" >&2
+echo "[post-commit] Only ${remaining} tokens remaining (< ${REMAINING_TOKEN_THRESHOLD}) — rotating session" >&2
 
 # Kill the Claude process
 if [ -n "$claude_pid" ] && kill -0 "$claude_pid" 2>/dev/null; then
@@ -80,7 +83,7 @@ cat > /tmp/auto-impl-rotation.json << EOF
   "reason": "context_rotation",
   "killed_session_id": "$session_id",
   "spec_id": "$spec_id",
-  "context_percent": $percent,
+  "remaining_tokens": $remaining,
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
