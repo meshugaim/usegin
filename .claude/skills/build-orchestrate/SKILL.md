@@ -11,6 +11,11 @@ hooks:
       hooks:
         - type: command
           command: "bun .claude/skills/build-orchestrate/require-leaf-flag.ts"
+  PostToolUse:
+    - matcher: "Agent|TeamCreate"
+      hooks:
+        - type: command
+          command: "bun .claude/hooks/build-orchestrate-auto-inject.ts"
 ---
 
 # Build Orchestrate
@@ -28,6 +33,14 @@ The build has three objectives, in strict priority order:
 If completing a phase would require weakening a test, the phase is NOT complete — it's blocked. Escalate to the user.
 
 ## Hard Rules
+
+<!-- AUTO-INJECT-START -->
+**Priority:** Don't regress > Orchestrate > Build. Never sacrifice correctness for velocity.
+**Role:** I am the director. I NEVER do work myself. Every action = a subagent. If I'm about to do it myself, I stop and delegate.
+**Output:** Tell every agent "return ≤10 line summary." I read summaries, never details.
+**Integrity:** After every implementation phase, spawn a test-integrity reviewer. Check the test diff, not the summary.
+**Process:** Read whiteboard → write note-to-self → spawn agent → read summary → update whiteboard.
+<!-- AUTO-INJECT-END -->
 
 Breaking any one means you've collapsed from director to worker, or violated the priority hierarchy.
 
@@ -107,30 +120,31 @@ Phase: [N] [name] | Status: [in-progress/iterating/done] | Iteration: [K]
 Last checkpoint: [one line about what just happened]
 Next: [one line about what's coming]
 
-## Auto-Inject (survives compaction — read this every time you re-orient)
+## Auto-Inject (automatically re-injected after every agent/team return)
 Priority: Don't regress > Orchestrate > Build. Never sacrifice correctness for velocity. (§Priority Hierarchy)
-Process: Re-read skill (§Pre-Phase Hook) → read whiteboard → note-to-self (§Note-to-Self) → spawn agent → read summary only → update whiteboard
+Process: Read whiteboard → write note-to-self (§Note-to-Self) → spawn agent → read summary only → update whiteboard
 Role: I am the director. I NEVER do work myself — not checking, not reviewing, not fixing, not reading code. Every action = a subagent. If I'm about to do it myself, I stop and delegate. (§Hard Rules, §Role Collapse)
 Output: Tell every agent "return ≤10 line summary; write details to phase file." I read summaries, never details. If unclear, spawn a follow-up agent to clarify — don't read the source. (§Agent Output Protocol)
 Integrity: After every implementation phase, spawn a test-integrity reviewer. Check the test diff, not the summary. Summaries lie, diffs don't. (§Test-Integrity Review)
 Verification: Spawn sanity-check agents at phase boundaries AND between phases for continuous confidence. Not just in QA. (§Continuous Verification)
 ```
 
-This is what you read first when re-orienting. The `Auto-Inject` block is critical — it survives context compaction and reminds you HOW to work, WHO you are, and WHERE to find details if a rule is unclear. Update the `Current State` lines at every phase boundary and iteration. The `Auto-Inject` lines are permanent — never edit them.
+The `Auto-Inject` section of your whiteboard is automatically injected into your context after every agent/team return. Write session-specific reminders here — they'll re-orient you between phases without manual re-reading. Update the `Current State` lines at every phase boundary and iteration. The `Auto-Inject` lines are permanent — never edit them.
+
+**After creating the whiteboard,** register it for auto-injection by writing `.claude/active-build.json` with `{"whiteboard": "<path-to-your-whiteboard>"}` (e.g., `{"whiteboard": ".claude/research/my-project/whiteboard.md"}`). This enables automatic re-orientation after every agent return.
 
 ## Pre-Phase Hook (Mandatory)
 
 Before every phase spawn, execute this ritual in order. Skipping any step is a bug.
 
-1. **Re-read this skill** — `Read .claude/skills/build-orchestrate/SKILL.md`. This is the hook that prevents role drift after context compaction.
-2. **Read the whiteboard** — re-ground in project state. The Auto-Inject block re-grounds you in process.
-3. **Role-check** — ask yourself: "Am I about to do anything other than whiteboard + note-to-self + spawn?" If yes, stop.
-4. **Write a note-to-self** (see §Note-to-Self Template below)
-5. **Spawn the phase agent**
-6. **Receive results** — your note-to-self sits above them in context, anchoring your judgment
-7. **Update the whiteboard** — distill, update phase map, update recovery block
+1. **Read the whiteboard** — re-ground in project state. The full whiteboard gives you the phase map, quality log, and open questions. (The Auto-Inject block is injected automatically after every agent return, but reading the full whiteboard gives you the complete picture.)
+2. **Role-check** — ask yourself: "Am I about to do anything other than whiteboard + note-to-self + spawn?" If yes, stop.
+3. **Write a note-to-self** (see §Note-to-Self Template below)
+4. **Spawn the phase agent**
+5. **Receive results** — your note-to-self sits above them in context, anchoring your judgment. The auto-inject hook re-orients you with process rules + session notes.
+6. **Update the whiteboard** — distill, update phase map, update recovery block
 
-> **Why step 1 matters:** After context compaction, you retain state memory (whiteboard) but lose process memory (how to orchestrate). Re-reading the skill restores your operating instructions. This is the difference between staying a director and collapsing into a worker.
+> **Why the auto-inject hook matters:** Between phases, you retain state memory (whiteboard) but can lose process memory (how to orchestrate). The hook automatically injects the director's core rules and your session-specific notes after every agent/team return, keeping you oriented without manual re-reading.
 
 ## Note-to-Self Template
 
@@ -238,7 +252,7 @@ The hook enforces this. If you forget `[leaf]` on a bare Agent call, it blocks w
 
 - **Main thread = thin orchestrator.** You read the whiteboard, write notes-to-self, make phase decisions, update the whiteboard. That's it.
 - **Phase agents get distilled context,** not the whole whiteboard. You decide what's relevant.
-- **Re-read this skill at every phase boundary.** This is enforced by the Pre-Phase Hook. The whiteboard Auto-Inject block also reminds you.
+- **The auto-inject hook re-orients you at every phase boundary.** After every agent/team return, the hook injects the director's core rules and your session-specific notes. The full whiteboard read in the Pre-Phase Hook gives you the complete picture.
 - **Subagents use opus.** For quality-sensitive work (design, spec, review, implementation), always `model: "opus"`.
 - **Implementation and QA agents run in foreground.** Never use `run_in_background: true` for these — you lose visibility into progress and can't intervene. Background is only for truly independent research tasks.
 
@@ -329,21 +343,20 @@ Create whiteboard with goal, scope, phase map, Auto-Inject block
        │
        ▼
 ┌─── Phase Loop (Pre-Phase Hook §) ─────────────────────┐
-│  1. Re-read THIS SKILL (prevents drift)               │
-│  2. Read whiteboard + Auto-Inject block (re-orient)    │
-│  3. Role-check: am I about to do work? If yes, stop   │
-│  4. Write note-to-self (§Note-to-Self Template)        │
-│  5. Spawn phase agent (typed, foreground, opus)        │
-│  6. Receive summary — check status: PASS/STOP/DEFER   │
-│  7. Spawn reviewer agent (mandatory)                   │
-│  7a.  For impl phases: test-integrity review (§)       │
-│  8.   Pass → update whiteboard, next phase             │
-│  8.   Fail → spawn fix agent → re-review               │
-│  8.   STOP → investigate, escalate to user if needed   │
-│  8.   DEFER → log on whiteboard, continue              │
-│  8.   VIOLATION → block, fix tests, re-review          │
-│  9. (Optional) Spawn verification agent (§Continuous)  │
-│ 10. Update recovery block                              │
+│  1. Read whiteboard (full state + phase map)           │
+│  2. Role-check: am I about to do work? If yes, stop   │
+│  3. Write note-to-self (§Note-to-Self Template)        │
+│  4. Spawn phase agent (typed, foreground, opus)        │
+│  5. Receive summary + auto-inject re-orientation       │
+│  6. Spawn reviewer agent (mandatory)                   │
+│  6a.  For impl phases: test-integrity review (§)       │
+│  7.   Pass → update whiteboard, next phase             │
+│  7.   Fail → spawn fix agent → re-review               │
+│  7.   STOP → investigate, escalate to user if needed   │
+│  7.   DEFER → log on whiteboard, continue              │
+│  7.   VIOLATION → block, fix tests, re-review          │
+│  8. (Optional) Spawn verification agent (§Continuous)  │
+│  9. Update recovery block                              │
 └────────────────────────────────────────────────────────┘
        │
        ▼
