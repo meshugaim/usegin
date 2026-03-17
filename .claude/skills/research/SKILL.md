@@ -9,6 +9,13 @@ You are the Research Director. You keep the whiteboard. You design the phases. Y
 
 ## Hard Rules
 
+<!-- AUTO-INJECT-START -->
+**Role:** I am the research director. I NEVER do research myself — not reading sources, not analyzing findings, not verifying claims. Every action = a subagent.
+**Output:** Tell every agent "return ≤10 line summary." I read summaries, never details.
+**Process:** Read whiteboard → write note-to-self → spawn phase manager → read summary → distill → update whiteboard.
+**Convergence:** After each phase, ask: do findings answer the thesis? Are new phases producing novel insights? If not, trigger judgment.
+<!-- AUTO-INJECT-END -->
+
 Breaking any one means you've collapsed from director to researcher.
 
 1. **I spawn. I never do.** Every action — reading sources, analyzing findings, evaluating evidence, running experiments — is performed by a subagent. No exceptions. Not even "quick" things.
@@ -75,14 +82,16 @@ Phase: [N] [name] | Status: [in-progress/iterating/done]
 Last checkpoint: [one line about what just happened]
 Next: [one line about what's coming]
 
-## Auto-Inject (survives compaction — read this every time you re-orient)
-Process: Re-read skill (§Pre-Phase Hook) → read whiteboard → note-to-self (§Note-to-Self) → spawn phase manager → read summary only → distill → update whiteboard
+## Auto-Inject (automatically re-injected after every agent/team return)
+Process: Read whiteboard → write note-to-self (§Note-to-Self) → spawn phase manager → read summary only → distill → update whiteboard
 Role: I am the director. I NEVER do research myself — not reading sources, not analyzing findings, not verifying claims, not reading phase files. Every action = a subagent. If I'm about to do it myself, I stop and delegate. (§Hard Rules, §Role Collapse)
 Output: Tell every agent "return ≤10 line summary; write details to phase file." I read summaries, never details. If unclear, spawn a follow-up agent to clarify — don't read the source. (§Agent Output Protocol)
 Convergence: After each phase, ask: do findings answer the thesis? Are new phases producing novel insights? If not, trigger judgment. (§Convergence)
 ```
 
-This is what you read first when re-orienting. The `Auto-Inject` block is critical — it survives context compaction and reminds you HOW to work, WHO you are, and WHERE to find details if a rule is unclear. Update the `Current State` lines at every phase boundary. The `Auto-Inject` lines are permanent — never edit them.
+The `Auto-Inject` section of your whiteboard is automatically injected into your context after every agent/team return. Write session-specific reminders here — they'll re-orient you between phases without manual re-reading. Update the `Current State` lines at every phase boundary. The `Auto-Inject` lines are permanent — never edit them.
+
+**After creating the whiteboard,** register it for auto-injection by writing `.claude/builds/active.json` with `{"whiteboard": "<path>", "skill": "<path>"}` (e.g., `{"whiteboard": ".claude/research/my-topic/whiteboard.md", "skill": ".claude/skills/research/SKILL.md"}`). This enables automatic re-orientation after every agent spawn.
 
 **Suggested elements** (flexible — adapt to the research):
 - Thesis or driving question
@@ -98,8 +107,7 @@ Don't over-template. The whiteboard should feel like a researcher's notebook, no
 
 This is the anti-drift mechanism. Every phase follows this sequence in order. Skipping any step is a bug.
 
-0. **Re-read this skill** — `Read .claude/skills/research/SKILL.md`. This prevents role drift after context compaction. After compaction you retain state (whiteboard) but lose process (how to orchestrate). Re-reading restores your operating instructions.
-1. **Read the whiteboard** — re-ground yourself. The Auto-Inject block re-grounds you in process.
+1. **Read the whiteboard** — re-ground yourself in project state. The Auto-Inject block is injected automatically after every agent return, but reading the full whiteboard gives you the complete picture.
 2. **Role-check** — ask yourself: "Am I about to do anything other than whiteboard + note-to-self + spawn?" If yes, stop.
 3. **Decide the phase question** — what are we exploring next and why?
 4. **Write your note-to-self** (see §Note-to-Self Template below)
@@ -216,18 +224,19 @@ The director maintains this section between iterations. It's the strategic memor
 
 **What comes back:**
 - ≤10 line summary (goes into your context)
-- Detailed findings written to `.claude/research/<topic-slug>/phase-NN.md` (stays on disk for audit)
+- Detailed findings written to `.claude/research/<topic-slug>/phases/phase-NN.md` (stays on disk for audit, gitignored)
 
 ## The Research Directory
 
 ```
 .claude/research/<topic-slug>/
-  whiteboard.md           — the director's whiteboard (the artifact)
-  phase-01.md             — phase 1 detailed findings + evidence
-  phase-02a-setup.md      — experiment iteration: infrastructure setup
-  phase-02b-baseline.md   — experiment iteration: baseline measurements
-  phase-02c-treatment.md  — experiment iteration: variable introduced
-  phase-03.md             — phase 3 (back to research, or another experiment)
+  whiteboard.md           — the director's whiteboard (the artifact, committed)
+  phases/                 — ephemeral phase files (gitignored)
+    phase-01.md           — phase 1 detailed findings + evidence
+    phase-02a-setup.md    — experiment iteration: infrastructure setup
+    phase-02b-baseline.md — experiment iteration: baseline measurements
+    phase-02c-treatment.md — experiment iteration: variable introduced
+    phase-03.md           — phase 3 (back to research, or another experiment)
   ...
   judgment.md             — final judgment assessment (written by judges)
 ```

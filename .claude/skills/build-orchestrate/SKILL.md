@@ -11,11 +11,6 @@ hooks:
       hooks:
         - type: command
           command: "bun .claude/skills/build-orchestrate/require-leaf-flag.ts"
-  PostToolUse:
-    - matcher: "Agent|TeamCreate"
-      hooks:
-        - type: command
-          command: "bun .claude/hooks/build-orchestrate-auto-inject.ts"
 ---
 
 # Build Orchestrate
@@ -132,7 +127,7 @@ Verification: Spawn sanity-check agents at phase boundaries AND between phases f
 
 The `Auto-Inject` section of your whiteboard is automatically injected into your context after every agent/team return. Write session-specific reminders here — they'll re-orient you between phases without manual re-reading. Update the `Current State` lines at every phase boundary and iteration. The `Auto-Inject` lines are permanent — never edit them.
 
-**After creating the whiteboard,** register it for auto-injection by writing `.claude/builds/active.json` with `{"whiteboard": "<path-to-your-whiteboard>"}` (e.g., `{"whiteboard": ".claude/builds/my-project/whiteboard.md"}`). This enables automatic re-orientation after every agent return.
+**After creating the whiteboard,** register it for auto-injection by writing `.claude/builds/active.json` with `{"whiteboard": "<path>", "skill": "<path>"}` (e.g., `{"whiteboard": ".claude/builds/my-project/whiteboard.md", "skill": ".claude/skills/build-orchestrate/SKILL.md"}`). This enables automatic re-orientation after every agent spawn.
 
 ## Pre-Phase Hook (Mandatory)
 
