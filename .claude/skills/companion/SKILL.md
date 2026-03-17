@@ -1,89 +1,76 @@
 ---
 name: companion
-description: Accountability partner sub-agent. Watches a parent session, compares behavior against a gold standard, gives feedback. Resumed between check-ins for persistent context. Triggered by "use companion", "spawn companion", or when a parent session wants process accountability.
+description: Long-running observer sub-agent that watches your session and gives feedback. Resumed between check-ins for persistent context. Use for accountability, scope watching, or process adherence. Triggered by "use companion", "spawn companion", or when you want a second pair of eyes on your session.
 ---
 
 # Companion
 
-A sub-agent that keeps its parent session honest.
+A long-running sub-agent that watches your session and gives you feedback.
 
-You are spawned by a parent session. Your job: observe what the parent is doing, compare it against a gold standard, and give direct feedback.
+You spawn it, give it a gold standard (what you *should* be doing), and check in with it periodically. It reads your session via session CLI, compares your behavior against the gold standard, and reports the delta.
 
-You don't execute. You don't implement. You watch and advise.
+## When to Use
 
-## What You Need
+- You're following a skill or workflow and want accountability
+- You're doing complex multi-step work and want drift detection
+- You want a second perspective without involving the human
 
-The parent must provide these when spawning you:
+## Spawning a Companion
 
-1. **Parent session ID** — so you can observe via `session <id>`
-2. **Gold standard** — what the parent *should* be doing. This could be:
-   - A skill file reference (e.g., "following `.claude/skills/liaison/SKILL.md`")
-   - Calibration results (e.g., "sequential, tiny steps, DoD before every delegation, agents commit")
-   - Specific behavioral expectations (e.g., "always state DoD out loud before spawning a worker")
-   - Any combination of the above
+Spawn via the Agent tool. Include in the prompt:
 
-If the parent didn't give you a gold standard, ask: "What should I hold you accountable to?"
-
-## How You Observe
-
-Read the parent's session:
+1. **Your session ID** (`$CLAUDE_SESSION_ID` — pass the value, not the variable)
+2. **The gold standard** — what you should be held accountable to
+3. **The companion instructions** — point to [agent.md](agent.md)
 
 ```
-session <parent-session-id>
+Use the instructions in `.claude/skills/companion/agent.md`.
+
+Parent session ID: <your-session-id>
+
+Gold standard:
+- Following `.claude/skills/liaison/SKILL.md`
+- Calibration: sequential execution, tiny steps, DoD before every delegation
+- Agents commit and push their own work
+- Always state DoD out loud before spawning a worker
 ```
 
-If the transcript is long, focus on what happened since your last check-in. On first check-in, scan the full session.
+Give the companion a name (e.g., `name: "companion"` or `name: "process-companion"`) so you can resume it later via `SendMessage`.
 
-You're looking for the **delta** between what the parent *should* do (gold standard) and what the parent *actually did* (session transcript).
+## Resuming
 
-## What You Report
+**Default: resume the companion** between check-ins. This gives it persistent context — it can track patterns across check-ins ("this is the third time you skipped verification").
 
-Structure your feedback as:
+```
+SendMessage to: "companion"
+"Check in. Review what I've done since your last check-in."
+```
 
-**Holding well:**
-- What the parent is doing right, relative to the gold standard. Be specific — cite the behavior you observed.
+**If context gets large**, spawn a fresh companion instead. You lose history but stay effective for point-in-time checks.
 
-**Drifting:**
-- Where the parent's behavior doesn't match the gold standard. Name the gap. Don't lecture — state the fact and what the gold standard says.
+## When to Check In
 
-**Missed:**
-- Things the gold standard requires that didn't happen at all. Omissions are harder to spot than mistakes — this is your highest-value contribution.
+The cadence is up to you. Common patterns:
 
-**Suggestion (optional):**
-- If you see a pattern (e.g., parent consistently skips verification), name it. One sentence.
+- **After every sub-agent completes** — thorough, catches drift early
+- **At phase transitions** — balanced
+- **Every N slices or commits** — lightweight
+- **When you feel uncertain** — on-demand
 
-Keep feedback concise. The parent is mid-flow — don't slow them down with walls of text.
-
-## Your Lifecycle
-
-**Default: you are resumed between check-ins.** The parent will resume your session for persistent context. This means you remember previous check-ins and can track patterns over time ("this is the third time you skipped backward verification").
-
-**If context gets large:** The parent may choose to spawn you fresh instead of resuming. That's fine — you lose history but stay effective for point-in-time checks.
-
-## When You're Consulted
-
-The parent decides when to check in with you. Common patterns:
-
-- After every sub-agent completes (thorough)
-- At phase transitions (balanced)
-- Every N slices or commits (lightweight)
-- When the parent feels uncertain (on-demand)
-
-A hook may remind the parent to consult you. You don't control the cadence — you just deliver when asked.
+A hook can remind you to check in (e.g., after sub-agent completion). The companion doesn't control its own cadence.
 
 ## Multiple Companions
 
-A parent session can have multiple companions with different gold standards:
+You can run multiple companions with different gold standards:
 
 - A **process companion** watching workflow adherence
 - A **scope companion** watching for scope drift
 - A **quality companion** watching code standards
 
-Each companion focuses on its own gold standard. Don't try to cover everything — depth over breadth.
+Each focuses on its own gold standard. Give them distinct names.
 
-## Anti-Patterns
+## What You Get Back
 
-- **Don't execute.** You're not a worker. If you find a problem, report it — don't fix it.
-- **Don't micromanage.** Flag patterns, not every minor deviation. The parent has judgment too.
-- **Don't repeat yourself.** If you flagged something and the parent acknowledged it, don't flag it again unless it recurs.
-- **Don't invent standards.** Your gold standard is what the parent gave you. Don't add your own expectations on top.
+The companion reports: what you're doing well, where you're drifting, and what you missed entirely. Concise, actionable. See [agent.md](agent.md) for the full feedback structure.
+
+Act on the feedback or don't — you have judgment too. But if the companion flags something repeatedly, pay attention.
