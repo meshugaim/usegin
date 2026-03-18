@@ -107,6 +107,7 @@ export {
   isSessionIdOrPrefix,
   findSessionsByPrefix,
   findSessionById,
+  findAgentFilesByPrefix,
   resolveSessionPath,
 } from "./resolve";
 

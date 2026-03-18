@@ -439,3 +439,127 @@ describe("AmbiguousSessionError", () => {
 // =============================================================================
 // END SHORT ID PREFIX RESOLUTION TESTS
 // =============================================================================
+
+// =============================================================================
+// DIRECT SUBAGENT ACCESS TESTS
+// =============================================================================
+
+describe("resolveSessionPath with subagent IDs", () => {
+  test("resolves agent file by agentId when session ID not found", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+
+    // Create a temp directory to simulate a Claude projects directory
+    const tempDir = await mkdtemp(join(tmpdir(), "session-test-agent-"));
+
+    // Use a known agent ID
+    const agentId = "abcd1234-0000-0000-0000-agent0000001";
+    const sessionId = "eeee5678-0000-0000-0000-session00001";
+
+    // Create an agent file in the temp directory
+    const agentFile = join(tempDir, `agent-${agentId}.jsonl`);
+    const agentEntry = JSON.stringify({
+      type: "system",
+      sessionId,
+      agentId,
+      uuid: "uuid-001",
+    });
+    await writeFile(agentFile, agentEntry + "\n");
+
+    try {
+      // Import the function we'll add: findAgentFilesByPrefix
+      const { findAgentFilesByPrefix } = await import("./resolve");
+
+      const results = await findAgentFilesByPrefix("abcd1234", [tempDir]);
+      expect(results.length).toBe(1);
+      expect(results[0]).toBe(agentFile);
+    } finally {
+      await rm(tempDir, { recursive: true });
+    }
+  });
+
+  test("returns empty array when no agent files match prefix", async () => {
+    const { mkdtemp, rm } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+
+    const tempDir = await mkdtemp(join(tmpdir(), "session-test-agent-"));
+
+    try {
+      const { findAgentFilesByPrefix } = await import("./resolve");
+      const results = await findAgentFilesByPrefix("ffff9999", [tempDir]);
+      expect(results).toEqual([]);
+    } finally {
+      await rm(tempDir, { recursive: true });
+    }
+  });
+});
+
+// =============================================================================
+// SESSION RM (deleteSessionFiles) TESTS
+// =============================================================================
+
+describe("deleteSessionFiles", () => {
+  test("deletes all specified files", async () => {
+    const { mkdtemp, writeFile, rm, access } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+
+    const tempDir = await mkdtemp(join(tmpdir(), "session-test-rm-"));
+    const file1 = join(tempDir, "session.jsonl");
+    const file2 = join(tempDir, "agent-abc.jsonl");
+
+    await writeFile(file1, "line1\n");
+    await writeFile(file2, "line2\n");
+
+    const { deleteSessionFiles } = await import("../rm");
+    const result = await deleteSessionFiles([file1, file2]);
+
+    expect(result.deleted).toBe(2);
+    expect(result.failed).toBe(0);
+
+    // Verify files are gone
+    await expect(access(file1)).rejects.toThrow();
+    await expect(access(file2)).rejects.toThrow();
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  test("reports failures for non-existent files", async () => {
+    const { deleteSessionFiles } = await import("../rm");
+    const result = await deleteSessionFiles(["/tmp/nonexistent-session-file-12345.jsonl"]);
+
+    expect(result.deleted).toBe(0);
+    expect(result.failed).toBe(1);
+  });
+
+  test("handles mix of existing and non-existing files", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { tmpdir } = await import("node:os");
+
+    const tempDir = await mkdtemp(join(tmpdir(), "session-test-rm-"));
+    const existingFile = join(tempDir, "session.jsonl");
+    await writeFile(existingFile, "data\n");
+
+    const { deleteSessionFiles } = await import("../rm");
+    const result = await deleteSessionFiles([
+      existingFile,
+      "/tmp/nonexistent-session-file-67890.jsonl",
+    ]);
+
+    expect(result.deleted).toBe(1);
+    expect(result.failed).toBe(1);
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  test("returns zero counts for empty file list", async () => {
+    const { deleteSessionFiles } = await import("../rm");
+    const result = await deleteSessionFiles([]);
+
+    expect(result.deleted).toBe(0);
+    expect(result.failed).toBe(0);
+  });
+});

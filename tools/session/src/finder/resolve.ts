@@ -5,11 +5,12 @@
  * with support for short ID prefixes (e.g., "abc12345" instead of full UUID).
  */
 
-import { basename } from "path";
+import { basename, join } from "path";
+import { readdir } from "node:fs/promises";
 import { SessionNotFoundError } from "../errors";
 import { AmbiguousSessionError } from "./types";
 import type { SessionInfo } from "./types";
-import { discoverSessions, getCurrentProjectHash } from "./discovery";
+import { discoverSessions, getCurrentProjectHash, getClaudeProjectsDir, claudeProjectsDirExists } from "./discovery";
 
 // =============================================================================
 // SESSION ID UTILITIES
@@ -137,6 +138,74 @@ export async function findSessionById(sessionId: string): Promise<SessionInfo | 
 }
 
 // =============================================================================
+// SUBAGENT FILE LOOKUP
+// =============================================================================
+
+/**
+ * Find agent files whose agentId starts with the given prefix.
+ *
+ * Searches the specified directories for `agent-<prefix>*.jsonl` files.
+ * If no directories are provided, searches all Claude project directories.
+ *
+ * Returns full paths to matching agent files.
+ */
+export async function findAgentFilesByPrefix(
+  prefix: string,
+  searchDirs?: string[]
+): Promise<string[]> {
+  const dirs = searchDirs ?? (await getProjectDirs());
+  const results: string[] = [];
+
+  for (const dir of dirs) {
+    try {
+      const files = await readdir(dir);
+      for (const file of files) {
+        if (
+          file.startsWith(`agent-${prefix}`) &&
+          file.endsWith(".jsonl")
+        ) {
+          results.push(join(dir, file));
+        }
+      }
+    } catch {
+      // Directory doesn't exist or isn't readable — skip
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Get all project directories under ~/.claude/projects/.
+ */
+async function getProjectDirs(): Promise<string[]> {
+  if (!(await claudeProjectsDirExists())) return [];
+
+  const claudeDir = getClaudeProjectsDir();
+  const dirs: string[] = [];
+
+  // Prefer current project first
+  const currentProject = getCurrentProjectHash();
+  if (currentProject) {
+    dirs.push(join(claudeDir, currentProject));
+  }
+
+  // Then add all other project directories
+  try {
+    const entries = await readdir(claudeDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name !== currentProject) {
+        dirs.push(join(claudeDir, entry.name));
+      }
+    }
+  } catch {
+    // Can't read projects dir
+  }
+
+  return dirs;
+}
+
+// =============================================================================
 // SESSION PATH RESOLUTION
 // =============================================================================
 
@@ -156,21 +225,26 @@ export async function resolveSessionPath(input: string): Promise<string> {
   // Check if it's a full UUID - use exact match
   if (isSessionId(input)) {
     const session = await findSessionById(input);
-    if (!session) {
-      const currentProject = getCurrentProjectHash();
-      throw new SessionNotFoundError(input, {
-        searchedLocation: currentProject
-          ? `~/.claude/projects/${currentProject}/`
-          : "~/.claude/projects/",
-      });
+    if (session) {
+      return session.path;
     }
-    return session.path;
-  }
 
-  // It's a prefix - find matching sessions
-  const matches = await findSessionsByPrefix(input);
+    // Fall back: check if it matches an agent file
+    const agentMatches = await findAgentFilesByPrefix(input);
+    if (agentMatches.length === 1 && agentMatches[0]) {
+      return agentMatches[0];
+    }
+    if (agentMatches.length > 1) {
+      // Multiple agent files match — ambiguous
+      const agentInfos = agentMatches.map((path) => ({
+        path,
+        id: basename(path, ".jsonl").replace(/^agent-/, ""),
+        mtime: new Date(),
+        project: "",
+      }));
+      throw new AmbiguousSessionError(input, agentInfos);
+    }
 
-  if (matches.length === 0) {
     const currentProject = getCurrentProjectHash();
     throw new SessionNotFoundError(input, {
       searchedLocation: currentProject
@@ -179,11 +253,38 @@ export async function resolveSessionPath(input: string): Promise<string> {
     });
   }
 
+  // It's a prefix - find matching sessions
+  const matches = await findSessionsByPrefix(input);
+
   if (matches.length === 1) {
     const match = matches[0];
     if (match) return match.path;
   }
 
-  // Multiple matches - throw ambiguous error
-  throw new AmbiguousSessionError(input, matches);
+  if (matches.length > 1) {
+    // Multiple matches - throw ambiguous error
+    throw new AmbiguousSessionError(input, matches);
+  }
+
+  // No session matches — fall back to agent file search
+  const agentMatches = await findAgentFilesByPrefix(input);
+  if (agentMatches.length === 1 && agentMatches[0]) {
+    return agentMatches[0];
+  }
+  if (agentMatches.length > 1) {
+    const agentInfos = agentMatches.map((path) => ({
+      path,
+      id: basename(path, ".jsonl").replace(/^agent-/, ""),
+      mtime: new Date(),
+      project: "",
+    }));
+    throw new AmbiguousSessionError(input, agentInfos);
+  }
+
+  const currentProject = getCurrentProjectHash();
+  throw new SessionNotFoundError(input, {
+    searchedLocation: currentProject
+      ? `~/.claude/projects/${currentProject}/`
+      : "~/.claude/projects/",
+  });
 }
