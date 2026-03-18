@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { $ } from "bun";
 import { getMaxUpdatedAt, createListCommand, shouldDefaultToJson } from "../src/commands/list";
+import { paginateIssues } from "../src/lib/output";
 import type { PlanIssue } from "../src/types";
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
@@ -264,5 +265,132 @@ describe("shouldDefaultToJson", () => {
 
   it("treats missing env as empty", () => {
     expect(shouldDefaultToJson({ isTTY: true })).toBe(false);
+  });
+});
+
+describe("pagination", () => {
+  describe("CLI parsing", () => {
+    it("parses --page flag", () => {
+      const cmd = createListCommand();
+      let capturedOpts: Record<string, unknown> = {};
+      cmd.action((opts: Record<string, unknown>) => {
+        capturedOpts = opts;
+      });
+
+      cmd.parse(["node", "plan", "--page", "3"], { from: "user" });
+      expect(capturedOpts.page).toBe("3");
+    });
+
+    it("parses --page-size flag", () => {
+      const cmd = createListCommand();
+      let capturedOpts: Record<string, unknown> = {};
+      cmd.action((opts: Record<string, unknown>) => {
+        capturedOpts = opts;
+      });
+
+      cmd.parse(["node", "plan", "--page-size", "10"], { from: "user" });
+      expect(capturedOpts.pageSize).toBe("10");
+    });
+
+    it("parses --page and --page-size together", () => {
+      const cmd = createListCommand();
+      let capturedOpts: Record<string, unknown> = {};
+      cmd.action((opts: Record<string, unknown>) => {
+        capturedOpts = opts;
+      });
+
+      cmd.parse(["node", "plan", "--page", "2", "--page-size", "5"], { from: "user" });
+      expect(capturedOpts.page).toBe("2");
+      expect(capturedOpts.pageSize).toBe("5");
+    });
+  });
+
+  describe("--page and --limit conflict", () => {
+    it("errors when both --page and --limit are provided", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page", "1", "--limit", "5"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain("--page and --limit cannot be used together");
+    });
+  });
+
+  describe("paginateIssues", () => {
+    function makeIssues(count: number): PlanIssue[] {
+      return Array.from({ length: count }, (_, i) =>
+        createIssue({
+          id: `issue-${i}`,
+          identifier: `ENG-${i + 1}`,
+          title: `Issue ${i + 1}`,
+        })
+      );
+    }
+
+    it("wraps issues with default pagination metadata", () => {
+      const issues = makeIssues(5);
+      const result = paginateIssues(issues, 1, 25);
+
+      expect(result).toHaveProperty("issues");
+      expect(result).toHaveProperty("pagination");
+      expect(result.pagination.page).toBe(1);
+      expect(result.pagination.pageSize).toBe(25);
+      expect(result.pagination.totalCount).toBe(5);
+      expect(result.pagination.hasNextPage).toBe(false);
+      expect(result.issues).toHaveLength(5);
+    });
+
+    it("returns correct slice for page 2 with page-size 2", () => {
+      const issues = makeIssues(5);
+      const result = paginateIssues(issues, 2, 2);
+
+      expect(result.issues).toHaveLength(2);
+      expect(result.issues[0].identifier).toBe("ENG-3");
+      expect(result.issues[1].identifier).toBe("ENG-4");
+    });
+
+    it("hasNextPage is true when more items exist", () => {
+      const issues = makeIssues(10);
+      const result = paginateIssues(issues, 1, 3);
+
+      expect(result.pagination.hasNextPage).toBe(true);
+      expect(result.pagination.totalCount).toBe(10);
+    });
+
+    it("hasNextPage is false on last page", () => {
+      const issues = makeIssues(6);
+      const result = paginateIssues(issues, 3, 2);
+
+      expect(result.issues).toHaveLength(2);
+      expect(result.issues[0].identifier).toBe("ENG-5");
+      expect(result.issues[1].identifier).toBe("ENG-6");
+      expect(result.pagination.hasNextPage).toBe(false);
+    });
+
+    it("returns empty issues with hasNextPage false for page beyond total", () => {
+      const issues = makeIssues(3);
+      const result = paginateIssues(issues, 10, 25);
+
+      expect(result.issues).toHaveLength(0);
+      expect(result.pagination.hasNextPage).toBe(false);
+      expect(result.pagination.totalCount).toBe(3);
+      expect(result.pagination.page).toBe(10);
+    });
+
+    it("handles partial last page correctly", () => {
+      const issues = makeIssues(5);
+      const result = paginateIssues(issues, 2, 3);
+
+      expect(result.issues).toHaveLength(2);
+      expect(result.issues[0].identifier).toBe("ENG-4");
+      expect(result.issues[1].identifier).toBe("ENG-5");
+      expect(result.pagination.hasNextPage).toBe(false);
+    });
   });
 });
