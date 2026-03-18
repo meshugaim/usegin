@@ -67,14 +67,17 @@ describe("auto-detect JSON wiring", () => {
 
       it(`does not use opts.json for output branching`, () => {
         const source = readCommandSource(command);
-        // After wiring, opts.json should only appear in the shouldDefaultToJson call,
-        // not in any if-conditions for output branching.
-        // Extract lines that use opts.json in a conditional (excluding the shouldDefaultToJson call).
+        // After wiring, opts.json should only appear in:
+        // 1. The shouldDefaultToJson({ json: opts.json, ... }) call
+        // 2. Type annotations (json?: boolean)
+        // It should NOT appear in if-conditions for output branching.
         const lines = source.split("\n");
         const offendingLines = lines.filter(
           (line) =>
             /opts\.json/.test(line) &&
             !line.includes("shouldDefaultToJson") &&
+            // Allow the property being passed to shouldDefaultToJson
+            !line.trim().startsWith("json: opts.json") &&
             // Allow opts.json in type annotations and parameter destructuring
             !line.trim().startsWith("json?:") &&
             !line.trim().startsWith("*")
