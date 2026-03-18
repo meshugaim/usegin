@@ -14,6 +14,8 @@ This guide is for companion sub-agents using the `session` CLI to observe a pare
 | Goal | Command |
 |------|---------|
 | Full observation | `session <id> --full --tool-input --tool-output --truncate 2000` |
+| Incremental (since last check-in) | `session <id> --since-turn N --full --tool-output --truncate 2000` |
+| Last N turns | `session <id> --last 20 --full --tool-output` |
 | Quick scan | `session <id> --timeline --show-tools` |
 | Tool focus (e.g., Bash) | `session <id> --tool Bash --tool-input --tool-output` |
 | Stats overview | `session <id>` (default) |
