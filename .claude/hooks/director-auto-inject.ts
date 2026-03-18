@@ -1,13 +1,18 @@
 #!/usr/bin/env bun
 /**
- * Director auto-inject PreToolUse hook — shared by build-orchestrate and research.
+ * Director auto-inject PreToolUse hook — shared by build-orchestrate, build-liaison, and research.
  *
- * Fires before every Agent/TeamCreate spawn. Reads the active session's
+ * Fires before every Agent/TeamCreate spawn. Reads the active build's
  * skill rules (from AUTO-INJECT markers) and whiteboard Auto-Inject section,
- * then outputs both as additionalContext to re-orient the director.
+ * then outputs both as additionalContext to re-orient the orchestrator.
  *
- * The active session file (.claude/builds/active.json) contains:
+ * Supports two active.json formats:
+ *
+ * Legacy (single build):
  *   { "whiteboard": "<path>", "skill": "<path>" }
+ *
+ * Multi-build:
+ *   { "builds": { "<slug>": { "whiteboard": "<path>", "skill": "<path>" }, ... }, "current": "<slug>" }
  *
  * Silent (no output, exit 0) when:
  * - Tool is not Agent/TeamCreate
@@ -27,6 +32,11 @@ interface PostToolInput {
 interface ActiveSession {
   whiteboard: string;
   skill?: string;
+}
+
+interface MultiBuildConfig {
+  builds: Record<string, ActiveSession>;
+  current: string;
 }
 
 /**
@@ -95,7 +105,21 @@ async function main() {
   let activeSession: ActiveSession;
   try {
     const raw = await Bun.file(activeBuildPath).text();
-    activeSession = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+
+    // Multi-build format: { builds: { ... }, current: "slug" }
+    if (parsed.builds && parsed.current) {
+      const config = parsed as MultiBuildConfig;
+      const build = config.builds[config.current];
+      if (!build) {
+        console.error(`[auto-inject] Build "${config.current}" not found in active.json`);
+        process.exit(0);
+      }
+      activeSession = build;
+    } else {
+      // Legacy format: { whiteboard: "...", skill: "..." }
+      activeSession = parsed as ActiveSession;
+    }
   } catch {
     console.error("[auto-inject] Failed to parse .claude/builds/active.json");
     process.exit(0);

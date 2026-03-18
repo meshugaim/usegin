@@ -1,0 +1,13 @@
+{
+  "builds": {
+    "gfs-sync-items": {
+      "whiteboard": ".claude/builds/gfs-sync-items/whiteboard.md",
+      "skill": ".claude/skills/build-orchestrate/SKILL.md"
+    },
+    "gfs-sync-emails": {
+      "whiteboard": ".claude/builds/gfs-sync-emails/whiteboard.md",
+      "skill": ".claude/skills/build-liaison/SKILL.md"
+    }
+  },
+  "current": "gfs-sync-emails"
+}
