@@ -310,7 +310,7 @@ Phase agent → Reviewer agent → Fix agent (if needed) → Re-review agent
 
 ### Test-Integrity Review (mandatory for implementation phases)
 
-After every implementation phase, the reviewer agent has three jobs:
+After every implementation phase, the reviewer agent has four jobs:
 
 **1. Code review** — does the change match the spec? Is the code correct?
 
@@ -328,7 +328,15 @@ A VIOLATION blocks the next phase. The orchestrator must investigate — spawn a
 - **"Pre-existing" is a claim, not a fact.** If the agent reported test failures as "pre-existing" or "unrelated," flag it. The orchestrator should verify — a test that was passing before this work and failing after is a regression, even if the test file wasn't touched.
 - **Scope check.** If the task was "add X to function Y," verify the diff shows ONLY X added. If the agent rewrote the whole function, check that nothing else changed. The diff between old and new should contain only the intended change.
 
-**Why this matters:** In the GFS Sync Unification (2026-03-12), agents introduced two classes of regression:
+**4. Schema compatibility audit** — when a migration writes to existing columns (INSERT, UPDATE, or trigger-generated writes), verify the written values are compatible with all existing readers of those columns:
+
+- **Grep for all readers.** If the migration writes to `gfs_sync_events.event_type`, find every query, view, and trigger that reads `event_type` and verify the written values match what readers expect. `WHERE event_type = 'sync_succeeded'` will miss events written as `'synced'`.
+- **Check trigger chains.** If the migration creates a trigger that INSERTs into a table, check if other triggers fire on that INSERT. Verify the inserted values are compatible with what downstream triggers expect in their CASE/WHEN branches.
+- **Check views.** If the migration recreates a view that references a column, verify the view's filter values match what producers write. The same migration containing BOTH a new vocabulary (trigger writes `'synced'`) and an old vocabulary (view filters `'sync_succeeded'`) is the strongest signal of a compatibility gap.
+
+**Why this matters:** In the GFS Sync Items migration (2026-03-18), the Slice 1 audit trigger wrote `NEW.gfs_sync_status::TEXT` as `event_type` (status names: `'synced'`, `'upload_failed'`). The entire existing system expected action names (`'sync_succeeded'`, `'sync_failed'`). Both spec reviewers missed it. The old trigger's CASE branches didn't match the new event names, orphaning 6 file branches and making a "temporary" projection load-bearing. Four review cycles (code review + regression + tests + data verification) ran for each of 4 slices — 16 reviews total — and none caught it, because none checked whether written values matched existing readers.
+
+**Prior incident (2026-03-12):** Agents introduced two classes of regression:
 1. *Test manipulation* — deleted 7 assertions, weakened 7 more to hide behavioral changes. Caught by test file audit.
 2. *Silent filter loss* — `CREATE OR REPLACE FUNCTION` on claim RPCs carried forward an older definition, silently dropping an `is_excluded` filter added by a later migration. The agent labeled the resulting test failures as "pre-existing." Caught only by behavioral change audit — the test files were never touched.
 
