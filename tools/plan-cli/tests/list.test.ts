@@ -199,6 +199,14 @@ describe("shouldDefaultToJson", () => {
     expect(shouldDefaultToJson({ env: { PLAN_OUTPUT: "json" }, isTTY: true })).toBe(true);
   });
 
+  it("returns true when PLAN_OUTPUT=JSON (case-insensitive)", () => {
+    expect(shouldDefaultToJson({ env: { PLAN_OUTPUT: "JSON" }, isTTY: true })).toBe(true);
+  });
+
+  it("returns false when PLAN_OUTPUT=Human (case-insensitive)", () => {
+    expect(shouldDefaultToJson({ env: { PLAN_OUTPUT: "Human" }, isTTY: false })).toBe(false);
+  });
+
   it("returns false when PLAN_OUTPUT=human", () => {
     expect(shouldDefaultToJson({ env: { PLAN_OUTPUT: "human" }, isTTY: false })).toBe(false);
   });

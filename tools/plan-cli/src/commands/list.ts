@@ -49,8 +49,9 @@ export function shouldDefaultToJson(opts: {
   const planOutput = env.PLAN_OUTPUT;
 
   // Explicit PLAN_OUTPUT env var overrides everything else
-  if (planOutput === "json") return true;
-  if (planOutput === "human") return false;
+  const planOutputLower = planOutput?.toLowerCase();
+  if (planOutputLower === "json") return true;
+  if (planOutputLower === "human") return false;
 
   // Claude Code agent detection
   if (env.CLAUDECODE === "1") return true;
