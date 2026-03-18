@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { $ } from "bun";
-import { getMaxUpdatedAt, createListCommand } from "../src/commands/list";
+import { getMaxUpdatedAt, createListCommand, shouldDefaultToJson } from "../src/commands/list";
 import type { PlanIssue } from "../src/types";
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
@@ -191,5 +191,58 @@ describe("getMaxUpdatedAt", () => {
     });
     const result = getMaxUpdatedAt(issue);
     expect(result).toBe(new Date("2024-12-01T00:00:00Z").getTime());
+  });
+});
+
+describe("shouldDefaultToJson", () => {
+  it("returns true when PLAN_OUTPUT=json", () => {
+    expect(shouldDefaultToJson({ env: { PLAN_OUTPUT: "json" }, isTTY: true })).toBe(true);
+  });
+
+  it("returns false when PLAN_OUTPUT=human", () => {
+    expect(shouldDefaultToJson({ env: { PLAN_OUTPUT: "human" }, isTTY: false })).toBe(false);
+  });
+
+  it("returns false when PLAN_OUTPUT=human even if CLAUDECODE=1", () => {
+    expect(shouldDefaultToJson({
+      env: { PLAN_OUTPUT: "human", CLAUDECODE: "1" },
+      isTTY: false,
+    })).toBe(false);
+  });
+
+  it("returns true when CLAUDECODE=1", () => {
+    expect(shouldDefaultToJson({ env: { CLAUDECODE: "1" }, isTTY: true })).toBe(true);
+  });
+
+  it("returns true when no TTY and no fzf", () => {
+    expect(shouldDefaultToJson({ env: {}, isTTY: false })).toBe(true);
+  });
+
+  it("returns false when no TTY but fzf is set", () => {
+    expect(shouldDefaultToJson({ env: {}, isTTY: false, fzf: true })).toBe(false);
+  });
+
+  it("returns false with TTY and no env vars (default)", () => {
+    expect(shouldDefaultToJson({ env: {}, isTTY: true })).toBe(false);
+  });
+
+  it("returns true when explicit --json flag is set regardless of other conditions", () => {
+    expect(shouldDefaultToJson({ json: true, env: {}, isTTY: true })).toBe(true);
+  });
+
+  it("returns true when explicit --json flag overrides PLAN_OUTPUT=human", () => {
+    expect(shouldDefaultToJson({
+      json: true,
+      env: { PLAN_OUTPUT: "human" },
+      isTTY: true,
+    })).toBe(true);
+  });
+
+  it("treats isTTY undefined as no TTY", () => {
+    expect(shouldDefaultToJson({ env: {} })).toBe(true);
+  });
+
+  it("treats missing env as empty", () => {
+    expect(shouldDefaultToJson({ isTTY: true })).toBe(false);
   });
 });

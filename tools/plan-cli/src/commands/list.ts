@@ -25,6 +25,42 @@ export function getMaxUpdatedAt(issue: PlanIssue): number {
   return maxTime;
 }
 
+/**
+ * Determine whether JSON output should be used by default.
+ *
+ * Priority order:
+ * 1. Explicit --json flag → always JSON
+ * 2. PLAN_OUTPUT=json → force JSON
+ * 3. PLAN_OUTPUT=human → force human (overrides CLAUDECODE and TTY detection)
+ * 4. CLAUDECODE=1 → default to JSON (Claude Code sets this)
+ * 5. No TTY on stdout AND no --fzf → default to JSON (piped/scripted usage)
+ * 6. Otherwise → human
+ */
+export function shouldDefaultToJson(opts: {
+  fzf?: boolean;
+  json?: boolean;
+  env?: Record<string, string | undefined>;
+  isTTY?: boolean;
+}): boolean {
+  // Explicit --json flag always wins
+  if (opts.json) return true;
+
+  const env = opts.env ?? {};
+  const planOutput = env.PLAN_OUTPUT;
+
+  // Explicit PLAN_OUTPUT env var overrides everything else
+  if (planOutput === "json") return true;
+  if (planOutput === "human") return false;
+
+  // Claude Code agent detection
+  if (env.CLAUDECODE === "1") return true;
+
+  // No TTY and not in fzf mode → likely piped/scripted
+  if (!opts.isTTY && !opts.fzf) return true;
+
+  return false;
+}
+
 export function createListCommand(): Command {
   const cmd = new Command("list")
     .alias("ls")
@@ -83,6 +119,13 @@ async function runList(opts: {
     process.exit(2);
   }
 
+  const useJson = shouldDefaultToJson({
+    fzf: opts.fzf,
+    json: opts.json,
+    env: process.env,
+    isTTY: process.stdout.isTTY,
+  });
+
   try {
     const client = new LinearClient({ apiKey });
 
@@ -123,7 +166,7 @@ async function runList(opts: {
     let issues = await client.listIssues(options);
 
     if (issues.length === 0) {
-      if (opts.json) {
+      if (useJson) {
         if (opts.groupBy) {
           console.log(JSON.stringify({ groups: [] }, null, 2));
         } else {
@@ -203,7 +246,7 @@ async function runList(opts: {
     // Standard output modes
     // Show Done children if explicitly requested OR if filtering by done status
     const showDone = opts.showDone ?? (opts.status?.toLowerCase() === "done");
-    if (opts.json) {
+    if (useJson) {
       const groupBy = opts.groupBy as "label" | "project" | "status";
       if (opts.groupBy) {
         console.log(formatGroupedListJson(issues, groupBy, { showDone }));
