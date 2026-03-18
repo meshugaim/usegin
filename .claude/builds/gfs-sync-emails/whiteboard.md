@@ -1,7 +1,7 @@
 ## Current State
-Slice: E4 (Switch email readers) | Step: not started | Status: pending
-Last checkpoint: E3 complete. Worker writes to gfs_sync_items. Attachment backfill done (A1 pulled forward).
-Next: Start E4 — switch email readers to gfs_sync_items.
+Phase: Complete (emails + attachments migrated) | Status: coexistence
+Last checkpoint: E4 done. Attachment work collapsed into email slices (E2/E3/E4 handled both entity types).
+Next: Cleanup — drop old columns from inbound_emails + email_attachments (production-gated).
 
 ## Auto-Inject (re-injected after every agent return)
 Priority: Don't regress > Orchestrate > Build. Never sacrifice correctness for velocity.
@@ -47,12 +47,12 @@ Migrate emails and attachments to use gfs_sync_items, same pattern as files (Sli
 - [x] Slice E1: Backfill emails — PASS. Commit 9c704e36.
 - [x] Slice E2: Switch email writers — PASS. 5 commits (prereqs + resolver + Python API + test fixes).
 - [x] Slice E3: Switch email worker + attachment backfill — PASS. Commit ef3ee9cc.
-- [ ] Slice E4: Switch email readers (project-email.ts ~20 sites)
+- [x] Slice E4: Switch email readers — PASS. Commit 06bb3c8e.
 - [x] Slice A1: Pulled forward into E3 (attachment backfill done)
-- [ ] Slice A2: Switch attachment writers
-- [ ] Slice A3: Switch attachment worker
-- [ ] Slice A4: Switch attachment readers
-- [ ] Cleanup: Drop old columns from inbound_emails + email_attachments
+- [x] Slice A2: Collapsed into E2 (attachment writers switched alongside email writers)
+- [x] Slice A3: Collapsed into E3 (attachment worker switched alongside email worker)
+- [x] Slice A4: Collapsed into E4 (attachment readers switched alongside email readers)
+- [ ] Cleanup: Drop old columns from inbound_emails + email_attachments (production-gated)
 
 ## Key Context
 
