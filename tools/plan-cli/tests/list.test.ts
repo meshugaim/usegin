@@ -219,8 +219,12 @@ describe("shouldDefaultToJson", () => {
     })).toBe(false);
   });
 
-  it("returns true when CLAUDECODE=1", () => {
-    expect(shouldDefaultToJson({ env: { CLAUDECODE: "1" }, isTTY: true })).toBe(true);
+  it("returns true when CLAUDECODE=1 and no TTY (sub-agent context)", () => {
+    expect(shouldDefaultToJson({ env: { CLAUDECODE: "1" }, isTTY: false })).toBe(true);
+  });
+
+  it("returns false when CLAUDECODE=1 and TTY (interactive session)", () => {
+    expect(shouldDefaultToJson({ env: { CLAUDECODE: "1" }, isTTY: true })).toBe(false);
   });
 
   it("returns false when CLAUDECODE=0 (only '1' triggers auto-detect)", () => {

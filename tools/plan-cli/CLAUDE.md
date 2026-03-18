@@ -46,12 +46,13 @@ By default, `plan list` auto-detects the best output format:
 
 1. Explicit `--json` flag → always JSON
 2. `PLAN_OUTPUT=json` env var → force JSON
-3. `PLAN_OUTPUT=human` env var → force human (overrides auto-detection)
-4. `CLAUDECODE=1` env var → JSON (Claude Code sets this automatically)
-5. No TTY on stdout → JSON (piped/scripted usage)
-6. Otherwise → human table
+3. `PLAN_OUTPUT=human` env var → force human (overrides all auto-detection)
+4. stdout IS a TTY → human table (interactive session, even inside Claude Code)
+5. `CLAUDECODE=1` + no TTY → JSON (sub-agent context)
+6. No TTY on stdout → JSON (piped/scripted usage)
+7. Otherwise → human table
 
-Agents almost always get JSON automatically (via `CLAUDECODE=1`). Use `PLAN_OUTPUT=human` to override.
+Agents get JSON automatically when running as sub-agents (no TTY + `CLAUDECODE=1`). Humans running `plan list` interactively inside Claude Code get the human table because the TTY check takes priority.
 
 ## Pagination (JSON only)
 
