@@ -3,6 +3,7 @@ import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
 import { normalizeIssueId } from "../lib/identifier";
+import { shouldDefaultToJson } from "../lib/output-mode";
 
 export function createCloseCommand(): Command {
   const cmd = new Command("close")
@@ -55,9 +56,15 @@ async function runClose(
       status: "Done",
     });
 
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
     if (opts.quiet) {
       // No output
-    } else if (opts.json) {
+    } else if (useJson) {
       console.log(
         JSON.stringify(
           {
