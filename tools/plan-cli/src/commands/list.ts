@@ -124,6 +124,24 @@ async function runList(opts: {
     process.exit(2);
   }
 
+  // Validate --page
+  if (opts.page) {
+    const parsed = parseInt(opts.page, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      console.error(`Error: --page must be a positive integer, got "${opts.page}"`);
+      process.exit(1);
+    }
+  }
+
+  // Validate --page-size
+  if (opts.pageSize) {
+    const parsed = parseInt(opts.pageSize, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      console.error(`Error: --page-size must be a positive integer, got "${opts.pageSize}"`);
+      process.exit(1);
+    }
+  }
+
   // --page and --limit are mutually exclusive
   if (opts.page && opts.limit) {
     console.error("Error: --page and --limit cannot be used together");

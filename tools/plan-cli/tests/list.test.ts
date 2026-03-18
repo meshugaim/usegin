@@ -305,6 +305,100 @@ describe("pagination", () => {
     });
   });
 
+  describe("--page validation", () => {
+    it("errors when --page is 0", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page", "0"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('--page must be a positive integer, got "0"');
+    });
+
+    it("errors when --page is negative", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page", "-1"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('--page must be a positive integer, got "-1"');
+    });
+
+    it("errors when --page is not a number", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page", "foo"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('--page must be a positive integer, got "foo"');
+    });
+  });
+
+  describe("--page-size validation", () => {
+    it("errors when --page-size is 0", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page-size", "0"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('--page-size must be a positive integer, got "0"');
+    });
+
+    it("errors when --page-size is negative", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page-size", "-5"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('--page-size must be a positive integer, got "-5"');
+    });
+
+    it("errors when --page-size is not a number", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page-size", "abc"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      const exitCode = await proc.exited;
+
+      expect(exitCode).not.toBe(0);
+      expect(stderr).toContain('--page-size must be a positive integer, got "abc"');
+    });
+  });
+
   describe("--page and --limit conflict", () => {
     it("errors when both --page and --limit are provided", async () => {
       const proc = Bun.spawn(
