@@ -51,6 +51,7 @@ export interface PaginatedResult<T = PlanIssue> {
     page: number;
     pageSize: number;
     totalCount: number;
+    totalPages: number;
     hasNextPage: boolean;
   };
 }

@@ -466,6 +466,7 @@ describe("pagination", () => {
       expect(result.pagination.page).toBe(1);
       expect(result.pagination.pageSize).toBe(25);
       expect(result.pagination.totalCount).toBe(5);
+      expect(result.pagination.totalPages).toBe(1);
       expect(result.pagination.hasNextPage).toBe(false);
       expect(result.issues).toHaveLength(5);
     });
@@ -485,6 +486,7 @@ describe("pagination", () => {
 
       expect(result.pagination.hasNextPage).toBe(true);
       expect(result.pagination.totalCount).toBe(10);
+      expect(result.pagination.totalPages).toBe(4);
     });
 
     it("hasNextPage is false on last page", () => {
@@ -495,6 +497,7 @@ describe("pagination", () => {
       expect(result.issues[0].identifier).toBe("ENG-5");
       expect(result.issues[1].identifier).toBe("ENG-6");
       expect(result.pagination.hasNextPage).toBe(false);
+      expect(result.pagination.totalPages).toBe(3);
     });
 
     it("returns empty issues with hasNextPage false for page beyond total", () => {
@@ -504,6 +507,7 @@ describe("pagination", () => {
       expect(result.issues).toHaveLength(0);
       expect(result.pagination.hasNextPage).toBe(false);
       expect(result.pagination.totalCount).toBe(3);
+      expect(result.pagination.totalPages).toBe(1);
       expect(result.pagination.page).toBe(10);
     });
 
@@ -514,6 +518,16 @@ describe("pagination", () => {
       expect(result.issues).toHaveLength(2);
       expect(result.issues[0].identifier).toBe("ENG-4");
       expect(result.issues[1].identifier).toBe("ENG-5");
+      expect(result.pagination.hasNextPage).toBe(false);
+      expect(result.pagination.totalPages).toBe(2);
+    });
+
+    it("returns totalPages 0 for empty input", () => {
+      const result = paginateIssues([], 1, 25);
+
+      expect(result.issues).toHaveLength(0);
+      expect(result.pagination.totalPages).toBe(0);
+      expect(result.pagination.totalCount).toBe(0);
       expect(result.pagination.hasNextPage).toBe(false);
     });
   });

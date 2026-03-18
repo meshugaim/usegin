@@ -258,6 +258,15 @@ function issueToCompactJson(issue: PlanIssue, showDone: boolean) {
 }
 
 /**
+ * Convert issues to compact JSON objects without serializing to a string.
+ * Use this when you need the objects directly (e.g., for pagination).
+ */
+export function issuesToCompactObjects(issues: PlanIssue[], options: FormatOptions = {}): object[] {
+  const showDone = options.showDone ?? false;
+  return issues.map((issue) => issueToCompactJson(issue, showDone));
+}
+
+/**
  * Format issues as a JSON array with compact shape.
  * Omits id, description, createdAt, updatedAt to reduce token cost.
  */
@@ -382,6 +391,7 @@ export function paginateIssues<T>(
   pageSize: number,
 ): PaginatedResult<T> {
   const totalCount = issues.length;
+  const totalPages = Math.ceil(totalCount / pageSize);
   const start = (page - 1) * pageSize;
   const pageIssues = issues.slice(start, start + pageSize);
   const hasNextPage = start + pageSize < totalCount;
@@ -392,6 +402,7 @@ export function paginateIssues<T>(
       page,
       pageSize,
       totalCount,
+      totalPages,
       hasNextPage,
     },
   };

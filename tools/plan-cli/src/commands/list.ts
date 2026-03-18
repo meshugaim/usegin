@@ -1,11 +1,13 @@
 import { Command } from "commander";
 import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
-import { formatListHuman, formatListJson, formatGroupedList, formatGroupedListJson, paginateIssues } from "../lib/output";
+import { formatListHuman, formatListJson, formatGroupedList, formatGroupedListJson, paginateIssues, issuesToCompactObjects } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import { printApiStats } from "../lib/stats";
 import { dim } from "../lib/colors";
 import type { ListOptions, PlanIssue } from "../types";
+
+export const DEFAULT_PAGE_SIZE = 25;
 
 /**
  * Get the maximum updatedAt timestamp across an issue and all its descendants.
@@ -81,7 +83,7 @@ export function createListCommand(): Command {
     .option("--multi", "Allow multiple selection (with --fzf)")
     .option("--limit <n>", "Maximum number of top-level issues to show")
     .option("--page <n>", "Page number (1-indexed, JSON mode only)")
-    .option("--page-size <n>", "Items per page (default 25, JSON mode only)")
+    .option("--page-size <n>", `Items per page (default ${DEFAULT_PAGE_SIZE}, JSON mode only)`)
     .option("--show-done", "Show Done sub-issues (hidden by default)")
     .option("--stats", "Show API call statistics")
     .action(async (opts) => {
@@ -148,6 +150,10 @@ async function runList(opts: {
     process.exit(1);
   }
 
+  // Parse page/pageSize once (validation above guarantees these are valid if set)
+  const page = opts.page ? parseInt(opts.page, 10) : undefined;
+  const pageSize = opts.pageSize ? parseInt(opts.pageSize, 10) : DEFAULT_PAGE_SIZE;
+
   const useJson = shouldDefaultToJson({
     fzf: opts.fzf,
     json: opts.json,
@@ -156,12 +162,12 @@ async function runList(opts: {
   });
 
   // Warn when --page is used in human mode (silently ignored)
-  if (opts.page && !useJson) {
+  if (page && !useJson) {
     console.error("Warning: --page is only supported in JSON mode. Use --json or set PLAN_OUTPUT=json.");
   }
 
   // Warn when --page is used with --group-by (pagination ignored)
-  if (opts.page && opts.groupBy && useJson) {
+  if (page && opts.groupBy && useJson) {
     console.error("Warning: --page is ignored when --group-by is used.");
   }
 
@@ -208,9 +214,7 @@ async function runList(opts: {
       if (useJson) {
         if (opts.groupBy) {
           console.log(JSON.stringify({ groups: [] }, null, 2));
-        } else if (opts.page) {
-          const page = parseInt(opts.page, 10);
-          const pageSize = parseInt(opts.pageSize ?? "25", 10);
+        } else if (page) {
           console.log(JSON.stringify(paginateIssues([], page, pageSize), null, 2));
         } else {
           console.log("[]");
@@ -293,11 +297,9 @@ async function runList(opts: {
       const groupBy = opts.groupBy as "label" | "project" | "status";
       if (opts.groupBy) {
         console.log(formatGroupedListJson(issues, groupBy, { showDone }));
-      } else if (opts.page) {
-        const page = parseInt(opts.page, 10);
-        const pageSize = parseInt(opts.pageSize ?? "25", 10);
-        // Format each issue to compact JSON shape, then paginate
-        const compactIssues = JSON.parse(formatListJson(issues, { showDone }));
+      } else if (page) {
+        // Convert to compact objects directly (no JSON round-trip)
+        const compactIssues = issuesToCompactObjects(issues, { showDone });
         const result = paginateIssues(compactIssues, page, pageSize);
         console.log(JSON.stringify(result, null, 2));
       } else {
