@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { formatHistoryHuman } from "../lib/output";
 import { printApiStats } from "../lib/stats";
+import { shouldDefaultToJson } from "../lib/output-mode";
 import { normalizeIssueId } from "../lib/identifier";
 import { colors, dim, bold } from "../lib/colors";
 
@@ -45,7 +46,13 @@ async function runHistory(
     // Get history
     const history = await client.getIssueHistory(identifier, limit);
 
-    if (opts.json) {
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
+    if (useJson) {
       console.log(JSON.stringify({
         issue: {
           identifier: issue.identifier,

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { shouldDefaultToJson } from "../lib/output-mode";
 import { colors, colorizeStatus, padEnd, dim } from "../lib/colors";
 import type { PlanIssue } from "../types";
 
@@ -50,6 +51,12 @@ async function runSearch(
     const team = opts.team ?? process.env.PLAN_TEAM;
     const limit = parseInt(opts.limit ?? "50", 10);
 
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
     const issues = await client.searchIssues({
       query: query.trim(),
       team,
@@ -58,12 +65,16 @@ async function runSearch(
     });
 
     if (issues.length === 0) {
-      console.log(`No issues found matching "${query}"`);
+      if (useJson) {
+        console.log("[]");
+      } else {
+        console.log(`No issues found matching "${query}"`);
+      }
       printApiStats(client.apiCallCount, opts.stats ?? false);
       return;
     }
 
-    if (opts.json) {
+    if (useJson) {
       console.log(formatSearchResultsJson(issues));
     } else {
       console.log(formatSearchResultsHuman(issues, query));

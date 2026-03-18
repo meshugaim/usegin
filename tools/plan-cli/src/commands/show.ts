@@ -3,6 +3,7 @@ import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
 import { formatShowHuman, formatShowJson, formatHistoryHuman, formatTreeContext, type IssueTreeContext } from "../lib/output";
 import { printApiStats } from "../lib/stats";
+import { shouldDefaultToJson } from "../lib/output-mode";
 import { normalizeIssueId } from "../lib/identifier";
 import { colors } from "../lib/colors";
 
@@ -96,7 +97,13 @@ async function runShow(
       };
     }
 
-    if (opts.json) {
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
+    if (useJson) {
       console.log(formatShowJson(issue, history));
     } else {
       console.log(formatShowHuman(issue));

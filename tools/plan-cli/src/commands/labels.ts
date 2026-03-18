@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
+import { shouldDefaultToJson } from "../lib/output-mode";
 import { getTeamKey } from "../lib/identifier";
 
 export function createLabelsCommand(): Command {
@@ -62,8 +63,18 @@ async function runLabels(opts: {
       }
     }
 
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
     if (allLabels.size === 0) {
-      console.log("No labels found");
+      if (useJson) {
+        console.log(JSON.stringify({ labels: [], details: [] }, null, 2));
+      } else {
+        console.log("No labels found");
+      }
       printApiStats(client.apiCallCount, opts.stats ?? false);
       return;
     }
@@ -72,7 +83,7 @@ async function runLabels(opts: {
       a.name.localeCompare(b.name)
     );
 
-    if (opts.json) {
+    if (useJson) {
       console.log(JSON.stringify({
         labels: sortedLabels.map((l) => l.name),
         details: sortedLabels
