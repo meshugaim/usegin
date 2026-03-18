@@ -17,7 +17,7 @@
  */
 
 import { parseSession, listRelatedFiles, StreamingParser, withTimeout } from "./parser";
-import { formatNarrative, formatMarkdown, formatTerminal, formatToolFilter, type FormatOptions } from "./formatter";
+import { formatNarrative, formatMarkdown, formatTerminal, formatToolFilter, dedupTaskNotifications, type FormatOptions } from "./formatter";
 import { formatStats } from "./formatter-stats";
 import { buildTimeline } from "./timeline";
 import { formatTimeline } from "./formatter-timeline";
@@ -129,6 +129,8 @@ OPTIONS:
   --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
                      Case-sensitive. Replaces normal output with focused list.
                      Note: combine with --tool-output to see actual results.
+  --tools <names>    Show calls for multiple tools (e.g., --tools Bash,Edit,Write)
+                     Comma-separated, case-sensitive. Mutually exclusive with --tool.
   --since-turn <n>   Show turns after index N (0-based). Use for incremental reads.
   --last <n>         Show only the last N turns.
   --stream           Stream mode: read from stdin, output in real-time
@@ -951,6 +953,9 @@ async function main() {
       }
     }
 
+    // Deduplicate task notifications (queued + delivered with same task-id)
+    session = { ...session, turns: dedupTaskNotifications(session.turns) };
+
     // --timeline: standalone output mode showing chronological event flow
     if (args.timeline) {
       const events = buildTimeline(session, { reportLines: args.reportLines });
@@ -961,14 +966,17 @@ async function main() {
       return;
     }
 
-    // --tool filter: standalone output mode that replaces normal formatting
-    if (args.tool) {
+    // --tool / --tools filter: standalone output mode that replaces normal formatting
+    if (args.tool || args.tools) {
+      const toolNames = args.tools
+        ? args.tools.split(",").map((t) => t.trim())
+        : [args.tool!];
       const options: Partial<FormatOptions> = {
         toolInput: args.toolInput,
         toolOutput: args.toolOutput,
         truncate: args.truncate,
       };
-      const toolOutput = formatToolFilter(session, args.tool, options);
+      const toolOutput = formatToolFilter(session, toolNames, options);
       debugLog(debug, "Total parse time", totalStart);
       console.log(toolOutput);
       return;

@@ -275,6 +275,47 @@ export function getToolSummary(tool: ToolCall): string {
 }
 
 // ============================================================================
+// TASK NOTIFICATION DEDUP
+// ============================================================================
+
+/**
+ * Deduplicate turns that contain the same `<task-id>`.
+ *
+ * Task notifications appear twice in the session: once when queued and once
+ * when delivered. Both contain `<task-notification>` with the same `<task-id>`.
+ * This function removes earlier duplicates, keeping only the last occurrence
+ * of each task-id (the delivery, which has the actual result).
+ *
+ * Turns without task notifications pass through unchanged.
+ */
+export function dedupTaskNotifications(turns: Turn[]): Turn[] {
+  const taskIdPattern = /<task-id>([^<]+)<\/task-id>/;
+  const taskIdToIndices = new Map<string, number[]>();
+
+  for (let i = 0; i < turns.length; i++) {
+    const match = turns[i].text.match(taskIdPattern);
+    if (match) {
+      const taskId = match[1];
+      const indices = taskIdToIndices.get(taskId) || [];
+      indices.push(i);
+      taskIdToIndices.set(taskId, indices);
+    }
+  }
+
+  // For each task-id with multiple turns, mark all but the last for removal
+  const removeIndices = new Set<number>();
+  for (const indices of taskIdToIndices.values()) {
+    if (indices.length > 1) {
+      for (let i = 0; i < indices.length - 1; i++) {
+        removeIndices.add(indices[i]);
+      }
+    }
+  }
+
+  return turns.filter((_, i) => !removeIndices.has(i));
+}
+
+// ============================================================================
 // COMPACTION HELPERS
 // ============================================================================
 
@@ -663,27 +704,30 @@ export function formatMarkdown(session: ParsedSession): string {
  */
 export function formatToolFilter(
   session: ParsedSession,
-  toolName: string,
+  toolName: string | string[],
   options: Partial<FormatOptions> = {}
 ): string {
   const formatOptions = { ...defaultOptions, ...options };
+  const toolNames = Array.isArray(toolName) ? toolName : [toolName];
   const matchingCalls: ToolCall[] = [];
 
   for (const turn of session.turns) {
     if (turn.role !== "assistant") continue;
     for (const tc of turn.toolCalls) {
-      if (tc.name === toolName) {
+      if (toolNames.includes(tc.name)) {
         matchingCalls.push(tc);
       }
     }
   }
 
+  const displayName = toolNames.join(", ");
+
   if (matchingCalls.length === 0) {
-    return `No ${toolName} calls found in this session.`;
+    return `No ${displayName} calls found in this session.`;
   }
 
   const noun = matchingCalls.length === 1 ? "call" : "calls";
-  const header = `${"─".repeat(3)} ${toolName} (${matchingCalls.length} ${noun}) ${"─".repeat(Math.max(0, 38 - toolName.length - String(matchingCalls.length).length - noun.length - 8))}`;
+  const header = `${"─".repeat(3)} ${displayName} (${matchingCalls.length} ${noun}) ${"─".repeat(Math.max(0, 38 - displayName.length - String(matchingCalls.length).length - noun.length - 8))}`;
 
   const lines: string[] = [header];
 

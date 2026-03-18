@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { formatNarrative, formatMarkdown, formatToolFilter } from "./formatter";
+import { formatNarrative, formatMarkdown, formatToolFilter, dedupTaskNotifications } from "./formatter";
 import {
   makeSession,
   makeSubagent,
@@ -1122,5 +1122,206 @@ describe("formatNarrative with compactions", () => {
     const queuedIdx = output.indexOf("USER (queued):");
     const compactionIdx = output.indexOf("Compaction #1");
     expect(queuedIdx).toBeLessThan(compactionIdx);
+  });
+});
+
+// ============================================================================
+// MULTI-TOOL FILTER
+// ============================================================================
+
+describe("formatToolFilter with multiple tools", () => {
+  test("--tools Bash,Edit shows both, excludes Read", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "Working", {
+          toolCalls: [
+            toolCall("t1", "Bash", { command: "ls" }),
+            toolCall("t2", "Edit", { file_path: "/a.ts", old_string: "x", new_string: "y" }),
+            toolCall("t3", "Read", { file_path: "/b.ts" }),
+          ],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, ["Bash", "Edit"]);
+
+    expect(output).toContain("Bash");
+    expect(output).toContain("Edit");
+    expect(output).not.toContain("Read");
+  });
+
+  test("header shows comma-separated tool names", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [
+            toolCall("t1", "Bash", { command: "ls" }),
+            toolCall("t2", "Edit", { file_path: "/a.ts", old_string: "x", new_string: "y" }),
+          ],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, ["Bash", "Edit"]);
+
+    expect(output).toContain("Bash, Edit");
+  });
+
+  test("single-element array works same as string", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [
+            toolCall("t1", "Bash", { command: "echo hi" }),
+            toolCall("t2", "Read", { file_path: "/b.ts" }),
+          ],
+        }),
+      ],
+    });
+
+    const arrayOutput = formatToolFilter(session, ["Bash"]);
+    const stringOutput = formatToolFilter(session, "Bash");
+
+    // Both should show Bash and exclude Read
+    expect(arrayOutput).toContain("Bash");
+    expect(arrayOutput).not.toContain("Read");
+    expect(stringOutput).toContain("Bash");
+    expect(stringOutput).not.toContain("Read");
+  });
+
+  test("--tools with --tool-output shows results", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [
+            toolCall("t1", "Bash", { command: "bun test" }),
+            toolCall("t2", "Edit", { file_path: "/a.ts", old_string: "x", new_string: "y" }),
+          ],
+        }),
+        userTurn("u1", "", {
+          toolResults: [
+            toolResult("t1", "3 tests passed"),
+            toolResult("t2", "File edited"),
+          ],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, ["Bash", "Edit"], { toolOutput: true });
+
+    expect(output).toContain("3 tests passed");
+    expect(output).toContain("File edited");
+  });
+
+  test("returns not-found message when no tools match array", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "echo hi" })],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, ["Write", "Glob"]);
+
+    expect(output).toBe("No Write, Glob calls found in this session.");
+  });
+
+  test("counts calls across multiple tool types correctly", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [
+            toolCall("t1", "Bash", { command: "ls" }),
+            toolCall("t2", "Bash", { command: "pwd" }),
+            toolCall("t3", "Edit", { file_path: "/a.ts", old_string: "x", new_string: "y" }),
+          ],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, ["Bash", "Edit"]);
+
+    expect(output).toContain("3 calls");
+  });
+});
+
+// ============================================================================
+// DEDUP TASK NOTIFICATIONS
+// ============================================================================
+
+describe("dedupTaskNotifications", () => {
+  test("two turns with same task-id: only the later one kept", () => {
+    const turns = [
+      userTurn("u1", "Hello"),
+      userTurn("u2", "<task-notification><task-id>task-abc</task-id>queued</task-notification>"),
+      assistantTurn("a1", "Working"),
+      userTurn("u3", "<task-notification><task-id>task-abc</task-id>result: done</task-notification>"),
+    ];
+
+    const result = dedupTaskNotifications(turns);
+
+    expect(result).toHaveLength(3);
+    // u2 (the earlier occurrence) should be removed
+    expect(result[0].uuid).toEqual(asEntryUuid("u1"));
+    expect(result[1].uuid).toEqual(asEntryUuid("a1"));
+    expect(result[2].uuid).toEqual(asEntryUuid("u3"));
+  });
+
+  test("turns without task notifications unchanged", () => {
+    const turns = [
+      userTurn("u1", "Hello"),
+      assistantTurn("a1", "Hi!"),
+      userTurn("u2", "How are you?"),
+    ];
+
+    const result = dedupTaskNotifications(turns);
+
+    expect(result).toHaveLength(3);
+    expect(result[0].uuid).toEqual(asEntryUuid("u1"));
+    expect(result[1].uuid).toEqual(asEntryUuid("a1"));
+    expect(result[2].uuid).toEqual(asEntryUuid("u2"));
+  });
+
+  test("three turns with same task-id: only last kept", () => {
+    const turns = [
+      userTurn("u1", "<task-notification><task-id>task-xyz</task-id>queued</task-notification>"),
+      userTurn("u2", "<task-notification><task-id>task-xyz</task-id>in-progress</task-notification>"),
+      userTurn("u3", "<task-notification><task-id>task-xyz</task-id>done</task-notification>"),
+    ];
+
+    const result = dedupTaskNotifications(turns);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].uuid).toEqual(asEntryUuid("u3"));
+  });
+
+  test("different task-ids both preserved", () => {
+    const turns = [
+      userTurn("u1", "<task-notification><task-id>task-aaa</task-id>queued</task-notification>"),
+      userTurn("u2", "<task-notification><task-id>task-bbb</task-id>queued</task-notification>"),
+      userTurn("u3", "<task-notification><task-id>task-aaa</task-id>done</task-notification>"),
+      userTurn("u4", "<task-notification><task-id>task-bbb</task-id>done</task-notification>"),
+    ];
+
+    const result = dedupTaskNotifications(turns);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].uuid).toEqual(asEntryUuid("u3"));
+    expect(result[1].uuid).toEqual(asEntryUuid("u4"));
+  });
+
+  test("empty array returns empty", () => {
+    expect(dedupTaskNotifications([])).toHaveLength(0);
+  });
+
+  test("single turn with task notification is preserved", () => {
+    const turns = [
+      userTurn("u1", "<task-notification><task-id>task-solo</task-id>result</task-notification>"),
+    ];
+
+    const result = dedupTaskNotifications(turns);
+
+    expect(result).toHaveLength(1);
   });
 });

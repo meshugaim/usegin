@@ -647,6 +647,46 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--tools validation", () => {
+    it("defaults tools to undefined", () => {
+      expect(parseMainArgs(["session.jsonl"]).tools).toBeUndefined();
+    });
+
+    it("parses --tools flag correctly", () => {
+      expect(parseMainArgs(["session.jsonl", "--tools", "Bash,Edit"]).tools).toBe("Bash,Edit");
+    });
+
+    it("throws when --tools is last argument with no value", () => {
+      expect(() => parseMainArgs(["--tools"])).toThrow("Missing value for --tools");
+    });
+
+    it("throws when --tools is followed by another flag", () => {
+      expect(() => parseMainArgs(["--tools", "--debug"])).toThrow(
+        "Missing value for --tools"
+      );
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs(["session.jsonl", "--tools", "Bash,Read", "--debug"]);
+      expect(result.tools).toBe("Bash,Read");
+      expect(result.debug).toBe(true);
+    });
+  });
+
+  describe("--tool and --tools mutual exclusion", () => {
+    it("throws when both --tool and --tools are provided", () => {
+      expect(() =>
+        parseMainArgs(["session.jsonl", "--tool", "Bash", "--tools", "Bash,Edit"])
+      ).toThrow("Cannot use --tool and --tools together");
+    });
+
+    it("throws regardless of argument order", () => {
+      expect(() =>
+        parseMainArgs(["session.jsonl", "--tools", "Bash,Edit", "--tool", "Bash"])
+      ).toThrow("Cannot use --tool and --tools together");
+    });
+  });
+
   describe("file argument", () => {
     it("accepts file path as positional argument", () => {
       expect(parseMainArgs(["session.jsonl"]).file).toBe("session.jsonl");
