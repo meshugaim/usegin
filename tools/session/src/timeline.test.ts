@@ -10,6 +10,7 @@ import {
   makeSession,
   makeSubagent,
   makeCommit,
+  makeGitCommit,
   makeCompaction,
   userTurn,
   assistantTurn,
@@ -539,6 +540,43 @@ describe("buildTimeline", () => {
         "assistant_message",
         "session_end",
       ]);
+    });
+
+    test("prefers gitCommits over regex-extracted commits", () => {
+      const ts = createTimestampGenerator();
+      const t1 = ts(); // 10:00
+      const t2 = ts(); // 10:01
+      const t3 = ts(); // 10:02
+
+      const session = makeSession({
+        startTimestamp: t1,
+        endTimestamp: t3,
+        // regex-extracted commits (no timestamps — these should be ignored)
+        commits: [
+          makeCommit("old1234", "old regex commit"),
+        ],
+        // git-history commits (have timestamps — these should be used)
+        gitCommits: [
+          makeGitCommit("new1234", "git history commit", {
+            timestamp: t2,
+            insertions: 10,
+            deletions: 3,
+          }),
+        ],
+        turns: [
+          userTurn("u1", "Fix the bug", { timestamp: t1 }),
+          assistantTurn("a1", "Done", { timestamp: t3 }),
+        ],
+      });
+
+      const events = buildTimeline(session);
+      const commitEvents = events.filter((e) => e.kind === "commit");
+
+      // Should use gitCommits (which have timestamps), not regex commits (which don't)
+      expect(commitEvents).toHaveLength(1);
+      const commitEvent = commitEvents[0] as EventOf<"commit">;
+      expect(commitEvent.hash).toStartWith("new1234");
+      expect(commitEvent.subject).toBe("git history commit");
     });
 
     test("skips commits without timestamp property", () => {

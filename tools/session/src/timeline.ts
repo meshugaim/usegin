@@ -600,14 +600,16 @@ export function buildTimeline(
   }
 
   // --- Commit events ---
-  // Prefer gitCommits (from git log) if available, fall back to regex-extracted commits
-  const commits: CommitInfo[] = session.commits;
-  for (const commit of commits) {
-    // CommitInfo doesn't have a timestamp, so we can't place these precisely.
-    // If a GitCommit (from git-commits.ts) is in use and has a timestamp, it
-    // would be on a different field. For now, skip commits without timestamps.
-    // However, we check if the commit object has a timestamp property (duck typing
-    // for GitCommit which extends CommitInfo with extra fields).
+  // Use gitCommits (from git log, with timestamps) when available.
+  // Fall back to regex-extracted commits, which lack timestamps and
+  // will be skipped by the timestamp check below.
+  const commitSource = (session.gitCommits && session.gitCommits.length > 0)
+    ? session.gitCommits
+    : session.commits;
+  for (const commit of commitSource) {
+    // Duck-type to check for a timestamp property. GitCommit objects have it
+    // as a proper field; CommitInfo objects (regex-extracted) do not and will
+    // be skipped — they can't be placed in the timeline without timestamps.
     const commitAny = commit as Record<string, unknown>;
     const commitTs = parseTimestamp(commitAny.timestamp as string | undefined);
     if (commitTs) {
@@ -615,7 +617,9 @@ export function buildTimeline(
         kind: "commit",
         timestamp: commitTs,
         hash: commit.hash,
-        subject: commit.message ?? "",
+        subject: (commitAny.subject as string | undefined)
+          ?? (commitAny.message as string | undefined)
+          ?? "",
       });
     }
   }
