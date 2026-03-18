@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { formatListHuman, getTerminalWidth } from "../src/lib/output";
+import {
+  formatListHuman,
+  formatListJson,
+  formatGroupedListJson,
+  getTerminalWidth,
+} from "../src/lib/output";
 import { stripAnsi } from "../src/lib/colors";
 import type { PlanIssue } from "../src/types";
 
@@ -333,6 +338,202 @@ describe("formatListHuman", () => {
       expect(output).toContain("More");
       expect(output).toContain("+5");
     });
+  });
+});
+
+describe("formatListJson", () => {
+  it("produces a valid JSON array with the correct shape", () => {
+    const result = formatListJson(mockIssues);
+    const parsed = JSON.parse(result);
+
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toHaveLength(3);
+
+    // Every item must have exactly these keys
+    const expectedKeys = new Set([
+      "identifier",
+      "title",
+      "status",
+      "assignee",
+      "labels",
+      "project",
+      "parent",
+      "children",
+      "sortOrder",
+    ]);
+
+    for (const item of parsed) {
+      const keys = new Set(Object.keys(item));
+      // childCount is optional — remove it before comparing
+      keys.delete("childCount");
+      expect(keys).toEqual(expectedKeys);
+    }
+
+    // Must NOT contain heavyweight fields
+    for (const item of parsed) {
+      expect(item).not.toHaveProperty("id");
+      expect(item).not.toHaveProperty("description");
+      expect(item).not.toHaveProperty("createdAt");
+      expect(item).not.toHaveProperty("updatedAt");
+    }
+  });
+
+  it("flattens assignee to displayName string or null", () => {
+    const result = JSON.parse(formatListJson(mockIssues));
+
+    // ENG-12 has an assignee
+    expect(result[0].assignee).toBe("Nitsan");
+    // ENG-20 has no assignee
+    expect(result[1].assignee).toBeNull();
+  });
+
+  it("flattens parent to identifier string or null", () => {
+    const result = JSON.parse(formatListJson(mockIssues));
+
+    // Top-level issues have no parent
+    expect(result[0].parent).toBeNull();
+    expect(result[1].parent).toBeNull();
+
+    // ENG-21 (child of ENG-20) has a parent — but it's nested inside
+    // children array, so check children shape instead
+    expect(result[1].children[0]).toBeDefined();
+  });
+
+  it("formats children with only identifier, title, status", () => {
+    const result = JSON.parse(formatListJson(mockIssues));
+
+    const parent = result[1]; // ENG-20
+    expect(parent.children).toHaveLength(1);
+
+    const child = parent.children[0];
+    expect(Object.keys(child)).toEqual(["identifier", "title", "status"]);
+    expect(child.identifier).toBe("ENG-21");
+    expect(child.title).toBe("Extract types");
+    expect(child.status).toBe("Backlog");
+  });
+
+  it("includes childCount when present on the issue", () => {
+    const issuesWithChildCount: PlanIssue[] = [
+      {
+        id: "issue-1",
+        identifier: "ENG-1",
+        title: "Parent",
+        status: "Backlog",
+        sortOrder: 1.0,
+        children: [],
+        childCount: 3,
+      },
+    ];
+
+    const result = JSON.parse(formatListJson(issuesWithChildCount));
+    expect(result[0].childCount).toBe(3);
+  });
+
+  it("omits childCount when not present on the issue", () => {
+    const result = JSON.parse(formatListJson(mockIssues));
+
+    // mockIssues don't have childCount
+    for (const item of result) {
+      expect(item).not.toHaveProperty("childCount");
+    }
+  });
+
+  it("excludes Done children when showDone is false (default)", () => {
+    const result = JSON.parse(formatListJson(mockIssuesWithDoneChildren));
+
+    const parent = result[0];
+    // Only the non-Done child should be present
+    expect(parent.children).toHaveLength(1);
+    expect(parent.children[0].identifier).toBe("ENG-101");
+  });
+
+  it("includes Done children when showDone is true", () => {
+    const result = JSON.parse(formatListJson(mockIssuesWithDoneChildren, { showDone: true }));
+
+    const parent = result[0];
+    expect(parent.children).toHaveLength(2);
+    expect(parent.children.map((c: { identifier: string }) => c.identifier)).toEqual([
+      "ENG-101",
+      "ENG-102",
+    ]);
+  });
+});
+
+describe("formatGroupedListJson", () => {
+  const issuesWithLabels: PlanIssue[] = [
+    {
+      id: "issue-1",
+      identifier: "ENG-1",
+      title: "Bug fix",
+      status: "In Progress",
+      sortOrder: 1.0,
+      labels: ["bug"],
+      children: [],
+    },
+    {
+      id: "issue-2",
+      identifier: "ENG-2",
+      title: "New feature",
+      status: "Backlog",
+      sortOrder: 2.0,
+      labels: ["feature"],
+      children: [],
+    },
+    {
+      id: "issue-3",
+      identifier: "ENG-3",
+      title: "Another bug",
+      status: "Done",
+      sortOrder: 3.0,
+      labels: ["bug"],
+      children: [],
+    },
+  ];
+
+  it("produces valid JSON with groups array", () => {
+    const result = JSON.parse(formatGroupedListJson(issuesWithLabels, "label"));
+
+    expect(result).toHaveProperty("groups");
+    expect(Array.isArray(result.groups)).toBe(true);
+  });
+
+  it("each group has name and issues array", () => {
+    const result = JSON.parse(formatGroupedListJson(issuesWithLabels, "label"));
+
+    for (const group of result.groups) {
+      expect(group).toHaveProperty("name");
+      expect(group).toHaveProperty("issues");
+      expect(typeof group.name).toBe("string");
+      expect(Array.isArray(group.issues)).toBe(true);
+    }
+  });
+
+  it("sorts groups alphabetically by name", () => {
+    const result = JSON.parse(formatGroupedListJson(issuesWithLabels, "label"));
+
+    const names = result.groups.map((g: { name: string }) => g.name);
+    expect(names).toEqual(["bug", "feature"]);
+  });
+
+  it("groups by status", () => {
+    const result = JSON.parse(formatGroupedListJson(issuesWithLabels, "status"));
+
+    const names = result.groups.map((g: { name: string }) => g.name);
+    expect(names).toEqual(["Backlog", "Done", "In Progress"]);
+  });
+
+  it("issues within groups use the same compact shape as formatListJson", () => {
+    const result = JSON.parse(formatGroupedListJson(issuesWithLabels, "label"));
+
+    const bugGroup = result.groups.find((g: { name: string }) => g.name === "bug");
+    expect(bugGroup.issues).toHaveLength(2);
+
+    const issue = bugGroup.issues[0];
+    expect(issue).toHaveProperty("identifier");
+    expect(issue).toHaveProperty("title");
+    expect(issue).toHaveProperty("status");
+    expect(issue).not.toHaveProperty("id");
+    expect(issue).not.toHaveProperty("description");
   });
 });
 

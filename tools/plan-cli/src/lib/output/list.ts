@@ -229,16 +229,55 @@ export function formatListHuman(issues: PlanIssue[], options: FormatOptions = {}
   };
 }
 
+// ============================================================================
+// JSON Formatters
+// ============================================================================
+
 /**
- * Format issues grouped by a field
+ * Compact JSON shape for a single issue, omitting heavyweight fields
+ * (id, description, timestamps) to reduce token cost for agents.
  */
-export function formatGroupedList(
+function issueToCompactJson(issue: PlanIssue, showDone: boolean) {
+  const children = filterChildren(issue.children, showDone);
+  return {
+    identifier: issue.identifier,
+    title: issue.title,
+    status: issue.status,
+    assignee: issue.assignee?.displayName ?? null,
+    labels: issue.labels ?? [],
+    project: issue.project ?? null,
+    parent: issue.parent?.identifier ?? null,
+    sortOrder: issue.sortOrder,
+    children: children.map((child) => ({
+      identifier: child.identifier,
+      title: child.title,
+      status: child.status,
+    })),
+    ...(issue.childCount ? { childCount: issue.childCount } : {}),
+  };
+}
+
+/**
+ * Format issues as a JSON array with compact shape.
+ * Omits id, description, createdAt, updatedAt to reduce token cost.
+ */
+export function formatListJson(
   issues: PlanIssue[],
-  groupBy: "label" | "project" | "status",
-  _options: FormatOptions = {}
+  options: FormatOptions = {}
 ): string {
-  // Note: grouped list currently only shows top-level issues, not children
-  // _options.showDone would be relevant if we add child display
+  const showDone = options.showDone ?? false;
+  const output = issues.map((issue) => issueToCompactJson(issue, showDone));
+  return JSON.stringify(output, null, 2);
+}
+
+/**
+ * Group issues by a field, returning a sorted Map of group name -> issues.
+ * Shared between human and JSON grouped formatters.
+ */
+function groupIssuesBy(
+  issues: PlanIssue[],
+  groupBy: "label" | "project" | "status"
+): Map<string, PlanIssue[]> {
   const groups = new Map<string, PlanIssue[]>();
 
   for (const issue of issues) {
@@ -260,11 +299,51 @@ export function formatGroupedList(
     }
   }
 
-  const lines: string[] = [];
-  const sortedKeys = Array.from(groups.keys()).sort();
+  // Return a new map with sorted keys
+  const sorted = new Map<string, PlanIssue[]>();
+  for (const key of Array.from(groups.keys()).sort()) {
+    sorted.set(key, groups.get(key)!);
+  }
+  return sorted;
+}
 
-  for (const key of sortedKeys) {
-    const groupIssues = groups.get(key)!;
+/**
+ * Format issues grouped by a field as JSON.
+ * Shape: { groups: [{ name: string, issues: [...] }] }
+ */
+export function formatGroupedListJson(
+  issues: PlanIssue[],
+  groupBy: "label" | "project" | "status",
+  options: FormatOptions = {}
+): string {
+  const showDone = options.showDone ?? false;
+  const groups = groupIssuesBy(issues, groupBy);
+
+  const output = {
+    groups: Array.from(groups.entries()).map(([name, groupIssues]) => ({
+      name,
+      issues: groupIssues.map((issue) => issueToCompactJson(issue, showDone)),
+    })),
+  };
+
+  return JSON.stringify(output, null, 2);
+}
+
+/**
+ * Format issues grouped by a field
+ */
+export function formatGroupedList(
+  issues: PlanIssue[],
+  groupBy: "label" | "project" | "status",
+  _options: FormatOptions = {}
+): string {
+  // Note: grouped list currently only shows top-level issues, not children
+  // _options.showDone would be relevant if we add child display
+  const groups = groupIssuesBy(issues, groupBy);
+
+  const lines: string[] = [];
+
+  for (const [key, groupIssues] of groups) {
     // Color the group header based on the groupBy type
     let coloredKey = key;
     if (groupBy === "label") {

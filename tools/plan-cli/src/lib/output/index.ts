@@ -3,7 +3,7 @@ export type { FormatOptions, FormatResult } from "./shared";
 export { getTerminalWidth } from "./shared";
 
 // Re-export list formatting
-export { formatListHuman, formatGroupedList } from "./list";
+export { formatListHuman, formatListJson, formatGroupedList, formatGroupedListJson } from "./list";
 
 // Re-export detail formatting
 export { formatShowHuman, formatShowJson } from "./detail";
