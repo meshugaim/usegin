@@ -553,6 +553,100 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--since-turn validation", () => {
+    it("defaults sinceTurn to undefined", () => {
+      expect(parseMainArgs(["session.jsonl"]).sinceTurn).toBeUndefined();
+    });
+
+    it("parses --since-turn to a number", () => {
+      expect(parseMainArgs(["session.jsonl", "--since-turn", "5"]).sinceTurn).toBe(5);
+    });
+
+    it("accepts zero as a valid value", () => {
+      expect(parseMainArgs(["session.jsonl", "--since-turn", "0"]).sinceTurn).toBe(0);
+    });
+
+    it("throws when --since-turn is last argument with no value", () => {
+      expect(() => parseMainArgs(["--since-turn"])).toThrow("Missing value for --since-turn");
+    });
+
+    it("throws when --since-turn is followed by another flag", () => {
+      expect(() => parseMainArgs(["--since-turn", "--debug"])).toThrow(
+        "Missing value for --since-turn"
+      );
+    });
+
+    it("throws when --since-turn has non-numeric value", () => {
+      expect(() => parseMainArgs(["--since-turn", "abc"])).toThrow(
+        'Invalid --since-turn: expected non-negative integer, got "abc"'
+      );
+    });
+
+    it("throws when --since-turn is a float", () => {
+      expect(() => parseMainArgs(["--since-turn", "2.5"])).toThrow(
+        'Invalid --since-turn: expected non-negative integer, got "2.5"'
+      );
+    });
+
+    it("throws when --since-turn is negative (looks like a flag)", () => {
+      expect(() => parseMainArgs(["--since-turn", "-1"])).toThrow(
+        "Missing value for --since-turn"
+      );
+    });
+  });
+
+  describe("--last validation", () => {
+    it("defaults last to undefined", () => {
+      expect(parseMainArgs(["session.jsonl"]).last).toBeUndefined();
+    });
+
+    it("parses --last to a number", () => {
+      expect(parseMainArgs(["session.jsonl", "--last", "3"]).last).toBe(3);
+    });
+
+    it("throws when --last is last argument with no value", () => {
+      expect(() => parseMainArgs(["--last"])).toThrow("Missing value for --last");
+    });
+
+    it("throws when --last is followed by another flag", () => {
+      expect(() => parseMainArgs(["--last", "--debug"])).toThrow(
+        "Missing value for --last"
+      );
+    });
+
+    it("throws when --last has non-numeric value", () => {
+      expect(() => parseMainArgs(["--last", "abc"])).toThrow(
+        'Invalid --last: expected non-negative integer, got "abc"'
+      );
+    });
+
+    it("throws when --last is zero", () => {
+      expect(() => parseMainArgs(["--last", "0"])).toThrow(
+        'Invalid --last: expected positive integer, got "0"'
+      );
+    });
+
+    it("throws when --last is a float", () => {
+      expect(() => parseMainArgs(["--last", "1.5"])).toThrow(
+        'Invalid --last: expected non-negative integer, got "1.5"'
+      );
+    });
+
+    it("throws when --last is negative (looks like a flag)", () => {
+      expect(() => parseMainArgs(["--last", "-3"])).toThrow(
+        "Missing value for --last"
+      );
+    });
+  });
+
+  describe("--since-turn and --last mutual exclusion", () => {
+    it("throws when both --since-turn and --last are provided", () => {
+      expect(() => parseMainArgs(["session.jsonl", "--since-turn", "5", "--last", "3"])).toThrow(
+        "Cannot use --since-turn and --last together"
+      );
+    });
+  });
+
   describe("file argument", () => {
     it("accepts file path as positional argument", () => {
       expect(parseMainArgs(["session.jsonl"]).file).toBe("session.jsonl");

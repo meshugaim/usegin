@@ -56,6 +56,10 @@ export interface MainArgs {
   help: boolean;
   /** Filter output to show only calls for a specific tool type (case-sensitive) */
   tool?: string;
+  /** Show turns from index N onward (0-based). For incremental reads. */
+  sinceTurn?: number;
+  /** Show only the last N turns. */
+  last?: number;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -130,9 +134,26 @@ export function parseMainArgs(args: string[]): MainArgs {
       const value = requireArgValue(args, i, "--tool");
       result.tool = value;
       i++;
+    } else if (arg === "--since-turn") {
+      const value = requireArgValue(args, i, "--since-turn");
+      result.sinceTurn = validateNonNegativeInteger(value, "--since-turn");
+      i++;
+    } else if (arg === "--last") {
+      const value = requireArgValue(args, i, "--last");
+      const n = validateNonNegativeInteger(value, "--last");
+      if (n === 0) {
+        throw new Error('Invalid --last: expected positive integer, got "0"');
+      }
+      result.last = n;
+      i++;
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";
     }
+  }
+
+  // --since-turn and --last are mutually exclusive
+  if (result.sinceTurn != null && result.last != null) {
+    throw new Error("Cannot use --since-turn and --last together");
   }
 
   // --full sets format to narrative, unless --format was explicitly provided

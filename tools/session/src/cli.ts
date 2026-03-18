@@ -47,6 +47,7 @@ import { parseFindArgs, parsePickArgs, parseListArgs, parseFetchArgs, parseResum
 import { parseMainArgs, type MainArgs } from "./cli-args-main";
 import { fetchSession, formatFetchResult } from "./fetch";
 import { debugLog } from "./debug";
+import { sliceTurns, formatPositionHeader } from "./incremental";
 
 /**
  * Check if debug mode is enabled via --debug flag or DEBUG=session env var
@@ -128,6 +129,8 @@ OPTIONS:
   --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
                      Case-sensitive. Replaces normal output with focused list.
                      Note: combine with --tool-output to see actual results.
+  --since-turn <n>   Show turns after index N (0-based). Use for incremental reads.
+  --last <n>         Show only the last N turns.
   --stream           Stream mode: read from stdin, output in real-time
   --tool-input       Include tool call inputs
   --tool-output      Include tool results
@@ -892,7 +895,7 @@ async function main() {
     // Parse session with debug timing and timeout
     let stepStart = Date.now();
     debugLog(debug, "Parsing session...");
-    const session = await withTimeout(
+    let session = await withTimeout(
       parseSession(filePath, {
         includeSubagents,
         includeWarmups: args.includeWarmups,
@@ -926,6 +929,25 @@ async function main() {
         // Graceful degradation: git history is best-effort enrichment.
         // Fall back to regex-extracted commits if this fails.
         debugLog(debug, "Git history query failed, using regex commits", stepStart);
+      }
+    }
+
+    // --- Turn windowing (--since-turn, --last) ---
+    const sliceResult = sliceTurns(session.turns, {
+      sinceTurn: args.sinceTurn,
+      last: args.last,
+    });
+
+    if (args.sinceTurn != null || args.last != null) {
+      session = { ...session, turns: sliceResult.turns };
+      const header = formatPositionHeader({
+        windowStart: sliceResult.windowStart,
+        turnCount: sliceResult.turns.length,
+        totalTurns: sliceResult.totalTurns,
+      });
+      if (header) {
+        console.log(header);
+        console.log();
       }
     }
 
