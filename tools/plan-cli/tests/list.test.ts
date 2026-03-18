@@ -222,6 +222,18 @@ describe("shouldDefaultToJson", () => {
     expect(shouldDefaultToJson({ env: { CLAUDECODE: "1" }, isTTY: true })).toBe(true);
   });
 
+  it("returns false when CLAUDECODE=0 (only '1' triggers auto-detect)", () => {
+    expect(shouldDefaultToJson({ env: { CLAUDECODE: "0" }, isTTY: true })).toBe(false);
+  });
+
+  it("returns false when CLAUDECODE=true (only '1' triggers auto-detect)", () => {
+    expect(shouldDefaultToJson({ env: { CLAUDECODE: "true" }, isTTY: true })).toBe(false);
+  });
+
+  it("returns false when CLAUDECODE is empty string (only '1' triggers auto-detect)", () => {
+    expect(shouldDefaultToJson({ env: { CLAUDECODE: "" }, isTTY: true })).toBe(false);
+  });
+
   it("returns true when no TTY and no fzf", () => {
     expect(shouldDefaultToJson({ env: {}, isTTY: false })).toBe(true);
   });
