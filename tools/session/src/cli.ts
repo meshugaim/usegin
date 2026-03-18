@@ -48,6 +48,7 @@ import { parseMainArgs, type MainArgs } from "./cli-args-main";
 import { fetchSession, formatFetchResult } from "./fetch";
 import { debugLog } from "./debug";
 import { sliceTurns, formatPositionHeader } from "./incremental";
+import { searchInSession } from "./search";
 
 /**
  * Check if debug mode is enabled via --debug flag or DEBUG=session env var
@@ -75,6 +76,7 @@ USAGE:
   session fetch <id>        Fetch archived session to local storage
   session resume <id>       Fetch (if needed) and resume a session
   session fork <id>         Fork a session (copy + resume the copy)
+  session search-in <id> <query>  Search within a session's turns
   session docs [list|show]  Browse embedded documentation
 
 SESSION IDENTIFIERS:
@@ -118,6 +120,12 @@ FORK:
   session fork <id>    Create a copy of the session with a new ID and resume it.
                        The original session is untouched. Like git branch.
                        --dry-run  Show what would be copied without doing it.
+
+SEARCH-IN:
+  session search-in <id|path> <query>
+                       Search within a session's turns for matching text.
+                       Searches turn text and tool result content (case-insensitive).
+                       Shows matching turns with index, role, and a context snippet.
 
 OPTIONS:
   --full             Full narrative output (default: compact stats card)
@@ -737,6 +745,40 @@ async function runFork(args: string[]) {
   }
 }
 
+async function runSearchIn(args: string[]) {
+  if (args.length < 2) {
+    console.error("Usage: session search-in <id|path> <query>");
+    process.exit(1);
+  }
+
+  const [fileOrId, ...queryParts] = args;
+  const query = queryParts.join(" ");
+
+  try {
+    const filePath = await resolveSessionPath(fileOrId);
+    const session = await parseSession(filePath, { includeSubagents: false });
+
+    const matches = searchInSession(session.turns, query);
+
+    if (matches.length === 0) {
+      console.log(`No matches for "${query}" in ${session.turns.length} turns.`);
+      return;
+    }
+
+    console.log(`Found ${matches.length} match(es) for "${query}":\n`);
+    for (const match of matches) {
+      console.log(`  Turn ${match.index} (${match.role}): ${match.snippet}`);
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`Error: ${error.message}`);
+    } else {
+      console.error("An unknown error occurred");
+    }
+    process.exit(1);
+  }
+}
+
 function runDocs(args: string[]): void {
   const { user, internal } = loadAllDocs(getSessionDocsDir);
   const allDocs = [...user, ...internal];
@@ -823,6 +865,12 @@ async function main() {
   // Check for 'fork' subcommand
   if (rawArgs[0] === "fork") {
     await runFork(rawArgs.slice(1));
+    return;
+  }
+
+  // Check for 'search-in' subcommand
+  if (rawArgs[0] === "search-in") {
+    await runSearchIn(rawArgs.slice(1));
     return;
   }
 
