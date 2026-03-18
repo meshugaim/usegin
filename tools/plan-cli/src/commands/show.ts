@@ -15,7 +15,8 @@ export function createShowCommand(): Command {
     .option("--web", "Open issue in web browser")
     .option("--comments", "Include comments in the output")
     .option("--with-history", "Include change history")
-    .option("--tree", "Show issue graph context (parent, siblings, children)")
+    .option("--tree", "Show issue graph context (parent, siblings, children) (default: true)", true)
+    .option("--no-tree", "Hide issue graph context")
     .option("--stats", "Show API call statistics")
     .action(async (identifier: string, opts) => {
       await runShow(normalizeIssueId(identifier), opts);
@@ -61,7 +62,7 @@ async function runShow(
       ? await client.getIssueHistory(identifier)
       : undefined;
 
-    // Fetch tree context if requested
+    // Fetch tree context (on by default, disabled with --no-tree)
     let treeContext: IssueTreeContext | undefined;
     if (opts.tree) {
       const siblings: Array<{ identifier: string; title: string; id: string }> = [];
@@ -104,11 +105,11 @@ async function runShow(
     });
 
     if (useJson) {
-      console.log(formatShowJson(issue, history));
+      console.log(formatShowJson(issue, history, treeContext));
     } else {
       console.log(formatShowHuman(issue));
 
-      // Print tree section if requested
+      // Print tree section (on by default)
       if (opts.tree && treeContext) {
         console.log("");
         console.log(colors.fieldName("Graph Context:"));

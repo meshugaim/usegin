@@ -1,4 +1,5 @@
 import type { PlanIssueDetail, PlanComment, IssueHistoryEntry } from "../../types";
+import type { IssueTreeContext } from "./tree";
 import {
   colors,
   colorizeStatus,
@@ -110,7 +111,7 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
 /**
  * Format a single issue for `plan show` - JSON output
  */
-export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEntry[]): string {
+export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEntry[], treeContext?: IssueTreeContext): string {
   const output: Record<string, unknown> = {
     id: issue.id,
     identifier: issue.identifier,
@@ -147,6 +148,11 @@ export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEnt
   // Include history if provided
   if (history) {
     output.history = history;
+  }
+
+  // Include tree context if provided
+  if (treeContext) {
+    output.treeContext = treeContext;
   }
 
   return JSON.stringify(output, null, 2);

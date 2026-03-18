@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { formatShowHuman, formatShowJson, formatHistoryHuman } from "../src/lib/output";
 import type { PlanIssueDetail, PlanComment, IssueHistoryEntry } from "../src/types";
+import type { IssueTreeContext } from "../src/lib/output/tree";
+import { createShowCommand } from "../src/commands/show";
 
 // Helper to strip ANSI color codes from output for testing
 function stripAnsi(str: string): string {
@@ -422,5 +424,68 @@ describe("formatHistoryHuman", () => {
     ];
     const output = formatHistoryHuman(history);
     expect(stripAnsi(output)).toContain("(no meaningful changes recorded)");
+  });
+});
+
+describe("--tree default behavior (Commander parsing)", () => {
+  it("defaults --tree to true when no flag is provided", () => {
+    const cmd = createShowCommand();
+    // Parse with no --tree or --no-tree flag
+    cmd.exitOverride(); // prevent process.exit on parse errors
+    cmd.action(() => {}); // override action to prevent execution
+    cmd.parse(["node", "plan", "ENG-123"], { from: "user" });
+    const opts = cmd.opts();
+    expect(opts.tree).toBe(true);
+  });
+
+  it("sets tree to false when --no-tree is provided", () => {
+    const cmd = createShowCommand();
+    cmd.exitOverride();
+    cmd.action(() => {});
+    cmd.parse(["node", "plan", "ENG-123", "--no-tree"], { from: "user" });
+    const opts = cmd.opts();
+    expect(opts.tree).toBe(false);
+  });
+
+  it("keeps tree as true when --tree is explicitly provided", () => {
+    const cmd = createShowCommand();
+    cmd.exitOverride();
+    cmd.action(() => {});
+    cmd.parse(["node", "plan", "ENG-123", "--tree"], { from: "user" });
+    const opts = cmd.opts();
+    expect(opts.tree).toBe(true);
+  });
+});
+
+describe("formatShowJson with treeContext", () => {
+  const treeContext: IssueTreeContext = {
+    parent: { identifier: "ENG-10", title: "Parent issue" },
+    siblings: [
+      { identifier: "ENG-20", title: "Refactor API client", id: "issue-2" },
+      { identifier: "ENG-22", title: "Sibling issue", id: "issue-5" },
+    ],
+    children: [
+      { identifier: "ENG-21", title: "Extract types" },
+      { identifier: "ENG-23", title: "Update imports" },
+    ],
+    currentIssueId: "issue-2",
+  };
+
+  it("includes treeContext in JSON output when provided", () => {
+    const output = formatShowJson(mockIssue, undefined, treeContext);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.treeContext).toBeDefined();
+    expect(parsed.treeContext.parent.identifier).toBe("ENG-10");
+    expect(parsed.treeContext.siblings).toHaveLength(2);
+    expect(parsed.treeContext.children).toHaveLength(2);
+    expect(parsed.treeContext.currentIssueId).toBe("issue-2");
+  });
+
+  it("omits treeContext from JSON output when not provided", () => {
+    const output = formatShowJson(mockIssue);
+    const parsed = JSON.parse(output);
+
+    expect(parsed.treeContext).toBeUndefined();
   });
 });

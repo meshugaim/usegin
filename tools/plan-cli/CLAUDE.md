@@ -16,8 +16,8 @@ plan list --latest                            # Sort by creation date
 plan list --json                              # Output as JSON (for agents)
 plan list --json --group-by status            # Grouped JSON output
 plan list --json --page 1 --page-size 10      # Paginated JSON output
-plan show <id>                                # Full details + relationships
-plan show <id> --tree                         # Graph: parent, siblings, children
+plan show <id>                                # Full details + graph context (default)
+plan show <id> --no-tree                      # Hide graph context
 
 # Work
 plan start <id>                               # Set In Progress + assign to me
