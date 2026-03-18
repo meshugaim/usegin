@@ -4,6 +4,7 @@ import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
 import { normalizeIssueId } from "../lib/identifier";
+import { shouldDefaultToJson } from "../lib/output-mode";
 
 export function createUpdateCommand(): Command {
   const cmd = new Command("update")
@@ -115,38 +116,44 @@ async function runUpdate(
       opts.description = finalDescription;
     }
 
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
     // Handle relationships first
     if (opts.blockedBy) {
       await client.addBlockedBy(identifier, opts.blockedBy);
-      if (!opts.quiet && !opts.json) {
+      if (!opts.quiet && !useJson) {
         console.log(`${colors.success("Added")}: ${colors.identifier(identifier)} blocked by ${colors.identifier(opts.blockedBy)}`);
       }
     }
 
     if (opts.removeBlockedBy) {
       await client.removeBlockedBy(identifier, opts.removeBlockedBy);
-      if (!opts.quiet && !opts.json) {
+      if (!opts.quiet && !useJson) {
         console.log(`${colors.success("Removed")}: ${colors.identifier(identifier)} no longer blocked by ${colors.identifier(opts.removeBlockedBy)}`);
       }
     }
 
     if (opts.blocking) {
       await client.addBlocking(identifier, opts.blocking);
-      if (!opts.quiet && !opts.json) {
+      if (!opts.quiet && !useJson) {
         console.log(`${colors.success("Added")}: ${colors.identifier(identifier)} blocks ${colors.identifier(opts.blocking)}`);
       }
     }
 
     if (opts.relatedTo) {
       await client.addRelatedTo(identifier, opts.relatedTo);
-      if (!opts.quiet && !opts.json) {
+      if (!opts.quiet && !useJson) {
         console.log(`${colors.success("Added")}: ${colors.identifier(identifier)} related to ${colors.identifier(opts.relatedTo)}`);
       }
     }
 
     if (opts.duplicateOf) {
       await client.markDuplicateOf(identifier, opts.duplicateOf);
-      if (!opts.quiet && !opts.json) {
+      if (!opts.quiet && !useJson) {
         console.log(`${colors.success("Marked")}: ${colors.identifier(identifier)} duplicate of ${colors.identifier(opts.duplicateOf)}`);
       }
     }
@@ -154,7 +161,7 @@ async function runUpdate(
     // Handle comment
     if (opts.comment) {
       await client.addComment(identifier, opts.comment);
-      if (!opts.quiet && !opts.json) {
+      if (!opts.quiet && !useJson) {
         console.log(`${colors.success("Added comment")} to ${colors.identifier(identifier)}`);
       }
     }
@@ -189,7 +196,7 @@ async function runUpdate(
 
       if (opts.quiet) {
         // No output
-      } else if (opts.json) {
+      } else if (useJson) {
         console.log(
           JSON.stringify(
             {
