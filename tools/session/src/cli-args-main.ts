@@ -62,6 +62,8 @@ export interface MainArgs {
   sinceTurn?: number;
   /** Show only the last N turns. */
   last?: number;
+  /** Interleave commits chronologically in narrative output instead of appending at end. */
+  commits: boolean;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -82,6 +84,7 @@ export function parseMainArgs(args: string[]): MainArgs {
     debug: false,
     timeout: 30,
     help: false,
+    commits: false,
   };
 
   // Track whether --format was explicitly provided (takes precedence over --full)
@@ -144,6 +147,8 @@ export function parseMainArgs(args: string[]): MainArgs {
       const value = requireArgValue(args, i, "--since-turn");
       result.sinceTurn = validateNonNegativeInteger(value, "--since-turn");
       i++;
+    } else if (arg === "--commits") {
+      result.commits = true;
     } else if (arg === "--last") {
       const value = requireArgValue(args, i, "--last");
       const n = validateNonNegativeInteger(value, "--last");

@@ -1325,3 +1325,157 @@ describe("dedupTaskNotifications", () => {
     expect(result).toHaveLength(1);
   });
 });
+
+// ============================================================================
+// COMMIT INTERLEAVING (--commits flag)
+// ============================================================================
+
+describe("formatNarrative with commits interleaved (commits: true)", () => {
+  test("interleaves commits chronologically with turns when commits option is true", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Fix the login bug", { timestamp: "2025-01-15T10:00:00.000Z" }),
+        assistantTurn("a1", "Fixed it", { timestamp: "2025-01-15T10:01:00.000Z" }),
+        userTurn("u2", "Now add tests", { timestamp: "2025-01-15T10:05:00.000Z" }),
+        assistantTurn("a2", "Tests added", { timestamp: "2025-01-15T10:06:00.000Z" }),
+      ],
+      gitCommits: [
+        makeGitCommit("abc1234", "fix: login bug", {
+          timestamp: "2025-01-15T10:02:00+00:00",
+          insertions: 10,
+          deletions: 3,
+        }),
+        makeGitCommit("def5678", "test: add login tests", {
+          timestamp: "2025-01-15T10:07:00+00:00",
+          insertions: 42,
+          deletions: 0,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session, { commits: true });
+
+    // First commit should appear between first assistant turn and second user turn
+    const fixedIdx = output.indexOf("ASSISTANT: Fixed it");
+    const commitIdx = output.indexOf("commit abc1234");
+    const testsIdx = output.indexOf("USER: Now add tests");
+    expect(fixedIdx).toBeGreaterThan(-1);
+    expect(commitIdx).toBeGreaterThan(-1);
+    expect(testsIdx).toBeGreaterThan(-1);
+    expect(fixedIdx).toBeLessThan(commitIdx);
+    expect(commitIdx).toBeLessThan(testsIdx);
+
+    // Second commit should appear after the last assistant turn
+    const testCommitIdx = output.indexOf("commit def5678");
+    const testsAddedIdx = output.indexOf("ASSISTANT: Tests added");
+    expect(testCommitIdx).toBeGreaterThan(-1);
+    expect(testsAddedIdx).toBeGreaterThan(-1);
+    expect(testsAddedIdx).toBeLessThan(testCommitIdx);
+  });
+
+  test("commit block includes subject and stats", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Go", { timestamp: "2025-01-15T10:00:00.000Z" }),
+      ],
+      gitCommits: [
+        makeGitCommit("abc1234", "fix: resolve login bug", {
+          timestamp: "2025-01-15T10:01:00+00:00",
+          insertions: 42,
+          deletions: 7,
+          filesChanged: 3,
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session, { commits: true });
+
+    expect(output).toContain("commit abc1234");
+    expect(output).toContain("fix: resolve login bug");
+    expect(output).toContain("+42");
+    expect(output).toContain("-7");
+    expect(output).toContain("3 files");
+  });
+
+  test("commit block omits stats when none available", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Go", { timestamp: "2025-01-15T10:00:00.000Z" }),
+      ],
+      gitCommits: [
+        makeGitCommit("abc1234", "merge commit", {
+          timestamp: "2025-01-15T10:01:00+00:00",
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session, { commits: true });
+
+    expect(output).toContain("commit abc1234");
+    expect(output).toContain("merge commit");
+    // No stats parenthetical
+    expect(output).not.toContain("+");
+    expect(output).not.toContain("files");
+  });
+
+  test("without commits flag, gitCommits are appended at end (existing behavior)", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Fix the login bug", { timestamp: "2025-01-15T10:00:00.000Z" }),
+        assistantTurn("a1", "Fixed it", { timestamp: "2025-01-15T10:01:00.000Z" }),
+      ],
+      gitCommits: [
+        makeGitCommit("abc1234", "fix: login bug", {
+          timestamp: "2025-01-15T10:02:00+00:00",
+          insertions: 10,
+          deletions: 3,
+        }),
+      ],
+    });
+
+    // Default (no commits option) should NOT interleave
+    const output = formatNarrative(session);
+
+    // Should have the old-style commits section at end
+    expect(output).toContain("─── Commits ");
+    expect(output).toContain("abc1234  fix: login bug");
+    // Should NOT have interleaved commit blocks
+    expect(output).not.toContain("commit abc1234");
+  });
+
+  test("interleaving works with empty gitCommits array", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello", { timestamp: "2025-01-15T10:00:00.000Z" }),
+        assistantTurn("a1", "Hi!", { timestamp: "2025-01-15T10:01:00.000Z" }),
+      ],
+      gitCommits: [],
+    });
+
+    const output = formatNarrative(session, { commits: true });
+
+    // Should render normally without commits
+    expect(output).toContain("USER: Hello");
+    expect(output).toContain("ASSISTANT: Hi!");
+    expect(output).not.toContain("commit ");
+  });
+
+  test("commit block uses box-drawing characters for visual separators", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Go", { timestamp: "2025-01-15T10:00:00.000Z" }),
+      ],
+      gitCommits: [
+        makeGitCommit("abc1234", "feat: new thing", {
+          timestamp: "2025-01-15T10:01:00+00:00",
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session, { commits: true });
+
+    // Commit blocks should use box-drawing dash characters
+    expect(output).toContain("──");
+    expect(output).toContain("─".repeat(40));
+  });
+});

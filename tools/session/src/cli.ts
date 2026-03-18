@@ -22,7 +22,7 @@ import { formatStats } from "./formatter-stats";
 import { buildTimeline } from "./timeline";
 import { formatTimeline } from "./formatter-timeline";
 import { buildJsonOutput } from "./json-format";
-import { getCommitsFromGitHistory } from "./git-commits";
+import { getSessionCommits } from "./git-commits";
 import { loadAllDocs, findDoc } from "../../docs-registry/src/shared";
 import { join, dirname } from "path";
 import {
@@ -133,6 +133,9 @@ OPTIONS:
                      Comma-separated, case-sensitive. Mutually exclusive with --tool.
   --since-turn <n>   Show turns after index N (0-based). Use for incremental reads.
   --last <n>         Show only the last N turns.
+  --commits          Interleave commits chronologically in narrative output
+                     (default: append at end). Uses Claude-Session trailer for
+                     precise discovery, falls back to time-window.
   --stream           Stream mode: read from stdin, output in real-time
   --tool-input       Include tool call inputs
   --tool-output      Include tool results
@@ -911,13 +914,15 @@ async function main() {
       debugLog(debug, `Found ${session.subagents.length} subagent(s)`);
     }
 
-    // Enrich session with git history commits when timestamps and cwd are available
-    if (session.startTimestamp && session.endTimestamp && session.cwd) {
+    // Enrich session with git history commits when cwd and session ID are available.
+    // Uses trailer-based discovery first (precise), then falls back to time-window.
+    if (session.cwd && session.sessionId) {
       stepStart = Date.now();
       debugLog(debug, "Querying git history for commits...");
       try {
-        const gitCommits = await getCommitsFromGitHistory({
+        const gitCommits = await getSessionCommits({
           cwd: session.cwd,
+          sessionId: session.sessionId,
           startTime: session.startTimestamp,
           endTime: session.endTimestamp,
         });
@@ -925,7 +930,7 @@ async function main() {
           session.gitCommits = gitCommits;
           debugLog(debug, `Found ${gitCommits.length} git commit(s)`, stepStart);
         } else {
-          debugLog(debug, "No git commits in session time window", stepStart);
+          debugLog(debug, "No git commits found for session", stepStart);
         }
       } catch {
         // Graceful degradation: git history is best-effort enrichment.
@@ -990,6 +995,7 @@ async function main() {
       toolOutput: args.toolOutput,
       truncate: args.truncate,
       includeSubagents: args.subagents,
+      commits: args.commits,
     };
 
     let output: string;

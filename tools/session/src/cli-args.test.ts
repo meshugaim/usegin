@@ -699,6 +699,37 @@ describe("parseMainArgs", () => {
       expect(result.format).toBe("terminal");
     });
   });
+
+  describe("--commits flag", () => {
+    it("defaults commits to false", () => {
+      expect(parseMainArgs(["session.jsonl"]).commits).toBe(false);
+    });
+
+    it("sets commits to true when --commits is specified", () => {
+      const result = parseMainArgs(["session.jsonl", "--commits"]);
+      expect(result.commits).toBe(true);
+    });
+
+    it("works alongside --full", () => {
+      const result = parseMainArgs(["session.jsonl", "--full", "--commits"]);
+      expect(result.full).toBe(true);
+      expect(result.commits).toBe(true);
+      expect(result.format).toBe("narrative");
+    });
+
+    it("works alongside --format narrative", () => {
+      const result = parseMainArgs(["session.jsonl", "--format", "narrative", "--commits"]);
+      expect(result.commits).toBe(true);
+      expect(result.format).toBe("narrative");
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs(["session.jsonl", "--commits", "--debug", "--subagents"]);
+      expect(result.commits).toBe(true);
+      expect(result.debug).toBe(true);
+      expect(result.subagents).toBe(true);
+    });
+  });
 });
 
 describe("parseFetchArgs", () => {

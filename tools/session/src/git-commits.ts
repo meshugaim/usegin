@@ -273,3 +273,62 @@ export async function getCommitsFromGitHistory(options: {
     return [];
   }
 }
+
+/**
+ * Get commits tagged with a Claude-Session trailer for a specific session.
+ * Uses git log --grep to find commits with "Claude-Session: <sessionId>" in the message.
+ * Falls back to empty array on any error.
+ */
+export async function getCommitsByTrailer(options: {
+  cwd: string;
+  sessionId: string;
+}): Promise<GitCommit[]> {
+  const { cwd, sessionId } = options;
+  if (!cwd || !sessionId) return [];
+
+  try {
+    const proc = Bun.spawn(
+      [
+        "git", "log", "--all",
+        `--grep=Claude-Session: ${sessionId}`,
+        `--format=${GIT_LOG_FORMAT}`,
+        "--shortstat",
+      ],
+      { cwd, stdout: "pipe", stderr: "pipe" }
+    );
+
+    const stdout = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) return [];
+
+    return parseGitLogOutput(stdout);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get session commits: trailer-based first, then time-window fallback.
+ *
+ * Tries trailer-based discovery first (precise, session-scoped) then
+ * falls back to time-window query (existing behavior).
+ */
+export async function getSessionCommits(options: {
+  cwd: string;
+  sessionId: string;
+  startTime?: string;
+  endTime?: string;
+}): Promise<GitCommit[]> {
+  const { cwd, sessionId, startTime, endTime } = options;
+
+  // Try trailer-based first (precise)
+  const trailerCommits = await getCommitsByTrailer({ cwd, sessionId });
+  if (trailerCommits.length > 0) return trailerCommits;
+
+  // Fall back to time-window (existing behavior)
+  if (startTime && endTime) {
+    return getCommitsFromGitHistory({ cwd, startTime, endTime });
+  }
+
+  return [];
+}

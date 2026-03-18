@@ -2,6 +2,8 @@ import { test, expect, describe } from "bun:test";
 import {
   parseGitLogOutput,
   getCommitsFromGitHistory,
+  getCommitsByTrailer,
+  getSessionCommits,
   type GitCommit,
 } from "./git-commits";
 
@@ -429,6 +431,118 @@ describe("getCommitsFromGitHistory", () => {
       cwd: "",
       startTime: "2025-01-01T00:00:00Z",
       endTime: "2025-12-31T23:59:59Z",
+    });
+
+    expect(commits).toEqual([]);
+  });
+});
+
+// ============================================================================
+// getCommitsByTrailer — trailer-based commit discovery
+// ============================================================================
+
+describe("getCommitsByTrailer", () => {
+  test("returns empty array for empty cwd", async () => {
+    const commits = await getCommitsByTrailer({
+      cwd: "",
+      sessionId: "abc-123",
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty array for empty sessionId", async () => {
+    const commits = await getCommitsByTrailer({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "",
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty array for non-existent directory", async () => {
+    const commits = await getCommitsByTrailer({
+      cwd: "/nonexistent/path/that/does/not/exist",
+      sessionId: "abc-123",
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty array for directory that is not a git repo", async () => {
+    const commits = await getCommitsByTrailer({
+      cwd: "/tmp",
+      sessionId: "abc-123",
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty array when no commits match the trailer", async () => {
+    // Use a session ID that no commit will ever have
+    const commits = await getCommitsByTrailer({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+    });
+
+    expect(commits).toEqual([]);
+  });
+});
+
+// ============================================================================
+// getSessionCommits — trailer-first, time-window fallback
+// ============================================================================
+
+describe("getSessionCommits", () => {
+  test("returns empty array for empty cwd", async () => {
+    const commits = await getSessionCommits({
+      cwd: "",
+      sessionId: "abc-123",
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty array for empty sessionId and no time window", async () => {
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "",
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("falls back to time-window when no trailer commits found", async () => {
+    // Use a session ID that won't match any trailers, but a wide time window
+    const endTime = new Date().toISOString();
+    const startTime = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+      startTime,
+      endTime,
+    });
+
+    // Should fall back to time-window and find commits
+    expect(commits.length).toBeGreaterThan(0);
+  });
+
+  test("returns empty array when no trailer match and no time window provided", async () => {
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty array when no trailer match and time window has no commits", async () => {
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+      startTime: "1990-01-01T00:00:00Z",
+      endTime: "1990-01-02T00:00:00Z",
     });
 
     expect(commits).toEqual([]);

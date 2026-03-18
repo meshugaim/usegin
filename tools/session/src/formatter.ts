@@ -12,6 +12,7 @@ import type {
   EntryUuid,
 } from "./types";
 import { getToolCallInput } from "./types";
+import type { GitCommit } from "./git-commits";
 import { truncate, formatTokenCount } from "./format-utils";
 
 export interface FormatOptions {
@@ -19,6 +20,8 @@ export interface FormatOptions {
   toolOutput: boolean;
   truncate: number;
   includeSubagents: boolean;
+  /** When true, interleave git commits chronologically with turns instead of appending at end. */
+  commits?: boolean;
 }
 
 const defaultOptions: FormatOptions = {
@@ -80,61 +83,87 @@ export function formatNarrative(
     lines.push("");
   };
 
-  // Main session turns, interleaved with queued messages chronologically
+  // Determine whether to interleave commits into the chronological stream
+  const interleaveCommits =
+    formatOptions.commits === true &&
+    session.gitCommits != null &&
+    session.gitCommits.length > 0;
+
+  // Build a unified chronological stream of turns, queued messages, and optionally commits
+  type StreamItem =
+    | { kind: "turn"; timestamp?: string; turn: Turn }
+    | { kind: "queued"; timestamp: string; message: QueuedMessage }
+    | { kind: "commit"; timestamp: string; commit: GitCommit };
+
+  const stream: StreamItem[] = [];
+
+  // Always include turns
+  for (const turn of session.turns) {
+    stream.push({ kind: "turn", timestamp: turn.timestamp, turn });
+  }
+
+  // Include queued messages when present
   const queuedMessages = session.queuedMessages ?? [];
-  if (queuedMessages.length > 0) {
-    // Merge turns and queued messages into a single chronological stream
-    const timedTurns = session.turns.map((turn) => ({
-      kind: "turn" as const,
-      timestamp: turn.timestamp,
-      turn,
-    }));
-    const timedQueued = queuedMessages.map((qm) => ({
-      kind: "queued" as const,
-      timestamp: qm.timestamp,
-      message: qm,
-    }));
-    const merged = [...timedTurns, ...timedQueued];
-    merged.sort((a, b) => {
+  for (const qm of queuedMessages) {
+    stream.push({ kind: "queued", timestamp: qm.timestamp, message: qm });
+  }
+
+  // Include commits in the stream only when interleaving
+  if (interleaveCommits) {
+    for (const commit of session.gitCommits!) {
+      stream.push({ kind: "commit", timestamp: commit.timestamp, commit });
+    }
+  }
+
+  // Sort the stream chronologically when we have anything to interleave
+  const needsMerge = queuedMessages.length > 0 || interleaveCommits;
+  if (needsMerge) {
+    stream.sort((a, b) => {
       // Items without timestamps go first (preserve original behavior)
       if (!a.timestamp && !b.timestamp) return 0;
       if (!a.timestamp) return -1;
       if (!b.timestamp) return 1;
       return a.timestamp.localeCompare(b.timestamp);
     });
+  }
 
-    for (const item of merged) {
-      if (item.kind === "turn") {
+  // Render the stream
+  for (const item of stream) {
+    switch (item.kind) {
+      case "turn":
         renderTurn(item.turn);
-      } else {
+        break;
+      case "queued":
         lines.push(`USER (queued): ${item.message.content}`);
         lines.push("");
-      }
-    }
-  } else {
-    for (const turn of session.turns) {
-      renderTurn(turn);
+        break;
+      case "commit":
+        lines.push(formatCommitBlock(item.commit));
+        lines.push("");
+        break;
     }
   }
 
-  // Commits section — prefer git-history commits when available
-  if (session.gitCommits && session.gitCommits.length > 0) {
-    lines.push("─── Commits " + "─".repeat(28));
-    for (const commit of session.gitCommits) {
-      const diffStats =
-        commit.insertions !== undefined || commit.deletions !== undefined
-          ? `  (+${commit.insertions ?? 0}/-${commit.deletions ?? 0})`
-          : "";
-      lines.push(`  ${commit.shortHash}  ${commit.subject}${diffStats}`);
+  // Commits section (appended at end) — only when NOT interleaving
+  if (!interleaveCommits) {
+    if (session.gitCommits && session.gitCommits.length > 0) {
+      lines.push("─── Commits " + "─".repeat(28));
+      for (const commit of session.gitCommits) {
+        const diffStats =
+          commit.insertions !== undefined || commit.deletions !== undefined
+            ? `  (+${commit.insertions ?? 0}/-${commit.deletions ?? 0})`
+            : "";
+        lines.push(`  ${commit.shortHash}  ${commit.subject}${diffStats}`);
+      }
+      lines.push("");
+    } else if (session.commits.length > 0) {
+      lines.push("─── Commits " + "─".repeat(28));
+      for (const commit of session.commits) {
+        const shortHash = commit.hash.slice(0, 7);
+        lines.push(`  ${shortHash}  ${commit.message ?? ""}`);
+      }
+      lines.push("");
     }
-    lines.push("");
-  } else if (session.commits.length > 0) {
-    lines.push("─── Commits " + "─".repeat(28));
-    for (const commit of session.commits) {
-      const shortHash = commit.hash.slice(0, 7);
-      lines.push(`  ${shortHash}  ${commit.message ?? ""}`);
-    }
-    lines.push("");
   }
 
   // Subagent transcripts (appended at end)
@@ -388,6 +417,35 @@ function formatCompactionSummaryText(text: string): string {
   const preview = trimmed.slice(0, COMPACTION_SUMMARY_PREVIEW_CHARS);
   const totalChars = trimmed.length.toLocaleString("en-US");
   return `${preview}\n  ... [${totalChars} chars — compaction summary truncated]`;
+}
+
+// ============================================================================
+// COMMIT INTERLEAVING
+// ============================================================================
+
+/**
+ * Format a commit block for narrative interleaving.
+ *
+ * Renders a visually distinct commit marker with the short hash, subject line,
+ * and optional diff stats (insertions, deletions, files changed).
+ *
+ * Example output:
+ *   ── commit abc1234 ─────────────────────
+ *   fix: login bug (+42, -7, 3 files)
+ *   ────────────────────────────────────────
+ */
+function formatCommitBlock(commit: GitCommit): string {
+  const stats: string[] = [];
+  if (commit.insertions !== undefined) stats.push(`+${commit.insertions}`);
+  if (commit.deletions !== undefined) stats.push(`-${commit.deletions}`);
+  if (commit.filesChanged !== undefined) stats.push(`${commit.filesChanged} files`);
+  const statsStr = stats.length > 0 ? ` (${stats.join(", ")})` : "";
+
+  return [
+    `── commit ${commit.shortHash} ${"─".repeat(Math.max(0, 30 - commit.shortHash.length))}`,
+    `${commit.subject}${statsStr}`,
+    "─".repeat(40),
+  ].join("\n");
 }
 
 // ============================================================================
