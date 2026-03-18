@@ -88,7 +88,7 @@ describe("E2E: plan create against real Linear", () => {
   it("creates issue with full output by default", async () => {
     const testTitle = `[TEST] E2E create verbose ${Date.now()}`;
 
-    const result = await $`bun ${CLI_PATH} create ${testTitle}`.text();
+    const result = await $`PLAN_OUTPUT=human bun ${CLI_PATH} create ${testTitle}`.text();
 
     // Extract identifier for cleanup BEFORE assertions
     const match = result.match(/([A-Z]+-\d+)/);

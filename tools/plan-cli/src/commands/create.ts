@@ -3,6 +3,7 @@ import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
 import { normalizeIssueId, getTeamKey } from "../lib/identifier";
+import { shouldDefaultToJson } from "../lib/output-mode";
 
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
@@ -117,10 +118,16 @@ async function runCreate(
     // Check if any connections were made
     const hasConnections = opts.parent || opts.blockedBy || opts.blocking || opts.relatedTo;
 
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
     if (opts.quiet) {
       // Just output the identifier
       console.log(startedIssue.identifier);
-    } else if (opts.json) {
+    } else if (useJson) {
       // JSON output
       console.log(
         JSON.stringify(
