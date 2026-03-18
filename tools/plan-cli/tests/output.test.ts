@@ -472,6 +472,14 @@ describe("formatListJson", () => {
       "ENG-102",
     ]);
   });
+
+  it("returns an empty JSON array for zero issues", () => {
+    const result = formatListJson([]);
+    const parsed = JSON.parse(result);
+
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toHaveLength(0);
+  });
 });
 
 describe("formatGroupedListJson", () => {
@@ -604,6 +612,13 @@ describe("formatGroupedListJson", () => {
     expect(fallbackGroup).toBeDefined();
     expect(fallbackGroup.issues).toHaveLength(1);
     expect(fallbackGroup.issues[0].identifier).toBe("ENG-21");
+  });
+
+  it("returns empty groups array for zero issues", () => {
+    const result = JSON.parse(formatGroupedListJson([], "label"));
+
+    expect(result).toHaveProperty("groups");
+    expect(result.groups).toHaveLength(0);
   });
 });
 

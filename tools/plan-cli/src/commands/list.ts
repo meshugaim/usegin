@@ -123,7 +123,15 @@ async function runList(opts: {
     let issues = await client.listIssues(options);
 
     if (issues.length === 0) {
-      console.log("No issues found");
+      if (opts.json) {
+        if (opts.groupBy) {
+          console.log(JSON.stringify({ groups: [] }, null, 2));
+        } else {
+          console.log("[]");
+        }
+      } else {
+        console.log("No issues found");
+      }
       return;
     }
 
@@ -157,7 +165,7 @@ async function runList(opts: {
       issues = issues.slice(0, limit);
     }
 
-    // FZF mode
+    // FZF mode takes precedence over --json (interactive selection can't be JSON)
     if (opts.fzf) {
       const fzfInput = formatIssuesForFzf(issues);
       const binPath = new URL("../../../bin/plan", import.meta.url).pathname;
@@ -195,17 +203,18 @@ async function runList(opts: {
     // Standard output modes
     // Show Done children if explicitly requested OR if filtering by done status
     const showDone = opts.showDone ?? (opts.status?.toLowerCase() === "done");
-    const depthExplicit = process.argv.some(arg => arg.startsWith("--depth"));
-
     if (opts.json) {
+      const groupBy = opts.groupBy as "label" | "project" | "status";
       if (opts.groupBy) {
-        console.log(formatGroupedListJson(issues, opts.groupBy as "label" | "project" | "status", { showDone }));
+        console.log(formatGroupedListJson(issues, groupBy, { showDone }));
       } else {
         console.log(formatListJson(issues, { showDone }));
       }
     } else if (opts.groupBy) {
-      console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status", { showDone }));
+      const groupBy = opts.groupBy as "label" | "project" | "status";
+      console.log(formatGroupedList(issues, groupBy, { showDone }));
     } else {
+      const depthExplicit = process.argv.some(arg => arg.startsWith("--depth"));
       const result = formatListHuman(issues, { depth: options.depth, showDone });
       console.log(result.output);
 
