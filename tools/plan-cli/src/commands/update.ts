@@ -212,7 +212,19 @@ async function runUpdate(
       } else {
         console.log(`${colors.success("Updated")}: ${colors.identifier(issue.identifier)} - ${issue.title}`);
       }
-    } else if (!opts.blockedBy && !opts.removeBlockedBy && !opts.blocking && !opts.relatedTo && !opts.duplicateOf && !opts.comment) {
+    } else if (opts.blockedBy || opts.removeBlockedBy || opts.blocking || opts.relatedTo || opts.duplicateOf || opts.comment) {
+      // Side-effect-only operations (no field updates) — emit JSON confirmation
+      if (!opts.quiet && useJson) {
+        const result: Record<string, unknown> = { identifier };
+        if (opts.comment) result.commentAdded = true;
+        if (opts.blockedBy) result.blockedByAdded = opts.blockedBy;
+        if (opts.removeBlockedBy) result.blockedByRemoved = opts.removeBlockedBy;
+        if (opts.blocking) result.blockingAdded = opts.blocking;
+        if (opts.relatedTo) result.relatedToAdded = opts.relatedTo;
+        if (opts.duplicateOf) result.duplicateOf = opts.duplicateOf;
+        console.log(JSON.stringify(result, null, 2));
+      }
+    } else {
       console.error("Error: No updates specified. Use --help to see options.");
       process.exit(1);
     }
