@@ -1,7 +1,7 @@
 ## Current State
-Slice: E3 (Switch email worker) | Step: not started | Status: pending
-Last checkpoint: E2 complete. All 6 writer paths switched. All tests green (2 pre-existing flaky).
-Next: Start E3 — switch email worker to use gfs_sync_items claim RPCs.
+Slice: E4 (Switch email readers) | Step: not started | Status: pending
+Last checkpoint: E3 complete. Worker writes to gfs_sync_items. Attachment backfill done (A1 pulled forward).
+Next: Start E4 — switch email readers to gfs_sync_items.
 
 ## Auto-Inject (re-injected after every agent return)
 Priority: Don't regress > Orchestrate > Build. Never sacrifice correctness for velocity.
@@ -46,9 +46,9 @@ Migrate emails and attachments to use gfs_sync_items, same pattern as files (Sli
 ## Phase Map
 - [x] Slice E1: Backfill emails — PASS. Commit 9c704e36.
 - [x] Slice E2: Switch email writers — PASS. 5 commits (prereqs + resolver + Python API + test fixes).
-- [ ] Slice E3: Switch email worker (claim RPCs + sync_worker)
+- [x] Slice E3: Switch email worker + attachment backfill — PASS. Commit ef3ee9cc.
 - [ ] Slice E4: Switch email readers (project-email.ts ~20 sites)
-- [ ] Slice A1: Backfill attachments into gfs_sync_items
+- [x] Slice A1: Pulled forward into E3 (attachment backfill done)
 - [ ] Slice A2: Switch attachment writers
 - [ ] Slice A3: Switch attachment worker
 - [ ] Slice A4: Switch attachment readers
