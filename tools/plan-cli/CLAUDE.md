@@ -13,6 +13,8 @@ plan list --status "In Progress"              # Filter by status
 plan list --assignee @me                      # My issues
 plan list --active                            # Sort by recent activity
 plan list --latest                            # Sort by creation date
+plan list --json                              # Output as JSON (for agents)
+plan list --json --group-by status            # Grouped JSON output
 plan show <id>                                # Full details + relationships
 plan show <id> --tree                         # Graph: parent, siblings, children
 
@@ -41,7 +43,6 @@ Short IDs work everywhere: `plan show 365` → `plan show ENG-365`.
 
 | Tempting | Reality |
 |---|---|
-| `--json` on list | Only on `show` and `create` |
 | `--sort` | Use `--latest` or `--active` |
 | `--all` | Use `--show-done` for done sub-issues |
 | `--count` | Not available |

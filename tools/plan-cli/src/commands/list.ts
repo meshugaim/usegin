@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
-import { formatListHuman, formatGroupedList } from "../lib/output";
+import { formatListHuman, formatListJson, formatGroupedList, formatGroupedListJson } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import { printApiStats } from "../lib/stats";
 import { dim } from "../lib/colors";
@@ -39,6 +39,7 @@ export function createListCommand(): Command {
     .option("--assignee <user>", "Filter by assignee (@me for self)")
     .option("--latest", "Sort by creation date (newest first)")
     .option("--active", "Sort by recent activity (most recently updated first)")
+    .option("--json", "Output as JSON")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
     .option("--limit <n>", "Maximum number of top-level issues to show")
@@ -66,6 +67,7 @@ async function runList(opts: {
   status?: string;
   assignee?: string;
   limit?: string;
+  json?: boolean;
   latest?: boolean;
   active?: boolean;
   fzf?: boolean;
@@ -195,7 +197,13 @@ async function runList(opts: {
     const showDone = opts.showDone ?? (opts.status?.toLowerCase() === "done");
     const depthExplicit = process.argv.some(arg => arg.startsWith("--depth"));
 
-    if (opts.groupBy) {
+    if (opts.json) {
+      if (opts.groupBy) {
+        console.log(formatGroupedListJson(issues, opts.groupBy as "label" | "project" | "status", { showDone }));
+      } else {
+        console.log(formatListJson(issues, { showDone }));
+      }
+    } else if (opts.groupBy) {
       console.log(formatGroupedList(issues, opts.groupBy as "label" | "project" | "status", { showDone }));
     } else {
       const result = formatListHuman(issues, { depth: options.depth, showDone });

@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { $ } from "bun";
-import { getMaxUpdatedAt } from "../src/commands/list";
+import { getMaxUpdatedAt, createListCommand } from "../src/commands/list";
 import type { PlanIssue } from "../src/types";
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
@@ -52,6 +52,13 @@ describe("plan list command", () => {
       expect(result).toContain("--depth");
     });
 
+    it("has --json option in help output", async () => {
+      const result = await $`bun ${CLI_PATH} list --help`.text();
+
+      expect(result).toContain("--json");
+      expect(result).toContain("Output as JSON");
+    });
+
     it("shows version with --version on main command", async () => {
       const result = await $`bun ${CLI_PATH} --version`.text();
       expect(result).toContain("0.1.0");
@@ -59,6 +66,52 @@ describe("plan list command", () => {
   });
 
   // Note: Tests that require actual Linear API are in tests/e2e/
+});
+
+describe("createListCommand --json option", () => {
+  it("has --json defined as a boolean option", () => {
+    const cmd = createListCommand();
+    const jsonOption = cmd.options.find(
+      (opt) => opt.long === "--json"
+    );
+    expect(jsonOption).toBeDefined();
+    expect(jsonOption!.description).toBe("Output as JSON");
+  });
+
+  it("parses --json flag without errors", () => {
+    const cmd = createListCommand();
+    // Override action to capture opts without running the actual command
+    let capturedOpts: Record<string, unknown> = {};
+    cmd.action((opts: Record<string, unknown>) => {
+      capturedOpts = opts;
+    });
+
+    cmd.parse(["node", "plan", "--json"], { from: "user" });
+    expect(capturedOpts.json).toBe(true);
+  });
+
+  it("defaults json to undefined when not passed", () => {
+    const cmd = createListCommand();
+    let capturedOpts: Record<string, unknown> = {};
+    cmd.action((opts: Record<string, unknown>) => {
+      capturedOpts = opts;
+    });
+
+    cmd.parse(["node", "plan"], { from: "user" });
+    expect(capturedOpts.json).toBeUndefined();
+  });
+
+  it("parses --json together with --group-by", () => {
+    const cmd = createListCommand();
+    let capturedOpts: Record<string, unknown> = {};
+    cmd.action((opts: Record<string, unknown>) => {
+      capturedOpts = opts;
+    });
+
+    cmd.parse(["node", "plan", "--json", "--group-by", "status"], { from: "user" });
+    expect(capturedOpts.json).toBe(true);
+    expect(capturedOpts.groupBy).toBe("status");
+  });
 });
 
 describe("getMaxUpdatedAt", () => {
