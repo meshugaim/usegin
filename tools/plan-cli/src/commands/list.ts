@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { $ } from "bun";
 import { LinearClient } from "../lib/linear-client";
-import { formatListHuman, formatListJson, formatGroupedList, formatGroupedListJson } from "../lib/output";
+import { formatListHuman, formatListJson, formatGroupedList, formatGroupedListJson, paginateIssues } from "../lib/output";
 import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import { printApiStats } from "../lib/stats";
 import { dim } from "../lib/colors";
@@ -80,6 +80,8 @@ export function createListCommand(): Command {
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
     .option("--limit <n>", "Maximum number of top-level issues to show")
+    .option("--page <n>", "Page number (1-indexed, JSON mode only)")
+    .option("--page-size <n>", "Items per page (default 25, JSON mode only)")
     .option("--show-done", "Show Done sub-issues (hidden by default)")
     .option("--stats", "Show API call statistics")
     .action(async (opts) => {
@@ -104,6 +106,8 @@ async function runList(opts: {
   status?: string;
   assignee?: string;
   limit?: string;
+  page?: string;
+  pageSize?: string;
   json?: boolean;
   latest?: boolean;
   active?: boolean;
@@ -118,6 +122,12 @@ async function runList(opts: {
     console.error("Error: LINEAR_API_KEY environment variable is required");
     console.error("Get your API key from: https://linear.app/settings/api");
     process.exit(2);
+  }
+
+  // --page and --limit are mutually exclusive
+  if (opts.page && opts.limit) {
+    console.error("Error: --page and --limit cannot be used together");
+    process.exit(1);
   }
 
   const useJson = shouldDefaultToJson({
@@ -170,6 +180,10 @@ async function runList(opts: {
       if (useJson) {
         if (opts.groupBy) {
           console.log(JSON.stringify({ groups: [] }, null, 2));
+        } else if (opts.page) {
+          const page = parseInt(opts.page, 10);
+          const pageSize = parseInt(opts.pageSize ?? "25", 10);
+          console.log(JSON.stringify(paginateIssues([], page, pageSize), null, 2));
         } else {
           console.log("[]");
         }
@@ -251,6 +265,13 @@ async function runList(opts: {
       const groupBy = opts.groupBy as "label" | "project" | "status";
       if (opts.groupBy) {
         console.log(formatGroupedListJson(issues, groupBy, { showDone }));
+      } else if (opts.page) {
+        const page = parseInt(opts.page, 10);
+        const pageSize = parseInt(opts.pageSize ?? "25", 10);
+        // Format each issue to compact JSON shape, then paginate
+        const compactIssues = JSON.parse(formatListJson(issues, { showDone }));
+        const result = paginateIssues(compactIssues, page, pageSize);
+        console.log(JSON.stringify(result, null, 2));
       } else {
         console.log(formatListJson(issues, { showDone }));
       }

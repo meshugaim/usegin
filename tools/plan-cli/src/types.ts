@@ -43,6 +43,19 @@ export interface ListResult {
 }
 
 /**
+ * Paginated JSON output envelope for `plan list --json --page`
+ */
+export interface PaginatedResult<T = PlanIssue> {
+  issues: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    hasNextPage: boolean;
+  };
+}
+
+/**
  * Comment on an issue
  */
 export interface PlanComment {

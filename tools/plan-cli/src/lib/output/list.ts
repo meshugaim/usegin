@@ -1,4 +1,4 @@
-import type { PlanIssue } from "../../types";
+import type { PlanIssue, PaginatedResult } from "../../types";
 import type { FormatOptions, FormatResult } from "./shared";
 import {
   colors,
@@ -361,4 +361,38 @@ export function formatGroupedList(
   }
 
   return lines.join("\n").trim();
+}
+
+// ============================================================================
+// Pagination
+// ============================================================================
+
+/**
+ * Paginate a flat list of issues, returning a metadata envelope.
+ *
+ * Pure function — does not mutate the input array.
+ *
+ * @param issues  The full list of issues (already sorted/filtered)
+ * @param page    1-indexed page number
+ * @param pageSize  Number of items per page
+ */
+export function paginateIssues<T>(
+  issues: T[],
+  page: number,
+  pageSize: number,
+): PaginatedResult<T> {
+  const totalCount = issues.length;
+  const start = (page - 1) * pageSize;
+  const pageIssues = issues.slice(start, start + pageSize);
+  const hasNextPage = start + pageSize < totalCount;
+
+  return {
+    issues: pageIssues,
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      hasNextPage,
+    },
+  };
 }
