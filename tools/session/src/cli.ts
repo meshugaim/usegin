@@ -21,7 +21,7 @@ import { formatNarrative, formatMarkdown, formatTerminal, formatToolFilter, type
 import { formatStats } from "./formatter-stats";
 import { buildTimeline } from "./timeline";
 import { formatTimeline } from "./formatter-timeline";
-import { computeStats } from "./stats";
+import { buildJsonOutput } from "./json-format";
 import { getCommitsFromGitHistory } from "./git-commits";
 import { loadAllDocs, findDoc } from "../../docs-registry/src/shared";
 import { join, dirname } from "path";
@@ -987,17 +987,7 @@ async function main() {
     let output: string;
     switch (args.format) {
       case "json": {
-        const stats = computeStats(session);
-        const jsonOutput = {
-          sessionId: session.sessionId,
-          slug: session.slug ?? null,
-          model: session.model,
-          cwd: session.cwd,
-          summary: session.summary ?? null,
-          startTimestamp: session.startTimestamp ?? null,
-          endTimestamp: session.endTimestamp ?? null,
-          ...stats,
-        };
+        const jsonOutput = buildJsonOutput(session, args.truncate);
         output = JSON.stringify(jsonOutput, null, 2);
         break;
       }
