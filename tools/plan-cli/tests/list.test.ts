@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { $ } from "bun";
-import { getMaxUpdatedAt, createListCommand, shouldDefaultToJson } from "../src/commands/list";
+import { getMaxUpdatedAt, createListCommand } from "../src/commands/list";
+import { shouldDefaultToJson } from "../src/lib/output-mode";
 import { paginateIssues } from "../src/lib/output";
 import type { PlanIssue } from "../src/types";
 
