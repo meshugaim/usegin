@@ -1913,3 +1913,202 @@ describe("buildTimeline — compaction summary messages", () => {
     expect(userMsg!.text.endsWith("...")).toBe(true);
   });
 });
+
+// ============================================================================
+// BTW (aside_question) EVENTS
+// ============================================================================
+
+describe("buildTimeline btw events from aside_question subagents", () => {
+  test("creates btw event from aside_question subagent", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+    const t3 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t3,
+      subagents: [
+        makeSubagent("agent-aside_question-abc123", [
+          userTurn("u1", "What is the meaning of life?", { timestamp: t2 }),
+          assistantTurn("a1", "42, according to Douglas Adams.", { timestamp: t3 }),
+        ], { startTimestamp: t2 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const btwEvents = eventsOfKind(events, "btw");
+
+    expect(btwEvents).toHaveLength(1);
+    expect(btwEvents[0]!.question).toContain("What is the meaning of life?");
+    expect(btwEvents[0]!.answer).toContain("42, according to Douglas Adams.");
+  });
+
+  test("does not create btw event for normal subagents", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+    const t3 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t3,
+      subagents: [
+        makeSubagent("agent-regular-task-xyz", [
+          userTurn("u1", "Do something", { timestamp: t2 }),
+          assistantTurn("a1", "Done.", { timestamp: t3 }),
+        ], { startTimestamp: t2 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const btwEvents = eventsOfKind(events, "btw");
+
+    expect(btwEvents).toHaveLength(0);
+  });
+
+  test("places btw event at subagent start timestamp", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+    const t3 = ts();
+    const t4 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t4,
+      turns: [
+        userTurn("u1", "Work on something", { timestamp: t1 }),
+      ],
+      subagents: [
+        makeSubagent("agent-aside_question-def456", [
+          userTurn("u2", "Quick question?", { timestamp: t3 }),
+          assistantTurn("a2", "Quick answer.", { timestamp: t4 }),
+        ], { startTimestamp: t3 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const btwEvents = eventsOfKind(events, "btw");
+
+    expect(btwEvents).toHaveLength(1);
+    // Btw event timestamp should match subagent start
+    const expectedTs = new Date(t3);
+    expect(btwEvents[0]!.timestamp.getTime()).toBe(expectedTs.getTime());
+  });
+
+  test("handles aside_question subagent with no user or assistant turns", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t2,
+      subagents: [
+        makeSubagent("agent-aside_question-empty", [], { startTimestamp: t2 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const btwEvents = eventsOfKind(events, "btw");
+
+    // No content to extract — should not create a btw event
+    expect(btwEvents).toHaveLength(0);
+  });
+
+  test("multiple aside_question subagents produce multiple btw events", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+    const t3 = ts();
+    const t4 = ts();
+    const t5 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t5,
+      subagents: [
+        makeSubagent("agent-aside_question-q1", [
+          userTurn("u1", "First question?", { timestamp: t2 }),
+          assistantTurn("a1", "First answer.", { timestamp: t3 }),
+        ], { startTimestamp: t2 }),
+        makeSubagent("agent-aside_question-q2", [
+          userTurn("u2", "Second question?", { timestamp: t4 }),
+          assistantTurn("a2", "Second answer.", { timestamp: t5 }),
+        ], { startTimestamp: t4 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const btwEvents = eventsOfKind(events, "btw");
+
+    expect(btwEvents).toHaveLength(2);
+    expect(btwEvents[0]!.question).toContain("First question?");
+    expect(btwEvents[1]!.question).toContain("Second question?");
+  });
+
+  test("btw events are sorted chronologically with other events", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+    const t3 = ts();
+    const t4 = ts();
+    const t5 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t5,
+      turns: [
+        userTurn("u1", "Start working", { timestamp: t1 }),
+        userTurn("u2", "Continue working", { timestamp: t4 }),
+      ],
+      subagents: [
+        makeSubagent("agent-aside_question-mid", [
+          userTurn("u3", "Middle question?", { timestamp: t2 }),
+          assistantTurn("a3", "Middle answer.", { timestamp: t3 }),
+        ], { startTimestamp: t2 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const eventKinds = kinds(events);
+
+    // btw should appear between the two user_messages
+    const firstUserIdx = eventKinds.indexOf("user_message");
+    const btwIdx = eventKinds.indexOf("btw");
+    const secondUserIdx = eventKinds.lastIndexOf("user_message");
+
+    expect(btwIdx).toBeGreaterThan(firstUserIdx);
+    expect(btwIdx).toBeLessThan(secondUserIdx);
+  });
+
+  test("aside_question subagents still produce normal subagent_spawn/return events", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+    const t3 = ts();
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t3,
+      subagents: [
+        makeSubagent("agent-aside_question-abc", [
+          userTurn("u1", "Question?", { timestamp: t2 }),
+          assistantTurn("a1", "Answer.", { timestamp: t3 }),
+        ], { startTimestamp: t2 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+
+    // Should have both btw AND the normal subagent lifecycle events
+    const btwEvents = eventsOfKind(events, "btw");
+    const spawnEvents = eventsOfKind(events, "subagent_spawn");
+    const returnEvents = eventsOfKind(events, "subagent_return");
+
+    expect(btwEvents).toHaveLength(1);
+    expect(spawnEvents).toHaveLength(1);
+    expect(returnEvents).toHaveLength(1);
+  });
+});

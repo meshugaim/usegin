@@ -213,6 +213,18 @@ function formatEvent(
       return formatCompactionMarker(event.number, event.trigger, tokens, event.segmentNumber, event.totalSegments);
     }
 
+    case "btw": {
+      const ts = formatTimestamp(event.timestamp, sessionStartMs);
+      const question = truncate(event.question, 80);
+      const mainLine = `  ${ts}  \u2753 BTW: "${question}"`;
+      if (event.answer) {
+        const indent = " ".repeat(10);
+        const answerText = truncate(event.answer, 120);
+        return [mainLine, `${indent}"${answerText}"`];
+      }
+      return mainLine;
+    }
+
     case "idle_gap": {
       const ts = formatTimestamp(event.timestamp, sessionStartMs);
       const duration = formatDuration(event.durationMs);

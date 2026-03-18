@@ -1317,4 +1317,74 @@ describe("computeTokenStats", () => {
       expect(stats.tokenStats).toBeUndefined();
     });
   });
+
+  // ========================================================================
+  // BTW COUNT (aside_question subagents)
+  // ========================================================================
+
+  describe("btwCount", () => {
+    test("counts aside_question subagents", () => {
+      const session = makeSession({
+        subagents: [
+          makeSubagent("agent-aside_question-abc123", [
+            userTurn("u1", "What is X?"),
+            assistantTurn("a1", "X is Y."),
+          ]),
+          makeSubagent("agent-aside_question-def456", [
+            userTurn("u2", "What is Z?"),
+            assistantTurn("a2", "Z is W."),
+          ]),
+        ],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.btwCount).toBe(2);
+    });
+
+    test("returns 0 when no aside_question subagents exist", () => {
+      const session = makeSession({
+        subagents: [
+          makeSubagent("agent-regular-task-xyz", [
+            userTurn("u1", "Do work"),
+            assistantTurn("a1", "Done."),
+          ]),
+        ],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.btwCount).toBe(0);
+    });
+
+    test("returns 0 for session with no subagents", () => {
+      const session = makeSession();
+      const stats = computeStats(session);
+
+      expect(stats.btwCount).toBe(0);
+    });
+
+    test("only counts aside_question subagents, not regular ones", () => {
+      const session = makeSession({
+        subagents: [
+          makeSubagent("agent-aside_question-q1", [
+            userTurn("u1", "Question?"),
+            assistantTurn("a1", "Answer."),
+          ]),
+          makeSubagent("agent-regular-task-t1", [
+            userTurn("u2", "Task"),
+            assistantTurn("a2", "Done."),
+          ]),
+          makeSubagent("agent-aside_question-q2", [
+            userTurn("u3", "Another question?"),
+            assistantTurn("a3", "Another answer."),
+          ]),
+        ],
+      });
+
+      const stats = computeStats(session);
+
+      expect(stats.btwCount).toBe(2);
+    });
+  });
 });

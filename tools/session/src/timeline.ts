@@ -22,6 +22,7 @@ import type {
 } from "./types";
 import { getToolCallInput } from "./types";
 import { truncate } from "./format-utils";
+import { isAsideQuestion, extractBtwContent } from "./parser";
 
 // ============================================================================
 // TYPES
@@ -38,6 +39,7 @@ export type TimelineEvent =
   | { kind: "commit"; timestamp: Date; hash: string; subject: string }
   | { kind: "interrupted"; timestamp: Date }
   | { kind: "compaction"; timestamp: Date; number: number; trigger: string; preTokens: number; segmentNumber: number; totalSegments: number; summaryPreview?: string }
+  | { kind: "btw"; timestamp: Date; question: string; answer: string }
   | { kind: "idle_gap"; timestamp: Date; durationMs: number }
   | { kind: "session_end"; timestamp: Date; totalDurationMs?: number };
 
@@ -597,6 +599,26 @@ export function buildTimeline(
         ...(resumeReport ? { report: resumeReport } : {}),
       });
     }
+  }
+
+  // --- Btw events (aside_question subagents) ---
+  // /btw questions are lightweight aside subagents. Surface them as compact
+  // btw events showing the question and answer.
+  for (const sub of session.subagents) {
+    if (!isAsideQuestion(sub)) continue;
+
+    const btwTs = subagentStartTimestamp(sub);
+    if (!btwTs) continue;
+
+    const content = extractBtwContent(sub);
+    if (!content) continue;
+
+    events.push({
+      kind: "btw",
+      timestamp: btwTs,
+      question: truncate(content.question, 100),
+      answer: truncate(content.answer, 100),
+    });
   }
 
   // --- Commit events ---

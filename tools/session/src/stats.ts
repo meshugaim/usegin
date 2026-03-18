@@ -10,6 +10,7 @@ import { getToolCallInput } from "./types";
 import type { GitCommit } from "./git-commits";
 import { getModelPricing, getContextWindowSize, estimateCost } from "./pricing";
 import { truncate } from "./format-utils";
+import { isAsideQuestion } from "./parser";
 
 // ============================================================================
 // TYPES
@@ -47,6 +48,8 @@ export interface SessionStats {
   /** Rich commit data from git history, when available */
   gitCommits?: GitCommit[];
   rewindCount: number;
+  /** Number of /btw aside questions (aside_question subagents) */
+  btwCount: number;
   /** Total session duration from result entry, if available */
   durationMs?: number;
   /** Total session cost from result entry, if available */
@@ -488,6 +491,9 @@ export function computeStats(session: ParsedSession): SessionStats {
     session.turns
   );
 
+  // Count aside_question subagents (/btw questions)
+  const btwCount = session.subagents.filter(isAsideQuestion).length;
+
   return {
     turnCount: {
       total: session.turns.length,
@@ -502,6 +508,7 @@ export function computeStats(session: ParsedSession): SessionStats {
     commitCount,
     ...(hasGitCommits ? { gitCommits: session.gitCommits } : {}),
     rewindCount: session.rewinds.length,
+    btwCount,
     ...(session.result
       ? {
           durationMs: session.result.durationMs,

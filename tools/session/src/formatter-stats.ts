@@ -62,6 +62,7 @@ export function formatStats(
   appendSection(lines, formatSubagentsSection(stats, showHints));
   appendSection(lines, formatTeamMembersSection(stats, showHints));
   appendSection(lines, formatRewindsSection(stats, showHints));
+  appendSection(lines, formatBtwSection(stats));
   appendSection(lines, formatGitSection(stats, showHints));
 
   // Bottom rule
@@ -426,6 +427,22 @@ function formatRewindsSection(
   const text = `${stats.rewindCount} ${noun} detected`;
   const hint = showHints ? padHint("(--full to see context)") : "";
   lines.push(` ${text}${hint}`);
+
+  return lines;
+}
+
+// ============================================================================
+// SECTION: BTW (aside questions)
+// ============================================================================
+
+function formatBtwSection(stats: SessionStats): string[] {
+  if (stats.btwCount === 0) return [];
+
+  const lines: string[] = [];
+  lines.push(sectionHeader("Btw"));
+
+  const noun = stats.btwCount === 1 ? "btw question" : "btw questions";
+  lines.push(` ${stats.btwCount} ${noun}`);
 
   return lines;
 }

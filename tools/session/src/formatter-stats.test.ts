@@ -1864,3 +1864,51 @@ describe("JSON format output shape", () => {
     });
   });
 });
+
+// ============================================================================
+// BTW COUNT IN STATS CARD
+// ============================================================================
+
+describe("formatStats btw count", () => {
+  test("shows btw count when aside_question subagents exist", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+      ],
+      subagents: [
+        makeSubagent("agent-aside_question-q1", [
+          userTurn("u2", "What is X?"),
+          assistantTurn("a2", "X is Y."),
+        ]),
+        makeSubagent("agent-aside_question-q2", [
+          userTurn("u3", "What is Z?"),
+          assistantTurn("a3", "Z is W."),
+        ]),
+      ],
+    });
+
+    const output = formatStats(session, { showHints: false });
+
+    expect(output).toContain("2 btw");
+  });
+
+  test("omits btw count when no aside_question subagents exist", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello"),
+        assistantTurn("a1", "Hi!"),
+      ],
+      subagents: [
+        makeSubagent("agent-regular-task", [
+          userTurn("u2", "Do something"),
+          assistantTurn("a2", "Done."),
+        ]),
+      ],
+    });
+
+    const output = formatStats(session, { showHints: false });
+
+    expect(output).not.toContain("btw");
+  });
+});

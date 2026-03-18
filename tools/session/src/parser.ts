@@ -277,6 +277,37 @@ export function isWarmupSubagent(subagent: ParsedSubagent): boolean {
 }
 
 /**
+ * Detect if a subagent is an aside question (from /btw command).
+ *
+ * Aside questions are identified by their agentId containing "aside_question".
+ * These are lightweight subagents spawned when the user asks a tangential
+ * question mid-session via `/btw`.
+ */
+export function isAsideQuestion(subagent: ParsedSubagent): boolean {
+  return subagent.agentId?.includes("aside_question") ?? false;
+}
+
+/**
+ * Extract the question and answer from an aside_question subagent.
+ *
+ * - Question: the last user turn text (after system-reminder injection)
+ * - Answer: the last assistant turn text
+ *
+ * Returns null if neither question nor answer can be extracted.
+ */
+export function extractBtwContent(subagent: ParsedSubagent): { question: string; answer: string } | null {
+  const userTurns = subagent.turns.filter((t) => t.role === "user");
+  const assistantTurns = subagent.turns.filter((t) => t.role === "assistant");
+
+  // The question is the last user message (after system-reminder injection)
+  const question = userTurns[userTurns.length - 1]?.text ?? "";
+  const answer = assistantTurns[assistantTurns.length - 1]?.text ?? "";
+
+  if (!question && !answer) return null;
+  return { question, answer };
+}
+
+/**
  * Discover subagent files for a session
  */
 async function discoverSubagents(
