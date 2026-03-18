@@ -23,7 +23,22 @@ Use the `session` CLI (available on PATH — it is NOT `claude session`):
 session <parent-session-id>
 ```
 
-Useful flags: `--full` for complete transcript, `--show-tools` to include tool calls, `--subagents` for sub-agent internals. Run `session --help` for more.
+### Recommended invocations
+
+```bash
+# Full observation (recommended for check-ins):
+session <id> --full --tool-input --tool-output --truncate 2000
+
+# Quick scan:
+session <id> --timeline --show-tools
+
+# Focused review (e.g., only Bash commands):
+session <id> --tool Bash --tool-input --tool-output
+```
+
+**Critical:** `--tool-output` is required to see actual results (test failures, command output). Without it you only see summaries. Default truncation is 500 chars — use `--truncate 2000` or higher.
+
+Run `session docs show companion-usage` for the full flag reference, recipes, and gotchas.
 
 ## On Spawn (first interaction)
 
