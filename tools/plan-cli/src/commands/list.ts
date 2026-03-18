@@ -155,6 +155,16 @@ async function runList(opts: {
     isTTY: process.stdout.isTTY,
   });
 
+  // Warn when --page is used in human mode (silently ignored)
+  if (opts.page && !useJson) {
+    console.error("Warning: --page is only supported in JSON mode. Use --json or set PLAN_OUTPUT=json.");
+  }
+
+  // Warn when --page is used with --group-by (pagination ignored)
+  if (opts.page && opts.groupBy && useJson) {
+    console.error("Warning: --page is ignored when --group-by is used.");
+  }
+
   try {
     const client = new LinearClient({ apiKey });
 

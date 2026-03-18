@@ -399,6 +399,36 @@ describe("pagination", () => {
     });
   });
 
+  describe("--page warnings", () => {
+    it("warns when --page is used in human mode", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page", "1"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key", PLAN_OUTPUT: "human" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      await proc.exited;
+
+      expect(stderr).toContain("--page is only supported in JSON mode");
+    });
+
+    it("warns when --page is used with --group-by in JSON mode", async () => {
+      const proc = Bun.spawn(
+        ["bun", CLI_PATH, "list", "--page", "1", "--group-by", "status", "--json"],
+        {
+          env: { ...process.env, LINEAR_API_KEY: "fake-key" },
+          stderr: "pipe",
+        }
+      );
+      const stderr = await new Response(proc.stderr).text();
+      await proc.exited;
+
+      expect(stderr).toContain("--page is ignored when --group-by is used");
+    });
+  });
+
   describe("--page and --limit conflict", () => {
     it("errors when both --page and --limit are provided", async () => {
       const proc = Bun.spawn(
