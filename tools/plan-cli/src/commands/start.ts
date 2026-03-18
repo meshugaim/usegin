@@ -3,6 +3,7 @@ import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";
 import { colors } from "../lib/colors";
 import { normalizeIssueId } from "../lib/identifier";
+import { shouldDefaultToJson } from "../lib/output-mode";
 
 export function createStartCommand(): Command {
   const cmd = new Command("start")
@@ -42,9 +43,15 @@ async function runStart(
       assignee: "@me",
     });
 
+    const useJson = shouldDefaultToJson({
+      json: opts.json,
+      env: process.env,
+      isTTY: process.stdout.isTTY,
+    });
+
     if (opts.quiet) {
       // No output
-    } else if (opts.json) {
+    } else if (useJson) {
       console.log(
         JSON.stringify(
           {
