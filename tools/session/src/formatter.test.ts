@@ -652,6 +652,102 @@ describe("formatToolFilter", () => {
 
     expect(output).toContain("Bash (1 call)");
   });
+
+  test("shows tool input when toolInput flag set", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "bun test" })],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Bash", { toolInput: true });
+
+    expect(output).toContain("command");
+    expect(output).toContain("bun test");
+    expect(output).toContain("input:");
+  });
+
+  test("shows tool output when toolOutput flag set", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "bun test" })],
+        }),
+        userTurn("u1", "", {
+          toolResults: [toolResult("t1", "3 tests passed")],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Bash", { toolOutput: true });
+
+    expect(output).toContain("3 tests passed");
+    expect(output).toContain("output:");
+  });
+
+  test("respects truncate for tool output", () => {
+    const longOutput = "x".repeat(200);
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "bun test" })],
+        }),
+        userTurn("u1", "", {
+          toolResults: [toolResult("t1", longOutput)],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Bash", { toolOutput: true, truncate: 50 });
+
+    expect(output).not.toContain(longOutput);
+    expect(output).toContain("...");
+  });
+
+  test("shows both input and output together", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "bun test" })],
+        }),
+        userTurn("u1", "", {
+          toolResults: [toolResult("t1", "3 tests passed")],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Bash", {
+      toolInput: true,
+      toolOutput: true,
+      truncate: 2000,
+    });
+
+    expect(output).toContain("input:");
+    expect(output).toContain("command");
+    expect(output).toContain("3 tests passed");
+  });
+
+  test("backward compatible — no options means summary only", () => {
+    const session = makeSession({
+      turns: [
+        assistantTurn("a1", "", {
+          toolCalls: [toolCall("t1", "Bash", { command: "bun test" })],
+        }),
+        userTurn("u1", "", {
+          toolResults: [toolResult("t1", "3 tests passed")],
+        }),
+      ],
+    });
+
+    const output = formatToolFilter(session, "Bash");
+
+    expect(output).toContain("→ Bash: bun test");
+    expect(output).not.toContain("input:");
+    expect(output).not.toContain("output:");
+    expect(output).not.toContain("3 tests passed");
+  });
 });
 
 describe("formatNarrative with queued messages", () => {

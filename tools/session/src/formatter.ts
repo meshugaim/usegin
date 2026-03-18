@@ -661,7 +661,12 @@ export function formatMarkdown(session: ParsedSession): string {
  *     -> Bash: export PATH=...
  *     ...
  */
-export function formatToolFilter(session: ParsedSession, toolName: string): string {
+export function formatToolFilter(
+  session: ParsedSession,
+  toolName: string,
+  options: Partial<FormatOptions> = {}
+): string {
+  const formatOptions = { ...defaultOptions, ...options };
   const matchingCalls: ToolCall[] = [];
 
   for (const turn of session.turns) {
@@ -683,8 +688,19 @@ export function formatToolFilter(session: ParsedSession, toolName: string): stri
   const lines: string[] = [header];
 
   for (const tc of matchingCalls) {
-    const summary = getToolSummary(tc);
-    lines.push(`  → ${tc.name}: ${summary}`);
+    lines.push(formatToolCall(tc, formatOptions));
+
+    if (formatOptions.toolOutput) {
+      for (const turn of session.turns) {
+        for (const result of turn.toolResults) {
+          if (result.toolUseId === tc.id) {
+            const content = truncate(result.content, formatOptions.truncate);
+            const prefix = result.isError ? "    error:" : "    output:";
+            lines.push(`${prefix} ${content}`);
+          }
+        }
+      }
+    }
   }
 
   return lines.join("\n");

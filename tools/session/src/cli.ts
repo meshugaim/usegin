@@ -869,7 +869,12 @@ async function main() {
 
     // --tool filter: standalone output mode that replaces normal formatting
     if (args.tool) {
-      const toolOutput = formatToolFilter(session, args.tool);
+      const options: Partial<FormatOptions> = {
+        toolInput: args.toolInput,
+        toolOutput: args.toolOutput,
+        truncate: args.truncate,
+      };
+      const toolOutput = formatToolFilter(session, args.tool, options);
       debugLog(debug, "Total parse time", totalStart);
       console.log(toolOutput);
       return;
