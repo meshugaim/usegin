@@ -397,6 +397,21 @@ describe("formatListJson", () => {
     // ENG-21 (child of ENG-20) has a parent — but it's nested inside
     // children array, so check children shape instead
     expect(result[1].children[0]).toBeDefined();
+
+    // Non-null parent: issue with parent set flattens to identifier string
+    const issueWithParent: PlanIssue[] = [
+      {
+        id: "child-1",
+        identifier: "ENG-50",
+        title: "Child task",
+        status: "In Progress",
+        sortOrder: 1.0,
+        parent: { id: "parent-1", identifier: "ENG-99" },
+        children: [],
+      },
+    ];
+    const withParent = JSON.parse(formatListJson(issueWithParent));
+    expect(withParent[0].parent).toBe("ENG-99");
   });
 
   it("formats children with only identifier, title, status", () => {
@@ -534,6 +549,61 @@ describe("formatGroupedListJson", () => {
     expect(issue).toHaveProperty("status");
     expect(issue).not.toHaveProperty("id");
     expect(issue).not.toHaveProperty("description");
+  });
+
+  it("places multi-label issues in every matching group", () => {
+    const multiLabelIssues: PlanIssue[] = [
+      {
+        id: "issue-10",
+        identifier: "ENG-10",
+        title: "Bug and feature",
+        status: "In Progress",
+        sortOrder: 1.0,
+        labels: ["bug", "feature"],
+        children: [],
+      },
+    ];
+
+    const result = JSON.parse(formatGroupedListJson(multiLabelIssues, "label"));
+
+    const bugGroup = result.groups.find((g: { name: string }) => g.name === "bug");
+    const featureGroup = result.groups.find((g: { name: string }) => g.name === "feature");
+
+    expect(bugGroup).toBeDefined();
+    expect(featureGroup).toBeDefined();
+    expect(bugGroup.issues).toHaveLength(1);
+    expect(featureGroup.issues).toHaveLength(1);
+    expect(bugGroup.issues[0].identifier).toBe("ENG-10");
+    expect(featureGroup.issues[0].identifier).toBe("ENG-10");
+  });
+
+  it("uses fallback group name for labelless issues", () => {
+    const mixedIssues: PlanIssue[] = [
+      {
+        id: "issue-20",
+        identifier: "ENG-20",
+        title: "Labeled issue",
+        status: "Backlog",
+        sortOrder: 1.0,
+        labels: ["bug"],
+        children: [],
+      },
+      {
+        id: "issue-21",
+        identifier: "ENG-21",
+        title: "Unlabeled issue",
+        status: "Backlog",
+        sortOrder: 2.0,
+        children: [],
+      },
+    ];
+
+    const result = JSON.parse(formatGroupedListJson(mixedIssues, "label"));
+
+    const fallbackGroup = result.groups.find((g: { name: string }) => g.name === "(no label)");
+    expect(fallbackGroup).toBeDefined();
+    expect(fallbackGroup.issues).toHaveLength(1);
+    expect(fallbackGroup.issues[0].identifier).toBe("ENG-21");
   });
 });
 
