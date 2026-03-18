@@ -23,6 +23,8 @@ import { buildTimeline } from "./timeline";
 import { formatTimeline } from "./formatter-timeline";
 import { computeStats } from "./stats";
 import { getCommitsFromGitHistory } from "./git-commits";
+import { loadAllDocs, findDoc } from "../../docs-registry/src/shared";
+import { join, dirname } from "path";
 import {
   checkFzfAvailable,
   claudeProjectsDirExists,
@@ -53,6 +55,12 @@ function isDebugEnabled(args: MainArgs): boolean {
   return args.debug || process.env.DEBUG === "session";
 }
 
+function getSessionDocsDir(internal = false): string {
+  // Resolve from src/ to root/docs
+  const base = join(dirname(import.meta.dir), "docs");
+  return internal ? join(base, "internal") : base;
+}
+
 function printHelp() {
   console.log(`
 Session - Parse Claude session JSONL files
@@ -66,6 +74,7 @@ USAGE:
   session fetch <id>        Fetch archived session to local storage
   session resume <id>       Fetch (if needed) and resume a session
   session fork <id>         Fork a session (copy + resume the copy)
+  session docs [list|show]  Browse embedded documentation
 
 SESSION IDENTIFIERS:
   You can specify sessions by:
@@ -118,6 +127,7 @@ OPTIONS:
                      Overrides --full when specified explicitly
   --tool <name>      Show only calls for a specific tool (e.g., --tool Bash)
                      Case-sensitive. Replaces normal output with focused list.
+                     Note: combine with --tool-output to see actual results.
   --stream           Stream mode: read from stdin, output in real-time
   --tool-input       Include tool call inputs
   --tool-output      Include tool results
@@ -719,6 +729,62 @@ async function runFork(args: string[]) {
   }
 }
 
+function runDocs(args: string[]): void {
+  const { user, internal } = loadAllDocs(getSessionDocsDir);
+  const allDocs = [...user, ...internal];
+
+  const sub = args[0];
+
+  // "session docs show <ref>"
+  if (sub === "show" || sub === "get") {
+    const ref = args[1];
+    if (!ref) {
+      console.error("Usage: session docs show <handle|number>");
+      process.exit(1);
+    }
+    const doc = findDoc(ref, allDocs);
+    if (!doc) {
+      console.error(`Doc not found: ${ref}\n`);
+      if (allDocs.length > 0) {
+        console.error("Available docs:");
+        for (let i = 0; i < allDocs.length; i++) {
+          console.error(`  ${i + 1}  ${allDocs[i].meta.handle}`);
+        }
+      }
+      process.exit(1);
+    }
+    console.log(doc.content);
+    return;
+  }
+
+  // Default / "session docs list" / "session docs ls"
+  if (allDocs.length === 0) {
+    console.log("No docs found.");
+    return;
+  }
+
+  let num = 1;
+  if (user.length > 0) {
+    for (const doc of user) {
+      const n = (num++).toString().padStart(2);
+      console.log(`${n}  ${doc.meta.name.padEnd(50)} [${doc.meta.type}]`);
+      console.log(`    ${doc.meta.context}`);
+    }
+  }
+  if (internal.length > 0) {
+    if (user.length > 0) console.log();
+    console.log("─── internal ───");
+    console.log();
+    for (const doc of internal) {
+      const n = (num++).toString().padStart(2);
+      console.log(`${n}  ${doc.meta.name.padEnd(50)} [${doc.meta.type}]`);
+      console.log(`    ${doc.meta.context}`);
+    }
+  }
+  console.log();
+  console.log("Use: session docs show <handle|number>");
+}
+
 async function main() {
   const rawArgs = process.argv.slice(2);
 
@@ -756,6 +822,12 @@ async function main() {
   if (rawArgs[0] === "resume") {
     await runResume(rawArgs.slice(1));
     return;
+  }
+
+  // Check for 'docs' subcommand
+  if (rawArgs[0] === "docs") {
+    runDocs(rawArgs.slice(1));
+    process.exit(0);
   }
 
   const args = parseMainArgs(rawArgs);
