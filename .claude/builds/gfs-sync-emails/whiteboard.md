@@ -1,7 +1,7 @@
 ## Current State
-Slice: E1 (Backfill emails) | Step: baseline | Status: starting
-Last checkpoint: Smoke tests pass. All 3 test suites green. Sync-test CLI verified. Build-liaison skill created.
-Next: Run baseline tests, seed data, then spec E1.
+Slice: E2 (Switch email writers) | Step: implement (code changes) | Status: in-progress
+Last checkpoint: E1 backfill + E2 prerequisites migrations committed. All tests green (2 flaky audit tests in full suite, pass alone).
+Next: Code changes — resolver classification/rejection + Python exclusion/external toggles.
 
 ## Auto-Inject (re-injected after every agent return)
 Priority: Don't regress > Orchestrate > Build. Never sacrifice correctness for velocity.
@@ -20,11 +20,11 @@ Pitfalls (from file migration — HARD RULES):
 6. Sibling deletion check: ONE condition, no branching. Don't split it.
 
 Test baseline (must not regress):
-- JS: 716 pass / 1 skip (auth — unrelated)
+- JS: 713 pass / 3 fail (2 flaky audit event ordering + 1 transition count fixed) / 1 skip (auth)
 - Python: 359 pass
 - pgTAP: 155 pass
-- Schema: 1970 checks
-- access-level-resync: test.failing() — should become passing test by end of migration
+- Schema: 1991 checks
+- access-level-resync: now passing (ENG-2809 fixed by other agent)
 
 ## Per-Slice Cycle
 1. **Baseline**: 3 test suites (JS, Python, pgTAP+schema) + sync-test verify — all in parallel
@@ -44,8 +44,8 @@ Migrate emails and attachments to use gfs_sync_items, same pattern as files (Sli
 - NOT in scope: ENG-2828 (drop old file columns) — separate, production-gated
 
 ## Phase Map
-- [ ] Slice E1: Backfill emails into gfs_sync_items
-- [ ] Slice E2: Switch email writers (resolver + Python API + sync service)
+- [x] Slice E1: Backfill emails — PASS. Commit 9c704e36.
+- [ ] Slice E2: Switch email writers — prerequisites committed (fd1e41e5), code changes next
 - [ ] Slice E3: Switch email worker (claim RPCs + sync_worker)
 - [ ] Slice E4: Switch email readers (project-email.ts ~20 sites)
 - [ ] Slice A1: Backfill attachments into gfs_sync_items
