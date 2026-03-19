@@ -9,7 +9,7 @@ import { resolveSessionPath } from "../finder";
 import { debugLog } from "../debug";
 import { sliceTurns, formatPositionHeader } from "../incremental";
 import { filterNotifications } from "../filter-notifications";
-import { parseTimestampArg, filterByTimestamp } from "../filter-by-timestamp";
+import { parseTimestampArg, filterByTimestamp, resolveCommitTimestamp } from "../filter-by-timestamp";
 import type { MainArgs } from "../cli-args-main";
 
 /**
@@ -124,6 +124,12 @@ export async function runParse(args: MainArgs) {
     if (args.sinceTimestamp) {
       const since = parseTimestampArg(args.sinceTimestamp);
       session = { ...session, turns: filterByTimestamp(session.turns, since) };
+    }
+
+    // --- Commit-based timestamp filter (sugar over sinceTimestamp) ---
+    if (args.sinceCommit) {
+      const commitDate = await resolveCommitTimestamp(args.sinceCommit, session.cwd);
+      session = { ...session, turns: filterByTimestamp(session.turns, commitDate) };
     }
 
     // --- Turn windowing (--since-turn, --last) ---

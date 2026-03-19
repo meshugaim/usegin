@@ -13,6 +13,7 @@ import {
   parseRelativeTime,
   parseTimestampArg,
   filterByTimestamp,
+  resolveCommitTimestamp,
 } from "./filter-by-timestamp";
 
 describe("parseRelativeTime", () => {
@@ -139,5 +140,37 @@ describe("filterByTimestamp", () => {
   it("returns empty array for empty input", () => {
     const result = filterByTimestamp([], cutoff);
     expect(result).toHaveLength(0);
+  });
+});
+
+describe("resolveCommitTimestamp", () => {
+  it("returns a Date for a valid full SHA", async () => {
+    const result = await resolveCommitTimestamp("4a926940b6e05322522e014c11e2b90bb85aa66d");
+    expect(result).toBeInstanceOf(Date);
+    expect(result.getTime()).not.toBeNaN();
+  });
+
+  it("returns a Date for a short SHA (7+ chars)", async () => {
+    const result = await resolveCommitTimestamp("4a92694");
+    expect(result).toBeInstanceOf(Date);
+    expect(result.getTime()).not.toBeNaN();
+  });
+
+  it("throws for an invalid/non-existent SHA", async () => {
+    await expect(
+      resolveCommitTimestamp("0000000000000000000000000000000000000000")
+    ).rejects.toThrow('Could not resolve commit "0000000000000000000000000000000000000000"');
+  });
+
+  it("throws for a non-git directory", async () => {
+    await expect(resolveCommitTimestamp("4a92694", "/tmp")).rejects.toThrow(
+      'Could not resolve commit "4a92694"'
+    );
+  });
+
+  it("throws for empty string", async () => {
+    await expect(resolveCommitTimestamp("")).rejects.toThrow(
+      "Commit SHA is required"
+    );
   });
 });

@@ -788,6 +788,49 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--since-commit validation", () => {
+    it("defaults sinceCommit to undefined", () => {
+      expect(parseMainArgs(["session.jsonl"]).sinceCommit).toBeUndefined();
+    });
+
+    it("parses --since-commit with a SHA value", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-commit", "abc1234"]);
+      expect(result.sinceCommit).toBe("abc1234");
+    });
+
+    it("throws when --since-commit is last argument with no value", () => {
+      expect(() => parseMainArgs(["--since-commit"])).toThrow(
+        "Missing value for --since-commit"
+      );
+    });
+
+    it("throws when --since-commit is followed by another flag", () => {
+      expect(() => parseMainArgs(["--since-commit", "--debug"])).toThrow(
+        "Missing value for --since-commit"
+      );
+    });
+
+    it("can combine with --last", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-commit", "abc1234", "--last", "5"]);
+      expect(result.sinceCommit).toBe("abc1234");
+      expect(result.last).toBe(5);
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs([
+        "session.jsonl",
+        "--since-commit",
+        "abc1234",
+        "--debug",
+        "--format",
+        "json",
+      ]);
+      expect(result.sinceCommit).toBe("abc1234");
+      expect(result.debug).toBe(true);
+      expect(result.format).toBe("json");
+    });
+  });
+
   describe("--commits flag", () => {
     it("defaults commits to false", () => {
       expect(parseMainArgs(["session.jsonl"]).commits).toBe(false);

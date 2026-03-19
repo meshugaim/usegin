@@ -68,6 +68,8 @@ export interface MainArgs {
   excludeNotifications: boolean;
   /** Show only turns at or after this timestamp. Raw string — resolved to Date at use site. */
   sinceTimestamp?: string;
+  /** Show only turns at or after the timestamp of the given git commit SHA. */
+  sinceCommit?: string;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -159,6 +161,10 @@ export function parseMainArgs(args: string[]): MainArgs {
     } else if (arg === "--since-timestamp") {
       const value = requireArgValue(args, i, "--since-timestamp");
       result.sinceTimestamp = value;
+      i++;
+    } else if (arg === "--since-commit") {
+      const value = requireArgValue(args, i, "--since-commit");
+      result.sinceCommit = value;
       i++;
     } else if (arg === "--last") {
       const value = requireArgValue(args, i, "--last");

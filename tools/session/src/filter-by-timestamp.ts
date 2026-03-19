@@ -57,6 +57,47 @@ export function parseTimestampArg(value: string): Date {
 }
 
 /**
+ * Resolve a git commit SHA to the commit's author date.
+ *
+ * This is sugar over `--since-timestamp` — it looks up the commit in the
+ * repo at `cwd` (defaulting to `process.cwd()`) and returns the author
+ * date as a `Date`, which can then be passed to `filterByTimestamp`.
+ *
+ * Throws if the SHA is empty, not found, or if `cwd` is not a git repo.
+ */
+export async function resolveCommitTimestamp(
+  sha: string,
+  cwd?: string
+): Promise<Date> {
+  if (!sha) throw new Error("Commit SHA is required");
+
+  const proc = Bun.spawn(["git", "show", "-s", "--format=%aI", sha], {
+    cwd: cwd || process.cwd(),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const stdout = await new Response(proc.stdout).text();
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0) {
+    throw new Error(
+      `Could not resolve commit "${sha}". Is it a valid commit in this repo?`
+    );
+  }
+
+  const timestamp = stdout.trim();
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) {
+    throw new Error(
+      `Commit "${sha}" returned invalid timestamp: "${timestamp}"`
+    );
+  }
+
+  return date;
+}
+
+/**
  * Filter turns to only those at or after the given cutoff date.
  *
  * - Turns with a timestamp >= cutoff are kept.
