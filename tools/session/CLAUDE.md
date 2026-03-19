@@ -23,12 +23,35 @@ session list --limit 5
 
 ```
 src/
-├── cli.ts              # Main entry point, subcommand routing
+├── cli.ts              # Thin dispatcher — parses argv, delegates to commands/
 ├── cli-args.ts         # Argument parsing for find/list/pick/fetch/resume commands
 ├── cli-args-main.ts    # Argument parsing for main parse command
-├── parser.ts           # Core JSONL parsing logic
+├── commands/           # One file per subcommand
+│   ├── index.ts        # Re-exports all runXxx functions
+│   ├── parse.ts        # Main parse command (formats, tool filters, streaming)
+│   ├── find.ts         # Interactive fzf browsing
+│   ├── list.ts         # Non-interactive session listing
+│   ├── pick.ts         # Popup picker (tmux/vsc)
+│   ├── fetch.ts        # Fetch archived sessions from ~/agent-records/
+│   ├── resume.ts       # Fetch + claude --resume
+│   ├── fork.ts         # Copy session + resume the copy
+│   ├── rm.ts           # Delete session and subagent files
+│   ├── bash.ts         # Browse Bash commands from sessions
+│   ├── search-in.ts    # Search within a session's turns
+│   └── docs.ts         # Browse embedded documentation
+├── parser.ts           # Orchestrator: parseSession(), StreamingParser, re-exports
+├── parse-entries.ts    # Entry → Turn conversion (parseTurn, extractCommitsFromToolResult)
+├── parse-turns.ts      # Entry[] → ParsedSession (parseEntries, rewind detection)
+├── parse-tokens.ts     # Token usage aggregation across turns
+├── parse-subagents.ts  # Subagent/team discovery, listing, and parsing
+├── formatter.ts        # Shared format utils (formatTurn, getToolSummary) + re-exports
+├── format-narrative.ts # Narrative transcript format
+├── format-terminal.ts  # Terminal/export format (replicates /export)
+├── format-markdown.ts  # Markdown format
+├── format-utils.ts     # Low-level format helpers (truncate, etc.)
+├── formatter-stats.ts  # Stats card format
+├── formatter-timeline.ts # Timeline format
 ├── fetch.ts            # Fetch archived sessions from ~/agent-records/ to local
-├── formatter.ts        # Output formatting (narrative, terminal, markdown)
 ├── types.ts            # Core types, branded IDs, ToolInputMap
 ├── errors.ts           # Custom error classes with actionable hints
 ├── validation.ts       # Type guards for entry validation
@@ -136,7 +159,7 @@ export type OutputFormat = "narrative" | "terminal" | "markdown" | "myformat";
 const VALID_FORMATS: readonly OutputFormat[] = [..., "myformat"] as const;
 ```
 
-2. Create the formatter function in `formatter.ts`:
+2. Create a new `format-myformat.ts` file with the formatter function:
 
 ```ts
 export function formatMyFormat(
@@ -147,7 +170,13 @@ export function formatMyFormat(
 }
 ```
 
-3. Add the case in `cli.ts`:
+3. Re-export it from `formatter.ts` (preserves the public API):
+
+```ts
+export { formatMyFormat } from "./format-myformat";
+```
+
+4. Add the case in `commands/parse.ts`:
 
 ```ts
 case "myformat":
@@ -155,7 +184,7 @@ case "myformat":
   break;
 ```
 
-4. Document in `printHelp()` in `cli.ts`.
+5. Document in `printHelp()` in `cli.ts`.
 
 ## Adding a New Tool to ToolInputMap
 
