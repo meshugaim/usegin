@@ -61,8 +61,12 @@ Map each acceptance criterion to one or more slices. Work through this mentally:
 | **End-to-end** | Touches all layers needed (DB → API → UI), not just one |
 | **Independently shippable** | Works on its own, even if the feature is incomplete |
 | **Demonstrable** | You can show it working |
-| **Right-sized** | One migration max. Describable in one sentence. Implementable in a single agent session without context pressure |
+| **Right-sized** | One migration max. ~6 AC max. Describable in one sentence. Implementable in a single agent session without context pressure |
 | **Traceable** | Maps back to specific acceptance criteria from the spec |
+
+**Sizing heuristic:** If a slice has more than ~6 acceptance criteria, it probably spans too many concerns. Look for a natural split — e.g., algorithm/DB logic vs UI, or data pipeline vs tools that consume the data. Two right-sized slices are better than one that risks context pressure.
+
+**Vertical integration for tools/features:** When a feature produces data and provides tools to access that data, bundle tools with the slice that produces their data — not in a separate "tools" slice. For example: a metadata sync slice should include the browse tools that only need metadata. An enrichment slice should include the tools that need enrichment results. This makes each slice independently demo-able: "sync works AND you can query the results."
 
 **Decomposition approach:** Start from user-facing behavior and work backward. "User can see X" is a better slice than "Add database table for X."
 
@@ -155,14 +159,16 @@ Append a slice map to the parent spec issue:
 ```
 ## Slice Map
 
-| # | Issue | Summary | Status |
-|---|-------|---------|--------|
-| 1 | ENG-XXX | Infrastructure: test harness + shared types | Pending |
-| 2 | ENG-YYY | User can create a widget | Pending |
-| 3 | ENG-ZZZ | Widget respects permissions | Pending |
-| 4 | ENG-AAA | Widget handles edge cases (empty, limits) | Pending |
+| # | Issue | Summary | AC covered | Status |
+|---|-------|---------|------------|--------|
+| 1 | ENG-XXX | Infrastructure: test harness + shared types | #1, #2 | Pending |
+| 2 | ENG-YYY | User can create a widget | #3, #4, #5 | Pending |
+| 3 | ENG-ZZZ | Widget respects permissions | #6, #7 | Pending |
+| 4 | ENG-AAA | Widget handles edge cases (empty, limits) | #8, #9 | Pending |
 
 **Ordering rationale:** [1-2 sentences on why this order]
+
+**External dependencies:** [issues that block specific slices, if any]
 
 **Cross-slice verification:** [criteria that can only be checked after all slices land]
 ```

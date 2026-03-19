@@ -183,6 +183,7 @@ Before marking the spec complete, verify these — they are the most common gaps
 | Scope clarity | Is every feature clearly in or out? No ambiguous "future" items in the main body? |
 | Decisions resolved | Are there zero "TBD" items? Each either resolved or tracked as a separate spike? |
 | Scoping validated | If the spec introduces a scoping/filtering model, was it validated against a real account? |
+| Linear in sync | If the spec was revised after initial writing, is the Linear issue description updated to match the on-disk version? Stale Linear descriptions create confusion — slices reference AC numbers that don't exist in the parent. |
 
 ## Downstream: How the Spec Gets Used
 
