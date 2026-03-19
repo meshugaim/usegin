@@ -35,6 +35,7 @@ import {
 // ============================================================================
 
 export { ParsingTimeoutError } from "./errors";
+export { filterNotifications, isNotificationTurn } from "./filter-notifications";
 export { parseTurn, extractCommitsFromToolResult } from "./parse-turn";
 export { parseEntries } from "./parse-turns";
 export { aggregateTokenUsage } from "./parse-tokens";

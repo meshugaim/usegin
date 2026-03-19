@@ -118,6 +118,7 @@ OPTIONS:
                      Comma-separated, case-sensitive. Mutually exclusive with --tool.
   --since-turn <n>   Show turns from index N onward. Can combine with --last.
   --last <n>         Show last N turns. When combined with --since-turn, caps the count.
+  --exclude-notifications  Filter out task-notification turns (from background agents)
   --commits          Interleave commits chronologically in narrative output
                      (default: append at end). Uses Claude-Session trailer for
                      precise discovery, falls back to time-window.

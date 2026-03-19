@@ -8,6 +8,7 @@ import { getSessionCommits } from "../git-commits";
 import { resolveSessionPath } from "../finder";
 import { debugLog } from "../debug";
 import { sliceTurns, formatPositionHeader } from "../incremental";
+import { filterNotifications } from "../filter-notifications";
 import type { MainArgs } from "../cli-args-main";
 
 /**
@@ -111,6 +112,11 @@ export async function runParse(args: MainArgs) {
         // Fall back to regex-extracted commits if this fails.
         debugLog(debug, "Git history query failed, using regex commits", stepStart);
       }
+    }
+
+    // --- Exclude task-notification turns (before windowing so --last N gives N real turns) ---
+    if (args.excludeNotifications) {
+      session = { ...session, turns: filterNotifications(session.turns) };
     }
 
     // --- Turn windowing (--since-turn, --last) ---

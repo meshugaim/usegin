@@ -64,6 +64,8 @@ export interface MainArgs {
   last?: number;
   /** Interleave commits chronologically in narrative output instead of appending at end. */
   commits: boolean;
+  /** Filter out task-notification turns from output. */
+  excludeNotifications: boolean;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -85,6 +87,7 @@ export function parseMainArgs(args: string[]): MainArgs {
     timeout: 30,
     help: false,
     commits: false,
+    excludeNotifications: false,
   };
 
   // Track whether --format was explicitly provided (takes precedence over --full)
@@ -149,6 +152,8 @@ export function parseMainArgs(args: string[]): MainArgs {
       i++;
     } else if (arg === "--commits") {
       result.commits = true;
+    } else if (arg === "--exclude-notifications") {
+      result.excludeNotifications = true;
     } else if (arg === "--last") {
       const value = requireArgValue(args, i, "--last");
       const n = validateNonNegativeInteger(value, "--last");

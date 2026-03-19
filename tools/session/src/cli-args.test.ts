@@ -706,6 +706,30 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--exclude-notifications flag", () => {
+    it("defaults excludeNotifications to false", () => {
+      expect(parseMainArgs(["session.jsonl"]).excludeNotifications).toBe(false);
+    });
+
+    it("sets excludeNotifications to true when --exclude-notifications is specified", () => {
+      const result = parseMainArgs(["session.jsonl", "--exclude-notifications"]);
+      expect(result.excludeNotifications).toBe(true);
+    });
+
+    it("works alongside --last", () => {
+      const result = parseMainArgs(["session.jsonl", "--exclude-notifications", "--last", "20"]);
+      expect(result.excludeNotifications).toBe(true);
+      expect(result.last).toBe(20);
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs(["session.jsonl", "--exclude-notifications", "--debug", "--format", "json"]);
+      expect(result.excludeNotifications).toBe(true);
+      expect(result.debug).toBe(true);
+      expect(result.format).toBe("json");
+    });
+  });
+
   describe("--commits flag", () => {
     it("defaults commits to false", () => {
       expect(parseMainArgs(["session.jsonl"]).commits).toBe(false);
