@@ -13,8 +13,8 @@ import type {
   ToolCall,
 } from "./types";
 import { getToolCallInput } from "./types";
-import type { FormatOptions } from "./formatter";
-import { defaultOptions } from "./formatter";
+import type { FormatOptions } from "./format-shared";
+import { defaultOptions } from "./format-shared";
 
 /**
  * Truncate by lines, showing first few and indicating how many more

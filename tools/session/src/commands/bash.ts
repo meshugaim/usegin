@@ -142,8 +142,9 @@ export function parseBashFzfOutput(
  * Prompt the user for confirmation, then run a command.
  *
  * Prints the command, asks y/n, and spawns it with inherited stdio if confirmed.
+ * Returns the exit code of the spawned process, or `undefined` if cancelled.
  */
-async function runWithConfirmation(command: string): Promise<void> {
+export async function runWithConfirmation(command: string): Promise<number | undefined> {
   console.log(`\n  ${command}\n`);
 
   // Prompt for confirmation
@@ -164,7 +165,7 @@ async function runWithConfirmation(command: string): Promise<void> {
 
   if (answer !== "y" && answer !== "yes") {
     console.log("Cancelled.");
-    return;
+    return undefined;
   }
 
   const proc = Bun.spawn(["bash", "-c", command], {
@@ -174,7 +175,7 @@ async function runWithConfirmation(command: string): Promise<void> {
   });
 
   const exitCode = await proc.exited;
-  process.exit(exitCode ?? 0);
+  return exitCode ?? 0;
 }
 
 // =============================================================================
@@ -272,7 +273,10 @@ export async function runBash(args: string[]) {
     }
 
     if (result.action === "run") {
-      await runWithConfirmation(result.command);
+      const exitCode = await runWithConfirmation(result.command);
+      if (exitCode !== undefined) {
+        process.exit(exitCode);
+      }
       return;
     }
 

@@ -11,11 +11,11 @@ import type {
   EntryUuid,
 } from "./types";
 import type { GitCommit } from "./git-commits";
-import type { FormatOptions } from "./formatter";
+import type { FormatOptions } from "./format-shared";
 import {
   defaultOptions,
   formatTurn,
-} from "./formatter";
+} from "./format-shared";
 import { formatTokenCount } from "./format-utils";
 
 // ============================================================================

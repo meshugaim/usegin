@@ -3,7 +3,7 @@
  */
 
 import type { ParsedSession } from "./types";
-import { getToolSummary } from "./formatter";
+import { getToolSummary } from "./format-shared";
 
 /**
  * Format a session as readable Markdown
