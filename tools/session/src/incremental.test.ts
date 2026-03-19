@@ -118,6 +118,14 @@ describe("sliceTurns", () => {
       expect(result.totalTurns).toBe(20);
     });
 
+    it("returns empty when sinceTurn is beyond total with last set", () => {
+      const session = makeTwentyTurnSession();
+      const result = sliceTurns(session.turns, { sinceTurn: 25, last: 5 });
+      expect(result.turns).toHaveLength(0);
+      expect(result.windowStart).toBe(25);
+      expect(result.totalTurns).toBe(20);
+    });
+
     it("returns first N turns when sinceTurn is 0", () => {
       const session = makeTwentyTurnSession();
       const result = sliceTurns(session.turns, { sinceTurn: 0, last: 3 });

@@ -116,8 +116,8 @@ OPTIONS:
                      Note: combine with --tool-output to see actual results.
   --tools <names>    Show calls for multiple tools (e.g., --tools Bash,Edit,Write)
                      Comma-separated, case-sensitive. Mutually exclusive with --tool.
-  --since-turn <n>   Show turns after index N (0-based). Use for incremental reads.
-  --last <n>         Show only the last N turns.
+  --since-turn <n>   Show turns from index N onward. Can combine with --last.
+  --last <n>         Show last N turns. When combined with --since-turn, caps the count.
   --commits          Interleave commits chronologically in narrative output
                      (default: append at end). Uses Claude-Session trailer for
                      precise discovery, falls back to time-window.
