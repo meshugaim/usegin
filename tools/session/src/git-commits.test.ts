@@ -3,6 +3,7 @@ import {
   parseGitLogOutput,
   getCommitsFromGitHistory,
   getCommitsByTrailer,
+  getCommitsBySha,
   getSessionCommits,
   type GitCommit,
 } from "./git-commits";
@@ -546,5 +547,262 @@ describe("getSessionCommits", () => {
     });
 
     expect(commits).toEqual([]);
+  });
+
+  // ==========================================================================
+  // SHA-BASED STRATEGY IN getSessionCommits
+  // ==========================================================================
+
+  test("uses SHA-based strategy first when shas are provided", async () => {
+    // Get a real SHA from this repo
+    const proc = Bun.spawn(["git", "log", "-1", "--format=%H"], {
+      cwd: "/workspaces/test-mvp",
+      stdout: "pipe",
+    });
+    const sha = (await new Response(proc.stdout).text()).trim();
+
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+      shas: [sha],
+    });
+
+    // SHA-based should succeed, no need to fall through to trailer/time-window
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.hash).toBe(sha);
+  });
+
+  test("skips SHA strategy when shas is empty array", async () => {
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+      shas: [],
+    });
+
+    // Empty shas -> skip SHA strategy -> no trailer match -> no time window -> empty
+    expect(commits).toEqual([]);
+  });
+
+  test("skips SHA strategy when shas is undefined", async () => {
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+      shas: undefined,
+    });
+
+    // undefined shas -> skip SHA strategy -> no trailer match -> no time window -> empty
+    expect(commits).toEqual([]);
+  });
+
+  test("falls through from SHA to trailer when all SHAs are invalid", async () => {
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+      shas: ["0000000000000000000000000000000000000000", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"],
+    });
+
+    // Invalid SHAs -> SHA strategy returns empty -> trailer returns empty -> no time window -> empty
+    expect(commits).toEqual([]);
+  });
+
+  test("falls through from SHA to time-window when SHAs invalid and no trailer match", async () => {
+    const endTime = new Date().toISOString();
+    const startTime = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    const commits = await getSessionCommits({
+      cwd: "/workspaces/test-mvp",
+      sessionId: "nonexistent-session-id-that-no-commit-has-99999",
+      startTime,
+      endTime,
+      shas: ["0000000000000000000000000000000000000000"],
+    });
+
+    // Invalid SHA -> trailer miss -> fall through to time-window
+    expect(commits.length).toBeGreaterThan(0);
+  });
+});
+
+// ============================================================================
+// getCommitsBySha — SHA-based commit discovery
+// ============================================================================
+
+describe("getCommitsBySha", () => {
+  // ==========================================================================
+  // VALID SHAs (integration tests against real repo)
+  // ==========================================================================
+
+  test("returns enriched commit for a valid full SHA", async () => {
+    // Get the most recent SHA from this repo
+    const proc = Bun.spawn(["git", "log", "-1", "--format=%H"], {
+      cwd: "/workspaces/test-mvp",
+      stdout: "pipe",
+    });
+    const sha = (await new Response(proc.stdout).text()).trim();
+
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas: [sha],
+    });
+
+    expect(commits).toHaveLength(1);
+    const commit = commits[0]!;
+    expect(commit.hash).toMatch(/^[0-9a-f]{40}$/);
+    expect(commit.shortHash.length).toBeGreaterThanOrEqual(7);
+    expect(commit.subject.length).toBeGreaterThan(0);
+    expect(commit.authorName.length).toBeGreaterThan(0);
+    expect(commit.authorEmail.length).toBeGreaterThan(0);
+    expect(commit.timestamp.length).toBeGreaterThan(0);
+  });
+
+  test("returns enriched commits for multiple valid SHAs", async () => {
+    const proc = Bun.spawn(["git", "log", "-3", "--format=%H"], {
+      cwd: "/workspaces/test-mvp",
+      stdout: "pipe",
+    });
+    const shas = (await new Response(proc.stdout).text()).trim().split("\n");
+
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas,
+    });
+
+    expect(commits).toHaveLength(3);
+    // Each commit should have valid structure
+    for (const commit of commits) {
+      expect(commit.hash).toMatch(/^[0-9a-f]{40}$/);
+      expect(commit.subject.length).toBeGreaterThan(0);
+    }
+  });
+
+  test("works with short (7-char) SHAs", async () => {
+    const proc = Bun.spawn(["git", "log", "-1", "--format=%h"], {
+      cwd: "/workspaces/test-mvp",
+      stdout: "pipe",
+    });
+    const shortSha = (await new Response(proc.stdout).text()).trim();
+
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas: [shortSha],
+    });
+
+    expect(commits).toHaveLength(1);
+    // The returned hash should be the full 40-char hash (enriched)
+    expect(commits[0]!.hash).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  // ==========================================================================
+  // EMPTY / TRIVIAL INPUT
+  // ==========================================================================
+
+  test("returns empty array for empty SHA list", async () => {
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas: [],
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty array for empty cwd", async () => {
+    const commits = await getCommitsBySha({
+      cwd: "",
+      shas: ["abc1234"],
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  // ==========================================================================
+  // GRACEFUL ERROR HANDLING
+  // ==========================================================================
+
+  test("gracefully handles non-existent SHAs", async () => {
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas: ["0000000000000000000000000000000000000000", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"],
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("handles mix of valid and invalid SHAs", async () => {
+    // Get one real SHA
+    const proc = Bun.spawn(["git", "log", "-1", "--format=%H"], {
+      cwd: "/workspaces/test-mvp",
+      stdout: "pipe",
+    });
+    const validSha = (await new Response(proc.stdout).text()).trim();
+
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas: [validSha, "0000000000000000000000000000000000000000"],
+    });
+
+    // Should return only the valid commit, skipping the invalid one
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.hash).toBe(validSha);
+  });
+
+  test("returns empty for non-git directory", async () => {
+    const commits = await getCommitsBySha({
+      cwd: "/tmp",
+      shas: ["abc1234"],
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  test("returns empty for non-existent directory", async () => {
+    const commits = await getCommitsBySha({
+      cwd: "/nonexistent/path/that/does/not/exist",
+      shas: ["abc1234"],
+    });
+
+    expect(commits).toEqual([]);
+  });
+
+  // ==========================================================================
+  // PRECISION TEST — demonstrates the core value of SHA-based scoping
+  // ==========================================================================
+
+  test("returns exactly the requested commit, not neighboring ones", async () => {
+    // Get 2 recent real SHAs
+    const proc = Bun.spawn(["git", "log", "-2", "--format=%H"], {
+      cwd: "/workspaces/test-mvp",
+      stdout: "pipe",
+    });
+    const shas = (await new Response(proc.stdout).text()).trim().split("\n");
+    expect(shas).toHaveLength(2);
+
+    // Ask for only the first one
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas: [shas[0]!],
+    });
+
+    // Should return exactly 1 commit — the one we asked for, not both
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.hash).toBe(shas[0]!);
+  });
+
+  test("returns commits sorted by timestamp ascending", async () => {
+    const proc = Bun.spawn(["git", "log", "-5", "--format=%H"], {
+      cwd: "/workspaces/test-mvp",
+      stdout: "pipe",
+    });
+    const shas = (await new Response(proc.stdout).text()).trim().split("\n");
+
+    const commits = await getCommitsBySha({
+      cwd: "/workspaces/test-mvp",
+      shas,
+    });
+
+    // Verify ascending order
+    for (let i = 1; i < commits.length; i++) {
+      const prevTime = new Date(commits[i - 1]!.timestamp).getTime();
+      const currTime = new Date(commits[i]!.timestamp).getTime();
+      expect(currTime).toBeGreaterThanOrEqual(prevTime);
+    }
   });
 });

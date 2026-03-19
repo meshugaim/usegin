@@ -1,9 +1,10 @@
 /**
- * Query git history for commits made during a session's time window.
+ * Git commit discovery for Claude Code sessions.
  *
- * Instead of relying on regex matching of Bash tool output (fragile, misses
- * subagent commits, breaks on unusual branch names), this module queries
- * `git log` directly for accurate, complete commit data.
+ * Three-tier resolution strategy (most precise to broadest):
+ * 1. **SHA-based** — exact commits extracted from session Bash tool output
+ * 2. **Trailer-based** — commits tagged with "Claude-Session: <id>" trailer
+ * 3. **Time-window** — all commits within the session's time range
  *
  * Design:
  * - Uses `Bun.spawn` to run `git log` with structured delimiters
@@ -275,6 +276,122 @@ export async function getCommitsFromGitHistory(options: {
 }
 
 /**
+ * Get commits by their SHA hashes.
+ *
+ * Uses `git log --no-walk` with the same structured format as other strategies,
+ * providing a single efficient command for all SHAs. This is the most precise
+ * strategy — it returns exactly the commits requested, nothing more.
+ *
+ * Gracefully handles:
+ * - Non-existent SHAs (amended/rebased away): skipped silently
+ * - Empty SHA list: returns []
+ * - Non-git directory: returns []
+ * - Mix of valid and invalid SHAs: returns only the valid ones
+ *
+ * @param options.cwd - Working directory (should be inside a git repo)
+ * @param options.shas - Array of commit SHAs (short 7-char or full 40-char)
+ * @returns Enriched commits for the valid SHAs, sorted by timestamp ascending
+ */
+export async function getCommitsBySha(options: {
+  cwd: string;
+  shas: string[];
+}): Promise<GitCommit[]> {
+  const { cwd, shas } = options;
+
+  if (!cwd || shas.length === 0) return [];
+
+  // Filter out obviously invalid SHAs (must be hex strings of reasonable length)
+  const validShas = shas.filter((sha) => /^[0-9a-f]{4,40}$/i.test(sha));
+  if (validShas.length === 0) return [];
+
+  try {
+    // --no-walk treats each SHA as a standalone commit (no traversal),
+    // so we get exactly the commits we asked for
+    const proc = Bun.spawn(
+      [
+        "git",
+        "log",
+        "--no-walk",
+        `--format=${GIT_LOG_FORMAT}`,
+        "--shortstat",
+        ...validShas,
+      ],
+      {
+        cwd,
+        stdout: "pipe",
+        stderr: "pipe",
+      }
+    );
+
+    const stdout = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+
+    // git log --no-walk exits with 0 even when some SHAs are missing —
+    // it just skips them. But if ALL SHAs are bad or the repo is invalid,
+    // it may exit non-zero.
+    if (exitCode !== 0) {
+      // Try individual SHAs as a fallback: some may be valid while
+      // the batch command fails because one bad SHA poisons the whole run
+      return getCommitsByShaIndividually({ cwd, shas: validShas });
+    }
+
+    return parseGitLogOutput(stdout);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fallback: try each SHA individually when the batch command fails.
+ * This handles the case where one bad SHA causes `git log --no-walk` to
+ * exit non-zero, but other SHAs in the list are valid.
+ */
+async function getCommitsByShaIndividually(options: {
+  cwd: string;
+  shas: string[];
+}): Promise<GitCommit[]> {
+  const { cwd, shas } = options;
+  const commits: GitCommit[] = [];
+
+  for (const sha of shas) {
+    try {
+      const proc = Bun.spawn(
+        [
+          "git",
+          "log",
+          "--no-walk",
+          `--format=${GIT_LOG_FORMAT}`,
+          "--shortstat",
+          sha,
+        ],
+        {
+          cwd,
+          stdout: "pipe",
+          stderr: "pipe",
+        }
+      );
+
+      const stdout = await new Response(proc.stdout).text();
+      const exitCode = await proc.exited;
+
+      if (exitCode === 0) {
+        commits.push(...parseGitLogOutput(stdout));
+      }
+      // Non-zero exit for this SHA: skip it silently
+    } catch {
+      // Skip this SHA silently
+    }
+  }
+
+  // Sort by timestamp ascending (same as parseGitLogOutput)
+  commits.sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  return commits;
+}
+
+/**
  * Get commits tagged with a Claude-Session trailer for a specific session.
  * Uses git log --grep to find commits with "Claude-Session: <sessionId>" in the message.
  * Falls back to empty array on any error.
@@ -308,24 +425,35 @@ export async function getCommitsByTrailer(options: {
 }
 
 /**
- * Get session commits: trailer-based first, then time-window fallback.
+ * Get session commits using a three-tier resolution strategy.
  *
- * Tries trailer-based discovery first (precise, session-scoped) then
- * falls back to time-window query (existing behavior).
+ * Resolution order (most precise to broadest):
+ * 1. **SHA-based** — exact commits extracted from session Bash output
+ * 2. **Trailer-based** — commits tagged with "Claude-Session: <id>"
+ * 3. **Time-window** — all commits within the session's time range
+ *
+ * Each strategy falls through to the next if it returns no results.
  */
 export async function getSessionCommits(options: {
   cwd: string;
   sessionId: string;
   startTime?: string;
   endTime?: string;
+  shas?: string[];
 }): Promise<GitCommit[]> {
-  const { cwd, sessionId, startTime, endTime } = options;
+  const { cwd, sessionId, startTime, endTime, shas } = options;
 
-  // Try trailer-based first (precise)
+  // 1. SHA-based (most precise): exact commits from this session's Bash output
+  if (shas && shas.length > 0) {
+    const shaCommits = await getCommitsBySha({ cwd, shas });
+    if (shaCommits.length > 0) return shaCommits;
+  }
+
+  // 2. Trailer-based (session-scoped): commits with Claude-Session trailer
   const trailerCommits = await getCommitsByTrailer({ cwd, sessionId });
   if (trailerCommits.length > 0) return trailerCommits;
 
-  // Fall back to time-window (existing behavior)
+  // 3. Time-window (broadest fallback): all commits in the time range
   if (startTime && endTime) {
     return getCommitsFromGitHistory({ cwd, startTime, endTime });
   }

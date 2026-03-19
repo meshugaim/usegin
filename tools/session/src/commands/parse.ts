@@ -98,6 +98,7 @@ export async function runParse(args: MainArgs) {
           sessionId: session.sessionId,
           startTime: session.startTimestamp,
           endTime: session.endTimestamp,
+          shas: session.commits.map((c) => c.hash),
         });
         if (gitCommits.length > 0) {
           session.gitCommits = gitCommits;
