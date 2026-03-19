@@ -300,8 +300,11 @@ export async function getCommitsBySha(options: {
 
   if (!cwd || shas.length === 0) return [];
 
+  // Deduplicate input SHAs to avoid redundant git lookups
+  const uniqueShas = [...new Set(shas)];
+
   // Filter out obviously invalid SHAs (must be hex strings of reasonable length)
-  const validShas = shas.filter((sha) => /^[0-9a-f]{4,40}$/i.test(sha));
+  const validShas = uniqueShas.filter((sha) => /^[0-9a-f]{7,40}$/i.test(sha));
   if (validShas.length === 0) return [];
 
   try {

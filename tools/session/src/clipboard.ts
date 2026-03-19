@@ -41,7 +41,7 @@ const CLIPBOARD_TOOLS: ClipboardTool[] = [
  */
 async function isCommandAvailable(command: string): Promise<boolean> {
   try {
-    const proc = Bun.spawn(["which", command], {
+    const proc = Bun.spawn(["sh", "-c", "command -v " + command], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -55,15 +55,21 @@ async function isCommandAvailable(command: string): Promise<boolean> {
 /**
  * Detect the first available clipboard tool on this system.
  *
- * Returns `null` if no clipboard tool is found.
+ * Returns `null` if no clipboard tool is found. Result is cached so
+ * subsequent calls skip the probe.
  */
+let cachedTool: ClipboardTool | null | undefined;
 export async function detectClipboardTool(): Promise<ClipboardTool | null> {
+  if (cachedTool !== undefined) return cachedTool;
+  let result: ClipboardTool | null = null;
   for (const tool of CLIPBOARD_TOOLS) {
     if (await isCommandAvailable(tool.command)) {
-      return tool;
+      result = tool;
+      break;
     }
   }
-  return null;
+  cachedTool = result;
+  return result;
 }
 
 // =============================================================================

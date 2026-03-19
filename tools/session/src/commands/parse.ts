@@ -88,7 +88,7 @@ export async function runParse(args: MainArgs) {
     }
 
     // Enrich session with git history commits when cwd and session ID are available.
-    // Uses trailer-based discovery first (precise), then falls back to time-window.
+    // Uses SHA-based discovery first (most precise), then trailer-based, then falls back to time-window.
     if (session.cwd && session.sessionId) {
       stepStart = Date.now();
       debugLog(debug, "Querying git history for commits...");
