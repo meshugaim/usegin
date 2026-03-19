@@ -1,19 +1,34 @@
 /**
- * Format parsed sessions into readable output
+ * Shared formatter utilities for session output formats.
+ *
+ * Format-specific code lives in dedicated modules:
+ * - format-narrative.ts  — narrative transcript format
+ * - format-terminal.ts   — terminal/export format
+ * - format-markdown.ts   — markdown format
+ *
+ * This module contains shared helpers (turn formatting, tool summaries, etc.)
+ * used by multiple formats, plus re-exports so existing imports keep working.
  */
 
 import type {
   ParsedSession,
-  ParsedSubagent,
   Turn,
   ToolCall,
-  QueuedMessage,
-  CompactionEvent,
-  EntryUuid,
 } from "./types";
 import { getToolCallInput } from "./types";
-import type { GitCommit } from "./git-commits";
-import { truncate, formatTokenCount } from "./format-utils";
+import { truncate } from "./format-utils";
+
+// ============================================================================
+// RE-EXPORTS — preserve the public API of formatter.ts
+// ============================================================================
+
+export { formatNarrative } from "./format-narrative";
+export { formatTerminal } from "./format-terminal";
+export { formatMarkdown } from "./format-markdown";
+
+// ============================================================================
+// SHARED TYPES
+// ============================================================================
 
 export interface FormatOptions {
   toolInput: boolean;
@@ -24,188 +39,16 @@ export interface FormatOptions {
   commits?: boolean;
 }
 
-const defaultOptions: FormatOptions = {
+export const defaultOptions: FormatOptions = {
   toolInput: false,
   toolOutput: false,
   truncate: 500,
   includeSubagents: false,
 };
 
-/**
- * Format a session as a narrative transcript
- */
-export function formatNarrative(
-  session: ParsedSession,
-  options: Partial<FormatOptions> = {}
-): string {
-  const formatOptions = { ...defaultOptions, ...options };
-  const lines: string[] = [];
-
-  // Summary header (separate from other metadata)
-  if (session.summary) {
-    lines.push("━".repeat(40));
-    lines.push(`★ ${session.summary}`);
-    lines.push("━".repeat(40));
-    lines.push("");
-  }
-
-  // Header section (metadata about the session)
-  const hasHeaders =
-    (session.triggeredSkills && session.triggeredSkills.length > 0) ||
-    (session.rewinds && session.rewinds.length > 0);
-
-  if (hasHeaders) {
-    lines.push("─".repeat(40));
-    if (session.triggeredSkills && session.triggeredSkills.length > 0) {
-      lines.push(`SKILLS: ${session.triggeredSkills.join(", ")}`);
-    }
-    if (session.rewinds && session.rewinds.length > 0) {
-      lines.push(`REWINDS: ${session.rewinds.length}`);
-    }
-    lines.push("─".repeat(40));
-    lines.push("");
-  }
-
-  // Build compaction context: map from summary turn UUID -> compaction info
-  const compactionCtx = buildCompactionContext(session.compactions);
-  const totalSegments = session.compactions.length + 1;
-
-  // Helper to render a turn with compaction awareness
-  const renderTurn = (turn: Turn): void => {
-    // Insert compaction boundary marker before compaction summary turns
-    const ctx = compactionCtx.get(turn.uuid);
-    if (ctx) {
-      lines.push(formatCompactionMarker(ctx.compaction, ctx.index, totalSegments));
-      lines.push("");
-    }
-
-    lines.push(formatTurn(turn, formatOptions));
-    lines.push("");
-  };
-
-  // Determine whether to interleave commits into the chronological stream
-  const interleaveCommits =
-    formatOptions.commits === true &&
-    session.gitCommits != null &&
-    session.gitCommits.length > 0;
-
-  // Build a unified chronological stream of turns, queued messages, and optionally commits
-  type StreamItem =
-    | { kind: "turn"; timestamp?: string; turn: Turn }
-    | { kind: "queued"; timestamp: string; message: QueuedMessage }
-    | { kind: "commit"; timestamp: string; commit: GitCommit };
-
-  const stream: StreamItem[] = [];
-
-  // Always include turns
-  for (const turn of session.turns) {
-    stream.push({ kind: "turn", timestamp: turn.timestamp, turn });
-  }
-
-  // Include queued messages when present
-  const queuedMessages = session.queuedMessages ?? [];
-  for (const qm of queuedMessages) {
-    stream.push({ kind: "queued", timestamp: qm.timestamp, message: qm });
-  }
-
-  // Include commits in the stream only when interleaving
-  if (interleaveCommits) {
-    for (const commit of session.gitCommits!) {
-      stream.push({ kind: "commit", timestamp: commit.timestamp, commit });
-    }
-  }
-
-  // Sort the stream chronologically when we have anything to interleave
-  const needsMerge = queuedMessages.length > 0 || interleaveCommits;
-  if (needsMerge) {
-    stream.sort((a, b) => {
-      // Items without timestamps go first (preserve original behavior)
-      if (!a.timestamp && !b.timestamp) return 0;
-      if (!a.timestamp) return -1;
-      if (!b.timestamp) return 1;
-      return a.timestamp.localeCompare(b.timestamp);
-    });
-  }
-
-  // Render the stream
-  for (const item of stream) {
-    switch (item.kind) {
-      case "turn":
-        renderTurn(item.turn);
-        break;
-      case "queued":
-        lines.push(`USER (queued): ${item.message.content}`);
-        lines.push("");
-        break;
-      case "commit":
-        lines.push(formatCommitBlock(item.commit));
-        lines.push("");
-        break;
-    }
-  }
-
-  // Commits section (appended at end) — only when NOT interleaving
-  if (!interleaveCommits) {
-    if (session.gitCommits && session.gitCommits.length > 0) {
-      lines.push("─── Commits " + "─".repeat(28));
-      for (const commit of session.gitCommits) {
-        const diffStats =
-          commit.insertions !== undefined || commit.deletions !== undefined
-            ? `  (+${commit.insertions ?? 0}/-${commit.deletions ?? 0})`
-            : "";
-        lines.push(`  ${commit.shortHash}  ${commit.subject}${diffStats}`);
-      }
-      lines.push("");
-    } else if (session.commits.length > 0) {
-      lines.push("─── Commits " + "─".repeat(28));
-      for (const commit of session.commits) {
-        const shortHash = commit.hash.slice(0, 7);
-        lines.push(`  ${shortHash}  ${commit.message ?? ""}`);
-      }
-      lines.push("");
-    }
-  }
-
-  // Subagent transcripts (appended at end)
-  if (formatOptions.includeSubagents && session.subagents.length > 0) {
-    lines.push("");
-    lines.push("═".repeat(60));
-    lines.push(`SUBAGENTS (${session.subagents.length})`);
-    lines.push("═".repeat(60));
-
-    for (const subagent of session.subagents) {
-      lines.push("");
-      lines.push(formatSubagent(subagent, formatOptions));
-    }
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Format a subagent transcript
- */
-function formatSubagent(subagent: ParsedSubagent, formatOptions: FormatOptions): string {
-  const lines: string[] = [];
-
-  // Subagent header
-  lines.push("─".repeat(40));
-  lines.push(`SUBAGENT: ${subagent.agentId}`);
-  if (subagent.startTimestamp) {
-    lines.push(`Started: ${subagent.startTimestamp}`);
-  }
-  lines.push(`Turns: ${subagent.turns.length}`);
-  lines.push("─".repeat(40));
-  lines.push("");
-
-  // Subagent turns
-  for (const turn of subagent.turns) {
-    lines.push(formatTurn(turn, formatOptions));
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
+// ============================================================================
+// SHARED TURN FORMATTING
+// ============================================================================
 
 /**
  * Format a single turn
@@ -345,59 +188,11 @@ export function dedupTaskNotifications(turns: Turn[]): Turn[] {
 }
 
 // ============================================================================
-// COMPACTION HELPERS
+// COMPACTION HELPERS (used by formatTurn)
 // ============================================================================
 
 /** Max chars of compaction summary text to show before truncating */
 const COMPACTION_SUMMARY_PREVIEW_CHARS = 200;
-
-interface CompactionTurnContext {
-  compaction: CompactionEvent;
-  /** 1-based compaction index */
-  index: number;
-}
-
-/**
- * Build a lookup map from compaction summary turn UUID to its context.
- *
- * This allows O(1) lookup during turn rendering to decide whether a turn
- * needs a compaction boundary marker inserted before it.
- */
-function buildCompactionContext(
-  compactions: CompactionEvent[]
-): Map<EntryUuid, CompactionTurnContext> {
-  const map = new Map<EntryUuid, CompactionTurnContext>();
-  for (let i = 0; i < compactions.length; i++) {
-    const compaction = compactions[i]!;
-    if (compaction.summaryMessageUuid) {
-      map.set(compaction.summaryMessageUuid, {
-        compaction,
-        index: i + 1,
-      });
-    }
-  }
-  return map;
-}
-
-/**
- * Format a compaction boundary marker line.
- *
- * Example:
- *   ━━━ Compaction #1 (auto) ━━━ 172k tokens ━━━ Segment 2 of 5 ━━━
- */
-function formatCompactionMarker(
-  compaction: CompactionEvent,
-  index: number,
-  totalSegments: number
-): string {
-  const segmentNumber = index + 1; // Segment after this compaction
-  const parts = [
-    `Compaction #${index} (${compaction.trigger})`,
-    `${formatTokenCount(compaction.preTokens)} tokens`,
-    `Segment ${segmentNumber} of ${totalSegments}`,
-  ];
-  return `━━━ ${parts.join(" ━━━ ")} ━━━`;
-}
 
 /**
  * Truncate compaction summary text for narrative display.
@@ -420,331 +215,8 @@ function formatCompactionSummaryText(text: string): string {
 }
 
 // ============================================================================
-// COMMIT INTERLEAVING
+// TOOL FILTER FORMAT
 // ============================================================================
-
-/**
- * Format a commit block for narrative interleaving.
- *
- * Renders a visually distinct commit marker with the short hash, subject line,
- * and optional diff stats (insertions, deletions, files changed).
- *
- * Example output:
- *   ── commit abc1234 ─────────────────────
- *   fix: login bug (+42, -7, 3 files)
- *   ────────────────────────────────────────
- */
-function formatCommitBlock(commit: GitCommit): string {
-  const stats: string[] = [];
-  if (commit.insertions !== undefined) stats.push(`+${commit.insertions}`);
-  if (commit.deletions !== undefined) stats.push(`-${commit.deletions}`);
-  if (commit.filesChanged !== undefined) stats.push(`${commit.filesChanged} files`);
-  const statsStr = stats.length > 0 ? ` (${stats.join(", ")})` : "";
-
-  return [
-    `── commit ${commit.shortHash} ${"─".repeat(Math.max(0, 30 - commit.shortHash.length))}`,
-    `${commit.subject}${statsStr}`,
-    "─".repeat(40),
-  ].join("\n");
-}
-
-// ============================================================================
-// GENERAL HELPERS
-// ============================================================================
-
-/**
- * Truncate by lines, showing first few and indicating how many more
- */
-function truncateLines(str: string, maxLines: number): string {
-  const lines = str.split("\n");
-  if (lines.length <= maxLines) return str;
-  const shown = lines.slice(0, maxLines).join("\n");
-  const remaining = lines.length - maxLines;
-  return `${shown}\n    … +${remaining} lines (ctrl+o to expand)`;
-}
-
-/**
- * Strip ANSI escape codes from a string
- */
-function stripAnsi(str: string): string {
-  // Match ANSI escape sequences: ESC[ followed by params and a letter
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
-}
-
-/**
- * Format a session in terminal style (replicates /export format)
- *
- * Format:
- * - User messages: "> message"
- * - Assistant text: plain text
- * - Tool calls: "● ToolName(params)"
- * - Tool results: "  ⎿ result"
- */
-export function formatTerminal(
-  session: ParsedSession,
-  options: Partial<FormatOptions> = {}
-): string {
-  const formatOptions = { ...defaultOptions, ...options };
-  const lines: string[] = [];
-
-  // Process turns - we need to pair tool calls with their results
-  // Tool results come in the next user turn after tool calls
-  for (let i = 0; i < session.turns.length; i++) {
-    const turn = session.turns[i];
-    if (!turn) continue;
-    const nextTurn = session.turns[i + 1];
-
-    // Skip rewound branches unless they have meaningful content
-    if (turn.isOnCurrentBranch === false) {
-      continue;
-    }
-
-    if (turn.role === "user") {
-      // User message - prefix with >
-      if (turn.text) {
-        // Indent multi-line user messages
-        const userLines = turn.text.split("\n");
-        const firstLine = userLines[0] ?? "";
-        lines.push(`> ${firstLine}`);
-        for (let lineIndex = 1; lineIndex < userLines.length; lineIndex++) {
-          lines.push(userLines[lineIndex] ?? "");
-        }
-        lines.push("");
-      }
-      // Tool results are handled when we process the preceding assistant turn
-    } else if (turn.role === "assistant") {
-      // Assistant text
-      if (turn.text) {
-        lines.push(`● ${turn.text}`);
-        lines.push("");
-      }
-
-      // Tool calls with results from next turn
-      for (const tool of turn.toolCalls) {
-        const toolLine = formatTerminalToolCall(tool);
-        lines.push(toolLine);
-
-        // Find matching result in next turn (if it's a user turn with results)
-        if (nextTurn && nextTurn.role === "user") {
-          const result = nextTurn.toolResults.find(
-            (toolResult) => toolResult.toolUseId === tool.id
-          );
-          if (result) {
-            const resultLine = formatTerminalToolResult(tool, result, formatOptions);
-            if (resultLine) {
-              lines.push(resultLine);
-            }
-          }
-        }
-        lines.push("");
-      }
-    }
-  }
-
-  return lines.join("\n");
-}
-
-/**
- * Format a tool call in terminal style: ● ToolName(params)
- */
-function formatTerminalToolCall(tool: ToolCall): string {
-  const params = getTerminalToolParams(tool);
-  if (params) {
-    return `● ${tool.name}(${params})`;
-  }
-  return `● ${tool.name}`;
-}
-
-/**
- * Get parameters string for terminal tool display
- */
-function getTerminalToolParams(tool: ToolCall): string {
-  const input = tool.input;
-
-  switch (tool.name) {
-    case "Read":
-      return String(input.file_path || "");
-    case "Write":
-      return String(input.file_path || "");
-    case "Edit":
-      return String(input.file_path || "");
-    case "Glob":
-      return `pattern: "${input.pattern || ""}"`;
-    case "Grep":
-    case "Search": {
-      const pattern = input.pattern || "";
-      const path = input.path || "";
-      if (path) {
-        return `pattern: "${pattern}", path: "${path}"`;
-      }
-      return `pattern: "${pattern}"`;
-    }
-    case "Bash": {
-      const cmd = String(input.command || "");
-      // Truncate long commands
-      return cmd.length > 70 ? cmd.slice(0, 70) + "..." : cmd;
-    }
-    case "Task":
-      return String(input.description || "");
-    case "TodoWrite": {
-      const todoInput = getToolCallInput("TodoWrite", tool);
-      return `${todoInput?.todos.length ?? 0} todos`;
-    }
-    case "Skill":
-      return String(input.skill || "");
-    case "AskUserQuestion":
-      return "";
-    default:
-      // Return first short string value found
-      for (const inputValue of Object.values(input)) {
-        if (typeof inputValue === "string" && inputValue.length > 0 && inputValue.length < 100) {
-          return inputValue;
-        }
-      }
-      return "";
-  }
-}
-
-/**
- * Format a tool result in terminal style: ⎿ result
- */
-function formatTerminalToolResult(
-  tool: ToolCall,
-  result: { content: string; isError: boolean },
-  _formatOptions: FormatOptions
-): string {
-  const indent = "  ⎿ ";
-
-  // Ensure content is a string and strip ANSI codes
-  const rawContent = typeof result.content === "string" ? result.content : String(result.content || "");
-  const content = stripAnsi(rawContent);
-
-  if (result.isError) {
-    const errorContent = truncateLines(content, 3);
-    return `${indent}Error: ${errorContent}`;
-  }
-
-  // Special formatting for certain tools
-  switch (tool.name) {
-    case "Read": {
-      // Count lines read
-      const lineCount = content.split("\n").length;
-      return `${indent}Read ${lineCount} lines`;
-    }
-    case "Grep":
-    case "Search": {
-      // Show match count
-      const matchLines = content.split("\n").filter((line) => line.trim());
-      return `${indent}Found ${matchLines.length} matches`;
-    }
-    case "Glob": {
-      const files = content.split("\n").filter((line) => line.trim());
-      return `${indent}Found ${files.length} files`;
-    }
-    case "Bash": {
-      if (!content.trim()) {
-        return `${indent}(No output)`;
-      }
-      const truncated = truncateLines(content.trim(), 4);
-      // Indent continuation lines
-      const resultLines = truncated.split("\n");
-      return resultLines.map((line, i) => (i === 0 ? `${indent}${line}` : `    ${line}`)).join("\n");
-    }
-    default: {
-      if (!content.trim()) {
-        return "";
-      }
-      const truncated = truncateLines(content.trim(), 4);
-      const resultLines = truncated.split("\n");
-      return resultLines.map((line, i) => (i === 0 ? `${indent}${line}` : `    ${line}`)).join("\n");
-    }
-  }
-}
-
-/**
- * Format a session as readable Markdown
- */
-export function formatMarkdown(session: ParsedSession): string {
-  const lines: string[] = [];
-
-  // Title
-  if (session.summary) {
-    lines.push(`# ${session.summary}`);
-  } else {
-    lines.push(`# Session ${session.sessionId}`);
-  }
-  lines.push("");
-
-  // Metadata
-  lines.push("## Metadata");
-  lines.push("");
-  lines.push(`- **Session ID:** ${session.sessionId}`);
-  lines.push(`- **Working Directory:** ${session.cwd}`);
-  lines.push(`- **Model:** ${session.model}`);
-  if (session.triggeredSkills.length > 0) {
-    lines.push(`- **Skills:** ${session.triggeredSkills.join(", ")}`);
-  }
-  if (session.rewinds.length > 0) {
-    lines.push(`- **Rewinds:** ${session.rewinds.length}`);
-  }
-  if (session.result) {
-    lines.push(`- **Duration:** ${(session.result.durationMs / 1000).toFixed(1)}s`);
-    if (session.result.costUsd !== undefined) {
-      lines.push(`- **Cost:** $${session.result.costUsd.toFixed(4)}`);
-    }
-  }
-  lines.push("");
-
-  // Conversation
-  lines.push("## Conversation");
-  lines.push("");
-
-  for (const turn of session.turns) {
-    const prefix = turn.isOnCurrentBranch === false ? "~~[REWIND]~~ " : "";
-    const role = turn.role === "user" ? "**User**" : "**Assistant**";
-
-    if (turn.text) {
-      lines.push(`### ${prefix}${role}`);
-      lines.push("");
-      lines.push(turn.text);
-      lines.push("");
-    }
-
-    // Tool calls
-    for (const tool of turn.toolCalls) {
-      const summary = getToolSummary(tool);
-      lines.push(`> 🔧 **${tool.name}**: ${summary}`);
-    }
-
-    if (turn.toolCalls.length > 0) {
-      lines.push("");
-    }
-  }
-
-  // Subagents
-  if (session.subagents.length > 0) {
-    lines.push("## Subagents");
-    lines.push("");
-
-    for (const subagent of session.subagents) {
-      lines.push(`### Subagent: ${subagent.agentId}`);
-      lines.push("");
-
-      for (const turn of subagent.turns) {
-        const role = turn.role === "user" ? "**User**" : "**Assistant**";
-        if (turn.text) {
-          lines.push(`#### ${role}`);
-          lines.push("");
-          lines.push(turn.text);
-          lines.push("");
-        }
-      }
-    }
-  }
-
-  return lines.join("\n");
-}
 
 /**
  * Format a filtered view showing only calls for a specific tool type.
