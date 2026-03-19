@@ -61,7 +61,11 @@ export function parseEntries(entries: Entry[]): ParsedSession {
   // to the boundary entry. When we encounter that user turn, we tag it
   // as a compaction summary and remove the boundary from this set.
   const pendingCompactionBoundaryUuids = new Set<string>();
-  // Aggregate token usage across all assistant turns
+  // Aggregate token usage across all assistant turns.
+  // NOTE: This is intentionally separate from aggregateTokenUsage() in parse-tokens.ts.
+  // This aggregates from raw entries AS turns are built (before rewind filtering).
+  // aggregateTokenUsage() aggregates from already-parsed Turn objects (used for subagents).
+  // They operate at different pipeline stages and cannot be unified.
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalCacheCreationInputTokens = 0;
