@@ -117,6 +117,9 @@ OPTIONS:
   --tools <names>    Show calls for multiple tools (e.g., --tools Bash,Edit,Write)
                      Comma-separated, case-sensitive. Mutually exclusive with --tool.
   --since-turn <n>   Show turns from index N onward. Can combine with --last.
+  --since-timestamp <t>  Show turns at or after time T. Supports ISO 8601
+                     (e.g., 2026-03-19T10:30:00Z) or relative (5m, 1h, 2d).
+                     Applied before --since-turn/--last windowing.
   --last <n>         Show last N turns. When combined with --since-turn, caps the count.
   --exclude-notifications  Filter out task-notification turns (from background agents)
   --commits          Interleave commits chronologically in narrative output

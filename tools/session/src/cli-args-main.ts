@@ -66,6 +66,8 @@ export interface MainArgs {
   commits: boolean;
   /** Filter out task-notification turns from output. */
   excludeNotifications: boolean;
+  /** Show only turns at or after this timestamp. Raw string — resolved to Date at use site. */
+  sinceTimestamp?: string;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -154,6 +156,10 @@ export function parseMainArgs(args: string[]): MainArgs {
       result.commits = true;
     } else if (arg === "--exclude-notifications") {
       result.excludeNotifications = true;
+    } else if (arg === "--since-timestamp") {
+      const value = requireArgValue(args, i, "--since-timestamp");
+      result.sinceTimestamp = value;
+      i++;
     } else if (arg === "--last") {
       const value = requireArgValue(args, i, "--last");
       const n = validateNonNegativeInteger(value, "--last");

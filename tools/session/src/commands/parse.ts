@@ -9,6 +9,7 @@ import { resolveSessionPath } from "../finder";
 import { debugLog } from "../debug";
 import { sliceTurns, formatPositionHeader } from "../incremental";
 import { filterNotifications } from "../filter-notifications";
+import { parseTimestampArg, filterByTimestamp } from "../filter-by-timestamp";
 import type { MainArgs } from "../cli-args-main";
 
 /**
@@ -117,6 +118,12 @@ export async function runParse(args: MainArgs) {
     // --- Exclude task-notification turns (before windowing so --last N gives N real turns) ---
     if (args.excludeNotifications) {
       session = { ...session, turns: filterNotifications(session.turns) };
+    }
+
+    // --- Timestamp filter (before windowing so --last N gives N real turns) ---
+    if (args.sinceTimestamp) {
+      const since = parseTimestampArg(args.sinceTimestamp);
+      session = { ...session, turns: filterByTimestamp(session.turns, since) };
     }
 
     // --- Turn windowing (--since-turn, --last) ---

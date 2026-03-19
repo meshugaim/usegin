@@ -730,6 +730,64 @@ describe("parseMainArgs", () => {
     });
   });
 
+  describe("--since-timestamp validation", () => {
+    it("defaults sinceTimestamp to undefined", () => {
+      expect(parseMainArgs(["session.jsonl"]).sinceTimestamp).toBeUndefined();
+    });
+
+    it("parses --since-timestamp with ISO 8601 value", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-timestamp", "2026-03-19T10:30:00"]);
+      expect(result.sinceTimestamp).toBe("2026-03-19T10:30:00");
+    });
+
+    it("parses --since-timestamp with relative time 5m", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-timestamp", "5m"]);
+      expect(result.sinceTimestamp).toBe("5m");
+    });
+
+    it("parses --since-timestamp with relative time 1h", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-timestamp", "1h"]);
+      expect(result.sinceTimestamp).toBe("1h");
+    });
+
+    it("parses --since-timestamp with relative time 2d", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-timestamp", "2d"]);
+      expect(result.sinceTimestamp).toBe("2d");
+    });
+
+    it("throws when --since-timestamp is last argument with no value", () => {
+      expect(() => parseMainArgs(["--since-timestamp"])).toThrow(
+        "Missing value for --since-timestamp"
+      );
+    });
+
+    it("throws when --since-timestamp is followed by another flag", () => {
+      expect(() => parseMainArgs(["--since-timestamp", "--debug"])).toThrow(
+        "Missing value for --since-timestamp"
+      );
+    });
+
+    it("works alongside other flags", () => {
+      const result = parseMainArgs([
+        "session.jsonl",
+        "--since-timestamp",
+        "10m",
+        "--debug",
+        "--format",
+        "json",
+      ]);
+      expect(result.sinceTimestamp).toBe("10m");
+      expect(result.debug).toBe(true);
+      expect(result.format).toBe("json");
+    });
+
+    it("works alongside --last", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-timestamp", "1h", "--last", "5"]);
+      expect(result.sinceTimestamp).toBe("1h");
+      expect(result.last).toBe(5);
+    });
+  });
+
   describe("--commits flag", () => {
     it("defaults commits to false", () => {
       expect(parseMainArgs(["session.jsonl"]).commits).toBe(false);
