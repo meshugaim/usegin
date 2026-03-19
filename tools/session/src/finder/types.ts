@@ -76,6 +76,8 @@ export interface FzfOptions {
 export interface FzfMultiLineOptions {
   filter?: string; // Non-interactive mode for testing
   preview?: boolean; // Enable preview pane (default: true)
+  deleteCommand?: string; // Shell command to delete selected session (receives path as $1)
+  reloadCommand?: string; // Shell command to regenerate NUL-separated entries for reload
 }
 
 // =============================================================================

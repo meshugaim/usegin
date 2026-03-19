@@ -12,32 +12,18 @@ import {
   warnIfConflictingFlags,
   writeOutputFile,
 } from "../finder";
+import type { SessionInfo } from "../finder";
 import { NoSessionsFoundError, FzfNotFoundError } from "../errors";
 import { parseFindArgs } from "../cli-args";
 import { parseSession } from "../parser";
 import { formatMarkdown } from "../formatter";
 import { fetchSession, formatFetchResult } from "../fetch";
 
-export async function runFind(args: string[]) {
-  // Check fzf availability before doing any work
-  if (!(await checkFzfAvailable())) {
-    const error = new FzfNotFoundError();
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
-  }
-
-  const findArgs = parseFindArgs(args);
-
-  // Warn if conflicting flags are specified
-  const conflictWarning = warnIfConflictingFlags({
-    project: findArgs.project,
-    allProjects: findArgs.allProjects,
-  });
-  if (conflictWarning) {
-    console.error(`Warning: ${conflictWarning}`);
-  }
-
-  // Project resolution: --all-projects > --project > current project
+/**
+ * Discover sessions and build NUL-separated multi-line entries for fzf.
+ * Shared between interactive find and --fzf-entries reload mode.
+ */
+async function buildFzfEntries(findArgs: ReturnType<typeof parseFindArgs>) {
   const currentProject = getCurrentProjectHash();
   const projectFilter = findArgs.allProjects
     ? undefined
@@ -49,8 +35,6 @@ export async function runFind(args: string[]) {
     since: findArgs.since,
   });
 
-  // When --remote is set, discover remote sessions and merge with local ones.
-  // Local sessions take priority over remote duplicates (higher fidelity).
   let sessions = localSessions;
   if (findArgs.remote) {
     const remoteSessions = await discoverRemoteSessions({
@@ -58,6 +42,83 @@ export async function runFind(args: string[]) {
     });
     sessions = mergeSessionLists(localSessions, remoteSessions);
   }
+
+  const entries: string[] = [];
+  const sessionMap = new Map<string, SessionInfo>();
+  const summaryMap = new Map<string, string | null>();
+
+  for (const session of sessions) {
+    const { messages, lineCount, summary } = await extractSessionMeta(session.path);
+    const entry = formatMultiLineEntry(
+      session,
+      messages,
+      lineCount,
+      6,
+      findArgs.allProjects ? undefined : (currentProject || undefined),
+      summary
+    );
+    entries.push(entry);
+    sessionMap.set(session.path, session);
+    summaryMap.set(session.path, summary);
+  }
+
+  return { entries, sessionMap, summaryMap, currentProject, projectFilter, sessions };
+}
+
+/**
+ * Build the shell commands used by the ctrl-x fzf binding.
+ *
+ * - deleteCommand: deletes the selected session (path extracted from last line of fzf entry)
+ * - reloadCommand: re-discovers sessions and outputs NUL-separated entries for fzf reload
+ */
+function buildFzfDeleteCommands(findArgs: ReturnType<typeof parseFindArgs>) {
+  const cliPath = new URL("../cli.ts", import.meta.url).pathname;
+
+  // Reconstruct the find flags so the reload command discovers the same sessions
+  const reloadFlags: string[] = ["--fzf-entries"];
+  if (findArgs.allProjects) reloadFlags.push("--all-projects");
+  if (findArgs.project) reloadFlags.push("--project", findArgs.project);
+  if (findArgs.since) reloadFlags.push("--since", findArgs.since);
+  if (findArgs.remote) reloadFlags.push("--remote");
+
+  // Delete: extract path from last line of the fzf entry, pass to session rm --yes
+  const deleteCommand = `echo {} | tail -1 | xargs bun ${cliPath} rm --yes`;
+
+  // Reload: re-run find in --fzf-entries mode to regenerate the list
+  const reloadCommand = `bun ${cliPath} find ${reloadFlags.join(" ")}`;
+
+  return { deleteCommand, reloadCommand };
+}
+
+export async function runFind(args: string[]) {
+  const findArgs = parseFindArgs(args);
+
+  // Internal mode: output NUL-separated entries for fzf reload, then exit.
+  // Used by the ctrl-x delete binding to refresh the session list.
+  if (args.includes("--fzf-entries")) {
+    const { entries } = await buildFzfEntries(findArgs);
+    process.stdout.write(entries.join("\0"));
+    return;
+  }
+
+  // Check fzf availability before doing any work
+  if (!(await checkFzfAvailable())) {
+    const error = new FzfNotFoundError();
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
+
+  // Warn if conflicting flags are specified
+  const conflictWarning = warnIfConflictingFlags({
+    project: findArgs.project,
+    allProjects: findArgs.allProjects,
+  });
+  if (conflictWarning) {
+    console.error(`Warning: ${conflictWarning}`);
+  }
+
+  const { entries, sessionMap, summaryMap, projectFilter, sessions } =
+    await buildFzfEntries(findArgs);
 
   if (sessions.length === 0) {
     // Check if the projects directory exists for better error message
@@ -72,29 +133,12 @@ export async function runFind(args: string[]) {
     process.exit(1);
   }
 
-  // Build multi-line entries with user messages and summaries
-  const entries: string[] = [];
-  const sessionMap = new Map<string, typeof sessions[0]>();
-  const summaryMap = new Map<string, string | null>();
-
-  for (const session of sessions) {
-    const { messages, lineCount, summary } = await extractSessionMeta(session.path);
-    const entry = formatMultiLineEntry(
-      session,
-      messages,
-      lineCount,
-      6,
-      findArgs.allProjects ? undefined : (currentProject || undefined),
-      summary
-    );
-    entries.push(entry);
-    // Map the path (last line of entry) to session for output formatting
-    sessionMap.set(session.path, session);
-    summaryMap.set(session.path, summary);
-  }
+  const { deleteCommand, reloadCommand } = buildFzfDeleteCommands(findArgs);
 
   const result = await runFzfMultiLine(entries, {
     preview: !findArgs.noPreview,
+    deleteCommand,
+    reloadCommand,
   });
 
   if (!result) {

@@ -105,6 +105,35 @@ describe("buildFzfArgs", () => {
     expect(headerValue).toContain("scroll");
   });
 
+  test("includes ctrl-x hint in header", () => {
+    const args = buildFzfArgs({});
+    const headerIdx = args.indexOf("--header");
+    const headerValue = args[headerIdx + 1];
+    expect(headerValue).toContain("ctrl-x");
+    expect(headerValue).toContain("delete");
+  });
+
+  test("includes ctrl-x binding when delete and reload commands provided", () => {
+    const args = buildFzfArgs({
+      deleteCommand: "echo {} | tail -1 | xargs session rm --yes",
+      reloadCommand: "session find --fzf-entries",
+    });
+    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
+    const ctrlXBind = bindArgs.find(b => b.includes("ctrl-x"));
+    expect(ctrlXBind).toBeDefined();
+    expect(ctrlXBind).toContain("execute-silent(");
+    expect(ctrlXBind).toContain("reload(");
+    expect(ctrlXBind).toContain("session rm --yes");
+    expect(ctrlXBind).toContain("session find --fzf-entries");
+  });
+
+  test("omits ctrl-x binding when delete/reload commands not provided", () => {
+    const args = buildFzfArgs({});
+    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
+    const ctrlXBind = bindArgs.find(b => b.includes("ctrl-x"));
+    expect(ctrlXBind).toBeUndefined();
+  });
+
   test("disables keybindings in filter mode", () => {
     const args = buildFzfArgs({ filter: "test" });
     expect(args).toContain("--filter");
