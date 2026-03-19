@@ -71,7 +71,7 @@ async function buildFzfEntries(findArgs: ReturnType<typeof parseFindArgs>) {
  * - deleteCommand: deletes the selected session (path extracted from last line of fzf entry)
  * - reloadCommand: re-discovers sessions and outputs NUL-separated entries for fzf reload
  */
-function buildFzfDeleteCommands(findArgs: ReturnType<typeof parseFindArgs>) {
+export function buildFzfDeleteCommands(findArgs: ReturnType<typeof parseFindArgs>) {
   const cliPath = new URL("../cli.ts", import.meta.url).pathname;
 
   // Reconstruct the find flags so the reload command discovers the same sessions

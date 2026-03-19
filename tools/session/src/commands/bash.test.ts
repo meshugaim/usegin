@@ -153,6 +153,35 @@ describe("parseBashFzfOutput", () => {
     const result = parseBashFzfOutput("$ bun test");
     expect(result).toEqual({ action: "copy", command: "bun test" });
   });
+
+  // ---------------------------------------------------------------------------
+  // Edge cases: whitespace handling
+  // ---------------------------------------------------------------------------
+
+  it("handles trailing newline after selection (common from fzf)", () => {
+    const output = "ctrl-r\n[2025-03-18 10:30]  Run tests\n$ bun test\n";
+    const result = parseBashFzfOutput(output);
+    expect(result).toEqual({ action: "run", command: "bun test" });
+  });
+
+  it("handles Enter key with trailing newline after selection", () => {
+    const output = "\n[2025-03-18 10:30]  Run tests\n$ bun test\n";
+    const result = parseBashFzfOutput(output);
+    expect(result).toEqual({ action: "copy", command: "bun test" });
+  });
+
+  it("handles leading whitespace on key line (Enter pressed)", () => {
+    // fzf shouldn't produce this, but the parser trims so it's resilient
+    const output = "  \n[2025-03-18 10:30]  Run tests\n$ git status";
+    const result = parseBashFzfOutput(output);
+    expect(result).toEqual({ action: "copy", command: "git status" });
+  });
+
+  it("handles extra trailing whitespace on selection lines", () => {
+    const output = "ctrl-r\n[2025-03-18 10:30]  Run tests  \n$ bun test  \n  ";
+    const result = parseBashFzfOutput(output);
+    expect(result).toEqual({ action: "run", command: "bun test" });
+  });
 });
 
 // =============================================================================

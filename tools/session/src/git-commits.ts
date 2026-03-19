@@ -348,6 +348,19 @@ export async function getCommitsBySha(options: {
  * Fallback: try each SHA individually when the batch command fails.
  * This handles the case where one bad SHA causes `git log --no-walk` to
  * exit non-zero, but other SHAs in the list are valid.
+ *
+ * When does this fire?
+ * - A corrupt git object makes `--no-walk` bail on the entire batch
+ * - Shallow clones where some SHAs are unreachable (pruned history)
+ * - Unusual git configurations (e.g., replace refs, grafts) that cause
+ *   `--no-walk` to fail for specific objects
+ *
+ * Why is this hard to test?
+ * The only trigger is `git log --no-walk` exiting non-zero while at least
+ * one SHA in the batch is valid. Simulating that requires a corrupted or
+ * shallow git repo, which makes for fragile, environment-dependent tests.
+ * The function's logic is straightforward (loop + collect), so the risk of
+ * bugs is low relative to the test maintenance cost.
  */
 async function getCommitsByShaIndividually(options: {
   cwd: string;
