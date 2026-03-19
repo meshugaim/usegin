@@ -2111,4 +2111,40 @@ describe("buildTimeline btw events from aside_question subagents", () => {
     expect(spawnEvents).toHaveLength(1);
     expect(returnEvents).toHaveLength(1);
   });
+
+  test("strips system-reminder preamble from btw question (real format)", () => {
+    const ts = createTimestampGenerator();
+    const t1 = ts();
+    const t2 = ts();
+    const t3 = ts();
+
+    const realBtwMessage = `<system-reminder>This is a side question from the user. You must answer this question directly in a single response.
+
+IMPORTANT CONTEXT:
+- You are a separate, lightweight agent spawned to answer this one question
+
+CRITICAL CONSTRAINTS:
+- You have NO tools available
+- Simply answer the question with the information you have.</system-reminder>
+
+why is it getting truncated? what makes it so?`;
+
+    const session = makeSession({
+      startTimestamp: t1,
+      endTimestamp: t3,
+      subagents: [
+        makeSubagent("agent-aside_question-real", [
+          userTurn("u1", realBtwMessage, { timestamp: t2 }),
+          assistantTurn("a1", "The truncation happens at two levels.", { timestamp: t3 }),
+        ], { startTimestamp: t2 }),
+      ],
+    });
+
+    const events = buildTimeline(session);
+    const btwEvents = eventsOfKind(events, "btw");
+
+    expect(btwEvents).toHaveLength(1);
+    expect(btwEvents[0]!.question).toContain("why is it getting truncated?");
+    expect(btwEvents[0]!.question).not.toContain("system-reminder");
+  });
 });

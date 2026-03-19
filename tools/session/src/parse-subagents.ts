@@ -154,7 +154,7 @@ export function isAsideQuestion(subagent: ParsedSubagent): boolean {
 /**
  * Extract the question and answer from an aside_question subagent.
  *
- * - Question: the last user turn text (after system-reminder injection)
+ * - Question: the last user turn text, with system-reminder wrapper stripped
  * - Answer: the last assistant turn text
  *
  * Returns null if neither question nor answer can be extracted.
@@ -163,12 +163,40 @@ export function extractBtwContent(subagent: ParsedSubagent): { question: string;
   const userTurns = subagent.turns.filter((t) => t.role === "user");
   const assistantTurns = subagent.turns.filter((t) => t.role === "assistant");
 
-  // The question is the last user message (after system-reminder injection)
-  const question = userTurns[userTurns.length - 1]?.text ?? "";
+  // The question is the last user message, but it's often wrapped in a
+  // <system-reminder> preamble. Strip that to get the actual human question.
+  const rawQuestion = userTurns[userTurns.length - 1]?.text ?? "";
+  const question = stripBtwSystemReminder(rawQuestion);
   const answer = assistantTurns[assistantTurns.length - 1]?.text ?? "";
 
   if (!question && !answer) return null;
   return { question, answer };
+}
+
+/**
+ * Strip the system-reminder wrapper from a /btw user message.
+ *
+ * The aside_question subagent receives user messages like:
+ *   <system-reminder>This is a side question from the user...
+ *   CRITICAL CONSTRAINTS:
+ *   ...</system-reminder>
+ *
+ *   why is it getting truncated?
+ *
+ * This function extracts just the human question after the closing tag.
+ * Falls back to the raw text if no system-reminder is found.
+ */
+function stripBtwSystemReminder(text: string): string {
+  // Try to find content after the closing </system-reminder> tag
+  const closeTag = "</system-reminder>";
+  const closeIdx = text.lastIndexOf(closeTag);
+  if (closeIdx !== -1) {
+    const afterTag = text.slice(closeIdx + closeTag.length).trim();
+    if (afterTag) return afterTag;
+  }
+
+  // No closing tag or nothing after it — return as-is
+  return text;
 }
 
 /**

@@ -1479,3 +1479,191 @@ describe("formatNarrative with commits interleaved (commits: true)", () => {
     expect(output).toContain("─".repeat(40));
   });
 });
+
+// ============================================================================
+// BTW ASIDE QUESTIONS IN NARRATIVE
+// ============================================================================
+
+describe("formatNarrative with btw aside questions", () => {
+  test("inlines btw Q&A block at chronological position", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello", { timestamp: "2025-01-15T10:00:00Z" }),
+        assistantTurn("a1", "Hi!", { timestamp: "2025-01-15T10:00:05Z" }),
+        userTurn("u2", "Continue work", { timestamp: "2025-01-15T10:02:00Z" }),
+        assistantTurn("a2", "Done", { timestamp: "2025-01-15T10:02:30Z" }),
+      ],
+      subagents: [
+        makeSubagent("agent-aside_question-abc123", [
+          userTurn("btwu1", "What port does the API use?", { timestamp: "2025-01-15T10:01:00Z" }),
+          assistantTurn("btwa1", "Port 8000 for the Python API.", { timestamp: "2025-01-15T10:01:10Z" }),
+        ], { startTimestamp: "2025-01-15T10:01:00Z" }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Btw block should appear inline (between turns)
+    expect(output).toContain("/btw");
+    expect(output).toContain("Q: What port does the API use?");
+    expect(output).toContain("A: Port 8000 for the Python API.");
+
+    // Verify chronological order: first turn, btw, then second turn
+    const helloIdx = output.indexOf("Hello");
+    const btwIdx = output.indexOf("/btw");
+    const continueIdx = output.indexOf("Continue work");
+    expect(helloIdx).toBeLessThan(btwIdx);
+    expect(btwIdx).toBeLessThan(continueIdx);
+  });
+
+  test("excludes aside subagents from SUBAGENTS section when --subagents is used", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      subagents: [
+        makeSubagent("agent-aside_question-abc123", [
+          userTurn("btwu1", "What is X?", { timestamp: "2025-01-15T10:01:00Z" }),
+          assistantTurn("btwa1", "X is Y.", { timestamp: "2025-01-15T10:01:10Z" }),
+        ], { startTimestamp: "2025-01-15T10:01:00Z" }),
+        makeSubagent("agent-real-worker-456", [
+          assistantTurn("sa1", "Working on task..."),
+        ], { startTimestamp: "2025-01-15T10:02:00Z" }),
+      ],
+    });
+
+    const output = formatNarrative(session, { includeSubagents: true });
+
+    // Regular subagent appears in SUBAGENTS section
+    expect(output).toContain("SUBAGENTS (1)");
+    expect(output).toContain("SUBAGENT: agent-real-worker-456");
+
+    // Aside subagent does NOT appear in SUBAGENTS section
+    expect(output).not.toContain("SUBAGENT: agent-aside_question-abc123");
+
+    // But btw content is inline
+    expect(output).toContain("/btw");
+    expect(output).toContain("Q: What is X?");
+  });
+
+  test("does not show SUBAGENTS section when all subagents are asides", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      subagents: [
+        makeSubagent("agent-aside_question-abc123", [
+          userTurn("btwu1", "Quick question?", { timestamp: "2025-01-15T10:01:00Z" }),
+          assistantTurn("btwa1", "Quick answer.", { timestamp: "2025-01-15T10:01:10Z" }),
+        ], { startTimestamp: "2025-01-15T10:01:00Z" }),
+      ],
+    });
+
+    const output = formatNarrative(session, { includeSubagents: true });
+
+    // No SUBAGENTS section since there are no non-aside subagents
+    expect(output).not.toContain("SUBAGENTS");
+
+    // But btw is shown inline
+    expect(output).toContain("/btw");
+  });
+
+  test("shows btw even without --subagents flag", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello", { timestamp: "2025-01-15T10:00:00Z" }),
+      ],
+      subagents: [
+        makeSubagent("agent-aside_question-abc", [
+          userTurn("btwu1", "Aside question?", { timestamp: "2025-01-15T10:00:30Z" }),
+          assistantTurn("btwa1", "Aside answer.", { timestamp: "2025-01-15T10:00:40Z" }),
+        ], { startTimestamp: "2025-01-15T10:00:30Z" }),
+      ],
+    });
+
+    // No includeSubagents — btw should still appear
+    const output = formatNarrative(session);
+
+    expect(output).toContain("/btw");
+    expect(output).toContain("Q: Aside question?");
+    expect(output).toContain("A: Aside answer.");
+    expect(output).not.toContain("SUBAGENTS");
+  });
+
+  test("handles multiple btw questions in chronological order", () => {
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Start", { timestamp: "2025-01-15T10:00:00Z" }),
+        assistantTurn("a1", "Working", { timestamp: "2025-01-15T10:00:05Z" }),
+        userTurn("u2", "End", { timestamp: "2025-01-15T10:05:00Z" }),
+      ],
+      subagents: [
+        makeSubagent("agent-aside_question-first", [
+          userTurn("btwu1", "First btw?", { timestamp: "2025-01-15T10:01:00Z" }),
+          assistantTurn("btwa1", "First answer.", { timestamp: "2025-01-15T10:01:10Z" }),
+        ], { startTimestamp: "2025-01-15T10:01:00Z" }),
+        makeSubagent("agent-aside_question-second", [
+          userTurn("btwu2", "Second btw?", { timestamp: "2025-01-15T10:03:00Z" }),
+          assistantTurn("btwa2", "Second answer.", { timestamp: "2025-01-15T10:03:10Z" }),
+        ], { startTimestamp: "2025-01-15T10:03:00Z" }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Both btw blocks appear
+    expect(output).toContain("Q: First btw?");
+    expect(output).toContain("Q: Second btw?");
+
+    // In chronological order
+    const firstIdx = output.indexOf("First btw?");
+    const secondIdx = output.indexOf("Second btw?");
+    expect(firstIdx).toBeLessThan(secondIdx);
+  });
+
+  test("handles btw with no extractable content gracefully", () => {
+    const session = makeSession({
+      turns: [userTurn("u1", "Hello")],
+      subagents: [
+        // Empty aside — no user or assistant turns
+        makeSubagent("agent-aside_question-empty", [], {
+          startTimestamp: "2025-01-15T10:01:00Z",
+        }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Should not crash, and should not show btw block for empty aside
+    expect(output).not.toContain("/btw");
+  });
+
+  test("strips system-reminder preamble from btw question (real format)", () => {
+    // Real /btw messages are wrapped in a system-reminder with instructions
+    const realBtwMessage = `<system-reminder>This is a side question from the user. You must answer this question directly in a single response.
+
+IMPORTANT CONTEXT:
+- You are a separate, lightweight agent spawned to answer this one question
+
+CRITICAL CONSTRAINTS:
+- You have NO tools available
+- Simply answer the question with the information you have.</system-reminder>
+
+why is it getting truncated? what makes it so?`;
+
+    const session = makeSession({
+      turns: [
+        userTurn("u1", "Hello", { timestamp: "2025-01-15T10:00:00Z" }),
+      ],
+      subagents: [
+        makeSubagent("agent-aside_question-real", [
+          userTurn("btwu1", realBtwMessage, { timestamp: "2025-01-15T10:01:00Z" }),
+          assistantTurn("btwa1", "The truncation happens at two levels.", { timestamp: "2025-01-15T10:01:10Z" }),
+        ], { startTimestamp: "2025-01-15T10:01:00Z" }),
+      ],
+    });
+
+    const output = formatNarrative(session);
+
+    // Shows the actual human question, not the system-reminder preamble
+    expect(output).toContain("Q: why is it getting truncated? what makes it so?");
+    expect(output).not.toContain("system-reminder");
+    expect(output).toContain("A: The truncation happens at two levels.");
+  });
+});

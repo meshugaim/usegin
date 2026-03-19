@@ -461,11 +461,11 @@ export function computeStats(session: ParsedSession): SessionStats {
   const rawCounts = countToolCalls(session.turns);
   const toolCounts = sortByCountDesc(rawCounts);
 
-  // Filter out compaction-summary subagents (IDs starting with "acompact-").
-  // These are infrastructure noise — auto-generated to produce compaction summaries —
-  // and already represented in the Compactions section.
+  // Filter out infrastructure noise from subagent summaries:
+  // - Compaction-summary subagents (IDs starting with "acompact-") — represented in Compactions section
+  // - Aside question subagents (/btw) — represented in Btw section
   const visibleSubagents = session.subagents.filter(
-    (sub) => !String(sub.agentId).startsWith("acompact-")
+    (sub) => !String(sub.agentId).startsWith("acompact-") && !isAsideQuestion(sub)
   );
   const subagentSummaries = visibleSubagents.map((sub) =>
     summarizeSubagent(sub, session.turns, session.subagents)

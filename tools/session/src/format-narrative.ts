@@ -16,7 +16,8 @@ import {
   defaultOptions,
   formatTurn,
 } from "./format-shared";
-import { formatTokenCount } from "./format-utils";
+import { formatTokenCount, truncate } from "./format-utils";
+import { isAsideQuestion, extractBtwContent } from "./parser";
 
 // ============================================================================
 // COMPACTION HELPERS
@@ -161,11 +162,23 @@ export function formatNarrative(
     session.gitCommits != null &&
     session.gitCommits.length > 0;
 
-  // Build a unified chronological stream of turns, queued messages, and optionally commits
+  // Collect btw aside subagents for inline rendering
+  const btwSubagents = session.subagents.filter(isAsideQuestion);
+  const btwItems: Array<{ timestamp: string; question: string; answer: string }> = [];
+  for (const sub of btwSubagents) {
+    const content = extractBtwContent(sub);
+    if (!content) continue;
+    const ts = sub.startTimestamp ?? sub.turns[0]?.timestamp;
+    if (!ts) continue;
+    btwItems.push({ timestamp: ts, question: content.question, answer: content.answer });
+  }
+
+  // Build a unified chronological stream of turns, queued messages, btw asides, and optionally commits
   type StreamItem =
     | { kind: "turn"; timestamp?: string; turn: Turn }
     | { kind: "queued"; timestamp: string; message: QueuedMessage }
-    | { kind: "commit"; timestamp: string; commit: GitCommit };
+    | { kind: "commit"; timestamp: string; commit: GitCommit }
+    | { kind: "btw"; timestamp: string; question: string; answer: string };
 
   const stream: StreamItem[] = [];
 
@@ -180,6 +193,11 @@ export function formatNarrative(
     stream.push({ kind: "queued", timestamp: qm.timestamp, message: qm });
   }
 
+  // Always include btw aside questions inline
+  for (const btw of btwItems) {
+    stream.push({ kind: "btw", timestamp: btw.timestamp, question: btw.question, answer: btw.answer });
+  }
+
   // Include commits in the stream only when interleaving
   if (interleaveCommits) {
     for (const commit of session.gitCommits!) {
@@ -188,7 +206,7 @@ export function formatNarrative(
   }
 
   // Sort the stream chronologically when we have anything to interleave
-  const needsMerge = queuedMessages.length > 0 || interleaveCommits;
+  const needsMerge = queuedMessages.length > 0 || btwItems.length > 0 || interleaveCommits;
   if (needsMerge) {
     stream.sort((a, b) => {
       // Items without timestamps go first (preserve original behavior)
@@ -211,6 +229,10 @@ export function formatNarrative(
         break;
       case "commit":
         lines.push(formatCommitBlock(item.commit));
+        lines.push("");
+        break;
+      case "btw":
+        lines.push(formatBtwBlock(item.question, item.answer));
         lines.push("");
         break;
     }
@@ -238,20 +260,46 @@ export function formatNarrative(
     }
   }
 
-  // Subagent transcripts (appended at end)
-  if (formatOptions.includeSubagents && session.subagents.length > 0) {
-    lines.push("");
-    lines.push("═".repeat(60));
-    lines.push(`SUBAGENTS (${session.subagents.length})`);
-    lines.push("═".repeat(60));
-
-    for (const subagent of session.subagents) {
+  // Subagent transcripts (appended at end) — exclude aside questions (already shown inline)
+  if (formatOptions.includeSubagents) {
+    const nonAsideSubagents = session.subagents.filter((sub) => !isAsideQuestion(sub));
+    if (nonAsideSubagents.length > 0) {
       lines.push("");
-      lines.push(formatSubagent(subagent, formatOptions));
+      lines.push("═".repeat(60));
+      lines.push(`SUBAGENTS (${nonAsideSubagents.length})`);
+      lines.push("═".repeat(60));
+
+      for (const subagent of nonAsideSubagents) {
+        lines.push("");
+        lines.push(formatSubagent(subagent, formatOptions));
+      }
     }
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Format a /btw aside question inline in the narrative.
+ *
+ * Renders a compact Q&A block with a visual marker so it's
+ * distinguishable from the main conversation flow.
+ *
+ * Example output:
+ *   ── /btw ──────────────────────────────
+ *   Q: What's the default port?
+ *   A: Port 3000 for Next.js, 8000 for the API.
+ *   ────────────────────────────────────────
+ */
+function formatBtwBlock(question: string, answer: string): string {
+  const q = truncate(question, 200);
+  const a = truncate(answer, 200);
+  return [
+    `── /btw ${"─".repeat(Math.max(0, 31))}`,
+    `Q: ${q}`,
+    `A: ${a}`,
+    "─".repeat(40),
+  ].join("\n");
 }
 
 /**

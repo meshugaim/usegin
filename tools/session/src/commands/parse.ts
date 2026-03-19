@@ -69,8 +69,9 @@ export async function runParse(args: MainArgs) {
       return;
     }
 
-    // Stats, JSON, and timeline formats need subagent data for the summaries section
-    const includeSubagents = args.subagents || args.timeline || args.format === "stats" || args.format === "json";
+    // Always discover subagents — btw aside questions are part of the session
+    // narrative and should be visible in every format, not just --subagents.
+    const includeSubagents = true;
 
     // Parse session with debug timing and timeout
     let stepStart = Date.now();
