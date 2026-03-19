@@ -22,7 +22,6 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { $ } from "bun";
 
-const CONTEXT_FILE = "/tmp/auto-impl-context.json";
 const STATE_FILE = "/tmp/auto-impl-tdd-state.json";
 
 interface ToolInput {
@@ -109,10 +108,9 @@ function writeState(state: TddState): void {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // Only active during auto-implement sessions
-  if (!existsSync(CONTEXT_FILE)) {
-    process.exit(0);
-  }
+  // This hook is only installed during auto-implement sessions (via lifecycle.ts).
+  // Its presence in settings.local.json IS the activation signal.
+  // No context-file check — the agent can't disarm the guard by deleting a file.
 
   const input = await Bun.stdin.text();
 

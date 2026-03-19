@@ -66,7 +66,7 @@ export type ActivityEvent =
 // Constants
 // ---------------------------------------------------------------------------
 
-const CONTEXT_WINDOW = 200_000;
+const CONTEXT_WINDOW = 1_000_000;
 const ACTIVITY_FILE = "activity.jsonl";
 /** Raw stream-json output — can be piped through `session --stream` for full narrative view */
 const STREAM_FILE = "stream.jsonl";
