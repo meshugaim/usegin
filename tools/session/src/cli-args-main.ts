@@ -162,11 +162,6 @@ export function parseMainArgs(args: string[]): MainArgs {
     }
   }
 
-  // --since-turn and --last are mutually exclusive
-  if (result.sinceTurn != null && result.last != null) {
-    throw new Error("Cannot use --since-turn and --last together");
-  }
-
   // --tool and --tools are mutually exclusive
   if (result.tool && result.tools) {
     throw new Error("Cannot use --tool and --tools together");

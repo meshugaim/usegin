@@ -33,6 +33,19 @@ function makeTenTurnSession() {
   });
 }
 
+/**
+ * Helper to create a 20-turn session (alternating user/assistant, turns 0-19)
+ */
+function makeTwentyTurnSession() {
+  return makeSession({
+    turns: Array.from({ length: 20 }, (_, i) =>
+      i % 2 === 0
+        ? userTurn(`u${i}`, `Message ${i}`)
+        : assistantTurn(`a${i}`, `Response ${i}`)
+    ),
+  });
+}
+
 describe("sliceTurns", () => {
   describe("--since-turn", () => {
     it("returns turns from index N onward", () => {
@@ -82,6 +95,41 @@ describe("sliceTurns", () => {
     });
   });
 
+  describe("--since-turn combined with --last", () => {
+    it("returns N turns starting at sinceTurn when both are provided", () => {
+      const session = makeTwentyTurnSession();
+      const result = sliceTurns(session.turns, { sinceTurn: 5, last: 3 });
+      expect(result.turns).toHaveLength(3);
+      expect(result.turns[0]).toBe(session.turns[5]);
+      expect(result.turns[1]).toBe(session.turns[6]);
+      expect(result.turns[2]).toBe(session.turns[7]);
+      expect(result.windowStart).toBe(5);
+      expect(result.totalTurns).toBe(20);
+    });
+
+    it("caps to available turns when last exceeds remaining after sinceTurn", () => {
+      const session = makeTwentyTurnSession();
+      const result = sliceTurns(session.turns, { sinceTurn: 15, last: 10 });
+      // Only 5 turns available (15-19), last caps to those 5
+      expect(result.turns).toHaveLength(5);
+      expect(result.turns[0]).toBe(session.turns[15]);
+      expect(result.turns[4]).toBe(session.turns[19]);
+      expect(result.windowStart).toBe(15);
+      expect(result.totalTurns).toBe(20);
+    });
+
+    it("returns first N turns when sinceTurn is 0", () => {
+      const session = makeTwentyTurnSession();
+      const result = sliceTurns(session.turns, { sinceTurn: 0, last: 3 });
+      expect(result.turns).toHaveLength(3);
+      expect(result.turns[0]).toBe(session.turns[0]);
+      expect(result.turns[1]).toBe(session.turns[1]);
+      expect(result.turns[2]).toBe(session.turns[2]);
+      expect(result.windowStart).toBe(0);
+      expect(result.totalTurns).toBe(20);
+    });
+  });
+
   describe("no windowing", () => {
     it("returns all turns when neither flag is set", () => {
       const session = makeTenTurnSession();
@@ -112,5 +160,10 @@ describe("formatPositionHeader", () => {
   it("shows empty range message when no turns in window", () => {
     const header = formatPositionHeader({ windowStart: 15, turnCount: 0, totalTurns: 10 });
     expect(header).toBe("[No turns in range (total: 10)]");
+  });
+
+  it("shows correct range for combined --since-turn 5 --last 3 on 20 turns", () => {
+    const header = formatPositionHeader({ windowStart: 5, turnCount: 3, totalTurns: 20 });
+    expect(header).toBe("[Showing turns 5\u20137 of 20]");
   });
 });

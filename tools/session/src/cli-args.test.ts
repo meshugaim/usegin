@@ -639,11 +639,17 @@ describe("parseMainArgs", () => {
     });
   });
 
-  describe("--since-turn and --last mutual exclusion", () => {
-    it("throws when both --since-turn and --last are provided", () => {
-      expect(() => parseMainArgs(["session.jsonl", "--since-turn", "5", "--last", "3"])).toThrow(
-        "Cannot use --since-turn and --last together"
-      );
+  describe("--since-turn and --last combined", () => {
+    it("parses both --since-turn and --last when provided together", () => {
+      const result = parseMainArgs(["session.jsonl", "--since-turn", "5", "--last", "3"]);
+      expect(result.sinceTurn).toBe(5);
+      expect(result.last).toBe(3);
+    });
+
+    it("preserves both values regardless of argument order", () => {
+      const result = parseMainArgs(["session.jsonl", "--last", "10", "--since-turn", "45"]);
+      expect(result.sinceTurn).toBe(45);
+      expect(result.last).toBe(10);
     });
   });
 

@@ -1,9 +1,9 @@
 /**
  * Incremental read support for session turns.
  *
- * Provides pure functions for slicing turns by index (--since-turn)
- * or by count from the end (--last), plus formatting the position header
- * that tells the reader where they are in the full session.
+ * Provides pure functions for slicing turns by index (--since-turn),
+ * by count from the end (--last), or both combined, plus formatting
+ * the position header that tells the reader where they are in the full session.
  */
 
 import type { Turn } from "./types";
@@ -20,10 +20,11 @@ export interface SliceResult {
 }
 
 /**
- * Slice a session's turns based on --since-turn or --last options.
+ * Slice a session's turns based on --since-turn and/or --last options.
  *
  * - `sinceTurn: N` returns turns from index N onward (0-based)
  * - `last: N` returns the last N turns
+ * - Both: starts at sinceTurn, then takes at most N turns
  * - Neither: returns all turns unchanged
  *
  * Returns the sliced turns, the starting index of the window,
@@ -31,6 +32,16 @@ export interface SliceResult {
  */
 export function sliceTurns(turns: Turn[], options: SliceOptions): SliceResult {
   const totalTurns = turns.length;
+
+  if (options.sinceTurn != null && options.last != null) {
+    // Combined: start at sinceTurn, then take at most `last` turns
+    const sliced = turns.slice(options.sinceTurn, options.sinceTurn + options.last);
+    return {
+      turns: sliced,
+      windowStart: options.sinceTurn,
+      totalTurns,
+    };
+  }
 
   if (options.sinceTurn != null) {
     return {
