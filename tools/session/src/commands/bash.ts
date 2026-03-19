@@ -43,12 +43,17 @@ EXAMPLES:
 // FZF CONFIGURATION
 // =============================================================================
 
-/** Marker prefix used by ctrl-r binding to signal "run this command". */
-export const RUN_MARKER = "RUN:";
+/** The key expected by fzf's --expect to trigger "run this command". */
+export const EXPECT_KEY = "ctrl-r";
 
 /**
  * Build fzf arguments for bash browsing.
  * Separated for testability.
+ *
+ * Uses `--expect ctrl-r` instead of `become()` to avoid shell injection.
+ * When ctrl-r is pressed, fzf exits with the key name as the first line
+ * of stdout, followed by the selected entry — keeping user data as data
+ * rather than passing it through shell expansion.
  */
 export function buildBashFzfArgs(): string[] {
   return [
@@ -61,7 +66,7 @@ export function buildBashFzfArgs(): string[] {
     "--preview-window", "right:50%:wrap",
     "--bind", "ctrl-u:preview-half-page-up",
     "--bind", "ctrl-d:preview-half-page-down",
-    "--bind", `ctrl-r:become(printf '${RUN_MARKER}'; echo {+2..})`,
+    "--expect", EXPECT_KEY,
   ];
 }
 
@@ -91,29 +96,41 @@ export function extractCommandFromSelection(selected: string): string {
 /**
  * Parse fzf output to determine the action and command.
  *
- * Returns `{ action: "run", command }` if the output starts with the RUN: marker,
+ * With `--expect ctrl-r`, fzf outputs:
+ *   Line 1: the key that was pressed ("ctrl-r"), or empty if Enter
+ *   Line 2+: the selected entry
+ *
+ * Returns `{ action: "run", command }` if ctrl-r was pressed,
  * or `{ action: "copy", command }` for a normal Enter selection.
  * Returns `null` if the output is empty (user cancelled).
  */
 export function parseBashFzfOutput(
   output: string
 ): { action: "copy" | "run"; command: string } | null {
-  const trimmed = output.trim();
-  if (!trimmed) return null;
+  if (!output.trim()) return null;
 
-  if (trimmed.startsWith(RUN_MARKER)) {
-    // ctrl-r: the become() binding outputs "RUN:" + the command line from {+2..}
-    // {+2..} extracts the second line onward, so it's already "$ command"
-    const rawCommand = trimmed.slice(RUN_MARKER.length).trim();
-    // Strip the "$ " prefix if present
-    const command = rawCommand.startsWith("$ ")
-      ? rawCommand.slice(2)
-      : rawCommand;
+  // --expect makes the first line the pressed key (or empty for Enter).
+  // Everything after the first newline is the selected entry.
+  const firstNewline = output.indexOf("\n");
+  if (firstNewline === -1) {
+    // Only one line — shouldn't happen with --expect, but handle gracefully.
+    // Treat as Enter with the single line as the selection.
+    const command = extractCommandFromSelection(output.trim());
+    return { action: "copy", command };
+  }
+
+  const pressedKey = output.slice(0, firstNewline).trim();
+  const selected = output.slice(firstNewline + 1).trim();
+
+  if (!selected) return null;
+
+  if (pressedKey === EXPECT_KEY) {
+    const command = extractCommandFromSelection(selected);
     return { action: "run", command };
   }
 
-  // Normal Enter: extract command from the multi-line selection
-  const command = extractCommandFromSelection(trimmed);
+  // Enter (or any other key): copy action
+  const command = extractCommandFromSelection(selected);
   return { action: "copy", command };
 }
 

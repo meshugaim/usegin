@@ -8,7 +8,7 @@ import {
   buildBashFzfArgs,
   extractCommandFromSelection,
   parseBashFzfOutput,
-  RUN_MARKER,
+  EXPECT_KEY,
 } from "./bash";
 
 // =============================================================================
@@ -32,13 +32,14 @@ describe("buildBashFzfArgs", () => {
     expect(headerValue).toContain("ctrl-r: run");
   });
 
-  it("includes ctrl-r binding that outputs RUN: marker", () => {
+  it("uses --expect for ctrl-r instead of become()", () => {
     const args = buildBashFzfArgs();
-    const bindArgs = args.filter((arg, i) => args[i - 1] === "--bind");
-    const ctrlRBind = bindArgs.find((b) => b.includes("ctrl-r"));
-    expect(ctrlRBind).toBeDefined();
-    expect(ctrlRBind).toContain("become(");
-    expect(ctrlRBind).toContain(RUN_MARKER);
+    const expectIdx = args.indexOf("--expect");
+    expect(expectIdx).toBeGreaterThanOrEqual(0);
+    expect(args[expectIdx + 1]).toBe(EXPECT_KEY);
+    // Verify become() is NOT used (shell injection vector)
+    const allArgs = args.join(" ");
+    expect(allArgs).not.toContain("become(");
   });
 
   it("includes ctrl-u binding for preview scroll up", () => {
@@ -106,39 +107,60 @@ describe("parseBashFzfOutput", () => {
     expect(parseBashFzfOutput("  \n  ")).toBeNull();
   });
 
-  it("parses RUN: marker output as run action", () => {
-    const result = parseBashFzfOutput("RUN:$ bun test");
+  it("parses ctrl-r + selection as run action", () => {
+    // --expect format: first line = key, rest = selected entry
+    const output = "ctrl-r\n[2025-03-18 10:30]  Run tests\n$ bun test";
+    const result = parseBashFzfOutput(output);
     expect(result).toEqual({ action: "run", command: "bun test" });
   });
 
-  it("parses RUN: marker with whitespace", () => {
-    const result = parseBashFzfOutput("RUN: $ bun test --grep parser");
-    expect(result).toEqual({ action: "run", command: "bun test --grep parser" });
+  it("parses ctrl-r with command containing quotes and $() safely", () => {
+    // This is the exact scenario that was vulnerable to shell injection
+    const output = 'ctrl-r\n[2025-03-18 10:30]  Check status\n$ echo "$(whoami)" && cat /etc/passwd';
+    const result = parseBashFzfOutput(output);
+    expect(result).toEqual({
+      action: "run",
+      command: 'echo "$(whoami)" && cat /etc/passwd',
+    });
   });
 
-  it("parses RUN: marker without $ prefix", () => {
-    const result = parseBashFzfOutput("RUN:echo hello");
-    expect(result).toEqual({ action: "run", command: "echo hello" });
+  it("parses ctrl-r with backtick command safely", () => {
+    const output = "ctrl-r\n[2025-03-18 10:30]  List files\n$ echo `ls /tmp`";
+    const result = parseBashFzfOutput(output);
+    expect(result).toEqual({ action: "run", command: "echo `ls /tmp`" });
   });
 
-  it("parses normal selection as copy action", () => {
-    const selected = "[2025-03-18 10:30]  Run tests\n$ bun test";
-    const result = parseBashFzfOutput(selected);
+  it("parses Enter (empty key) + selection as copy action", () => {
+    // --expect format: empty first line = Enter was pressed
+    const output = "\n[2025-03-18 10:30]  Run tests\n$ bun test";
+    const result = parseBashFzfOutput(output);
     expect(result).toEqual({ action: "copy", command: "bun test" });
   });
 
-  it("parses normal selection without $ line as copy action", () => {
-    const result = parseBashFzfOutput("some raw text");
+  it("parses Enter selection without $ line as copy action", () => {
+    const output = "\nsome raw text";
+    const result = parseBashFzfOutput(output);
     expect(result).toEqual({ action: "copy", command: "some raw text" });
+  });
+
+  it("returns null when key is present but selection is empty", () => {
+    expect(parseBashFzfOutput("ctrl-r\n")).toBeNull();
+    expect(parseBashFzfOutput("ctrl-r\n  ")).toBeNull();
+  });
+
+  it("handles single-line output gracefully (no key line)", () => {
+    // Edge case: if somehow only one line comes through
+    const result = parseBashFzfOutput("$ bun test");
+    expect(result).toEqual({ action: "copy", command: "bun test" });
   });
 });
 
 // =============================================================================
-// RUN_MARKER constant
+// EXPECT_KEY constant
 // =============================================================================
 
-describe("RUN_MARKER", () => {
-  it("is the string 'RUN:'", () => {
-    expect(RUN_MARKER).toBe("RUN:");
+describe("EXPECT_KEY", () => {
+  it("is the string 'ctrl-r'", () => {
+    expect(EXPECT_KEY).toBe("ctrl-r");
   });
 });
