@@ -40,7 +40,7 @@ src/
 │   ├── search-in.ts    # Search within a session's turns
 │   └── docs.ts         # Browse embedded documentation
 ├── parser.ts           # Orchestrator: parseSession(), StreamingParser, re-exports
-├── parse-entries.ts    # Entry → Turn conversion (parseTurn, extractCommitsFromToolResult)
+├── parse-turn.ts      # Entry → Turn conversion (parseTurn, extractCommitsFromToolResult)
 ├── parse-turns.ts      # Entry[] → ParsedSession (parseEntries, rewind detection)
 ├── parse-tokens.ts     # Token usage aggregation across turns
 ├── parse-subagents.ts  # Subagent/team discovery, listing, and parsing

@@ -18,7 +18,7 @@ import { asSessionId, asAgentId } from "./types";
 import { debugLog } from "./debug";
 import { isEntry, getSessionId, hasAgentId } from "./validation";
 import { readJsonlContent } from "./utils";
-import { parseTurn } from "./parse-entries";
+import { parseTurn } from "./parse-turn";
 import { aggregateTokenUsage } from "./parse-tokens";
 
 /**

@@ -105,12 +105,22 @@ describe("buildFzfArgs", () => {
     expect(headerValue).toContain("scroll");
   });
 
-  test("includes ctrl-x hint in header", () => {
-    const args = buildFzfArgs({});
+  test("includes ctrl-x hint in header when delete/reload commands provided", () => {
+    const args = buildFzfArgs({
+      deleteCommand: "echo {} | tail -1 | xargs session rm --yes",
+      reloadCommand: "session find --fzf-entries",
+    });
     const headerIdx = args.indexOf("--header");
     const headerValue = args[headerIdx + 1];
     expect(headerValue).toContain("ctrl-x");
     expect(headerValue).toContain("delete");
+  });
+
+  test("omits ctrl-x hint from header when delete/reload commands not provided", () => {
+    const args = buildFzfArgs({});
+    const headerIdx = args.indexOf("--header");
+    const headerValue = args[headerIdx + 1];
+    expect(headerValue).not.toContain("ctrl-x");
   });
 
   test("includes ctrl-x binding when delete and reload commands provided", () => {

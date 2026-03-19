@@ -13,16 +13,9 @@
  */
 
 // Shared types and utilities
-export {
-  type FormatOptions,
-  defaultOptions,
-  formatTurn,
-  getToolSummary,
-  dedupTaskNotifications,
-  formatToolFilter,
-} from "./format-shared";
+export * from "./format-shared";
 
 // Format-specific modules
-export { formatNarrative } from "./format-narrative";
-export { formatTerminal } from "./format-terminal";
-export { formatMarkdown } from "./format-markdown";
+export * from "./format-narrative";
+export * from "./format-terminal";
+export * from "./format-markdown";

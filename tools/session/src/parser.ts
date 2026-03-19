@@ -4,7 +4,7 @@
  * This module is the main entry point for session parsing. The actual work
  * is split across focused modules:
  *
- * - parse-entries.ts  — Entry-level parsing (parseTurn, extractCommitsFromToolResult)
+ * - parse-turn.ts     — Entry-level parsing (parseTurn, extractCommitsFromToolResult)
  * - parse-turns.ts    — Entry[] → ParsedSession (parseEntries, rewind detection)
  * - parse-tokens.ts   — Token usage aggregation across turns
  * - parse-subagents.ts — Subagent/team discovery, listing, and parsing
@@ -23,7 +23,7 @@ import { readJsonlContent } from "./utils";
 import { ParsingTimeoutError } from "./errors";
 import { formatTurn, type FormatOptions } from "./formatter";
 import { parseEntries } from "./parse-turns";
-import { parseTurn } from "./parse-entries";
+import { parseTurn } from "./parse-turn";
 import {
   discoverSubagents,
   extractTeamNames,
@@ -35,7 +35,7 @@ import {
 // ============================================================================
 
 export { ParsingTimeoutError } from "./errors";
-export { parseTurn, extractCommitsFromToolResult } from "./parse-entries";
+export { parseTurn, extractCommitsFromToolResult } from "./parse-turn";
 export { parseEntries } from "./parse-turns";
 export { aggregateTokenUsage } from "./parse-tokens";
 export {

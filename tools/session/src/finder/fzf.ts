@@ -158,7 +158,12 @@ export function buildFzfArgs(options: FzfMultiLineOptions): string[] {
   // Keybindings only in interactive mode
   if (isInteractive) {
     // Header with keybinding hints
-    args.push("--header", "ctrl-r: resume │ ctrl-t: retro │ ctrl-e: export │ ctrl-x: delete │ ctrl-u/d: scroll │ enter: output path");
+    const hints = ["ctrl-r: resume", "ctrl-t: retro", "ctrl-e: export"];
+    if (options.deleteCommand && options.reloadCommand) {
+      hints.push("ctrl-x: delete");
+    }
+    hints.push("ctrl-u/d: scroll", "enter: output path");
+    args.push("--header", hints.join(" │ "));
 
     // ctrl-r: resume session - print special marker so CLI can spawn claude
     args.push(

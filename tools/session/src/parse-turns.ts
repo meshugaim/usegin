@@ -19,7 +19,7 @@ import type {
   RewindInfo,
 } from "./types";
 import { asSessionId, asEntryUuid } from "./types";
-import { parseTurn, extractCommitsFromToolResult } from "./parse-entries";
+import { parseTurn, extractCommitsFromToolResult } from "./parse-turn";
 
 /**
  * Parse an array of JSONL entries into a structured session.
