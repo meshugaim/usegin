@@ -24,7 +24,7 @@ export interface ModelPricing {
   cacheWritePerMillion: number;
   /** USD per 1M cache read tokens (0.1x input) */
   cacheReadPerMillion: number;
-  /** Context window size in tokens (standard tier, not extended/1M beta) */
+  /** Context window size in tokens */
   contextWindow: number;
 }
 
@@ -53,7 +53,14 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPerMillion: 25.0,
     cacheWritePerMillion: 6.25,
     cacheReadPerMillion: 0.5,
-    contextWindow: 200_000,
+    contextWindow: 1_000_000,
+  },
+  "claude-sonnet-4-6": {
+    inputPerMillion: 3.0,
+    outputPerMillion: 15.0,
+    cacheWritePerMillion: 3.75,
+    cacheReadPerMillion: 0.3,
+    contextWindow: 1_000_000,
   },
   // Legacy Opus models (4.0, 4.1) have different (higher) pricing
   "claude-opus-4-1": {
@@ -92,6 +99,8 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 const MODEL_PREFIX_MAP: [prefix: string, canonicalId: string][] = [
   // Sonnet 4.5
   ["claude-sonnet-4-5", "claude-sonnet-4-5-20250929"],
+  // Sonnet 4.6
+  ["claude-sonnet-4-6", "claude-sonnet-4-6"],
   // Opus 4.6 (must come before shorter "claude-opus-4" prefix)
   ["claude-opus-4-6", "claude-opus-4-6"],
   // Legacy Opus (4.1, 4.0) — "claude-opus-4-1" before the catch-all "claude-opus-4"
@@ -122,7 +131,7 @@ export const DEFAULT_CONTEXT_WINDOW = 200_000;
  *
  * @example
  * ```ts
- * getContextWindowSize("claude-opus-4-6");       // 200_000
+ * getContextWindowSize("claude-opus-4-6");       // 1_000_000
  * getContextWindowSize("unknown-model");          // 200_000 (default)
  * ```
  */

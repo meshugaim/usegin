@@ -265,12 +265,19 @@ describe("pricing", () => {
   // ==========================================================================
 
   describe("getContextWindowSize", () => {
-    test("returns context window for known model", () => {
-      expect(getContextWindowSize("claude-opus-4-6")).toBe(200_000);
+    test("returns 1M context window for 4.6 models", () => {
+      expect(getContextWindowSize("claude-opus-4-6")).toBe(1_000_000);
+      expect(getContextWindowSize("claude-sonnet-4-6")).toBe(1_000_000);
+    });
+
+    test("returns 200K context window for 4.5 models", () => {
+      expect(getContextWindowSize("claude-sonnet-4-5")).toBe(200_000);
     });
 
     test("returns context window via fuzzy match", () => {
-      expect(getContextWindowSize("claude-sonnet-4-5")).toBe(200_000);
+      expect(getContextWindowSize("claude-sonnet-4-6-20260601")).toBe(1_000_000);
+      expect(getContextWindowSize("claude-opus-4-6-20260401")).toBe(1_000_000);
+      expect(getContextWindowSize("claude-sonnet-4-5-20250929")).toBe(200_000);
     });
 
     test("returns default for unknown model", () => {

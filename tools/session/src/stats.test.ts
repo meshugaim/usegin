@@ -1213,12 +1213,17 @@ describe("computeTokenStats", () => {
   // ========================================================================
 
   describe("context window", () => {
-    test("contextWindowSize is always 200,000", () => {
+    test("contextWindowSize defaults to 200K for unknown models", () => {
       const stats = computeTokenStats([]);
       expect(stats.contextWindowSize).toBe(200_000);
     });
 
-    test("peakContextPercent is relative to 200K window", () => {
+    test("contextWindowSize is 1M for opus-4-6", () => {
+      const stats = computeTokenStats([], "claude-opus-4-6");
+      expect(stats.contextWindowSize).toBe(1_000_000);
+    });
+
+    test("peakContextPercent is relative to model context window", () => {
       const turns = [
         assistantTurn("a1", "Response", {
           tokenUsage: {
@@ -1230,10 +1235,13 @@ describe("computeTokenStats", () => {
         }),
       ];
 
-      const stats = computeTokenStats(turns);
+      // Against 200K (default) — 200K context = 100%
+      const stats200k = computeTokenStats(turns);
+      expect(stats200k.peakContextPercent).toBeCloseTo(1.0, 6);
 
-      // Context: 50000 + 50000 + 100000 = 200000 = exactly the window
-      expect(stats.peakContextPercent).toBeCloseTo(1.0, 6);
+      // Against 1M (opus-4-6) — 200K context = 20%
+      const stats1m = computeTokenStats(turns, "claude-opus-4-6");
+      expect(stats1m.peakContextPercent).toBeCloseTo(0.2, 6);
     });
   });
 
