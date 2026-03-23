@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { applyStandardAliases } from "../../lib/standard-aliases";
+import { enablePrefixMatching } from "../../lib/commander-prefix";
 import { readdirSync, readFileSync, existsSync, statSync } from "fs";
 import { join, dirname, basename } from "path";
 
@@ -520,4 +521,5 @@ program
   });
 
 applyStandardAliases(program);
+enablePrefixMatching(program);
 program.parse();

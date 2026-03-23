@@ -15,6 +15,7 @@ import { createDocsCommand, getDocsHelpText } from "./commands/docs";
 import { createHistoryCommand } from "./commands/history";
 import { createSearchCommand } from "./commands/search";
 import { applyStandardAliases } from "../../lib/standard-aliases";
+import { enablePrefixMatching } from "../../lib/commander-prefix";
 
 // Help text explaining short ID support
 function getShortIdHelpText(): string {
@@ -53,6 +54,7 @@ program.addCommand(createSearchCommand());
 // Apply standard aliases (list→ls, show→get, search→find, create→new)
 // before parsing so aliases are available during command resolution.
 applyStandardAliases(program);
+enablePrefixMatching(program);
 
 // Parse arguments
 program.parse();
