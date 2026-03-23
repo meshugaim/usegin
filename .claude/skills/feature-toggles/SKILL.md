@@ -38,7 +38,9 @@ Browser flags can be passed to Python backend via REST headers using `backendFla
 
 ## Adding a Toggle
 
-**Browser flag:** Add entry to registry at `nextjs-app/lib/browser-flags/registry.ts`. The system auto-wires UI, testing, and server/client access.
+**Browser flag:** Add entry to registry at `nextjs-app/lib/browser-flags/registry.ts`. The system auto-wires UI, testing, and server/client access. Include the `checkedBy` array with the file path(s) that will check this flag (relative to `nextjs-app/`, excluding tests).
+
+Always use the generic check functions — `isFlagEnabled("x")` (client) or `isFlagEnabledServer("x")` (server). Never create named wrappers like `isXxxEnabled()`.
 
 **DB toggle:** Always use a migration:
 

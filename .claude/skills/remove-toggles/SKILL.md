@@ -66,12 +66,10 @@ Update any skill files, specs, or docs that reference the toggle.
 
 ### Removing a browser flag
 
+Start with `checkedBy` in the registry — it lists every non-test file that checks this flag. That's your removal checklist.
+
+- [ ] For each file in `checkedBy`: remove the `isFlagEnabled`/`isFlagEnabledServer` call, make behavior unconditional, delete the dead branch
 - [ ] Remove entry from `nextjs-app/lib/browser-flags/registry.ts`
-- [ ] Remove named wrappers from `client.ts` (e.g., `isXxxEnabled`, `toggleXxx`)
-- [ ] Remove re-exports from `index.ts`
-- [ ] Remove server wrapper from `server.ts` if it exists
-- [ ] Remove UI gating (`{isXxxEnabled() && (...)}`) -- make content unconditional
-- [ ] Remove mocks from `nextjs-app/tests/setup.ts`
 - [ ] Update/remove tests that set `globalThis.__mockBrowserFlags.xxx`
 - [ ] If flag had `backendFlag` config: remove header passing and backend flag checks
 
