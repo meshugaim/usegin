@@ -50,7 +50,7 @@ function getCompactCli(): string {
     "",
     "## Searching & Navigating",
     "",
-    "Use built-in search and filters — never pipe `plan` output through grep.",
+    "Use built-in search and filters first:",
     "",
     "```",
     'plan search "auth middleware"              # Text search across all issues',
