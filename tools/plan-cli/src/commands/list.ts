@@ -30,7 +30,6 @@ export function getMaxUpdatedAt(issue: PlanIssue): number {
 
 export function createListCommand(): Command {
   const cmd = new Command("list")
-    .alias("ls")
     .description("List issues from Linear")
     .option("--team <key>", "Team key (e.g., ENG)")
     .option("--project <name>", "Filter by project name")

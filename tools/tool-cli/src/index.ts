@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
+import { applyStandardAliases } from "../../lib/standard-aliases";
 import { readdirSync, readFileSync, existsSync, statSync } from "fs";
 import { join, dirname, basename } from "path";
 
@@ -495,7 +496,6 @@ program.action(() => {
 
 program
   .command("list")
-  .alias("ls")
   .description("List all tools")
   .option("-a, --all", "Include npm scripts and justfile recipes")
   .option("-v, --verbose", "Show location for each tool")
@@ -505,7 +505,6 @@ program
 
 program
   .command("show")
-  .alias("get")
   .description("Show details about a tool")
   .argument("<name>", "Tool name")
   .action((name: string) => {
@@ -514,11 +513,11 @@ program
 
 program
   .command("search")
-  .alias("find")
   .description("Search tools by name or description")
   .argument("<term>", "Search term")
   .action((term: string) => {
     runSearch(term);
   });
 
+applyStandardAliases(program);
 program.parse();
