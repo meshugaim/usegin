@@ -47,6 +47,11 @@ function getCompactCli(): string {
     "plan close <id>",
     "plan update <id> --comment \"text\"",
     "```",
+    "",
+    "## Searching & Navigating",
+    "",
+    "Use `plan search` and `plan list` filters — never pipe through grep.",
+    "Run `plan list --help` or `plan search --help` for all options.",
   ].join("\n");
 }
 
