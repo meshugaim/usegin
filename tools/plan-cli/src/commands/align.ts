@@ -50,8 +50,17 @@ function getCompactCli(): string {
     "",
     "## Searching & Navigating",
     "",
-    "Use `plan search` and `plan list` filters — never pipe through grep.",
-    "Run `plan list --help` or `plan search --help` for all options.",
+    "Use built-in search and filters — never pipe `plan` output through grep.",
+    "",
+    "```",
+    'plan search "auth middleware"              # Text search across all issues',
+    "plan list --label bug                      # Filter by label",
+    'plan list --status "In Progress"           # Filter by status',
+    "plan list --assignee @me                   # My issues",
+    "plan list --depth 0 --limit 10             # Top-level only, capped",
+    "```",
+    "",
+    "Run `plan list --help` for all options.",
   ].join("\n");
 }
 
