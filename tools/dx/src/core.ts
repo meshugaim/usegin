@@ -46,72 +46,111 @@ export interface FeatureInfo {
   source: FeatureSource;
 }
 
+/** Which env var or git config field matched during identity resolution. */
+export type UserSignal =
+  | "DX_USER"
+  | "GITHUB_USER"
+  | "USER"
+  | "whoami"
+  | "gitUserName"
+  | "gitUserEmail";
+
+/** How the signal was matched: "exact" for DX_USER, "key" for user key, "alias" for alias. */
+export type UserMatch = "exact" | "key" | "alias";
+
+/** Identity resolution result with provenance (how the user was found). */
+export interface UserProvenance {
+  user: string | null;
+  signal: UserSignal | null;
+  match: UserMatch | null;
+}
+
 // ---------------------------------------------------------------------------
 // Functions
 // ---------------------------------------------------------------------------
 
-export function resolveUser(ctx: DxContext): string | null {
+/**
+ * Resolve the current user with provenance — which signal matched and how.
+ *
+ * This is the canonical identity resolution function. `resolveUser` is a
+ * thin wrapper that returns only the user string.
+ */
+export function resolveUserWithProvenance(ctx: DxContext): UserProvenance {
   // $DX_USER is checked with !== undefined, so DX_USER="" is treated as "set"
   // (returns empty string). In practice, shells don't set vars to empty strings
   // for "unset" — they unset them. If this causes issues, unset the var instead.
   if (ctx.env.DX_USER !== undefined) {
-    return ctx.env.DX_USER;
+    return {
+      user: ctx.env.DX_USER || null,
+      signal: "DX_USER",
+      match: "exact",
+    };
   }
 
-  // 2. Scan signals in order: $GITHUB_USER, $USER, whoami, gitUserName
-  //    (gitUserEmail handled separately below — needs prefix extraction)
-  const signals: (string | null)[] = [
-    ctx.env.GITHUB_USER ?? null,
-    ctx.env.USER ?? null,
-    ctx.whoami,
-    ctx.gitUserName,
+  // Scan signals in order: $GITHUB_USER, $USER, whoami, gitUserName
+  // (gitUserEmail handled separately below — needs prefix extraction)
+  const signals: Array<{ value: string | null | undefined; signal: UserSignal }> = [
+    { value: ctx.env.GITHUB_USER, signal: "GITHUB_USER" },
+    { value: ctx.env.USER, signal: "USER" },
+    { value: ctx.whoami, signal: "whoami" },
+    { value: ctx.gitUserName, signal: "gitUserName" },
   ];
 
-  // Try each non-email signal
-  for (const signal of signals) {
-    if (signal == null) continue;
-    const match = matchSignalToUser(signal, ctx.config.users);
-    if (match !== null) return match;
+  for (const { value, signal } of signals) {
+    if (value == null) continue;
+    const result = matchSignalToUser(value, ctx.config.users);
+    if (result !== null) {
+      return { user: result.user, signal, match: result.match };
+    }
   }
 
   // gitUserEmail — extract prefix before @
   if (ctx.gitUserEmail != null) {
     const atIndex = ctx.gitUserEmail.indexOf("@");
-    let prefix: string;
-    if (atIndex === -1) {
-      prefix = ctx.gitUserEmail;
-    } else {
-      prefix = ctx.gitUserEmail.substring(0, atIndex);
-    }
+    const prefix =
+      atIndex === -1
+        ? ctx.gitUserEmail
+        : ctx.gitUserEmail.substring(0, atIndex);
 
     if (prefix.length > 0) {
-      const match = matchSignalToUser(prefix, ctx.config.users);
-      if (match !== null) return match;
+      const result = matchSignalToUser(prefix, ctx.config.users);
+      if (result !== null) {
+        return { user: result.user, signal: "gitUserEmail", match: result.match };
+      }
     }
   }
 
-  return null;
+  return { user: null, signal: null, match: null };
+}
+
+/**
+ * Resolve the current user from context signals.
+ *
+ * Thin wrapper around `resolveUserWithProvenance` — returns only the user key.
+ */
+export function resolveUser(ctx: DxContext): string | null {
+  return resolveUserWithProvenance(ctx).user;
 }
 
 /**
  * Case-insensitive match of a signal against user keys and aliases.
- * Returns the user key if matched, null otherwise.
+ * Returns the user key and match type ("key" or "alias"), or null.
  */
-function matchSignalToUser(
+export function matchSignalToUser(
   signal: string,
   users: Record<string, UserDefinition>,
-): string | null {
+): { user: string; match: "key" | "alias" } | null {
   const signalLower = signal.toLowerCase();
 
   for (const [userKey, userDef] of Object.entries(users)) {
     // Check user key
     if (userKey.toLowerCase() === signalLower) {
-      return userKey;
+      return { user: userKey, match: "key" };
     }
     // Check aliases
     for (const alias of userDef.aliases) {
       if (alias.toLowerCase() === signalLower) {
-        return userKey;
+        return { user: userKey, match: "alias" };
       }
     }
   }

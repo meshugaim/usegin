@@ -11,7 +11,6 @@ import {
   allFeatures,
   resolveUser,
   type FeatureInfo,
-  type DxConfig,
   type DxContext,
 } from "../core";
 import { shouldDefaultToJson } from "../../../lib/output-mode";
@@ -21,7 +20,6 @@ import dx from "../../sdk";
 export interface StatusData {
   user: string | null;
   features: Record<string, FeatureInfo & { description: string }>;
-  config: DxConfig;
 }
 
 /**
@@ -125,7 +123,6 @@ export function buildStatusData(ctx: DxContext): StatusData {
 
   return {
     user,
-    config: ctx.config,
     features,
   };
 }

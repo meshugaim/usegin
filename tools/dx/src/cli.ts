@@ -9,7 +9,7 @@
  */
 
 import { Command } from "commander";
-import { buildStatusCommand } from "./commands/status";
+import { buildStatusCommand, buildStatusData, formatStatusJson } from "./commands/status";
 import { buildResolveCommand } from "./commands/resolve";
 import { buildSyncCommand } from "./commands/sync";
 import { buildWhoamiCommand } from "./commands/whoami";
@@ -34,7 +34,6 @@ program.action(() => {
   });
   if (useJson) {
     // Headless: output JSON status
-    const { buildStatusData, formatStatusJson } = require("./commands/status");
     const ctx = dx.getContext();
     const data = buildStatusData(ctx);
     process.stdout.write(formatStatusJson(data) + "\n");

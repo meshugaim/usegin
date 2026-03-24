@@ -47,6 +47,8 @@ All read commands support `--json`. The CLI auto-detects headless contexts (non-
 
 Prefix matching is enabled: `dx st` = `dx status`, `dx r` = `dx resolve`, etc.
 
+**Bare `dx` behavior:** In headless mode (non-TTY / `CLAUDECODE=1`), bare `dx` outputs JSON status. In TTY mode, bare `dx` shows help (interactive picker coming in a future slice).
+
 ## Architecture
 
 Three-layer command design (same as effi-cli):

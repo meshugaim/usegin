@@ -9,6 +9,7 @@
 import { Command } from "commander";
 import { spawnSync } from "child_process";
 import { allFeatures, type FeatureInfo } from "../core";
+import { shouldDefaultToJson } from "../../../lib/output-mode";
 import dx from "../../sdk";
 
 /** A single entry to write to git config. */
@@ -38,25 +39,41 @@ export function buildSyncEntries(
  *
  * Options:
  *   --dry-run   Show what would be synced without writing to git config
+ *   --json      Output as JSON
  */
 export function buildSyncCommand(): Command {
   const cmd = new Command("sync")
     .description("Write resolved feature values to git config")
-    .option("--dry-run", "Show what would be synced without writing");
+    .option("--dry-run", "Show what would be synced without writing")
+    .option("--json", "Output as JSON");
 
-  cmd.action((opts: { dryRun?: boolean }) => {
+  cmd.action((opts: { dryRun?: boolean; json?: boolean }) => {
     const ctx = dx.getContext();
     const features = allFeatures(ctx);
     const entries = buildSyncEntries(features);
 
+    const useJson = shouldDefaultToJson({
+      envVarName: "DX_OUTPUT",
+      json: opts.json,
+      env: process.env as Record<string, string | undefined>,
+      isTTY: process.stdout.isTTY ?? false,
+    });
+
     if (opts.dryRun) {
-      for (const entry of entries) {
-        process.stdout.write(
-          `would write dx.${entry.key} = ${entry.value}\n`,
-        );
+      if (useJson) {
+        process.stdout.write(JSON.stringify(entries, null, 2) + "\n");
+      } else {
+        for (const entry of entries) {
+          process.stdout.write(
+            `would write dx.${entry.key} = ${entry.value}\n`,
+          );
+        }
       }
       return;
     }
+
+    // Write all features, collecting errors instead of aborting on first failure
+    const errors: Array<{ key: string; error: string }> = [];
 
     for (const entry of entries) {
       const result = spawnSync(
@@ -65,14 +82,39 @@ export function buildSyncCommand(): Command {
         { encoding: "utf-8" },
       );
       if (result.status !== 0) {
-        process.stderr.write(
-          `error: failed to write dx.${entry.key}: ${result.stderr?.trim() ?? "unknown error"}\n`,
-        );
-        process.exit(1);
+        errors.push({
+          key: entry.key,
+          error: result.stderr?.trim() ?? "unknown error",
+        });
       }
     }
 
-    process.stderr.write(`Synced ${entries.length} features to git config\n`);
+    const syncedCount = entries.length - errors.length;
+
+    if (useJson) {
+      process.stdout.write(
+        JSON.stringify(
+          {
+            synced: syncedCount,
+            entries,
+            ...(errors.length > 0 ? { errors } : {}),
+          },
+          null,
+          2,
+        ) + "\n",
+      );
+    } else {
+      process.stderr.write(`Synced ${syncedCount} features to git config\n`);
+    }
+
+    if (errors.length > 0) {
+      for (const err of errors) {
+        process.stderr.write(
+          `error: failed to write dx.${err.key}: ${err.error}\n`,
+        );
+      }
+      process.exit(1);
+    }
   });
 
   return cmd;

@@ -15,6 +15,9 @@ import dx from "../../sdk";
  * Format the resolve output for human display.
  *
  * Outputs "true" or "false".
+ *
+ * @param _feature Feature name (unused in human output, kept for API symmetry with formatResolveJson)
+ * @param info Resolved feature info
  */
 export function formatResolve(_feature: string, info: FeatureInfo): string {
   return info.enabled ? "true" : "false";
@@ -26,11 +29,15 @@ export function formatResolve(_feature: string, info: FeatureInfo): string {
  * Returns `{"feature":"<name>","enabled":<bool>,"source":"<source>"}`
  */
 export function formatResolveJson(feature: string, info: FeatureInfo): string {
-  return JSON.stringify({
-    feature,
-    enabled: info.enabled,
-    source: info.source,
-  });
+  return JSON.stringify(
+    {
+      feature,
+      enabled: info.enabled,
+      source: info.source,
+    },
+    null,
+    2,
+  );
 }
 
 /**

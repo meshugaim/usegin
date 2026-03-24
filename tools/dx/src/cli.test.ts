@@ -77,13 +77,10 @@ function makeConfig(overrides?: Partial<DxConfig>): DxConfig {
   };
 }
 
-/** Build a StatusData fixture with sensible defaults (finding #4: clean destructure). */
+/** Build a StatusData fixture with sensible defaults. */
 function makeStatusData(overrides?: Partial<StatusData>): StatusData {
-  const { config: overrideConfig, ...rest } = overrides ?? {};
-  const config = overrideConfig ?? makeConfig();
   return {
     user: "nitsan",
-    config,
     features: {
       "ci-watcher": {
         enabled: false,
@@ -96,7 +93,7 @@ function makeStatusData(overrides?: Partial<StatusData>): StatusData {
         description: "Push to origin after every commit",
       },
     },
-    ...rest,
+    ...overrides,
   };
 }
 
@@ -260,7 +257,6 @@ describe("formatStatus", () => {
   test("handles empty features list", () => {
     const data = makeStatusData({
       features: {},
-      config: makeConfig({ features: {} }),
     });
     const output = formatStatus(data);
     // Should still show user, just no feature rows
@@ -324,7 +320,6 @@ describe("formatStatusJson", () => {
   test("handles empty features", () => {
     const data = makeStatusData({
       features: {},
-      config: makeConfig({ features: {} }),
     });
     const parsed = JSON.parse(formatStatusJson(data));
     expect(parsed.features).toEqual({});
@@ -342,7 +337,6 @@ describe("buildStatusData", () => {
 
     expect(data).toHaveProperty("user");
     expect(data).toHaveProperty("features");
-    expect(data).toHaveProperty("config");
     expect(data.features).toHaveProperty("ci-watcher");
     expect(data.features).toHaveProperty("autosync");
     // Each feature should have enabled, source, and description
@@ -676,7 +670,8 @@ describe("buildResolveCommand", () => {
 
   test("accepts a required <feature> argument", () => {
     const cmd = buildResolveCommand();
-    // Commander stores arguments in _args
+    // Inspects Commander internals (_args) — fragile but functional.
+    // No public API for argument introspection as of commander@12.
     const args = (cmd as any)._args;
     expect(args).toHaveLength(1);
     expect(args[0].required).toBe(true);
@@ -716,6 +711,14 @@ describe("buildSyncCommand", () => {
       (o) => o.long === "--dry-run",
     );
     expect(dryRunOpt).toBeDefined();
+  });
+
+  test("has --json option", () => {
+    const cmd = buildSyncCommand();
+    const jsonOpt = cmd.options.find(
+      (o) => o.long === "--json",
+    );
+    expect(jsonOpt).toBeDefined();
   });
 });
 

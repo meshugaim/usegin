@@ -9,26 +9,18 @@
 import { Command } from "commander";
 import { shouldDefaultToJson } from "../../../lib/output-mode";
 import dx from "../../sdk";
-import { resolveUser, type DxContext } from "../core";
+import {
+  resolveUserWithProvenance,
+  type UserProvenance,
+  type UserSignal,
+  type UserMatch,
+} from "../core";
 
-/** The signal that matched during user resolution. */
-export type IdentitySignal =
-  | "DX_USER"
-  | "GITHUB_USER"
-  | "USER"
-  | "whoami"
-  | "gitUserName"
-  | "gitUserEmail";
-
-/** How the signal was matched. */
-export type IdentityMatch = "exact" | "alias";
-
-/** Result of identity resolution with provenance. */
-export interface IdentityInfo {
-  user: string | null;
-  signal: IdentitySignal | null;
-  match: IdentityMatch | null;
-}
+// Re-export core types under the names whoami consumers already use.
+// "IdentityInfo" is the public shape for this command's formatters.
+export type IdentitySignal = UserSignal;
+export type IdentityMatch = UserMatch;
+export type IdentityInfo = UserProvenance;
 
 /**
  * Format the whoami output for human display.
@@ -48,96 +40,20 @@ export function formatWhoami(info: IdentityInfo): string {
 }
 
 /**
- * Format the whoami output as JSON.
+ * Format the whoami output as JSON (pretty-printed for stdout consumption).
  *
- * Returns `{"user":"nitsan","signal":"USER","match":"alias"}`
+ * Returns `{ "user": "nitsan", "signal": "USER", "match": "alias" }`
  */
 export function formatWhoamiJson(info: IdentityInfo): string {
-  return JSON.stringify({
-    user: info.user,
-    signal: info.signal,
-    match: info.match,
-  });
-}
-
-/**
- * Resolve identity with provenance information.
- *
- * Walks the same signal chain as resolveUser but tracks which signal
- * matched and how (exact vs alias).
- */
-function resolveIdentity(ctx: DxContext): IdentityInfo {
-  // $DX_USER is the explicit override -- always exact
-  if (ctx.env.DX_USER !== undefined) {
-    return { user: ctx.env.DX_USER || null, signal: "DX_USER", match: "exact" };
-  }
-
-  // Signal chain: GITHUB_USER, USER, whoami, gitUserName
-  const signals: Array<{
-    value: string | null | undefined;
-    signal: IdentitySignal;
-  }> = [
-    { value: ctx.env.GITHUB_USER, signal: "GITHUB_USER" },
-    { value: ctx.env.USER, signal: "USER" },
-    { value: ctx.whoami, signal: "whoami" },
-    { value: ctx.gitUserName, signal: "gitUserName" },
-  ];
-
-  for (const { value, signal } of signals) {
-    if (value == null) continue;
-    const matchResult = matchSignalToUser(value, ctx);
-    if (matchResult !== null) {
-      return { user: matchResult.user, signal, match: matchResult.match };
-    }
-  }
-
-  // gitUserEmail -- extract prefix before @
-  if (ctx.gitUserEmail != null) {
-    const atIndex = ctx.gitUserEmail.indexOf("@");
-    const prefix =
-      atIndex === -1
-        ? ctx.gitUserEmail
-        : ctx.gitUserEmail.substring(0, atIndex);
-
-    if (prefix.length > 0) {
-      const matchResult = matchSignalToUser(prefix, ctx);
-      if (matchResult !== null) {
-        return {
-          user: matchResult.user,
-          signal: "gitUserEmail",
-          match: matchResult.match,
-        };
-      }
-    }
-  }
-
-  return { user: null, signal: null, match: null };
-}
-
-/**
- * Match a signal string against known users and their aliases.
- * Returns the matched user key and match type, or null.
- */
-function matchSignalToUser(
-  signal: string,
-  ctx: DxContext,
-): { user: string; match: IdentityMatch } | null {
-  const signalLower = signal.toLowerCase();
-
-  for (const [userKey, userDef] of Object.entries(ctx.config.users)) {
-    // Check user key (exact match)
-    if (userKey.toLowerCase() === signalLower) {
-      return { user: userKey, match: "exact" };
-    }
-    // Check aliases
-    for (const alias of userDef.aliases) {
-      if (alias.toLowerCase() === signalLower) {
-        return { user: userKey, match: "alias" };
-      }
-    }
-  }
-
-  return null;
+  return JSON.stringify(
+    {
+      user: info.user,
+      signal: info.signal,
+      match: info.match,
+    },
+    null,
+    2,
+  );
 }
 
 /**
@@ -150,7 +66,7 @@ export function buildWhoamiCommand(): Command {
 
   cmd.action((opts: { json?: boolean }) => {
     const ctx = dx.getContext();
-    const info = resolveIdentity(ctx);
+    const info = resolveUserWithProvenance(ctx);
 
     const useJson = shouldDefaultToJson({
       envVarName: "DX_OUTPUT",

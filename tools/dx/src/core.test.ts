@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   resolveUser,
+  resolveUserWithProvenance,
   isEnabled,
   getFeature,
   allFeatures,
@@ -8,6 +9,7 @@ import {
   type DxLocalConfig,
   type DxContext,
   type FeatureInfo,
+  type UserProvenance,
 } from "./core";
 
 // ---------------------------------------------------------------------------
@@ -91,10 +93,10 @@ describe("resolveUser", () => {
     expect(result).toBe("explicit-user");
   });
 
-  test("$DX_USER set to empty string returns empty string", () => {
+  test("$DX_USER set to empty string returns null (empty is not a valid user)", () => {
     const ctx = makeCtx({ env: { DX_USER: "" } });
     const result = resolveUser(ctx);
-    expect(result).toBe("");
+    expect(result).toBeNull();
   });
 
   // -----------------------------------------------------------------------
@@ -427,6 +429,123 @@ describe("resolveUser", () => {
     const result = resolveUser(ctx);
     // V8 iterates object keys in insertion order, so the first key ("alice") wins.
     expect(result).toBe("alice");
+  });
+});
+
+// ===========================================================================
+// resolveUserWithProvenance — identity resolution with provenance
+// ===========================================================================
+
+describe("resolveUserWithProvenance", () => {
+  // -----------------------------------------------------------------------
+  // $DX_USER (highest priority, always "exact")
+  // -----------------------------------------------------------------------
+
+  test("DX_USER returns exact match provenance", () => {
+    const ctx = makeCtx({ env: { DX_USER: "nitsan" } });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "DX_USER", match: "exact" });
+  });
+
+  test("DX_USER set to empty string returns null user with DX_USER signal", () => {
+    const ctx = makeCtx({ env: { DX_USER: "" } });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: null, signal: "DX_USER", match: "exact" });
+  });
+
+  // -----------------------------------------------------------------------
+  // $GITHUB_USER matching alias
+  // -----------------------------------------------------------------------
+
+  test("$GITHUB_USER matching alias returns alias provenance", () => {
+    const ctx = makeCtx({ env: { GITHUB_USER: "nitsan-ona" } });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "GITHUB_USER", match: "alias" });
+  });
+
+  test("$GITHUB_USER matching user key returns key provenance", () => {
+    const ctx = makeCtx({ env: { GITHUB_USER: "nitsan" } });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "GITHUB_USER", match: "key" });
+  });
+
+  // -----------------------------------------------------------------------
+  // $USER matching key
+  // -----------------------------------------------------------------------
+
+  test("$USER matching user key returns key provenance", () => {
+    const ctx = makeCtx({ env: { USER: "nitsan" } });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "USER", match: "key" });
+  });
+
+  test("$USER matching alias returns alias provenance", () => {
+    const ctx = makeCtx({ env: { USER: "Nitsan Avni" } });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "USER", match: "alias" });
+  });
+
+  // -----------------------------------------------------------------------
+  // gitUserName matching alias
+  // -----------------------------------------------------------------------
+
+  test("gitUserName matching alias returns alias provenance", () => {
+    const ctx = makeCtx({ gitUserName: "Nitsan Avni" });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "gitUserName", match: "alias" });
+  });
+
+  test("gitUserName matching user key returns key provenance", () => {
+    const ctx = makeCtx({ gitUserName: "nitsan" });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "gitUserName", match: "key" });
+  });
+
+  // -----------------------------------------------------------------------
+  // gitUserEmail
+  // -----------------------------------------------------------------------
+
+  test("gitUserEmail prefix matching alias returns gitUserEmail provenance", () => {
+    const config = makeConfig({
+      users: {
+        nitsan: {
+          aliases: ["Nitsan Avni", "nitsan-ona", "nitsan"],
+          overrides: {},
+        },
+      },
+    });
+    const ctx = makeCtx({ config, gitUserEmail: "nitsan@example.com" });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: "nitsan", signal: "gitUserEmail", match: "key" });
+  });
+
+  // -----------------------------------------------------------------------
+  // No match
+  // -----------------------------------------------------------------------
+
+  test("no match returns all nulls", () => {
+    const ctx = makeCtx({
+      env: { USER: "unknown-person" },
+      gitUserName: "Nobody Known",
+      gitUserEmail: "nobody@example.com",
+    });
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: null, signal: null, match: null });
+  });
+
+  test("no signals at all returns all nulls", () => {
+    const ctx = makeCtx();
+    const result = resolveUserWithProvenance(ctx);
+    expect(result).toEqual({ user: null, signal: null, match: null });
+  });
+
+  // -----------------------------------------------------------------------
+  // resolveUser is a thin wrapper
+  // -----------------------------------------------------------------------
+
+  test("resolveUser returns the same user as resolveUserWithProvenance", () => {
+    const ctx = makeCtx({ env: { USER: "nitsan" } });
+    expect(resolveUser(ctx)).toBe(resolveUserWithProvenance(ctx).user);
   });
 });
 
@@ -875,10 +994,11 @@ describe("edge cases", () => {
     expect(result).toEqual({});
   });
 
-  test("$DX_USER set to empty string returns empty string", () => {
+  test("$DX_USER set to empty string returns null (empty is not a valid user)", () => {
     const ctx = makeCtx({ env: { DX_USER: "" } });
     const result = resolveUser(ctx);
-    // It's set (not undefined), so return it as-is
-    expect(result).toBe("");
+    // DX_USER="" is recognized as "set" (signal: DX_USER, match: exact),
+    // but empty string is normalized to null — not a valid user key.
+    expect(result).toBeNull();
   });
 });
