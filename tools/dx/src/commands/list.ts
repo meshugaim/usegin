@@ -8,6 +8,7 @@
  */
 
 import { Command } from "commander";
+import { spawnSync } from "child_process";
 import type { DxContext } from "../core";
 import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
@@ -53,6 +54,42 @@ export function buildListData(
   }
 
   return entries;
+}
+
+/**
+ * Grep the codebase for feature name usage in dx patterns.
+ *
+ * For each feature, searches for occurrences in .ts and .sh files
+ * using `grep -rl`. Returns a map of feature name to match count.
+ */
+export function grepGateCounts(features: string[]): Record<string, number> {
+  const results: Record<string, number> = {};
+
+  for (const feature of features) {
+    // Search for the feature name in common dx patterns across ts and sh files
+    const result = spawnSync(
+      "grep",
+      ["-r", "--include=*.ts", "--include=*.sh", "--include=*.tsx", "-c", feature, "."],
+      { encoding: "utf-8", cwd: process.cwd() },
+    );
+
+    // grep -c outputs "filename:count" per file. Sum the counts.
+    // Exit code 1 means no matches (not an error).
+    if (result.status === 0 && result.stdout) {
+      let total = 0;
+      for (const line of result.stdout.trim().split("\n")) {
+        const match = line.match(/:(\d+)$/);
+        if (match) {
+          total += parseInt(match[1], 10);
+        }
+      }
+      results[feature] = total;
+    } else {
+      results[feature] = 0;
+    }
+  }
+
+  return results;
 }
 
 /**
@@ -108,8 +145,8 @@ export function buildListCommand(): Command {
     const useJson = dxShouldOutputJson(opts);
     const ctx = dx.getContext();
 
-    // In a real implementation, grepResults would come from scanning the codebase
-    const grepResults: Record<string, number> = {};
+    const featureNames = Object.keys(ctx.config.features);
+    const grepResults = grepGateCounts(featureNames);
     const data = buildListData(ctx, grepResults);
 
     if (useJson) {

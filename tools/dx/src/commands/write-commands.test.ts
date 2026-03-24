@@ -2,9 +2,6 @@
  * CLI write commands — tests for enable/disable, identify, interactive,
  * list, and docs.
  *
- * RED phase: these tests should all fail because the implementations
- * throw "Not implemented".
- *
  * Tests pure formatting functions (layer 1) and Commander command
  * structure (layer 2), following the three-layer architecture.
  *
@@ -30,6 +27,8 @@ import {
 // --- Identify pure functions ---
 import {
   collectIdentitySignals,
+  autoDetectUser,
+  addSignalsAsAliases,
   buildIdentifyCommand,
   type CollectedSignal,
 } from "./identify";
@@ -413,6 +412,28 @@ describe("formatEnableDisableResultJson", () => {
     expect(parsed.enabled).toBe(false);
     expect(parsed.target).toBe("config");
   });
+
+  test("includes user field when saved to config", () => {
+    const output = formatEnableDisableResultJson(
+      "ci-watcher",
+      false,
+      true,
+      "nitsan",
+    );
+    const parsed = JSON.parse(output);
+    expect(parsed.user).toBe("nitsan");
+  });
+
+  test("does not include user field for local target", () => {
+    const output = formatEnableDisableResultJson(
+      "ci-watcher",
+      false,
+      false,
+      null,
+    );
+    const parsed = JSON.parse(output);
+    expect(parsed).not.toHaveProperty("user");
+  });
 });
 
 // ===========================================================================
@@ -567,6 +588,169 @@ describe("collectIdentitySignals", () => {
     });
     const signals = collectIdentitySignals(ctx);
     expect(signals.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ===========================================================================
+// autoDetectUser — match signals to existing users
+// ===========================================================================
+
+describe("autoDetectUser", () => {
+  test("returns user when signal matches user key", () => {
+    const signals: CollectedSignal[] = [{ signal: "USER", value: "nitsan" }];
+    const users = {
+      nitsan: { aliases: [], overrides: {} },
+    };
+    expect(autoDetectUser(signals, users)).toBe("nitsan");
+  });
+
+  test("returns user when signal matches alias", () => {
+    const signals: CollectedSignal[] = [
+      { signal: "gitUserName", value: "Nitsan Avni" },
+    ];
+    const users = {
+      nitsan: { aliases: ["Nitsan Avni"], overrides: {} },
+    };
+    expect(autoDetectUser(signals, users)).toBe("nitsan");
+  });
+
+  test("returns null when no signals match", () => {
+    const signals: CollectedSignal[] = [
+      { signal: "USER", value: "unknown-person" },
+    ];
+    const users = {
+      nitsan: { aliases: ["Nitsan Avni"], overrides: {} },
+    };
+    expect(autoDetectUser(signals, users)).toBeNull();
+  });
+
+  test("returns null for empty signals", () => {
+    const users = {
+      nitsan: { aliases: [], overrides: {} },
+    };
+    expect(autoDetectUser([], users)).toBeNull();
+  });
+});
+
+// ===========================================================================
+// addSignalsAsAliases — persist new signals to config.json
+// ===========================================================================
+
+describe("addSignalsAsAliases", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "dx-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test("adds new signal values as aliases", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: { aliases: ["Nitsan Avni"], overrides: {} },
+        },
+      }),
+    );
+
+    const signals: CollectedSignal[] = [
+      { signal: "GITHUB_USER", value: "nitsan-ona" },
+      { signal: "USER", value: "nitsan" }, // same as key — should skip
+    ];
+
+    const added = addSignalsAsAliases(configPath, "nitsan", signals);
+    expect(added).toEqual(["nitsan-ona"]);
+
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(content.users.nitsan.aliases).toContain("nitsan-ona");
+  });
+
+  test("skips signals already in aliases (case-insensitive)", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: { aliases: ["Nitsan Avni"], overrides: {} },
+        },
+      }),
+    );
+
+    const signals: CollectedSignal[] = [
+      { signal: "gitUserName", value: "Nitsan Avni" },
+    ];
+
+    const added = addSignalsAsAliases(configPath, "nitsan", signals);
+    expect(added).toEqual([]);
+  });
+
+  test("creates user entry if not present", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {},
+      }),
+    );
+
+    const signals: CollectedSignal[] = [
+      { signal: "USER", value: "alice" },
+    ];
+
+    const added = addSignalsAsAliases(configPath, "newuser", signals);
+    expect(added).toEqual(["alice"]);
+
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(content.users.newuser).toBeDefined();
+    expect(content.users.newuser.aliases).toContain("alice");
+  });
+
+  test("does not write file when no new aliases added", () => {
+    const configPath = join(tempDir, "config.json");
+    const original = JSON.stringify({
+      features: {},
+      users: {
+        nitsan: { aliases: ["nitsan-ona"], overrides: {} },
+      },
+    });
+    writeFileSync(configPath, original);
+
+    const signals: CollectedSignal[] = [
+      { signal: "USER", value: "nitsan" }, // matches key
+      { signal: "GITHUB_USER", value: "nitsan-ona" }, // already alias
+    ];
+
+    addSignalsAsAliases(configPath, "nitsan", signals);
+    // File should be unchanged since no aliases were added
+    expect(readFileSync(configPath, "utf-8")).toBe(original);
+  });
+
+  test("skips empty signal values", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: { aliases: [], overrides: {} },
+        },
+      }),
+    );
+
+    const signals: CollectedSignal[] = [
+      { signal: "DX_USER", value: "" },
+    ];
+
+    const added = addSignalsAsAliases(configPath, "nitsan", signals);
+    expect(added).toEqual([]);
   });
 });
 

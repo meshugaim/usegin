@@ -58,3 +58,7 @@ Three-layer command design (same as effi-cli):
 3. **CLI handler** -- thin wrapper calling pure functions, handling exit codes
 
 Core logic lives in `src/core.ts`. SDK in `sdk.ts`. Config in `.dx/config.json`.
+
+## Output Convention
+
+Convention: human output goes to stderr, JSON data goes to stdout. This keeps stdout clean for piping (e.g., `dx status --json | jq .user`).

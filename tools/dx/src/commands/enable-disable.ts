@@ -9,7 +9,7 @@
 
 import { Command } from "commander";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
-import { dirname } from "path";
+import { dirname, resolve } from "path";
 import { spawnSync } from "child_process";
 import { dxShouldOutputJson } from "../output";
 import { resolveUser, allFeatures } from "../core";
@@ -39,12 +39,11 @@ export function writeLocalOverride(
   } else {
     // File doesn't exist — create with empty overrides
     data = { overrides: {} };
+    // Ensure parent directory exists (only needed when creating the file)
+    mkdirSync(dirname(localPath), { recursive: true });
   }
 
   data.overrides[feature] = enabled;
-
-  // Ensure parent directory exists
-  mkdirSync(dirname(localPath), { recursive: true });
 
   writeFileSync(localPath, JSON.stringify(data, null, 2) + "\n");
 }
@@ -116,18 +115,21 @@ export function formatEnableDisableResult(
  *
  * Returns a JSON string like:
  * `{"feature":"ci-watcher","enabled":false,"target":"local"}`
+ *
+ * When target is "config" and a user is known, includes the `user` field.
  */
 export function formatEnableDisableResultJson(
   feature: string,
   enabled: boolean,
   saved: boolean,
-  _user: string | null,
+  user: string | null,
 ): string {
   return JSON.stringify(
     {
       feature,
       enabled,
       target: saved ? "config" : "local",
+      ...(saved && user ? { user } : {}),
     },
     null,
     2,
@@ -139,6 +141,9 @@ export function formatEnableDisableResultJson(
  *
  * Called automatically after enable/disable writes so that
  * `git config dx.<feature>` stays in sync without a manual `dx sync`.
+ *
+ * Checks `result.status` from each `spawnSync` call and reports errors
+ * to stderr, matching the error handling pattern in `sync.ts`.
  */
 function autoSync(): void {
   dx.reload();
@@ -147,120 +152,97 @@ function autoSync(): void {
   const entries = buildSyncEntries(features);
 
   for (const entry of entries) {
-    spawnSync(
+    const result = spawnSync(
       "git",
       ["config", "--local", `dx.${entry.key}`, String(entry.value)],
       { encoding: "utf-8" },
     );
+    if (result.status !== 0) {
+      const error = result.stderr?.trim() ?? "unknown error";
+      process.stderr.write(
+        `dx: warning: failed to sync dx.${entry.key}: ${error}\n`,
+      );
+    }
   }
+}
+
+/**
+ * Factory for building `dx enable` and `dx disable` Commander commands.
+ *
+ * Both commands share identical structure — the only differences are
+ * the command name, description, and the boolean value written.
+ */
+function buildToggleCommand(name: "enable" | "disable", enabled: boolean): Command {
+  const cmd = new Command(name)
+    .description(`${name === "enable" ? "Enable" : "Disable"} a feature`)
+    .argument("<feature>", `Feature name to ${name}`)
+    .option("--save", "Persist to config.json (user override)")
+    .option("--json", "Output as JSON");
+
+  cmd.action((feature: string, opts: { save?: boolean; json?: boolean }) => {
+    const useJson = dxShouldOutputJson(opts);
+    const ctx = dx.getContext();
+    const user = resolveUser(ctx);
+
+    // Warn if the feature is not registered (but still proceed — unknown
+    // features default to enabled, so overrides are valid)
+    if (ctx.config.features && !(feature in ctx.config.features)) {
+      process.stderr.write(
+        `dx: warning: "${feature}" is not a registered feature\n`,
+      );
+    }
+
+    let saved = false;
+
+    if (opts.save) {
+      if (user) {
+        if (!ctx.configPath) {
+          throw new Error("dx: configPath not set in context — cannot --save");
+        }
+        writeUserOverride(ctx.configPath, user, feature, enabled);
+        saved = true;
+      } else {
+        // --save requires a known user; fall back to local with a warning
+        process.stderr.write(
+          "dx: cannot --save: user not identified. Run `dx identify` first.\n",
+        );
+        process.stderr.write("dx: writing to local config instead.\n");
+      }
+    }
+
+    if (!saved) {
+      const localPath = ctx.localPath ?? (ctx.configPath ? resolve(dirname(ctx.configPath), "config.local.json") : null);
+      if (!localPath) throw new Error("dx: cannot determine local config path");
+      writeLocalOverride(localPath, feature, enabled);
+    }
+
+    // Auto-sync to git config so `git config dx.<feature>` stays current
+    autoSync();
+
+    if (useJson) {
+      process.stdout.write(
+        formatEnableDisableResultJson(feature, enabled, saved, user) + "\n",
+      );
+    } else {
+      process.stderr.write(
+        formatEnableDisableResult(feature, enabled, saved, user) + "\n",
+      );
+    }
+  });
+
+  return cmd;
 }
 
 /**
  * Build the `dx enable` Commander command.
  */
 export function buildEnableCommand(): Command {
-  const cmd = new Command("enable")
-    .description("Enable a feature")
-    .argument("<feature>", "Feature name to enable")
-    .option("--save", "Persist to config.json (user override)")
-    .option("--json", "Output as JSON");
-
-  cmd.action((feature: string, opts: { save?: boolean; json?: boolean }) => {
-    const useJson = dxShouldOutputJson(opts);
-    const ctx = dx.getContext();
-    const user = resolveUser(ctx);
-
-    let saved = false;
-
-    if (opts.save) {
-      if (user) {
-        if (!ctx.configPath) {
-          throw new Error("dx: configPath not set in context — cannot --save");
-        }
-        writeUserOverride(ctx.configPath, user, feature, true);
-        saved = true;
-      } else {
-        // --save requires a known user; fall back to local with a warning
-        process.stderr.write(
-          "dx: cannot --save: user not identified. Run `dx identify` first.\n",
-        );
-        process.stderr.write("dx: writing to local config instead.\n");
-      }
-    }
-
-    if (!saved) {
-      const localPath = ctx.localPath ?? ".dx/config.local.json";
-      writeLocalOverride(localPath, feature, true);
-    }
-
-    // Auto-sync to git config so `git config dx.<feature>` stays current
-    autoSync();
-
-    if (useJson) {
-      process.stdout.write(
-        formatEnableDisableResultJson(feature, true, saved, user) + "\n",
-      );
-    } else {
-      process.stderr.write(
-        formatEnableDisableResult(feature, true, saved, user) + "\n",
-      );
-    }
-  });
-
-  return cmd;
+  return buildToggleCommand("enable", true);
 }
 
 /**
  * Build the `dx disable` Commander command.
  */
 export function buildDisableCommand(): Command {
-  const cmd = new Command("disable")
-    .description("Disable a feature")
-    .argument("<feature>", "Feature name to disable")
-    .option("--save", "Persist to config.json (user override)")
-    .option("--json", "Output as JSON");
-
-  cmd.action((feature: string, opts: { save?: boolean; json?: boolean }) => {
-    const useJson = dxShouldOutputJson(opts);
-    const ctx = dx.getContext();
-    const user = resolveUser(ctx);
-
-    let saved = false;
-
-    if (opts.save) {
-      if (user) {
-        if (!ctx.configPath) {
-          throw new Error("dx: configPath not set in context — cannot --save");
-        }
-        writeUserOverride(ctx.configPath, user, feature, false);
-        saved = true;
-      } else {
-        // --save requires a known user; fall back to local with a warning
-        process.stderr.write(
-          "dx: cannot --save: user not identified. Run `dx identify` first.\n",
-        );
-        process.stderr.write("dx: writing to local config instead.\n");
-      }
-    }
-
-    if (!saved) {
-      const localPath = ctx.localPath ?? ".dx/config.local.json";
-      writeLocalOverride(localPath, feature, false);
-    }
-
-    // Auto-sync to git config so `git config dx.<feature>` stays current
-    autoSync();
-
-    if (useJson) {
-      process.stdout.write(
-        formatEnableDisableResultJson(feature, false, saved, user) + "\n",
-      );
-    } else {
-      process.stderr.write(
-        formatEnableDisableResult(feature, false, saved, user) + "\n",
-      );
-    }
-  });
-
-  return cmd;
+  return buildToggleCommand("disable", false);
 }

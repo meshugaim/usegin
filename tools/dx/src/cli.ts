@@ -11,9 +11,9 @@
 import { Command } from "commander";
 import { buildStatusCommand, buildStatusData, formatStatusJson } from "./commands/status";
 import { buildResolveCommand } from "./commands/resolve";
-import { buildSyncCommand } from "./commands/sync";
+import { buildSyncCommand, buildSyncEntries } from "./commands/sync";
 import { buildWhoamiCommand } from "./commands/whoami";
-import { buildEnableCommand, buildDisableCommand } from "./commands/enable-disable";
+import { buildEnableCommand, buildDisableCommand, writeLocalOverride } from "./commands/enable-disable";
 import { buildIdentifyCommand } from "./commands/identify";
 import { buildListCommand } from "./commands/list";
 import { buildDocsCommand } from "./commands/docs";
@@ -21,6 +21,9 @@ import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
 import { isHeadless } from "../../lib/headless";
 import { dxShouldOutputJson } from "./output";
+import { allFeatures } from "./core";
+import { spawnSync } from "child_process";
+import { isCancel } from "@clack/prompts";
 import dx from "../sdk";
 
 const program = new Command()
@@ -50,7 +53,7 @@ program.action(async () => {
       return;
     }
 
-    await multiselect({
+    const selected = await multiselect({
       message: "Feature toggles",
       options: options.map((o) => ({
         value: o.value,
@@ -59,6 +62,47 @@ program.action(async () => {
         initialValue: o.initialValue,
       })),
     });
+
+    if (isCancel(selected)) {
+      process.stderr.write("dx: cancelled\n");
+      return;
+    }
+
+    // Compare selected to current state and write local overrides for changes
+    const selectedSet = new Set(selected as string[]);
+    const localPath = ctx.localPath;
+    if (!localPath) {
+      process.stderr.write("dx: cannot determine local config path\n");
+      return;
+    }
+
+    let changed = 0;
+    for (const opt of options) {
+      const wasEnabled = opt.initialValue;
+      const nowEnabled = selectedSet.has(opt.value);
+      if (wasEnabled !== nowEnabled) {
+        writeLocalOverride(localPath, opt.value, nowEnabled);
+        changed++;
+      }
+    }
+
+    if (changed > 0) {
+      // Auto-sync to git config
+      dx.reload();
+      const refreshedCtx = dx.getContext();
+      const features = allFeatures(refreshedCtx);
+      const entries = buildSyncEntries(features);
+      for (const entry of entries) {
+        spawnSync(
+          "git",
+          ["config", "--local", `dx.${entry.key}`, String(entry.value)],
+          { encoding: "utf-8" },
+        );
+      }
+      process.stderr.write(`dx: updated ${changed} feature(s)\n`);
+    } else {
+      process.stderr.write("dx: no changes\n");
+    }
   } else {
     program.help();
   }
