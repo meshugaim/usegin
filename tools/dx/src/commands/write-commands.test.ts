@@ -42,6 +42,8 @@ import {
 // --- List pure functions ---
 import {
   buildListData,
+  grepGateCounts,
+  buildGatePattern,
   formatList,
   formatListJson,
   buildListCommand,
@@ -134,6 +136,27 @@ describe("writeLocalOverride", () => {
     expect(() => {
       writeLocalOverride(localPath, "ci-watcher", false);
     }).toThrow();
+  });
+
+  test("handles file where overrides is not an object (defensive)", () => {
+    const localPath = join(tempDir, "config.local.json");
+    // Someone manually set overrides to a string or null
+    writeFileSync(localPath, JSON.stringify({ overrides: "not-an-object" }));
+
+    writeLocalOverride(localPath, "ci-watcher", false);
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.overrides["ci-watcher"]).toBe(false);
+  });
+
+  test("handles file where overrides is null (defensive)", () => {
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(localPath, JSON.stringify({ overrides: null }));
+
+    writeLocalOverride(localPath, "autosync", true);
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.overrides.autosync).toBe(true);
   });
 });
 
@@ -379,6 +402,18 @@ describe("formatEnableDisableResult", () => {
       null,
     );
     expect(output).toMatch(/^dx:/);
+  });
+
+  test("handles saved=true with null user gracefully (no 'for null')", () => {
+    const output = formatEnableDisableResult(
+      "ci-watcher",
+      false,
+      true,
+      null,
+    );
+    expect(output).toContain("config.json");
+    expect(output).not.toContain("for null");
+    expect(output).not.toContain("for undefined");
   });
 });
 
@@ -629,6 +664,52 @@ describe("autoDetectUser", () => {
       nitsan: { aliases: [], overrides: {} },
     };
     expect(autoDetectUser([], users)).toBeNull();
+  });
+
+  test("extracts email prefix for gitUserEmail signal before matching", () => {
+    const signals: CollectedSignal[] = [
+      { signal: "gitUserEmail", value: "nitsan@example.com" },
+    ];
+    const users = {
+      nitsan: { aliases: ["nitsan"], overrides: {} },
+    };
+    // Should match "nitsan" (prefix) against the alias, not "nitsan@example.com"
+    expect(autoDetectUser(signals, users)).toBe("nitsan");
+  });
+
+  test("does not match full email as alias", () => {
+    // If someone has "nitsan@example.com" as an alias, the full email
+    // won't match because we extract the prefix. But the prefix "nitsan"
+    // would match the user key.
+    const signals: CollectedSignal[] = [
+      { signal: "gitUserEmail", value: "alice@example.com" },
+    ];
+    const users = {
+      bob: { aliases: ["alice@example.com"], overrides: {} },
+    };
+    // "alice" (prefix) doesn't match user key "bob" or alias "alice@example.com"
+    expect(autoDetectUser(signals, users)).toBeNull();
+  });
+
+  test("handles gitUserEmail with no @ sign", () => {
+    const signals: CollectedSignal[] = [
+      { signal: "gitUserEmail", value: "nitsan" },
+    ];
+    const users = {
+      nitsan: { aliases: [], overrides: {} },
+    };
+    // No @, so the full string is used as the match value
+    expect(autoDetectUser(signals, users)).toBe("nitsan");
+  });
+
+  test("skips gitUserEmail with empty prefix (@domain.com)", () => {
+    const signals: CollectedSignal[] = [
+      { signal: "gitUserEmail", value: "@domain.com" },
+    ];
+    const users = {
+      "": { aliases: [], overrides: {} },
+    };
+    expect(autoDetectUser(signals, users)).toBeNull();
   });
 });
 
@@ -1042,6 +1123,65 @@ describe("formatListJson", () => {
     const output = formatListJson([]);
     const parsed = JSON.parse(output);
     expect(parsed).toEqual([]);
+  });
+});
+
+// ===========================================================================
+// buildGatePattern — regex for dx gate patterns
+// ===========================================================================
+
+describe("buildGatePattern", () => {
+  test("matches isEnabled SDK call", () => {
+    const pattern = buildGatePattern("ci-watcher");
+    const regex = new RegExp(pattern);
+    expect(regex.test('if (dx.isEnabled("ci-watcher"))')).toBe(true);
+  });
+
+  test("matches getFeature SDK call", () => {
+    const pattern = buildGatePattern("autosync");
+    const regex = new RegExp(pattern);
+    expect(regex.test('const f = dx.getFeature("autosync")')).toBe(true);
+  });
+
+  test("matches dx resolve CLI usage", () => {
+    const pattern = buildGatePattern("ci-watcher");
+    const regex = new RegExp(pattern);
+    expect(regex.test("dx resolve ci-watcher")).toBe(true);
+  });
+
+  test("matches git config dx.feature usage", () => {
+    const pattern = buildGatePattern("ci-watcher");
+    const regex = new RegExp(pattern);
+    expect(regex.test("git config dx.ci-watcher")).toBe(true);
+  });
+
+  test("does not match plain feature name in unrelated context", () => {
+    const pattern = buildGatePattern("ci-watcher");
+    const regex = new RegExp(pattern);
+    expect(regex.test("// ci-watcher is a feature")).toBe(false);
+  });
+});
+
+// ===========================================================================
+// grepGateCounts — grep the codebase for gate patterns
+// ===========================================================================
+
+describe("grepGateCounts", () => {
+  test("returns a record with a number for each feature", () => {
+    const results = grepGateCounts(["ci-watcher", "autosync"]);
+    expect(typeof results).toBe("object");
+    expect(typeof results["ci-watcher"]).toBe("number");
+    expect(typeof results["autosync"]).toBe("number");
+  });
+
+  test("returns 0 for a feature name that does not exist in the codebase", () => {
+    const results = grepGateCounts(["zzz-nonexistent-feature-xyz-12345"]);
+    expect(results["zzz-nonexistent-feature-xyz-12345"]).toBe(0);
+  });
+
+  test("handles empty feature list without crashing", () => {
+    const results = grepGateCounts([]);
+    expect(results).toEqual({});
   });
 });
 

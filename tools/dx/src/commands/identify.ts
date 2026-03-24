@@ -67,15 +67,31 @@ export function collectIdentitySignals(
  * Try to auto-detect which user the current signals match.
  *
  * Iterates through collected signals and checks if any match
- * a user key or alias in the config. Returns the matched user
- * key if found, or null.
+ * a user key or alias in the config. For `gitUserEmail` signals,
+ * extracts the prefix before `@` before matching — mirroring the
+ * email prefix extraction in `core.ts`'s `resolveUserWithProvenance`.
+ *
+ * Returns the matched user key if found, or null.
  */
 export function autoDetectUser(
   signals: CollectedSignal[],
   users: Record<string, { aliases: string[]; overrides: Record<string, boolean> }>,
 ): string | null {
   for (const s of signals) {
-    const result = matchSignalToUser(s.value, users);
+    let matchValue = s.value;
+
+    // For email signals, extract the prefix before @ to match how
+    // core.ts resolves identity from gitUserEmail.
+    if (s.signal === "gitUserEmail" && matchValue) {
+      const atIndex = matchValue.indexOf("@");
+      if (atIndex !== -1) {
+        matchValue = matchValue.substring(0, atIndex);
+      }
+      // Skip empty prefixes (e.g., "@domain.com")
+      if (matchValue.length === 0) continue;
+    }
+
+    const result = matchSignalToUser(matchValue, users);
     if (result !== null) {
       return result.user;
     }

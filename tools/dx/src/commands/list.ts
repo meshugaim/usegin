@@ -57,24 +57,51 @@ export function buildListData(
 }
 
 /**
- * Grep the codebase for feature name usage in dx patterns.
+ * Build a regex pattern that matches actual dx gate usage for a feature.
  *
- * For each feature, searches for occurrences in .ts and .sh files
- * using `grep -rl`. Returns a map of feature name to match count.
+ * Matches:
+ * - `isEnabled.*"feature"` or `getFeature.*"feature"` (TS SDK usage)
+ * - `dx resolve feature` or `dx.resolve.*feature` (CLI/bash usage)
+ * - `git config dx.feature` (git config cache usage)
+ */
+export function buildGatePattern(feature: string): string {
+  return `(isEnabled|getFeature).*"${feature}"|(dx resolve|dx\\.resolve).*${feature}|git config dx\\.${feature}`;
+}
+
+/**
+ * Grep the codebase for actual dx gate patterns per feature.
+ *
+ * For each feature, searches for SDK calls (`isEnabled`, `getFeature`),
+ * CLI invocations (`dx resolve`), and git config reads (`git config dx.X`)
+ * across .ts, .tsx, and .sh files. Excludes `tools/dx/` itself so the
+ * dx tool's own code doesn't inflate counts.
+ *
+ * Returns a map of feature name to matching line count.
  */
 export function grepGateCounts(features: string[]): Record<string, number> {
   const results: Record<string, number> = {};
 
   for (const feature of features) {
-    // Search for the feature name in common dx patterns across ts and sh files
+    const pattern = buildGatePattern(feature);
+
+    // grep -rE for extended regex, -c for counts per file.
+    // --exclude-dir to skip the dx tool's own source.
+    // Exit code 1 means no matches (not an error).
     const result = spawnSync(
       "grep",
-      ["-r", "--include=*.ts", "--include=*.sh", "--include=*.tsx", "-c", feature, "."],
+      [
+        "-rE",
+        "--include=*.ts",
+        "--include=*.tsx",
+        "--include=*.sh",
+        "--exclude-dir=tools/dx",
+        "-c",
+        pattern,
+        ".",
+      ],
       { encoding: "utf-8", cwd: process.cwd() },
     );
 
-    // grep -c outputs "filename:count" per file. Sum the counts.
-    // Exit code 1 means no matches (not an error).
     if (result.status === 0 && result.stdout) {
       let total = 0;
       for (const line of result.stdout.trim().split("\n")) {

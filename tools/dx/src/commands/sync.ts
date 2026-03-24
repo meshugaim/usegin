@@ -35,6 +35,37 @@ export function buildSyncEntries(
 }
 
 /**
+ * Re-resolve all features and sync their values to git config.
+ *
+ * Called automatically after enable/disable writes and the interactive
+ * picker so that `git config dx.<feature>` stays in sync without a
+ * manual `dx sync`.
+ *
+ * Reports sync errors to stderr rather than throwing, matching the
+ * error handling pattern in the sync command itself.
+ */
+export function autoSync(): void {
+  dx.reload();
+  const ctx = dx.getContext();
+  const features = allFeatures(ctx);
+  const entries = buildSyncEntries(features);
+
+  for (const entry of entries) {
+    const result = spawnSync(
+      "git",
+      ["config", "--local", `dx.${entry.key}`, String(entry.value)],
+      { encoding: "utf-8" },
+    );
+    if (result.status !== 0) {
+      const error = result.stderr?.trim() ?? "unknown error";
+      process.stderr.write(
+        `dx: warning: failed to sync dx.${entry.key}: ${error}\n`,
+      );
+    }
+  }
+}
+
+/**
  * Build the `dx sync` Commander command.
  *
  * Options:

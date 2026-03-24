@@ -10,10 +10,9 @@
 import { Command } from "commander";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { dirname, resolve } from "path";
-import { spawnSync } from "child_process";
 import { dxShouldOutputJson } from "../output";
-import { resolveUser, allFeatures } from "../core";
-import { buildSyncEntries } from "./sync";
+import { resolveUser } from "../core";
+import { autoSync } from "./sync";
 import dx from "../../sdk";
 
 /**
@@ -33,7 +32,7 @@ export function writeLocalOverride(
     // File exists — read and parse (throws on corrupted JSON)
     const raw = readFileSync(localPath, "utf-8");
     data = JSON.parse(raw);
-    if (!data.overrides) {
+    if (typeof data.overrides !== "object" || data.overrides === null) {
       data.overrides = {};
     }
   } else {
@@ -101,7 +100,10 @@ export function formatEnableDisableResult(
   const action = enabled ? "enable" : "disable";
 
   if (saved) {
-    return `dx: ${feature} ${state} for ${user} (saved to config.json)`;
+    if (user) {
+      return `dx: ${feature} ${state} for ${user} (saved to config.json)`;
+    }
+    return `dx: ${feature} ${state} (saved to config.json)`;
   }
 
   return (
@@ -134,36 +136,6 @@ export function formatEnableDisableResultJson(
     null,
     2,
   );
-}
-
-/**
- * Re-resolve all features and sync their values to git config.
- *
- * Called automatically after enable/disable writes so that
- * `git config dx.<feature>` stays in sync without a manual `dx sync`.
- *
- * Checks `result.status` from each `spawnSync` call and reports errors
- * to stderr, matching the error handling pattern in `sync.ts`.
- */
-function autoSync(): void {
-  dx.reload();
-  const ctx = dx.getContext();
-  const features = allFeatures(ctx);
-  const entries = buildSyncEntries(features);
-
-  for (const entry of entries) {
-    const result = spawnSync(
-      "git",
-      ["config", "--local", `dx.${entry.key}`, String(entry.value)],
-      { encoding: "utf-8" },
-    );
-    if (result.status !== 0) {
-      const error = result.stderr?.trim() ?? "unknown error";
-      process.stderr.write(
-        `dx: warning: failed to sync dx.${entry.key}: ${error}\n`,
-      );
-    }
-  }
 }
 
 /**

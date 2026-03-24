@@ -11,7 +11,7 @@
 import { Command } from "commander";
 import { buildStatusCommand, buildStatusData, formatStatusJson } from "./commands/status";
 import { buildResolveCommand } from "./commands/resolve";
-import { buildSyncCommand, buildSyncEntries } from "./commands/sync";
+import { buildSyncCommand, autoSync } from "./commands/sync";
 import { buildWhoamiCommand } from "./commands/whoami";
 import { buildEnableCommand, buildDisableCommand, writeLocalOverride } from "./commands/enable-disable";
 import { buildIdentifyCommand } from "./commands/identify";
@@ -21,8 +21,6 @@ import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
 import { isHeadless } from "../../lib/headless";
 import { dxShouldOutputJson } from "./output";
-import { allFeatures } from "./core";
-import { spawnSync } from "child_process";
 import { isCancel } from "@clack/prompts";
 import dx from "../sdk";
 
@@ -88,17 +86,7 @@ program.action(async () => {
 
     if (changed > 0) {
       // Auto-sync to git config
-      dx.reload();
-      const refreshedCtx = dx.getContext();
-      const features = allFeatures(refreshedCtx);
-      const entries = buildSyncEntries(features);
-      for (const entry of entries) {
-        spawnSync(
-          "git",
-          ["config", "--local", `dx.${entry.key}`, String(entry.value)],
-          { encoding: "utf-8" },
-        );
-      }
+      autoSync();
       process.stderr.write(`dx: updated ${changed} feature(s)\n`);
     } else {
       process.stderr.write("dx: no changes\n");
