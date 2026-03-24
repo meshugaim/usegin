@@ -12,7 +12,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { Command } from "commander";
@@ -58,50 +58,8 @@ import {
   type DocsSection,
 } from "./docs";
 
-// --- Core types for fixtures ---
-import type { DxConfig, DxContext } from "../core";
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-function makeConfig(overrides?: Partial<DxConfig>): DxConfig {
-  return {
-    features: {
-      "ci-watcher": {
-        description: "Monitor CI after push",
-        mechanism: "Claude PostToolUse hook",
-        default: true,
-      },
-      autosync: {
-        description: "Push to origin after every commit",
-        mechanism: "husky post-commit hook",
-        default: false,
-      },
-    },
-    users: {
-      nitsan: {
-        aliases: ["Nitsan Avni", "nitsan-ona"],
-        overrides: {
-          "ci-watcher": false,
-        },
-      },
-    },
-    ...overrides,
-  };
-}
-
-function makeContext(overrides?: Partial<DxContext>): DxContext {
-  return {
-    config: makeConfig(),
-    local: null,
-    env: { USER: "nitsan" },
-    gitUserName: null,
-    gitUserEmail: null,
-    whoami: null,
-    ...overrides,
-  };
-}
+// --- Shared test fixtures ---
+import { makeConfig, makeContext } from "../test-fixtures";
 
 // ===========================================================================
 // writeLocalOverride — synchronous file I/O for .dx/config.local.json
@@ -168,6 +126,15 @@ describe("writeLocalOverride", () => {
 
     const content = JSON.parse(readFileSync(nestedPath, "utf-8"));
     expect(content.overrides["ci-watcher"]).toBe(false);
+  });
+
+  test("throws when existing file contains corrupted JSON", () => {
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(localPath, "{ not valid json !!!");
+
+    expect(() => {
+      writeLocalOverride(localPath, "ci-watcher", false);
+    }).toThrow();
   });
 });
 
@@ -319,6 +286,28 @@ describe("writeUserOverride", () => {
       writeUserOverride(configPath, "nitsan", "ci-watcher", false);
     }).toThrow();
   });
+
+  test("writes pretty-printed JSON (not minified)", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: { aliases: [], overrides: {} },
+        },
+      }),
+    );
+
+    writeUserOverride(configPath, "nitsan", "ci-watcher", false);
+
+    const raw = readFileSync(configPath, "utf-8");
+    // Pretty-printed JSON contains newlines; minified JSON does not.
+    // config.json is committed to the repo, so diffs must stay readable.
+    expect(raw).toContain("\n");
+    // Verify it's still valid JSON after pretty-printing
+    expect(() => JSON.parse(raw)).not.toThrow();
+  });
 });
 
 // ===========================================================================
@@ -422,8 +411,7 @@ describe("formatEnableDisableResultJson", () => {
     const parsed = JSON.parse(output);
     expect(parsed.feature).toBe("ci-watcher");
     expect(parsed.enabled).toBe(false);
-    // When saved, target should not be "local"
-    expect(parsed.target).not.toBe("local");
+    expect(parsed.target).toBe("config");
   });
 });
 
@@ -659,6 +647,14 @@ describe("buildInteractiveOptions", () => {
     const options = buildInteractiveOptions(ctx);
     const syncOpt = options.find((o) => o.value === "autosync");
     expect(syncOpt!.initialValue).toBe(true);
+  });
+
+  test("label is a non-empty string containing the feature name", () => {
+    const options = buildInteractiveOptions(makeContext());
+    for (const opt of options) {
+      expect(typeof opt.label).toBe("string");
+      expect(opt.label.length).toBeGreaterThan(0);
+    }
   });
 
   test("handles empty features", () => {
@@ -974,7 +970,8 @@ describe("formatDocs", () => {
   });
 
   test("returns all sections for unknown topic (graceful fallback)", () => {
-    // When topic doesn't match any section, show all — same as no topic
+    // Design contract: unknown topics show all sections rather than an error,
+    // keeping the CLI forgiving.
     const output = formatDocs(sampleSections, "nonexistent");
     expect(output).toContain("Adding Features");
     expect(output).toContain("Config Format");

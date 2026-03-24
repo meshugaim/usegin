@@ -41,37 +41,8 @@ import { buildSyncCommand } from "./commands/sync";
 import { buildWhoamiCommand } from "./commands/whoami";
 
 // --- Core types for fixtures ---
-import type { DxConfig, DxContext, FeatureInfo } from "./core";
-
-// ---------------------------------------------------------------------------
-// Fixtures — reuse the same patterns as core.test.ts
-// ---------------------------------------------------------------------------
-
-function makeConfig(overrides?: Partial<DxConfig>): DxConfig {
-  return {
-    features: {
-      "ci-watcher": {
-        description: "Monitor CI after push",
-        mechanism: "Claude PostToolUse hook",
-        default: true,
-      },
-      autosync: {
-        description: "Push to origin after every commit",
-        mechanism: "husky post-commit hook",
-        default: false,
-      },
-    },
-    users: {
-      nitsan: {
-        aliases: ["Nitsan Avni", "nitsan-ona"],
-        overrides: {
-          "ci-watcher": false,
-        },
-      },
-    },
-    ...overrides,
-  };
-}
+import type { FeatureInfo } from "./core";
+import { makeConfig, makeContext } from "./test-fixtures";
 
 /** Build a StatusData fixture with sensible defaults. */
 function makeStatusData(overrides?: Partial<StatusData>): StatusData {
@@ -112,19 +83,6 @@ function makeIdentityInfo(
     user: "nitsan",
     signal: "USER",
     match: "alias",
-    ...overrides,
-  };
-}
-
-/** Build a DxContext fixture for buildStatusData tests. */
-function makeContext(overrides?: Partial<DxContext>): DxContext {
-  return {
-    config: makeConfig(),
-    local: null,
-    env: { USER: "nitsan" },
-    gitUserName: null,
-    gitUserEmail: null,
-    whoami: null,
     ...overrides,
   };
 }
