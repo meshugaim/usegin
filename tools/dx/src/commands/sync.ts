@@ -9,7 +9,7 @@
 import { Command } from "commander";
 import { spawnSync } from "child_process";
 import { allFeatures, type FeatureInfo } from "../core";
-import { shouldDefaultToJson } from "../../../lib/output-mode";
+import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
 
 /** A single entry to write to git config. */
@@ -52,12 +52,7 @@ export function buildSyncCommand(): Command {
     const features = allFeatures(ctx);
     const entries = buildSyncEntries(features);
 
-    const useJson = shouldDefaultToJson({
-      envVarName: "DX_OUTPUT",
-      json: opts.json,
-      env: process.env as Record<string, string | undefined>,
-      isTTY: process.stdout.isTTY ?? false,
-    });
+    const useJson = dxShouldOutputJson(opts);
 
     if (opts.dryRun) {
       if (useJson) {

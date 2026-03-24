@@ -7,7 +7,7 @@
  */
 
 import { Command } from "commander";
-import { shouldDefaultToJson } from "../../../lib/output-mode";
+import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
 import {
   resolveUserWithProvenance,
@@ -25,7 +25,9 @@ export type IdentityInfo = UserProvenance;
 /**
  * Format the whoami output for human display.
  *
- * Example: "User: nitsan (via $USER -> alias match)"
+ * Examples:
+ *   "User: nitsan (via $USER -> alias match)"
+ *   "User: nitsan (via gitUserName -> key match)"
  */
 export function formatWhoami(info: IdentityInfo): string {
   if (info.user === null) {
@@ -33,7 +35,11 @@ export function formatWhoami(info: IdentityInfo): string {
   }
 
   if (info.signal !== null && info.match !== null) {
-    return `User: ${info.user} (via $${info.signal} -> ${info.match} match)`;
+    // Only use `$` prefix for actual environment variables
+    const signalDisplay = ["DX_USER", "GITHUB_USER", "USER"].includes(info.signal)
+      ? `$${info.signal}`
+      : info.signal;
+    return `User: ${info.user} (via ${signalDisplay} -> ${info.match} match)`;
   }
 
   return `User: ${info.user}`;
@@ -68,12 +74,7 @@ export function buildWhoamiCommand(): Command {
     const ctx = dx.getContext();
     const info = resolveUserWithProvenance(ctx);
 
-    const useJson = shouldDefaultToJson({
-      envVarName: "DX_OUTPUT",
-      json: opts.json,
-      env: process.env as Record<string, string | undefined>,
-      isTTY: process.stdout.isTTY ?? false,
-    });
+    const useJson = dxShouldOutputJson(opts);
 
     if (useJson) {
       process.stdout.write(formatWhoamiJson(info) + "\n");

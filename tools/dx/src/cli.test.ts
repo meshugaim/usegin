@@ -1,12 +1,9 @@
 /**
- * CLI read commands — RED phase tests.
+ * CLI read commands — tests for formatting and command structure.
  *
  * Tests for the dx CLI's read-only commands: status, resolve, sync, whoami.
  * These test pure formatting functions (layer 1) and Commander command
  * structure (layer 2), following the three-layer architecture.
- *
- * All tests here should FAIL because the implementations throw
- * "Not implemented". This is the RED phase of TDD.
  *
  * Part of: ENG-3442
  */
@@ -17,7 +14,6 @@ import { Command } from "commander";
 // --- Shared lib (static imports — finding #8) ---
 import { shouldDefaultToJson } from "../../lib/output-mode";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
-import { applyStandardAliases } from "../../lib/standard-aliases";
 
 // --- Pure functions (layer 1) ---
 import {
@@ -582,6 +578,39 @@ describe("formatWhoami", () => {
     });
     const output = formatWhoami(info);
     expect(output).toContain("$GITHUB_USER");
+  });
+
+  test("shows resolution via gitUserName without $ prefix", () => {
+    const info = makeIdentityInfo({
+      user: "nitsan",
+      signal: "gitUserName",
+      match: "alias",
+    });
+    const output = formatWhoami(info);
+    expect(output).toContain("gitUserName");
+    expect(output).not.toContain("$gitUserName");
+  });
+
+  test("shows resolution via gitUserEmail without $ prefix", () => {
+    const info = makeIdentityInfo({
+      user: "nitsan",
+      signal: "gitUserEmail",
+      match: "key",
+    });
+    const output = formatWhoami(info);
+    expect(output).toContain("gitUserEmail");
+    expect(output).not.toContain("$gitUserEmail");
+  });
+
+  test("shows resolution via whoami without $ prefix", () => {
+    const info = makeIdentityInfo({
+      user: "nitsan",
+      signal: "whoami",
+      match: "key",
+    });
+    const output = formatWhoami(info);
+    expect(output).toContain("whoami");
+    expect(output).not.toContain("$whoami");
   });
 
   test("handles null user (unknown)", () => {

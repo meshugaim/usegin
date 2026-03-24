@@ -15,7 +15,7 @@ import { buildSyncCommand } from "./commands/sync";
 import { buildWhoamiCommand } from "./commands/whoami";
 import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
-import { shouldDefaultToJson } from "../../lib/output-mode";
+import { dxShouldOutputJson } from "./output";
 import dx from "../sdk";
 
 const program = new Command()
@@ -27,11 +27,7 @@ const program = new Command()
 
 // Bare `dx` with no args: if headless -> JSON status, if TTY -> show help
 program.action(() => {
-  const useJson = shouldDefaultToJson({
-    envVarName: "DX_OUTPUT",
-    env: process.env as Record<string, string | undefined>,
-    isTTY: process.stdout.isTTY ?? false,
-  });
+  const useJson = dxShouldOutputJson();
   if (useJson) {
     // Headless: output JSON status
     const ctx = dx.getContext();

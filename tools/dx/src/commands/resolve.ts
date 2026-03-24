@@ -8,7 +8,7 @@
 
 import { Command } from "commander";
 import { getFeature, type FeatureInfo } from "../core";
-import { shouldDefaultToJson } from "../../../lib/output-mode";
+import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
 
 /**
@@ -65,12 +65,7 @@ export function buildResolveCommand(): Command {
       const ctx = dx.getContext();
       const info = getFeature(feature, ctx);
 
-      const useJson = shouldDefaultToJson({
-        envVarName: "DX_OUTPUT",
-        json: opts.json,
-        env: process.env as Record<string, string | undefined>,
-        isTTY: process.stdout.isTTY ?? false,
-      });
+      const useJson = dxShouldOutputJson(opts);
 
       if (useJson) {
         process.stdout.write(formatResolveJson(feature, info) + "\n");

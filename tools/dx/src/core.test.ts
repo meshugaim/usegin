@@ -9,7 +9,6 @@ import {
   type DxLocalConfig,
   type DxContext,
   type FeatureInfo,
-  type UserProvenance,
 } from "./core";
 
 // ---------------------------------------------------------------------------

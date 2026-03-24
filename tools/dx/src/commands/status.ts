@@ -13,7 +13,7 @@ import {
   type FeatureInfo,
   type DxContext,
 } from "../core";
-import { shouldDefaultToJson } from "../../../lib/output-mode";
+import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
 
 /** Input shape for formatStatus. */
@@ -136,12 +136,7 @@ export function buildStatusCommand(): Command {
     .option("--json", "Output as JSON");
 
   cmd.action((opts: { json?: boolean }) => {
-    const useJson = shouldDefaultToJson({
-      envVarName: "DX_OUTPUT",
-      json: opts.json,
-      env: process.env as Record<string, string | undefined>,
-      isTTY: process.stdout.isTTY ?? false,
-    });
+    const useJson = dxShouldOutputJson(opts);
 
     const ctx = dx.getContext();
     const data = buildStatusData(ctx);
