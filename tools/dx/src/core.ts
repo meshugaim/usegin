@@ -36,6 +36,7 @@ export interface DxContext {
   gitUserName: string | null;
   gitUserEmail: string | null;
   whoami: string | null;
+  warn?: (msg: string) => void;
 }
 
 export type FeatureSource = "default" | "user-override" | "local-override";
@@ -46,26 +47,8 @@ export interface FeatureInfo {
 }
 
 // ---------------------------------------------------------------------------
-// Cache
-// ---------------------------------------------------------------------------
-
-let cachedCtx: DxContext | null = null;
-let cachedResult: (DxConfig & { local: DxLocalConfig | null }) | null = null;
-
-// ---------------------------------------------------------------------------
 // Functions
 // ---------------------------------------------------------------------------
-
-export function loadConfig(ctx: DxContext): DxConfig & { local: DxLocalConfig | null } {
-  if (cachedCtx === ctx && cachedResult !== null) {
-    return cachedResult;
-  }
-
-  const result = { ...ctx.config, local: ctx.local };
-  cachedCtx = ctx;
-  cachedResult = result;
-  return result;
-}
 
 export function resolveUser(ctx: DxContext): string | null {
   // 1. $DX_USER — return directly if set (no validation)
@@ -73,7 +56,8 @@ export function resolveUser(ctx: DxContext): string | null {
     return ctx.env.DX_USER;
   }
 
-  // 2. Scan signals in order: $GITHUB_USER, $USER, whoami, gitUserName, gitUserEmail
+  // 2. Scan signals in order: $GITHUB_USER, $USER, whoami, gitUserName
+  //    (gitUserEmail handled separately below — needs prefix extraction)
   const signals: (string | null)[] = [
     ctx.env.GITHUB_USER ?? null,
     ctx.env.USER ?? null,
@@ -145,7 +129,7 @@ export function getFeature(featureName: string, ctx: DxContext, user?: string | 
   const isUnknown = feature === undefined;
 
   if (isUnknown) {
-    process.stderr.write(`[dx] Warning: unknown feature "${featureName}"\n`);
+    ctx.warn?.(`dx: unknown feature "${featureName}" — defaulting to enabled\n`);
   }
 
   // Start with default
@@ -178,7 +162,3 @@ export function allFeatures(ctx: DxContext, user?: string | null): Record<string
   return result;
 }
 
-export function reload(): void {
-  cachedCtx = null;
-  cachedResult = null;
-}

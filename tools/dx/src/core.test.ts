@@ -1,11 +1,9 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import {
-  loadConfig,
   resolveUser,
   isEnabled,
   getFeature,
   allFeatures,
-  reload,
   type DxConfig,
   type DxLocalConfig,
   type DxContext,
@@ -66,35 +64,6 @@ function makeLocal(overrides?: Partial<DxLocalConfig>): DxLocalConfig {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Global test isolation — reset cache before every test
-// ---------------------------------------------------------------------------
-beforeEach(() => {
-  reload();
-});
-
-// ===========================================================================
-// loadConfig
-// ===========================================================================
-
-describe("loadConfig", () => {
-  test("passes through config and local from context", () => {
-    const ctx = makeCtx({ local: makeLocal() });
-    const result = loadConfig(ctx);
-
-    expect(result.features).toBe(ctx.config.features);
-    expect(result.users).toBe(ctx.config.users);
-    expect(result.local).toBe(ctx.local);
-  });
-
-  test("local is null when no local config exists", () => {
-    const ctx = makeCtx({ local: null });
-    const result = loadConfig(ctx);
-
-    expect(result.local).toBeNull();
-  });
-});
-
 // ===========================================================================
 // resolveUser — identity resolution
 // ===========================================================================
@@ -120,6 +89,12 @@ describe("resolveUser", () => {
     });
     const result = resolveUser(ctx);
     expect(result).toBe("explicit-user");
+  });
+
+  test("$DX_USER set to empty string returns empty string", () => {
+    const ctx = makeCtx({ env: { DX_USER: "" } });
+    const result = resolveUser(ctx);
+    expect(result).toBe("");
   });
 
   // -----------------------------------------------------------------------
@@ -557,20 +532,18 @@ describe("isEnabled", () => {
     expect(result).toBe(true);
   });
 
-  test("unknown feature warns to stderr", () => {
-    const ctx = makeCtx();
-    const stderrWrite = mock(() => {});
-    const originalWrite = process.stderr.write;
-    process.stderr.write = stderrWrite as any;
+  test("unknown feature calls warn callback", () => {
+    const warnings: string[] = [];
+    const ctx = makeCtx({ warn: (msg) => warnings.push(msg) });
+    isEnabled("nonexistent-feature", ctx, null);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("nonexistent-feature");
+  });
 
-    try {
-      isEnabled("nonexistent-feature", ctx, null);
-      expect(stderrWrite).toHaveBeenCalled();
-      const output = stderrWrite.mock.calls[0][0] as string;
-      expect(output).toContain("nonexistent-feature");
-    } finally {
-      process.stderr.write = originalWrite;
-    }
+  test("unknown feature does not throw when warn is not provided", () => {
+    const ctx = makeCtx();
+    // No warn callback — should silently skip
+    expect(() => isEnabled("nonexistent-feature", ctx, null)).not.toThrow();
   });
 
   // -----------------------------------------------------------------------
@@ -675,6 +648,20 @@ describe("getFeature", () => {
     const result = getFeature("ci-watcher", ctx);
     expect(result).toEqual({ enabled: false, source: "user-override" });
   });
+
+  test("getFeature with undefined auto-resolves user", () => {
+    const ctx = makeCtx({ env: { DX_USER: "nitsan" } });
+    // undefined triggers auto-resolution
+    const result = getFeature("ci-watcher", ctx, undefined);
+    expect(result).toEqual({ enabled: false, source: "user-override" });
+  });
+
+  test("getFeature with null does not auto-resolve user", () => {
+    const ctx = makeCtx({ env: { DX_USER: "nitsan" } });
+    // null means "no user" — skips user override layer
+    const result = getFeature("ci-watcher", ctx, null);
+    expect(result).toEqual({ enabled: true, source: "default" });
+  });
 });
 
 // ===========================================================================
@@ -758,55 +745,12 @@ describe("allFeatures", () => {
 });
 
 // ===========================================================================
-// Caching
+// Performance
 // ===========================================================================
 
-describe("caching", () => {
-  test("loadConfig returns cached result on second call", () => {
+describe("performance", () => {
+  test("isEnabled completes in <5ms (pure function, no I/O)", () => {
     const ctx = makeCtx();
-    const first = loadConfig(ctx);
-    const second = loadConfig(ctx);
-    expect(first).toBe(second); // same reference
-  });
-
-  test("reload() forces re-read on next loadConfig call", () => {
-    const ctx = makeCtx();
-    const first = loadConfig(ctx);
-
-    reload();
-
-    // After reload, a new context should produce a new result
-    const ctx2 = makeCtx({
-      config: makeConfig({
-        features: {
-          "new-feature": {
-            description: "Added after reload",
-            mechanism: "test",
-            default: true,
-          },
-        },
-      }),
-    });
-    const second = loadConfig(ctx2);
-
-    expect(second).not.toBe(first);
-    expect(second.features["new-feature"]).toBeDefined();
-  });
-
-  test("isEnabled uses cached config (fast path)", () => {
-    const ctx = makeCtx();
-
-    // Prime the cache
-    loadConfig(ctx);
-
-    // isEnabled should work without re-reading
-    expect(isEnabled("ci-watcher", ctx, null)).toBe(true);
-    expect(isEnabled("autosync", ctx, null)).toBe(false);
-  });
-
-  test("isEnabled completes in <5ms after cache is primed", () => {
-    const ctx = makeCtx();
-    loadConfig(ctx); // prime cache
     const start = performance.now();
     for (let i = 0; i < 100; i++) {
       isEnabled("ci-watcher", ctx, null);
@@ -930,5 +874,11 @@ describe("edge cases", () => {
     const result = allFeatures(ctx, null);
     expect(result).toEqual({});
   });
-});
 
+  test("$DX_USER set to empty string returns empty string", () => {
+    const ctx = makeCtx({ env: { DX_USER: "" } });
+    const result = resolveUser(ctx);
+    // It's set (not undefined), so return it as-is
+    expect(result).toBe("");
+  });
+});
