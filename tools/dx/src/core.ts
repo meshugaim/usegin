@@ -1,8 +1,8 @@
 /**
  * dx core module — pure functions for developer experience config.
  *
- * Stub file: exports exist for type-checking but are not implemented.
- * Implementation will be driven by the tests in core.test.ts.
+ * Provides config loading, user resolution, and feature flag evaluation
+ * with a three-layer merge chain: default → user-override → local-override.
  */
 
 // ---------------------------------------------------------------------------
@@ -46,29 +46,139 @@ export interface FeatureInfo {
 }
 
 // ---------------------------------------------------------------------------
-// Functions (stubs — not implemented)
+// Cache
 // ---------------------------------------------------------------------------
 
-export function loadConfig(_ctx: DxContext): DxConfig & { local: DxLocalConfig | null } {
-  throw new Error("Not implemented");
+let cachedCtx: DxContext | null = null;
+let cachedResult: (DxConfig & { local: DxLocalConfig | null }) | null = null;
+
+// ---------------------------------------------------------------------------
+// Functions
+// ---------------------------------------------------------------------------
+
+export function loadConfig(ctx: DxContext): DxConfig & { local: DxLocalConfig | null } {
+  if (cachedCtx === ctx && cachedResult !== null) {
+    return cachedResult;
+  }
+
+  const result = { ...ctx.config, local: ctx.local };
+  cachedCtx = ctx;
+  cachedResult = result;
+  return result;
 }
 
-export function resolveUser(_ctx: DxContext): string | null {
-  throw new Error("Not implemented");
+export function resolveUser(ctx: DxContext): string | null {
+  // 1. $DX_USER — return directly if set (no validation)
+  if (ctx.env.DX_USER !== undefined) {
+    return ctx.env.DX_USER;
+  }
+
+  // 2. Scan signals in order: $GITHUB_USER, $USER, whoami, gitUserName, gitUserEmail
+  const signals: (string | null)[] = [
+    ctx.env.GITHUB_USER ?? null,
+    ctx.env.USER ?? null,
+    ctx.whoami,
+    ctx.gitUserName,
+  ];
+
+  // Try each non-email signal
+  for (const signal of signals) {
+    if (signal == null) continue;
+    const match = matchSignalToUser(signal, ctx.config.users);
+    if (match !== null) return match;
+  }
+
+  // gitUserEmail — extract prefix before @
+  if (ctx.gitUserEmail != null) {
+    const atIndex = ctx.gitUserEmail.indexOf("@");
+    let prefix: string;
+    if (atIndex === -1) {
+      prefix = ctx.gitUserEmail;
+    } else {
+      prefix = ctx.gitUserEmail.substring(0, atIndex);
+    }
+
+    if (prefix.length > 0) {
+      const match = matchSignalToUser(prefix, ctx.config.users);
+      if (match !== null) return match;
+    }
+  }
+
+  return null;
 }
 
-export function isEnabled(_featureName: string, _ctx: DxContext, _user?: string | null): boolean {
-  throw new Error("Not implemented");
+/**
+ * Case-insensitive match of a signal against user keys and aliases.
+ * Returns the user key if matched, null otherwise.
+ */
+function matchSignalToUser(
+  signal: string,
+  users: Record<string, UserDefinition>,
+): string | null {
+  const signalLower = signal.toLowerCase();
+
+  for (const [userKey, userDef] of Object.entries(users)) {
+    // Check user key
+    if (userKey.toLowerCase() === signalLower) {
+      return userKey;
+    }
+    // Check aliases
+    for (const alias of userDef.aliases) {
+      if (alias.toLowerCase() === signalLower) {
+        return userKey;
+      }
+    }
+  }
+
+  return null;
 }
 
-export function getFeature(_featureName: string, _ctx: DxContext, _user?: string | null): FeatureInfo {
-  throw new Error("Not implemented");
+export function isEnabled(featureName: string, ctx: DxContext, user?: string | null): boolean {
+  return getFeature(featureName, ctx, user).enabled;
 }
 
-export function allFeatures(_ctx: DxContext, _user?: string | null): Record<string, FeatureInfo> {
-  throw new Error("Not implemented");
+export function getFeature(featureName: string, ctx: DxContext, user?: string | null): FeatureInfo {
+  // Auto-resolve user if not provided
+  const resolvedUser = user === undefined ? resolveUser(ctx) : user;
+
+  const feature = ctx.config.features[featureName];
+  const isUnknown = feature === undefined;
+
+  if (isUnknown) {
+    process.stderr.write(`[dx] Warning: unknown feature "${featureName}"\n`);
+  }
+
+  // Start with default
+  let enabled = isUnknown ? true : feature.default;
+  let source: FeatureSource = "default";
+
+  // User override layer
+  if (resolvedUser !== null) {
+    const userDef = ctx.config.users[resolvedUser];
+    if (userDef !== undefined && featureName in userDef.overrides) {
+      enabled = userDef.overrides[featureName];
+      source = "user-override";
+    }
+  }
+
+  // Local override layer (highest priority)
+  if (ctx.local?.overrides && featureName in ctx.local.overrides) {
+    enabled = ctx.local.overrides[featureName];
+    source = "local-override";
+  }
+
+  return { enabled, source };
+}
+
+export function allFeatures(ctx: DxContext, user?: string | null): Record<string, FeatureInfo> {
+  const result: Record<string, FeatureInfo> = {};
+  for (const featureName of Object.keys(ctx.config.features)) {
+    result[featureName] = getFeature(featureName, ctx, user);
+  }
+  return result;
 }
 
 export function reload(): void {
-  throw new Error("Not implemented");
+  cachedCtx = null;
+  cachedResult = null;
 }
