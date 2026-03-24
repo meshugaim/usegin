@@ -13,7 +13,7 @@ import {
   type FeatureInfo,
   type DxContext,
 } from "../core";
-import { dxShouldOutputJson } from "../output";
+import { dxShouldOutputJson, dotFill } from "../output";
 import dx from "../../sdk";
 
 /** Input shape for formatStatus. */
@@ -65,8 +65,7 @@ export function formatStatus(data: StatusData): string {
     }
 
     // Dot-fill between name and state
-    const dotCount = maxNameLen - name.length + 2;
-    const dots = ".".repeat(Math.max(dotCount, 2));
+    const dots = dotFill(name, maxNameLen);
 
     lines.push(
       `  ${name} ${dots} ${stateLabel}${marker}  ${feat.description}`,

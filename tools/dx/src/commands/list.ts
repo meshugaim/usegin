@@ -10,7 +10,7 @@
 import { Command } from "commander";
 import { spawnSync } from "child_process";
 import type { DxContext } from "../core";
-import { dxShouldOutputJson } from "../output";
+import { dxShouldOutputJson, dotFill } from "../output";
 import dx from "../../sdk";
 
 /** A single entry in the feature list. */
@@ -135,8 +135,7 @@ export function formatList(entries: ListEntry[]): string {
   const maxNameLen = Math.max(...entries.map((e) => e.feature.length));
 
   for (const entry of entries) {
-    const dotCount = maxNameLen - entry.feature.length + 2;
-    const dots = ".".repeat(Math.max(dotCount, 2));
+    const dots = dotFill(entry.feature, maxNameLen);
     const gateLabel = entry.gateCount === 1 ? "gate" : "gates";
 
     let line = `  ${entry.feature} ${dots} ${entry.gateCount} ${gateLabel}   ${entry.description}`;

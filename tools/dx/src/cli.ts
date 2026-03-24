@@ -21,7 +21,6 @@ import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
 import { isHeadless } from "../../lib/headless";
 import { dxShouldOutputJson } from "./output";
-import { isCancel } from "@clack/prompts";
 import dx from "../sdk";
 
 const program = new Command()
@@ -42,7 +41,7 @@ program.action(async () => {
   } else if (!isHeadless() && process.stdout.isTTY) {
     // TTY and not headless: show interactive picker
     const { buildInteractiveOptions } = await import("./commands/interactive");
-    const { multiselect } = await import("@clack/prompts");
+    const { multiselect, isCancel } = await import("@clack/prompts");
     const ctx = dx.getContext();
     const options = buildInteractiveOptions(ctx);
 

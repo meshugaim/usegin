@@ -34,14 +34,10 @@ export function collectIdentitySignals(
   const signals: CollectedSignal[] = [];
 
   // Environment variable signals
-  const envSignals: Array<{ key: string; signal: string }> = [
-    { key: "DX_USER", signal: "DX_USER" },
-    { key: "GITHUB_USER", signal: "GITHUB_USER" },
-    { key: "USER", signal: "USER" },
-  ];
+  const envSignalNames = ["DX_USER", "GITHUB_USER", "USER"] as const;
 
-  for (const { key, signal } of envSignals) {
-    const value = ctx.env[key];
+  for (const signal of envSignalNames) {
+    const value = ctx.env[signal];
     if (value !== undefined && value !== null) {
       signals.push({ signal, value });
     }

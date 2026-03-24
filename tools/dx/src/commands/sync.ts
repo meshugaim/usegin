@@ -35,6 +35,34 @@ export function buildSyncEntries(
 }
 
 /**
+ * Write sync entries to git config.
+ *
+ * Returns a list of errors for any entries that failed to write.
+ * Continues through all entries rather than aborting on first failure.
+ */
+export function writeSyncEntries(
+  entries: SyncEntry[],
+): Array<{ key: string; error: string }> {
+  const errors: Array<{ key: string; error: string }> = [];
+
+  for (const entry of entries) {
+    const result = spawnSync(
+      "git",
+      ["config", "--local", `dx.${entry.key}`, String(entry.value)],
+      { encoding: "utf-8" },
+    );
+    if (result.status !== 0) {
+      errors.push({
+        key: entry.key,
+        error: result.stderr?.trim() ?? "unknown error",
+      });
+    }
+  }
+
+  return errors;
+}
+
+/**
  * Re-resolve all features and sync their values to git config.
  *
  * Called automatically after enable/disable writes and the interactive
@@ -49,19 +77,12 @@ export function autoSync(): void {
   const ctx = dx.getContext();
   const features = allFeatures(ctx);
   const entries = buildSyncEntries(features);
+  const errors = writeSyncEntries(entries);
 
-  for (const entry of entries) {
-    const result = spawnSync(
-      "git",
-      ["config", "--local", `dx.${entry.key}`, String(entry.value)],
-      { encoding: "utf-8" },
+  for (const err of errors) {
+    process.stderr.write(
+      `dx: warning: failed to sync dx.${err.key}: ${err.error}\n`,
     );
-    if (result.status !== 0) {
-      const error = result.stderr?.trim() ?? "unknown error";
-      process.stderr.write(
-        `dx: warning: failed to sync dx.${entry.key}: ${error}\n`,
-      );
-    }
   }
 }
 
@@ -99,21 +120,7 @@ export function buildSyncCommand(): Command {
     }
 
     // Write all features, collecting errors instead of aborting on first failure
-    const errors: Array<{ key: string; error: string }> = [];
-
-    for (const entry of entries) {
-      const result = spawnSync(
-        "git",
-        ["config", "--local", `dx.${entry.key}`, String(entry.value)],
-        { encoding: "utf-8" },
-      );
-      if (result.status !== 0) {
-        errors.push({
-          key: entry.key,
-          error: result.stderr?.trim() ?? "unknown error",
-        });
-      }
-    }
+    const errors = writeSyncEntries(entries);
 
     const syncedCount = entries.length - errors.length;
 
