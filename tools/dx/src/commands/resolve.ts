@@ -28,6 +28,16 @@ export function formatResolveJson(_feature: string, _info: FeatureInfo): string 
 }
 
 /**
+ * Return a process exit code for a resolved feature.
+ *
+ * Returns 0 if the feature is enabled, 1 if disabled.
+ * Used by `dx resolve --exit-code` to signal feature state to scripts.
+ */
+export function resolveExitCode(_info: FeatureInfo): number {
+  throw new Error("Not implemented");
+}
+
+/**
  * Build the `dx resolve` Commander command.
  */
 export function buildResolveCommand(): Command {

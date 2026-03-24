@@ -14,13 +14,23 @@
 import { describe, test, expect } from "bun:test";
 import { Command } from "commander";
 
+// --- Shared lib (static imports — finding #8) ---
+import { shouldDefaultToJson } from "../../lib/output-mode";
+import { enablePrefixMatching } from "../../lib/commander-prefix";
+import { applyStandardAliases } from "../../lib/standard-aliases";
+
 // --- Pure functions (layer 1) ---
 import {
   formatStatus,
   formatStatusJson,
+  buildStatusData,
   type StatusData,
 } from "./commands/status";
-import { formatResolve, formatResolveJson } from "./commands/resolve";
+import {
+  formatResolve,
+  formatResolveJson,
+  resolveExitCode,
+} from "./commands/resolve";
 import { buildSyncEntries, type SyncEntry } from "./commands/sync";
 import {
   formatWhoami,
@@ -35,7 +45,7 @@ import { buildSyncCommand } from "./commands/sync";
 import { buildWhoamiCommand } from "./commands/whoami";
 
 // --- Core types for fixtures ---
-import type { DxConfig, FeatureInfo } from "./core";
+import type { DxConfig, DxContext, FeatureInfo } from "./core";
 
 // ---------------------------------------------------------------------------
 // Fixtures — reuse the same patterns as core.test.ts
@@ -67,11 +77,13 @@ function makeConfig(overrides?: Partial<DxConfig>): DxConfig {
   };
 }
 
-/** Build a StatusData fixture with sensible defaults. */
+/** Build a StatusData fixture with sensible defaults (finding #4: clean destructure). */
 function makeStatusData(overrides?: Partial<StatusData>): StatusData {
-  const config = overrides?.config ?? makeConfig();
+  const { config: overrideConfig, ...rest } = overrides ?? {};
+  const config = overrideConfig ?? makeConfig();
   return {
     user: "nitsan",
+    config,
     features: {
       "ci-watcher": {
         enabled: false,
@@ -84,8 +96,7 @@ function makeStatusData(overrides?: Partial<StatusData>): StatusData {
         description: "Push to origin after every commit",
       },
     },
-    config,
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -110,6 +121,40 @@ function makeIdentityInfo(
     match: "alias",
     ...overrides,
   };
+}
+
+/** Build a DxContext fixture for buildStatusData tests. */
+function makeContext(overrides?: Partial<DxContext>): DxContext {
+  return {
+    config: makeConfig(),
+    local: null,
+    env: { USER: "nitsan" },
+    gitUserName: null,
+    gitUserEmail: null,
+    whoami: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Build a Commander program with the four dx commands (status, resolve, sync, whoami).
+ * Used by prefix matching tests (finding #9).
+ */
+function buildTestProgram(): { program: Command; invoked: string[] } {
+  const program = new Command();
+  program.exitOverride();
+  program.configureOutput({
+    writeErr: () => {},
+    writeOut: () => {},
+  });
+
+  const invoked: string[] = [];
+  program.command("status").action(() => invoked.push("status"));
+  program.command("resolve").action(() => invoked.push("resolve"));
+  program.command("sync").action(() => invoked.push("sync"));
+  program.command("whoami").action(() => invoked.push("whoami"));
+
+  return { program, invoked };
 }
 
 // ===========================================================================
@@ -137,13 +182,33 @@ describe("formatStatus", () => {
   });
 
   test("shows enabled/disabled state for each feature", () => {
-    const data = makeStatusData();
+    const data = makeStatusData({
+      features: {
+        "ci-watcher": {
+          enabled: true,
+          source: "default",
+          description: "Monitor CI after push",
+        },
+        autosync: {
+          enabled: false,
+          source: "default",
+          description: "Push to origin after every commit",
+        },
+      },
+    });
     const output = formatStatus(data);
-    // ci-watcher is disabled (user override), autosync is disabled (default)
-    // The exact format can vary, but both should appear with their state
     const lines = output.split("\n");
+
+    // Finding #3: assert that each feature line contains an enabled/disabled indicator.
+    // ci-watcher is enabled — its line should contain "on" or "enabled" or a checkmark
     const ciLine = lines.find((l) => l.includes("ci-watcher"));
     expect(ciLine).toBeDefined();
+    expect(ciLine).toMatch(/on|enabled|✓|true/i);
+
+    // autosync is disabled — its line should contain "off" or "disabled" or an x
+    const syncLine = lines.find((l) => l.includes("autosync"));
+    expect(syncLine).toBeDefined();
+    expect(syncLine).toMatch(/off|disabled|✗|false/i);
   });
 
   test("marks user overrides with *", () => {
@@ -267,6 +332,47 @@ describe("formatStatusJson", () => {
 });
 
 // ===========================================================================
+// buildStatusData — enrichment from DxContext (finding #2)
+// ===========================================================================
+
+describe("buildStatusData", () => {
+  test("returns correct shape with enriched features", () => {
+    const ctx = makeContext();
+    const data = buildStatusData(ctx);
+
+    expect(data).toHaveProperty("user");
+    expect(data).toHaveProperty("features");
+    expect(data).toHaveProperty("config");
+    expect(data.features).toHaveProperty("ci-watcher");
+    expect(data.features).toHaveProperty("autosync");
+    // Each feature should have enabled, source, and description
+    for (const info of Object.values(data.features)) {
+      expect(info).toHaveProperty("enabled");
+      expect(info).toHaveProperty("source");
+      expect(info).toHaveProperty("description");
+    }
+  });
+
+  test("includes description from config", () => {
+    const ctx = makeContext();
+    const data = buildStatusData(ctx);
+
+    expect(data.features["ci-watcher"].description).toBe(
+      "Monitor CI after push",
+    );
+    expect(data.features.autosync.description).toBe(
+      "Push to origin after every commit",
+    );
+  });
+
+  test("resolves user automatically", () => {
+    const ctx = makeContext({ env: { USER: "nitsan" } });
+    const data = buildStatusData(ctx);
+    expect(data.user).toBe("nitsan");
+  });
+});
+
+// ===========================================================================
 // formatResolve — human-readable single feature
 // ===========================================================================
 
@@ -281,6 +387,22 @@ describe("formatResolve", () => {
     const info = makeFeatureInfo({ enabled: false });
     const output = formatResolve("autosync", info);
     expect(output).toBe("false");
+  });
+
+  test("output is purely the boolean string regardless of feature name", () => {
+    // Finding #5: verify output doesn't include the feature name
+    const enabledInfo = makeFeatureInfo({ enabled: true });
+    const disabledInfo = makeFeatureInfo({ enabled: false });
+
+    const out1 = formatResolve("ci-watcher", enabledInfo);
+    const out2 = formatResolve("some-other-feature", enabledInfo);
+    const out3 = formatResolve("autosync", disabledInfo);
+    const out4 = formatResolve("yet-another-feature", disabledInfo);
+
+    expect(out1).toBe("true");
+    expect(out2).toBe("true");
+    expect(out3).toBe("false");
+    expect(out4).toBe("false");
   });
 });
 
@@ -324,6 +446,22 @@ describe("formatResolveJson", () => {
       enabled: true,
       source: "default",
     });
+  });
+});
+
+// ===========================================================================
+// resolveExitCode — process exit code for feature state (finding #7)
+// ===========================================================================
+
+describe("resolveExitCode", () => {
+  test("returns 0 for enabled feature", () => {
+    const info = makeFeatureInfo({ enabled: true });
+    expect(resolveExitCode(info)).toBe(0);
+  });
+
+  test("returns 1 for disabled feature", () => {
+    const info = makeFeatureInfo({ enabled: false });
+    expect(resolveExitCode(info)).toBe(1);
   });
 });
 
@@ -377,7 +515,8 @@ describe("buildSyncEntries", () => {
     };
     const entries = buildSyncEntries(features);
     expect(entries).toHaveLength(3);
-    // All should be present regardless of source
+    // Ordering is unspecified — alphabetical is fine but not required.
+    // Sort before comparing to avoid brittle ordering assumptions.
     const keys = entries.map((e) => e.key).sort();
     expect(keys).toEqual(["a", "b", "c"]);
   });
@@ -584,8 +723,6 @@ describe("headless detection", () => {
   test("CLAUDECODE=1 + no TTY should default to JSON output", () => {
     // This tests the shouldDefaultToJson integration.
     // The dx CLI should use DX_OUTPUT as its env var name.
-    // We import and test directly since it's a pure function.
-    const { shouldDefaultToJson } = require("../../lib/output-mode");
     const result = shouldDefaultToJson({
       envVarName: "DX_OUTPUT",
       env: { CLAUDECODE: "1" },
@@ -595,7 +732,6 @@ describe("headless detection", () => {
   });
 
   test("TTY session defaults to human output even with CLAUDECODE=1", () => {
-    const { shouldDefaultToJson } = require("../../lib/output-mode");
     const result = shouldDefaultToJson({
       envVarName: "DX_OUTPUT",
       env: { CLAUDECODE: "1" },
@@ -605,7 +741,6 @@ describe("headless detection", () => {
   });
 
   test("explicit --json always wins", () => {
-    const { shouldDefaultToJson } = require("../../lib/output-mode");
     const result = shouldDefaultToJson({
       envVarName: "DX_OUTPUT",
       json: true,
@@ -616,7 +751,6 @@ describe("headless detection", () => {
   });
 
   test("DX_OUTPUT=human forces human output", () => {
-    const { shouldDefaultToJson } = require("../../lib/output-mode");
     const result = shouldDefaultToJson({
       envVarName: "DX_OUTPUT",
       env: { DX_OUTPUT: "human", CLAUDECODE: "1" },
@@ -626,7 +760,6 @@ describe("headless detection", () => {
   });
 
   test("DX_OUTPUT=json forces JSON output", () => {
-    const { shouldDefaultToJson } = require("../../lib/output-mode");
     const result = shouldDefaultToJson({
       envVarName: "DX_OUTPUT",
       env: { DX_OUTPUT: "json" },
@@ -641,26 +774,10 @@ describe("headless detection", () => {
 // ===========================================================================
 
 describe("standard aliases", () => {
-  test("status command gets 's' as prefix match", () => {
+  test("status command gets 'st' as prefix match", () => {
     // This tests that the CLI wiring enables prefix matching
-    // so `dx s` resolves to `dx status`.
-    // We simulate this by building a program with the same commands
-    // and checking prefix resolution.
-    const { enablePrefixMatching } = require("../../lib/commander-prefix");
-
-    const program = new Command();
-    program.exitOverride();
-    program.configureOutput({
-      writeErr: () => {},
-      writeOut: () => {},
-    });
-
-    const invoked: string[] = [];
-    program.command("status").action(() => invoked.push("status"));
-    program.command("resolve").action(() => invoked.push("resolve"));
-    program.command("sync").action(() => invoked.push("sync"));
-    program.command("whoami").action(() => invoked.push("whoami"));
-
+    // so `dx st` resolves to `dx status`.
+    const { program, invoked } = buildTestProgram();
     enablePrefixMatching(program);
 
     // "s" is ambiguous between "status" and "sync" — need "st" or "sy"
@@ -669,21 +786,7 @@ describe("standard aliases", () => {
   });
 
   test("'sy' prefix resolves to sync", () => {
-    const { enablePrefixMatching } = require("../../lib/commander-prefix");
-
-    const program = new Command();
-    program.exitOverride();
-    program.configureOutput({
-      writeErr: () => {},
-      writeOut: () => {},
-    });
-
-    const invoked: string[] = [];
-    program.command("status").action(() => invoked.push("status"));
-    program.command("resolve").action(() => invoked.push("resolve"));
-    program.command("sync").action(() => invoked.push("sync"));
-    program.command("whoami").action(() => invoked.push("whoami"));
-
+    const { program, invoked } = buildTestProgram();
     enablePrefixMatching(program);
 
     program.parse(["node", "test", "sy"]);
@@ -691,21 +794,7 @@ describe("standard aliases", () => {
   });
 
   test("'r' prefix resolves to resolve (unambiguous)", () => {
-    const { enablePrefixMatching } = require("../../lib/commander-prefix");
-
-    const program = new Command();
-    program.exitOverride();
-    program.configureOutput({
-      writeErr: () => {},
-      writeOut: () => {},
-    });
-
-    const invoked: string[] = [];
-    program.command("status").action(() => invoked.push("status"));
-    program.command("resolve").action(() => invoked.push("resolve"));
-    program.command("sync").action(() => invoked.push("sync"));
-    program.command("whoami").action(() => invoked.push("whoami"));
-
+    const { program, invoked } = buildTestProgram();
     enablePrefixMatching(program);
 
     program.parse(["node", "test", "r"]);
@@ -713,44 +802,13 @@ describe("standard aliases", () => {
   });
 
   test("'w' prefix resolves to whoami (unambiguous)", () => {
-    const { enablePrefixMatching } = require("../../lib/commander-prefix");
-
-    const program = new Command();
-    program.exitOverride();
-    program.configureOutput({
-      writeErr: () => {},
-      writeOut: () => {},
-    });
-
-    const invoked: string[] = [];
-    program.command("status").action(() => invoked.push("status"));
-    program.command("resolve").action(() => invoked.push("resolve"));
-    program.command("sync").action(() => invoked.push("sync"));
-    program.command("whoami").action(() => invoked.push("whoami"));
-
+    const { program, invoked } = buildTestProgram();
     enablePrefixMatching(program);
 
     program.parse(["node", "test", "w"]);
     expect(invoked).toEqual(["whoami"]);
   });
 
-  test("list command gets 'ls' alias (for future slice 3)", () => {
-    const { applyStandardAliases } = require("../../lib/standard-aliases");
-
-    const program = new Command();
-    program.exitOverride();
-    program.configureOutput({
-      writeErr: () => {},
-      writeOut: () => {},
-    });
-
-    const invoked: string[] = [];
-    program.command("list").action(() => invoked.push("list"));
-    program.command("status").action(() => invoked.push("status"));
-
-    applyStandardAliases(program);
-
-    program.parse(["node", "test", "ls"]);
-    expect(invoked).toEqual(["list"]);
-  });
+  // Finding #10: list alias is for a future slice — mark as todo
+  test.todo("registers 'ls' alias for list command (slice 3)");
 });

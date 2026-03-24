@@ -7,7 +7,7 @@
  */
 
 import type { Command } from "commander";
-import type { FeatureInfo, DxConfig } from "../core";
+import type { FeatureInfo, DxConfig, DxContext } from "../core";
 
 /** Input shape for formatStatus. */
 export interface StatusData {
@@ -34,6 +34,16 @@ export function formatStatus(_data: StatusData): string {
  * Returns `{ user, features: { [name]: { enabled, source, description } } }`
  */
 export function formatStatusJson(_data: StatusData): string {
+  throw new Error("Not implemented");
+}
+
+/**
+ * Build a StatusData object from a DxContext.
+ *
+ * Resolves the user, evaluates all features, and enriches each
+ * feature with its description from the config.
+ */
+export function buildStatusData(_ctx: DxContext): StatusData {
   throw new Error("Not implemented");
 }
 
