@@ -19,6 +19,8 @@ export interface SyncEntry {
  * Build the list of git config entries to write.
  *
  * Each entry maps `dx.<feature>` to the resolved boolean value.
+ * Also serves as the dry-run output: callers can display these entries
+ * instead of writing them to show what *would* be synced.
  */
 export function buildSyncEntries(
   _features: Record<string, FeatureInfo>,
@@ -28,6 +30,9 @@ export function buildSyncEntries(
 
 /**
  * Build the `dx sync` Commander command.
+ *
+ * Options:
+ *   --dry-run   Show what would be synced without writing to git config
  */
 export function buildSyncCommand(): Command {
   throw new Error("Not implemented");

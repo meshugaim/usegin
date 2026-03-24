@@ -520,6 +520,22 @@ describe("buildSyncEntries", () => {
     const keys = entries.map((e) => e.key).sort();
     expect(keys).toEqual(["a", "b", "c"]);
   });
+
+  test("entries have key and value fields suitable for dry-run display", () => {
+    const features: Record<string, FeatureInfo> = {
+      "ci-watcher": { enabled: true, source: "default" },
+      autosync: { enabled: false, source: "user-override" },
+    };
+    const entries = buildSyncEntries(features);
+
+    // Every entry must have a string key and boolean value —
+    // the shape needed to display "would write <key> = <value>" in dry-run.
+    for (const entry of entries) {
+      expect(typeof entry.key).toBe("string");
+      expect(entry.key.length).toBeGreaterThan(0);
+      expect(typeof entry.value).toBe("boolean");
+    }
+  });
 });
 
 // ===========================================================================
@@ -692,6 +708,14 @@ describe("buildSyncCommand", () => {
   test("has name 'sync'", () => {
     const cmd = buildSyncCommand();
     expect(cmd.name()).toBe("sync");
+  });
+
+  test("has --dry-run option", () => {
+    const cmd = buildSyncCommand();
+    const dryRunOpt = cmd.options.find(
+      (o) => o.long === "--dry-run",
+    );
+    expect(dryRunOpt).toBeDefined();
   });
 });
 
