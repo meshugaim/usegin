@@ -51,7 +51,9 @@ export interface FeatureInfo {
 // ---------------------------------------------------------------------------
 
 export function resolveUser(ctx: DxContext): string | null {
-  // 1. $DX_USER — return directly if set (no validation)
+  // $DX_USER is checked with !== undefined, so DX_USER="" is treated as "set"
+  // (returns empty string). In practice, shells don't set vars to empty strings
+  // for "unset" — they unset them. If this causes issues, unset the var instead.
   if (ctx.env.DX_USER !== undefined) {
     return ctx.env.DX_USER;
   }

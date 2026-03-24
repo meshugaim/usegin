@@ -6,7 +6,7 @@
  *   import dx from "../../dx/sdk";
  *   dx.isEnabled("ci-watcher")  // → boolean
  */
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { spawnSync } from "child_process";
 import {
@@ -24,12 +24,10 @@ import {
 function findRepoRoot(): string {
   let dir = __dirname;
   while (dir !== "/") {
-    try {
-      readFileSync(resolve(dir, ".dx/config.json"));
+    if (existsSync(resolve(dir, ".dx/config.json"))) {
       return dir;
-    } catch {
-      dir = resolve(dir, "..");
     }
+    dir = resolve(dir, "..");
   }
   throw new Error("dx: could not find .dx/config.json in any parent directory");
 }
