@@ -12,7 +12,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm, readFile, writeFile, mkdir } from "fs/promises";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { Command } from "commander";
@@ -22,6 +22,7 @@ import {
   writeLocalOverride,
   writeUserOverride,
   formatEnableDisableResult,
+  formatEnableDisableResultJson,
   buildEnableCommand,
   buildDisableCommand,
 } from "./enable-disable";
@@ -30,7 +31,7 @@ import {
 import {
   collectIdentitySignals,
   buildIdentifyCommand,
-  type IdentitySignal,
+  type CollectedSignal,
 } from "./identify";
 
 // --- Interactive pure functions ---
@@ -43,6 +44,7 @@ import {
 import {
   buildListData,
   formatList,
+  formatListJson,
   buildListCommand,
   type ListEntry,
 } from "./list";
@@ -51,6 +53,7 @@ import {
 import {
   buildDocsContent,
   formatDocs,
+  formatDocsJson,
   buildDocsCommand,
   type DocsSection,
 } from "./docs";
@@ -101,91 +104,91 @@ function makeContext(overrides?: Partial<DxContext>): DxContext {
 }
 
 // ===========================================================================
-// writeLocalOverride — file I/O for .dx/config.local.json
+// writeLocalOverride — synchronous file I/O for .dx/config.local.json
 // ===========================================================================
 
 describe("writeLocalOverride", () => {
   let tempDir: string;
 
-  beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), "dx-test-"));
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "dx-test-"));
   });
 
-  afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test("creates config.local.json when it does not exist", async () => {
+  test("creates config.local.json when it does not exist", () => {
     const localPath = join(tempDir, "config.local.json");
     writeLocalOverride(localPath, "ci-watcher", false);
 
-    const content = JSON.parse(await readFile(localPath, "utf-8"));
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
     expect(content.overrides["ci-watcher"]).toBe(false);
   });
 
-  test("reads existing file and preserves other overrides", async () => {
+  test("reads existing file and preserves other overrides", () => {
     const localPath = join(tempDir, "config.local.json");
-    await writeFile(
+    writeFileSync(
       localPath,
       JSON.stringify({ overrides: { autosync: true } }),
     );
 
     writeLocalOverride(localPath, "ci-watcher", false);
 
-    const content = JSON.parse(await readFile(localPath, "utf-8"));
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
     expect(content.overrides.autosync).toBe(true);
     expect(content.overrides["ci-watcher"]).toBe(false);
   });
 
-  test("overwrites an existing override for the same feature", async () => {
+  test("overwrites an existing override for the same feature", () => {
     const localPath = join(tempDir, "config.local.json");
-    await writeFile(
+    writeFileSync(
       localPath,
       JSON.stringify({ overrides: { "ci-watcher": true } }),
     );
 
     writeLocalOverride(localPath, "ci-watcher", false);
 
-    const content = JSON.parse(await readFile(localPath, "utf-8"));
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
     expect(content.overrides["ci-watcher"]).toBe(false);
   });
 
-  test("sets enabled=true when enabling a feature", async () => {
+  test("sets enabled=true when enabling a feature", () => {
     const localPath = join(tempDir, "config.local.json");
     writeLocalOverride(localPath, "autosync", true);
 
-    const content = JSON.parse(await readFile(localPath, "utf-8"));
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
     expect(content.overrides.autosync).toBe(true);
   });
 
-  test("creates parent directory if needed", async () => {
+  test("creates parent directory if needed", () => {
     const nestedPath = join(tempDir, ".dx", "config.local.json");
     // Parent dir does not exist yet — writeLocalOverride should create it
     writeLocalOverride(nestedPath, "ci-watcher", false);
 
-    const content = JSON.parse(await readFile(nestedPath, "utf-8"));
+    const content = JSON.parse(readFileSync(nestedPath, "utf-8"));
     expect(content.overrides["ci-watcher"]).toBe(false);
   });
 });
 
 // ===========================================================================
-// writeUserOverride — file I/O for .dx/config.json
+// writeUserOverride — synchronous file I/O for .dx/config.json
 // ===========================================================================
 
 describe("writeUserOverride", () => {
   let tempDir: string;
 
-  beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), "dx-test-"));
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "dx-test-"));
   });
 
-  afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test("writes override under the user's entry", async () => {
+  test("writes override under the user's entry", () => {
     const configPath = join(tempDir, "config.json");
-    await writeFile(
+    writeFileSync(
       configPath,
       JSON.stringify({
         features: {},
@@ -197,13 +200,13 @@ describe("writeUserOverride", () => {
 
     writeUserOverride(configPath, "nitsan", "ci-watcher", false);
 
-    const content = JSON.parse(await readFile(configPath, "utf-8"));
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
     expect(content.users.nitsan.overrides["ci-watcher"]).toBe(false);
   });
 
-  test("creates user entry when it does not exist", async () => {
+  test("creates user entry when it does not exist", () => {
     const configPath = join(tempDir, "config.json");
-    await writeFile(
+    writeFileSync(
       configPath,
       JSON.stringify({
         features: {},
@@ -213,14 +216,14 @@ describe("writeUserOverride", () => {
 
     writeUserOverride(configPath, "newuser", "autosync", true);
 
-    const content = JSON.parse(await readFile(configPath, "utf-8"));
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
     expect(content.users.newuser).toBeDefined();
     expect(content.users.newuser.overrides.autosync).toBe(true);
   });
 
-  test("preserves existing user overrides for other features", async () => {
+  test("preserves existing user overrides for other features", () => {
     const configPath = join(tempDir, "config.json");
-    await writeFile(
+    writeFileSync(
       configPath,
       JSON.stringify({
         features: {},
@@ -235,14 +238,14 @@ describe("writeUserOverride", () => {
 
     writeUserOverride(configPath, "nitsan", "autosync", true);
 
-    const content = JSON.parse(await readFile(configPath, "utf-8"));
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
     expect(content.users.nitsan.overrides["ci-watcher"]).toBe(false);
     expect(content.users.nitsan.overrides.autosync).toBe(true);
   });
 
-  test("preserves existing user aliases", async () => {
+  test("preserves existing user aliases", () => {
     const configPath = join(tempDir, "config.json");
-    await writeFile(
+    writeFileSync(
       configPath,
       JSON.stringify({
         features: {},
@@ -257,16 +260,16 @@ describe("writeUserOverride", () => {
 
     writeUserOverride(configPath, "nitsan", "ci-watcher", true);
 
-    const content = JSON.parse(await readFile(configPath, "utf-8"));
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
     expect(content.users.nitsan.aliases).toEqual([
       "Nitsan Avni",
       "nitsan-ona",
     ]);
   });
 
-  test("preserves other users when writing to one user", async () => {
+  test("preserves other users when writing to one user", () => {
     const configPath = join(tempDir, "config.json");
-    await writeFile(
+    writeFileSync(
       configPath,
       JSON.stringify({
         features: {},
@@ -279,13 +282,13 @@ describe("writeUserOverride", () => {
 
     writeUserOverride(configPath, "nitsan", "autosync", true);
 
-    const content = JSON.parse(await readFile(configPath, "utf-8"));
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
     expect(content.users.alice.overrides.autosync).toBe(true);
   });
 
-  test("preserves features section", async () => {
+  test("preserves features section", () => {
     const configPath = join(tempDir, "config.json");
-    await writeFile(
+    writeFileSync(
       configPath,
       JSON.stringify({
         features: {
@@ -303,8 +306,18 @@ describe("writeUserOverride", () => {
 
     writeUserOverride(configPath, "nitsan", "ci-watcher", false);
 
-    const content = JSON.parse(await readFile(configPath, "utf-8"));
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
     expect(content.features["ci-watcher"].description).toBe("Monitor CI");
+  });
+
+  test("throws when config file does not exist", () => {
+    const configPath = join(tempDir, "nonexistent", "config.json");
+    // config.json should always exist — it's committed to the repo.
+    // Unlike writeLocalOverride which creates the file, writeUserOverride
+    // should throw if the file is missing.
+    expect(() => {
+      writeUserOverride(configPath, "nitsan", "ci-watcher", false);
+    }).toThrow();
   });
 });
 
@@ -382,6 +395,39 @@ describe("formatEnableDisableResult", () => {
 });
 
 // ===========================================================================
+// formatEnableDisableResultJson — JSON output
+// ===========================================================================
+
+describe("formatEnableDisableResultJson", () => {
+  test("returns valid JSON with feature, enabled, and target fields", () => {
+    const output = formatEnableDisableResultJson(
+      "ci-watcher",
+      false,
+      false,
+      null,
+    );
+    const parsed = JSON.parse(output);
+    expect(parsed.feature).toBe("ci-watcher");
+    expect(parsed.enabled).toBe(false);
+    expect(parsed.target).toBe("local");
+  });
+
+  test("sets target to user config when saved", () => {
+    const output = formatEnableDisableResultJson(
+      "ci-watcher",
+      false,
+      true,
+      "nitsan",
+    );
+    const parsed = JSON.parse(output);
+    expect(parsed.feature).toBe("ci-watcher");
+    expect(parsed.enabled).toBe(false);
+    // When saved, target should not be "local"
+    expect(parsed.target).not.toBe("local");
+  });
+});
+
+// ===========================================================================
 // buildEnableCommand — Commander structure
 // ===========================================================================
 
@@ -407,6 +453,12 @@ describe("buildEnableCommand", () => {
     const cmd = buildEnableCommand();
     const saveOpt = cmd.options.find((o) => o.long === "--save");
     expect(saveOpt).toBeDefined();
+  });
+
+  test("has --json option", () => {
+    const cmd = buildEnableCommand();
+    const jsonOpt = cmd.options.find((o) => o.long === "--json");
+    expect(jsonOpt).toBeDefined();
   });
 });
 
@@ -437,6 +489,12 @@ describe("buildDisableCommand", () => {
     const saveOpt = cmd.options.find((o) => o.long === "--save");
     expect(saveOpt).toBeDefined();
   });
+
+  test("has --json option", () => {
+    const cmd = buildDisableCommand();
+    const jsonOpt = cmd.options.find((o) => o.long === "--json");
+    expect(jsonOpt).toBeDefined();
+  });
 });
 
 // ===========================================================================
@@ -458,6 +516,16 @@ describe("collectIdentitySignals", () => {
     const dxSignal = signals.find((s) => s.signal === "DX_USER");
     expect(dxSignal).toBeDefined();
     expect(dxSignal!.value).toBe("nitsan");
+  });
+
+  test("returns DX_USER signal with empty string value", () => {
+    // Signal collection reports what signals exist, not what they resolve to.
+    // DX_USER="" should still appear in the signals list with value "".
+    const ctx = makeContext({ env: { DX_USER: "" } });
+    const signals = collectIdentitySignals(ctx);
+    const dxSignal = signals.find((s) => s.signal === "DX_USER");
+    expect(dxSignal).toBeDefined();
+    expect(dxSignal!.value).toBe("");
   });
 
   test("returns GITHUB_USER signal when present", () => {
@@ -677,6 +745,20 @@ describe("buildListData", () => {
     const ciEntry = entries.find((e) => e.feature === "ci-watcher");
     expect(ciEntry!.description).toBe("Monitor CI after push");
   });
+
+  test("silently ignores unknown features in grepResults", () => {
+    // When grepResults contains a feature not in config, it should not
+    // appear in the output — only config-registered features are listed.
+    const ctx = makeContext();
+    const entries = buildListData(ctx, {
+      "ci-watcher": 1,
+      autosync: 1,
+      "nonexistent-feature": 5,
+    });
+    expect(entries).toHaveLength(2);
+    const names = entries.map((e) => e.feature).sort();
+    expect(names).toEqual(["autosync", "ci-watcher"]);
+  });
 });
 
 // ===========================================================================
@@ -736,10 +818,50 @@ describe("formatList", () => {
     expect(output).toContain("multiple");
   });
 
-  test("handles empty entries list", () => {
+  test("returns empty or 'no features' message for empty entries list", () => {
     const output = formatList([]);
-    // Should not throw, should return something meaningful
     expect(typeof output).toBe("string");
+    // Contract: empty list should produce either empty string or a
+    // human-friendly "no features" message — not arbitrary content.
+    const normalized = output.toLowerCase();
+    const isEmpty = output.trim() === "";
+    const hasNoFeaturesMessage = normalized.includes("no features");
+    expect(isEmpty || hasNoFeaturesMessage).toBe(true);
+  });
+});
+
+// ===========================================================================
+// formatListJson — JSON output
+// ===========================================================================
+
+describe("formatListJson", () => {
+  test("returns valid JSON array of entries", () => {
+    const entries: ListEntry[] = [
+      {
+        feature: "ci-watcher",
+        description: "Monitor CI",
+        gateCount: 1,
+        warning: null,
+      },
+      {
+        feature: "autosync",
+        description: "Auto push",
+        gateCount: 0,
+        warning: "registered but not gated",
+      },
+    ];
+    const output = formatListJson(entries);
+    const parsed = JSON.parse(output);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].feature).toBe("ci-watcher");
+    expect(parsed[1].feature).toBe("autosync");
+  });
+
+  test("returns empty JSON array for empty entries", () => {
+    const output = formatListJson([]);
+    const parsed = JSON.parse(output);
+    expect(parsed).toEqual([]);
   });
 });
 
@@ -756,6 +878,12 @@ describe("buildListCommand", () => {
   test("has name 'list'", () => {
     const cmd = buildListCommand();
     expect(cmd.name()).toBe("list");
+  });
+
+  test("has --json option", () => {
+    const cmd = buildListCommand();
+    const jsonOpt = cmd.options.find((o) => o.long === "--json");
+    expect(jsonOpt).toBeDefined();
   });
 });
 
@@ -845,12 +973,51 @@ describe("formatDocs", () => {
     expect(output).toContain("Resolved from env vars");
   });
 
-  test("returns all content for unknown topic", () => {
-    // When topic doesn't match any section, show all (graceful fallback)
+  test("returns all sections for unknown topic (graceful fallback)", () => {
+    // When topic doesn't match any section, show all — same as no topic
     const output = formatDocs(sampleSections, "nonexistent");
-    // Should either show all sections or show an error — test for string output
-    expect(typeof output).toBe("string");
-    expect(output.length).toBeGreaterThan(0);
+    expect(output).toContain("Adding Features");
+    expect(output).toContain("Config Format");
+    expect(output).toContain("Identity");
+  });
+});
+
+// ===========================================================================
+// formatDocsJson — JSON output
+// ===========================================================================
+
+describe("formatDocsJson", () => {
+  const sampleSections: DocsSection[] = [
+    {
+      id: "adding-features",
+      title: "Adding Features",
+      content: "Register in config.json under features.",
+    },
+    {
+      id: "config-format",
+      title: "Config Format",
+      content: "JSON with features and users keys.",
+    },
+    {
+      id: "identity",
+      title: "Identity",
+      content: "Resolved from env vars and git config.",
+    },
+  ];
+
+  test("returns valid JSON of all sections when no topic", () => {
+    const output = formatDocsJson(sampleSections);
+    const parsed = JSON.parse(output);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toHaveLength(3);
+  });
+
+  test("returns filtered JSON when topic is provided", () => {
+    const output = formatDocsJson(sampleSections, "identity");
+    const parsed = JSON.parse(output);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("identity");
   });
 });
 
@@ -874,5 +1041,11 @@ describe("buildDocsCommand", () => {
     const args = (cmd as any)._args;
     expect(args).toHaveLength(1);
     expect(args[0].required).toBe(false);
+  });
+
+  test("has --json option", () => {
+    const cmd = buildDocsCommand();
+    const jsonOpt = cmd.options.find((o) => o.long === "--json");
+    expect(jsonOpt).toBeDefined();
   });
 });

@@ -23,6 +23,10 @@ export interface InteractiveOption {
  *
  * Each option includes the feature name, description, and current
  * enabled state for the multiselect picker's initial values.
+ *
+ * Uses `getFeature` from core to resolve the current state per the
+ * three-layer merge chain. The `initialValue` reflects the resolved
+ * enabled state for the current user.
  */
 export function buildInteractiveOptions(
   _ctx: DxContext,

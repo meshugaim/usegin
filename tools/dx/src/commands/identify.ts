@@ -11,7 +11,7 @@ import { Command } from "commander";
 import type { DxContext } from "../core";
 
 /** A single identity signal with its source and value. */
-export interface IdentitySignal {
+export interface CollectedSignal {
   signal: string;
   value: string;
 }
@@ -24,7 +24,7 @@ export interface IdentitySignal {
  */
 export function collectIdentitySignals(
   _ctx: DxContext,
-): IdentitySignal[] {
+): CollectedSignal[] {
   throw new Error("Not implemented");
 }
 

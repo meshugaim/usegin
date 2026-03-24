@@ -44,6 +44,15 @@ export function formatList(_entries: ListEntry[]): string {
 }
 
 /**
+ * Format the list entries as a JSON array.
+ *
+ * Returns a JSON string of the entries array.
+ */
+export function formatListJson(_entries: ListEntry[]): string {
+  throw new Error("Not implemented");
+}
+
+/**
  * Build the `dx list` Commander command.
  */
 export function buildListCommand(): Command {

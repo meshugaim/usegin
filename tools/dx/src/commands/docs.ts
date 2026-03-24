@@ -39,6 +39,18 @@ export function formatDocs(
 }
 
 /**
+ * Format documentation sections as JSON.
+ *
+ * Returns a JSON string of the sections (optionally filtered by topic).
+ */
+export function formatDocsJson(
+  _sections: DocsSection[],
+  _topic?: string,
+): string {
+  throw new Error("Not implemented");
+}
+
+/**
  * Build the `dx docs` Commander command.
  *
  * Optional `[topic]` argument to show a specific section.

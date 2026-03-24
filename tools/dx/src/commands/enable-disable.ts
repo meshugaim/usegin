@@ -10,10 +10,10 @@
 import { Command } from "commander";
 
 /**
- * Write a local override to `.dx/config.local.json`.
+ * Synchronously reads/writes a local override to `.dx/config.local.json`.
  *
  * Reads the file (creates if missing), sets `overrides[feature] = enabled`,
- * and writes back to disk.
+ * and writes back to disk. Uses `readFileSync`/`writeFileSync`/`mkdirSync`.
  */
 export function writeLocalOverride(
   _localPath: string,
@@ -24,10 +24,12 @@ export function writeLocalOverride(
 }
 
 /**
- * Write a user override to `.dx/config.json`.
+ * Synchronously reads/writes a user override to `.dx/config.json`.
  *
  * Reads the file, sets `users[user].overrides[feature] = enabled`,
  * creates the user entry if it doesn't exist, and writes back to disk.
+ * Uses `readFileSync`/`writeFileSync`. Throws if the file does not exist
+ * (config.json should always be committed to the repo).
  */
 export function writeUserOverride(
   _configPath: string,
@@ -47,6 +49,21 @@ export function writeUserOverride(
  * - Includes hint: "To persist across environments: dx disable ci-watcher --save"
  */
 export function formatEnableDisableResult(
+  _feature: string,
+  _enabled: boolean,
+  _saved: boolean,
+  _user: string | null,
+): string {
+  throw new Error("Not implemented");
+}
+
+/**
+ * Format the result of an enable/disable operation as JSON.
+ *
+ * Returns a JSON string like:
+ * `{"feature":"ci-watcher","enabled":false,"target":"local"}`
+ */
+export function formatEnableDisableResultJson(
   _feature: string,
   _enabled: boolean,
   _saved: boolean,
