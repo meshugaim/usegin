@@ -69,6 +69,8 @@ function getContext(): DxContext {
     gitUserEmail,
     whoami,
     warn: (msg) => process.stderr.write(msg),
+    configPath,
+    localPath,
   };
 
   return cached;

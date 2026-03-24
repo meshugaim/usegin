@@ -10,8 +10,10 @@
 import { Command } from "commander";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { dirname } from "path";
+import { spawnSync } from "child_process";
 import { dxShouldOutputJson } from "../output";
-import { resolveUser } from "../core";
+import { resolveUser, allFeatures } from "../core";
+import { buildSyncEntries } from "./sync";
 import dx from "../../sdk";
 
 /**
@@ -133,6 +135,27 @@ export function formatEnableDisableResultJson(
 }
 
 /**
+ * Re-resolve all features and sync their values to git config.
+ *
+ * Called automatically after enable/disable writes so that
+ * `git config dx.<feature>` stays in sync without a manual `dx sync`.
+ */
+function autoSync(): void {
+  dx.reload();
+  const ctx = dx.getContext();
+  const features = allFeatures(ctx);
+  const entries = buildSyncEntries(features);
+
+  for (const entry of entries) {
+    spawnSync(
+      "git",
+      ["config", "--local", `dx.${entry.key}`, String(entry.value)],
+      { encoding: "utf-8" },
+    );
+  }
+}
+
+/**
  * Build the `dx enable` Commander command.
  */
 export function buildEnableCommand(): Command {
@@ -147,24 +170,39 @@ export function buildEnableCommand(): Command {
     const ctx = dx.getContext();
     const user = resolveUser(ctx);
 
-    if (opts.save && user) {
-      writeUserOverride(
-        ctx.config as any, // would be path in real usage
-        user,
-        feature,
-        true,
-      );
-    } else {
-      writeLocalOverride(".dx/config.local.json", feature, true);
+    let saved = false;
+
+    if (opts.save) {
+      if (user) {
+        if (!ctx.configPath) {
+          throw new Error("dx: configPath not set in context — cannot --save");
+        }
+        writeUserOverride(ctx.configPath, user, feature, true);
+        saved = true;
+      } else {
+        // --save requires a known user; fall back to local with a warning
+        process.stderr.write(
+          "dx: cannot --save: user not identified. Run `dx identify` first.\n",
+        );
+        process.stderr.write("dx: writing to local config instead.\n");
+      }
     }
+
+    if (!saved) {
+      const localPath = ctx.localPath ?? ".dx/config.local.json";
+      writeLocalOverride(localPath, feature, true);
+    }
+
+    // Auto-sync to git config so `git config dx.<feature>` stays current
+    autoSync();
 
     if (useJson) {
       process.stdout.write(
-        formatEnableDisableResultJson(feature, true, !!opts.save, user) + "\n",
+        formatEnableDisableResultJson(feature, true, saved, user) + "\n",
       );
     } else {
       process.stderr.write(
-        formatEnableDisableResult(feature, true, !!opts.save, user) + "\n",
+        formatEnableDisableResult(feature, true, saved, user) + "\n",
       );
     }
   });
@@ -187,24 +225,39 @@ export function buildDisableCommand(): Command {
     const ctx = dx.getContext();
     const user = resolveUser(ctx);
 
-    if (opts.save && user) {
-      writeUserOverride(
-        ctx.config as any, // would be path in real usage
-        user,
-        feature,
-        false,
-      );
-    } else {
-      writeLocalOverride(".dx/config.local.json", feature, false);
+    let saved = false;
+
+    if (opts.save) {
+      if (user) {
+        if (!ctx.configPath) {
+          throw new Error("dx: configPath not set in context — cannot --save");
+        }
+        writeUserOverride(ctx.configPath, user, feature, false);
+        saved = true;
+      } else {
+        // --save requires a known user; fall back to local with a warning
+        process.stderr.write(
+          "dx: cannot --save: user not identified. Run `dx identify` first.\n",
+        );
+        process.stderr.write("dx: writing to local config instead.\n");
+      }
     }
+
+    if (!saved) {
+      const localPath = ctx.localPath ?? ".dx/config.local.json";
+      writeLocalOverride(localPath, feature, false);
+    }
+
+    // Auto-sync to git config so `git config dx.<feature>` stays current
+    autoSync();
 
     if (useJson) {
       process.stdout.write(
-        formatEnableDisableResultJson(feature, false, !!opts.save, user) + "\n",
+        formatEnableDisableResultJson(feature, false, saved, user) + "\n",
       );
     } else {
       process.stderr.write(
-        formatEnableDisableResult(feature, false, !!opts.save, user) + "\n",
+        formatEnableDisableResult(feature, false, saved, user) + "\n",
       );
     }
   });

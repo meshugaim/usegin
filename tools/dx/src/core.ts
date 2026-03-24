@@ -37,6 +37,10 @@ export interface DxContext {
   gitUserEmail: string | null;
   whoami: string | null;
   warn?: (msg: string) => void;
+  /** Absolute path to .dx/config.json (set by SDK, absent in pure tests). */
+  configPath?: string;
+  /** Absolute path to .dx/config.local.json (set by SDK, absent in pure tests). */
+  localPath?: string;
 }
 
 export type FeatureSource = "default" | "user-override" | "local-override";
