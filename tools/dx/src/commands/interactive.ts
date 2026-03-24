@@ -8,7 +8,7 @@
  * Part of: ENG-3443
  */
 
-import type { DxContext } from "../core";
+import { getFeature, type DxContext } from "../core";
 
 /** A single option for the interactive multiselect picker. */
 export interface InteractiveOption {
@@ -29,7 +29,19 @@ export interface InteractiveOption {
  * enabled state for the current user.
  */
 export function buildInteractiveOptions(
-  _ctx: DxContext,
+  ctx: DxContext,
 ): InteractiveOption[] {
-  throw new Error("Not implemented");
+  const featureNames = Object.keys(ctx.config.features);
+
+  return featureNames.map((name) => {
+    const featureDef = ctx.config.features[name];
+    const info = getFeature(name, ctx);
+
+    return {
+      value: name,
+      label: name,
+      hint: featureDef.description,
+      initialValue: info.enabled,
+    };
+  });
 }

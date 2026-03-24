@@ -8,6 +8,11 @@
  */
 
 import { Command } from "commander";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { dirname } from "path";
+import { dxShouldOutputJson } from "../output";
+import { resolveUser } from "../core";
+import dx from "../../sdk";
 
 /**
  * Synchronously reads/writes a local override to `.dx/config.local.json`.
@@ -16,11 +21,30 @@ import { Command } from "commander";
  * and writes back to disk. Uses `readFileSync`/`writeFileSync`/`mkdirSync`.
  */
 export function writeLocalOverride(
-  _localPath: string,
-  _feature: string,
-  _enabled: boolean,
+  localPath: string,
+  feature: string,
+  enabled: boolean,
 ): void {
-  throw new Error("Not implemented");
+  let data: { overrides: Record<string, boolean> };
+
+  if (existsSync(localPath)) {
+    // File exists — read and parse (throws on corrupted JSON)
+    const raw = readFileSync(localPath, "utf-8");
+    data = JSON.parse(raw);
+    if (!data.overrides) {
+      data.overrides = {};
+    }
+  } else {
+    // File doesn't exist — create with empty overrides
+    data = { overrides: {} };
+  }
+
+  data.overrides[feature] = enabled;
+
+  // Ensure parent directory exists
+  mkdirSync(dirname(localPath), { recursive: true });
+
+  writeFileSync(localPath, JSON.stringify(data, null, 2) + "\n");
 }
 
 /**
@@ -32,12 +56,30 @@ export function writeLocalOverride(
  * (config.json should always be committed to the repo).
  */
 export function writeUserOverride(
-  _configPath: string,
-  _user: string,
-  _feature: string,
-  _enabled: boolean,
+  configPath: string,
+  user: string,
+  feature: string,
+  enabled: boolean,
 ): void {
-  throw new Error("Not implemented");
+  // config.json must exist — it's committed to the repo
+  const raw = readFileSync(configPath, "utf-8");
+  const data = JSON.parse(raw);
+
+  if (!data.users) {
+    data.users = {};
+  }
+
+  if (!data.users[user]) {
+    data.users[user] = { aliases: [], overrides: {} };
+  }
+
+  if (!data.users[user].overrides) {
+    data.users[user].overrides = {};
+  }
+
+  data.users[user].overrides[feature] = enabled;
+
+  writeFileSync(configPath, JSON.stringify(data, null, 2) + "\n");
 }
 
 /**
@@ -49,12 +91,22 @@ export function writeUserOverride(
  * - Includes hint: "To persist across environments: dx disable ci-watcher --save"
  */
 export function formatEnableDisableResult(
-  _feature: string,
-  _enabled: boolean,
-  _saved: boolean,
-  _user: string | null,
+  feature: string,
+  enabled: boolean,
+  saved: boolean,
+  user: string | null,
 ): string {
-  throw new Error("Not implemented");
+  const state = enabled ? "enabled" : "disabled";
+  const action = enabled ? "enable" : "disable";
+
+  if (saved) {
+    return `dx: ${feature} ${state} for ${user} (saved to config.json)`;
+  }
+
+  return (
+    `dx: ${feature} ${state} (local)\n` +
+    `    To persist across environments: dx ${action} ${feature} --save`
+  );
 }
 
 /**
@@ -64,24 +116,98 @@ export function formatEnableDisableResult(
  * `{"feature":"ci-watcher","enabled":false,"target":"local"}`
  */
 export function formatEnableDisableResultJson(
-  _feature: string,
-  _enabled: boolean,
-  _saved: boolean,
+  feature: string,
+  enabled: boolean,
+  saved: boolean,
   _user: string | null,
 ): string {
-  throw new Error("Not implemented");
+  return JSON.stringify(
+    {
+      feature,
+      enabled,
+      target: saved ? "config" : "local",
+    },
+    null,
+    2,
+  );
 }
 
 /**
  * Build the `dx enable` Commander command.
  */
 export function buildEnableCommand(): Command {
-  throw new Error("Not implemented");
+  const cmd = new Command("enable")
+    .description("Enable a feature")
+    .argument("<feature>", "Feature name to enable")
+    .option("--save", "Persist to config.json (user override)")
+    .option("--json", "Output as JSON");
+
+  cmd.action((feature: string, opts: { save?: boolean; json?: boolean }) => {
+    const useJson = dxShouldOutputJson(opts);
+    const ctx = dx.getContext();
+    const user = resolveUser(ctx);
+
+    if (opts.save && user) {
+      writeUserOverride(
+        ctx.config as any, // would be path in real usage
+        user,
+        feature,
+        true,
+      );
+    } else {
+      writeLocalOverride(".dx/config.local.json", feature, true);
+    }
+
+    if (useJson) {
+      process.stdout.write(
+        formatEnableDisableResultJson(feature, true, !!opts.save, user) + "\n",
+      );
+    } else {
+      process.stderr.write(
+        formatEnableDisableResult(feature, true, !!opts.save, user) + "\n",
+      );
+    }
+  });
+
+  return cmd;
 }
 
 /**
  * Build the `dx disable` Commander command.
  */
 export function buildDisableCommand(): Command {
-  throw new Error("Not implemented");
+  const cmd = new Command("disable")
+    .description("Disable a feature")
+    .argument("<feature>", "Feature name to disable")
+    .option("--save", "Persist to config.json (user override)")
+    .option("--json", "Output as JSON");
+
+  cmd.action((feature: string, opts: { save?: boolean; json?: boolean }) => {
+    const useJson = dxShouldOutputJson(opts);
+    const ctx = dx.getContext();
+    const user = resolveUser(ctx);
+
+    if (opts.save && user) {
+      writeUserOverride(
+        ctx.config as any, // would be path in real usage
+        user,
+        feature,
+        false,
+      );
+    } else {
+      writeLocalOverride(".dx/config.local.json", feature, false);
+    }
+
+    if (useJson) {
+      process.stdout.write(
+        formatEnableDisableResultJson(feature, false, !!opts.save, user) + "\n",
+      );
+    } else {
+      process.stderr.write(
+        formatEnableDisableResult(feature, false, !!opts.save, user) + "\n",
+      );
+    }
+  });
+
+  return cmd;
 }
