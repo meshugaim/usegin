@@ -35,6 +35,7 @@ export interface DxContext {
   env: Record<string, string | undefined>;
   gitUserName: string | null;
   gitUserEmail: string | null;
+  whoami: string | null;
 }
 
 export type FeatureSource = "default" | "user-override" | "local-override";

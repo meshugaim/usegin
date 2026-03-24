@@ -51,6 +51,7 @@ function makeCtx(overrides?: Partial<DxContext>): DxContext {
     env: {},
     gitUserName: null,
     gitUserEmail: null,
+    whoami: null,
     ...overrides,
   };
 }
@@ -65,28 +66,25 @@ function makeLocal(overrides?: Partial<DxLocalConfig>): DxLocalConfig {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Global test isolation — reset cache before every test
+// ---------------------------------------------------------------------------
+beforeEach(() => {
+  reload();
+});
+
 // ===========================================================================
 // loadConfig
 // ===========================================================================
 
 describe("loadConfig", () => {
-  test("returns the config with features and users", () => {
-    const ctx = makeCtx();
-    const result = loadConfig(ctx);
-
-    expect(result.features).toBeDefined();
-    expect(result.features["ci-watcher"]).toBeDefined();
-    expect(result.features["ci-watcher"].default).toBe(true);
-    expect(result.features.autosync.default).toBe(false);
-    expect(result.users.nitsan).toBeDefined();
-  });
-
-  test("includes local config when provided", () => {
+  test("passes through config and local from context", () => {
     const ctx = makeCtx({ local: makeLocal() });
     const result = loadConfig(ctx);
 
-    expect(result.local).not.toBeNull();
-    expect(result.local!.overrides.autosync).toBe(true);
+    expect(result.features).toBe(ctx.config.features);
+    expect(result.users).toBe(ctx.config.users);
+    expect(result.local).toBe(ctx.local);
   });
 
   test("local is null when no local config exists", () => {
@@ -94,31 +92,6 @@ describe("loadConfig", () => {
     const result = loadConfig(ctx);
 
     expect(result.local).toBeNull();
-  });
-
-  test("merges features from config correctly", () => {
-    const config = makeConfig({
-      features: {
-        "custom-feature": {
-          description: "A custom feature",
-          mechanism: "custom",
-          default: true,
-        },
-      },
-    });
-    const ctx = makeCtx({ config });
-    const result = loadConfig(ctx);
-
-    expect(Object.keys(result.features)).toEqual(["custom-feature"]);
-    expect(result.features["custom-feature"].default).toBe(true);
-  });
-
-  test("caches after first call — returns same object reference", () => {
-    const ctx = makeCtx();
-    const first = loadConfig(ctx);
-    const second = loadConfig(ctx);
-
-    expect(first).toBe(second);
   });
 });
 
@@ -329,6 +302,157 @@ describe("resolveUser", () => {
     const result = resolveUser(ctx);
     expect(result).toBe("alice");
   });
+
+  // -----------------------------------------------------------------------
+  // whoami fallback (spec step 2c)
+  // -----------------------------------------------------------------------
+
+  test("whoami matches user key", () => {
+    const ctx = makeCtx({ whoami: "nitsan" });
+    const result = resolveUser(ctx);
+    expect(result).toBe("nitsan");
+  });
+
+  test("whoami matches alias", () => {
+    const ctx = makeCtx({ whoami: "nitsan-ona" });
+    const result = resolveUser(ctx);
+    expect(result).toBe("nitsan");
+  });
+
+  test("$USER is checked before whoami in resolution order", () => {
+    const config = makeConfig({
+      users: {
+        alice: {
+          aliases: ["alice-local"],
+          overrides: {},
+        },
+        bob: {
+          aliases: ["bob-whoami"],
+          overrides: {},
+        },
+      },
+    });
+    const ctx = makeCtx({
+      config,
+      env: { USER: "alice-local" },
+      whoami: "bob-whoami",
+    });
+    const result = resolveUser(ctx);
+    // $USER should win over whoami (spec: $GITHUB_USER → $USER → whoami → git config)
+    expect(result).toBe("alice");
+  });
+
+  // -----------------------------------------------------------------------
+  // Email prefix matching
+  // -----------------------------------------------------------------------
+
+  test("matches git email prefix before @ against aliases", () => {
+    const config = makeConfig({
+      users: {
+        alice: {
+          aliases: ["alice-dev"],
+          overrides: {},
+        },
+      },
+    });
+    const ctx = makeCtx({
+      config,
+      gitUserEmail: "alice-dev@company.com",
+    });
+    const result = resolveUser(ctx);
+    expect(result).toBe("alice");
+  });
+
+  test("matches git email prefix against user keys", () => {
+    const config = makeConfig({
+      users: {
+        bob: {
+          aliases: [],
+          overrides: {},
+        },
+      },
+    });
+    const ctx = makeCtx({
+      config,
+      gitUserEmail: "bob@company.com",
+    });
+    const result = resolveUser(ctx);
+    expect(result).toBe("bob");
+  });
+
+  // -----------------------------------------------------------------------
+  // Email edge cases
+  // -----------------------------------------------------------------------
+
+  test("gitUserEmail with no @ sign — tries to match the full string", () => {
+    const config = makeConfig({
+      users: {
+        nitsan: {
+          aliases: ["nitsan"],
+          overrides: {},
+        },
+      },
+    });
+    const ctx = makeCtx({ config, gitUserEmail: "nitsan" });
+    const result = resolveUser(ctx);
+    // No @ sign means the "prefix" is the whole string — should match alias
+    expect(result).toBe("nitsan");
+  });
+
+  test("gitUserEmail with empty prefix — does not match anything", () => {
+    const config = makeConfig({
+      users: {
+        nitsan: {
+          aliases: ["", "nitsan-ona"],
+          overrides: {},
+        },
+      },
+    });
+    const ctx = makeCtx({ config, gitUserEmail: "@domain.com" });
+    const result = resolveUser(ctx);
+    // Empty prefix should not match any user
+    expect(result).toBeNull();
+  });
+
+  // -----------------------------------------------------------------------
+  // Partial alias and duplicate alias
+  // -----------------------------------------------------------------------
+
+  test("does not match partial alias — requires full string match", () => {
+    const config = makeConfig({
+      users: {
+        nitsan: {
+          aliases: ["Nitsan Avni"],
+          overrides: {},
+        },
+      },
+    });
+    const ctx = makeCtx({ config, env: { USER: "Nitsan" } });
+    // "Nitsan" is not the full alias "Nitsan Avni" — should not match alias
+    // But it should match the user key "nitsan" (case-insensitive)
+    const result = resolveUser(ctx);
+    expect(result).toBe("nitsan");
+  });
+
+  test("first matching user wins (deterministic order)", () => {
+    const config: DxConfig = {
+      features: {},
+      users: {
+        alice: {
+          aliases: ["shared-alias"],
+          overrides: {},
+        },
+        bob: {
+          aliases: ["shared-alias"],
+          overrides: {},
+        },
+      },
+    };
+    const ctx = makeCtx({ config, env: { USER: "shared-alias" } });
+    const result = resolveUser(ctx);
+    // V8 iterates object keys in insertion order, so the first key ("alice") wins.
+    expect(result).toBe("alice");
+  });
 });
 
 // ===========================================================================
@@ -467,6 +591,20 @@ describe("isEnabled", () => {
     const ctx = makeCtx({ env: { DX_USER: "nitsan" } });
     // nitsan overrides ci-watcher to false
     expect(isEnabled("ci-watcher", ctx)).toBe(false);
+  });
+
+  // -----------------------------------------------------------------------
+  // $DX_USER → non-existent user → falls back to defaults
+  // -----------------------------------------------------------------------
+
+  test("$DX_USER set to non-existent user falls back to feature defaults", () => {
+    const ctx = makeCtx({ env: { DX_USER: "explicit-user" } });
+    // resolveUser returns "explicit-user", which has no entry in users
+    const resolved = resolveUser(ctx);
+    expect(resolved).toBe("explicit-user");
+    // isEnabled should fall back to feature defaults (no user overrides apply)
+    expect(isEnabled("ci-watcher", ctx, resolved)).toBe(true);
+    expect(isEnabled("autosync", ctx, resolved)).toBe(false);
   });
 });
 
@@ -624,11 +762,6 @@ describe("allFeatures", () => {
 // ===========================================================================
 
 describe("caching", () => {
-  beforeEach(() => {
-    // Ensure clean cache state between tests
-    reload();
-  });
-
   test("loadConfig returns cached result on second call", () => {
     const ctx = makeCtx();
     const first = loadConfig(ctx);
@@ -669,6 +802,17 @@ describe("caching", () => {
     // isEnabled should work without re-reading
     expect(isEnabled("ci-watcher", ctx, null)).toBe(true);
     expect(isEnabled("autosync", ctx, null)).toBe(false);
+  });
+
+  test("isEnabled completes in <5ms after cache is primed", () => {
+    const ctx = makeCtx();
+    loadConfig(ctx); // prime cache
+    const start = performance.now();
+    for (let i = 0; i < 100; i++) {
+      isEnabled("ci-watcher", ctx, null);
+    }
+    const elapsed = (performance.now() - start) / 100;
+    expect(elapsed).toBeLessThan(5);
   });
 });
 
@@ -788,79 +932,3 @@ describe("edge cases", () => {
   });
 });
 
-// ===========================================================================
-// resolveUser — whoami fallback and email prefix matching
-// ===========================================================================
-
-describe("resolveUser — advanced matching", () => {
-  test("matches git email prefix before @ against aliases", () => {
-    const config = makeConfig({
-      users: {
-        alice: {
-          aliases: ["alice-dev"],
-          overrides: {},
-        },
-      },
-    });
-    const ctx = makeCtx({
-      config,
-      gitUserEmail: "alice-dev@company.com",
-    });
-    const result = resolveUser(ctx);
-    expect(result).toBe("alice");
-  });
-
-  test("matches git email prefix against user keys", () => {
-    const config = makeConfig({
-      users: {
-        bob: {
-          aliases: [],
-          overrides: {},
-        },
-      },
-    });
-    const ctx = makeCtx({
-      config,
-      gitUserEmail: "bob@company.com",
-    });
-    const result = resolveUser(ctx);
-    expect(result).toBe("bob");
-  });
-
-  test("does not match partial alias — requires full string match", () => {
-    const config = makeConfig({
-      users: {
-        nitsan: {
-          aliases: ["Nitsan Avni"],
-          overrides: {},
-        },
-      },
-    });
-    const ctx = makeCtx({ config, env: { USER: "Nitsan" } });
-    // "Nitsan" is not the full alias "Nitsan Avni" — should not match alias
-    // But it should match the user key "nitsan" (case-insensitive)
-    const result = resolveUser(ctx);
-    expect(result).toBe("nitsan");
-  });
-
-  test("first matching user wins (deterministic order)", () => {
-    const config: DxConfig = {
-      features: {},
-      users: {
-        alice: {
-          aliases: ["shared-alias"],
-          overrides: {},
-        },
-        bob: {
-          aliases: ["shared-alias"],
-          overrides: {},
-        },
-      },
-    };
-    const ctx = makeCtx({ config, env: { USER: "shared-alias" } });
-    const result = resolveUser(ctx);
-    // Should return the first user found (object key order)
-    expect(result).not.toBeNull();
-    expect(["alice", "bob"]).toContain(result);
-  });
-});
