@@ -42,6 +42,14 @@ Review cycles: review → fix → review → fix, until only nitpick-level findi
 
 Spawned at session start. Watches for drift against this workflow. Updated when workflow evolves.
 
+## More overrides
+
+- per issue / slice decide in advance how to manually verify it works and fits with rest of system
+- review->fix infinite loop until nitpick level - fixing all (unless completely wrong)
+- wait for companion, dont continue before seeing its inputs
+- tdd cycle can be made stricter by separate agents do 1. write the tests (including review fix infinite loop) 2. impl production code (again infinite loop)
+- FYI - other agents might be working in parallel on other things; only commit your own changes - tell your agents
+
 ## What Stays the Same from SKILL.md
 
 - Sequential by default (no parallelism unless explicitly requested)
