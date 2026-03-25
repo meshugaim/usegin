@@ -14,6 +14,7 @@
  */
 
 import { $ } from "bun";
+import dx from "../../tools/dx/sdk";
 
 interface PostToolInput {
   tool_name: string;
@@ -62,6 +63,8 @@ async function main() {
 
   if (!(await pushTargetsMain(command))) process.exit(0);
 
+  if (!dx.isEnabled("ci-watcher")) process.exit(0);
+
   // Need tmux
   if (!process.env.TMUX) {
     console.error("ci-watcher: skipped — not in tmux");
@@ -100,7 +103,7 @@ async function main() {
   // Spawn in detached tmux session
   const result = await $`tmux new-session -d -s ci-watch-${shortSha} -e TMUX_PARENT_SESSION=${mainSession} ${ciWatcher} ${sha}`.quiet().nothrow();
   if (result.exitCode === 0) {
-    console.error(`ci-watcher: started for ${shortSha}`);
+    console.error(`ci-watcher: started for ${shortSha} — disable with \`dx disable ci-watcher\``);
   }
 
   process.exit(0);
