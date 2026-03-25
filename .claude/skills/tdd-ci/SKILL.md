@@ -23,6 +23,24 @@ test.failingIf(condition)("description", () => { ... });
 - Always strict: unexpected pass = suite failure
 - Test body always runs (unlike `.skip` or `.todo`)
 
+**Lazy import for missing modules:** If the module under test doesn't exist yet, a top-level `import` will crash the file before any test registers — `test.failing` never runs. Use a lazy dynamic import instead:
+
+```ts
+// DON'T — top-level import crashes the whole file
+import { POST } from "@/app/api/my-route/route";
+
+// DO — lazy import inside test body, fails inside test.failing()
+async function getPOST() {
+  const mod = await import("@/app/api/my-route/route");
+  return mod.POST;
+}
+
+test.failing("ENG-XXX: description", async () => {
+  const POST = await getPOST();
+  // ... assertions
+});
+```
+
 ### Pytest
 
 ```python
