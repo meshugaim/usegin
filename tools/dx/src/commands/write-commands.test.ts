@@ -52,14 +52,8 @@ import {
   type ListEntry,
 } from "./list";
 
-// --- Docs pure functions ---
-import {
-  buildDocsContent,
-  formatDocs,
-  formatDocsJson,
-  buildDocsCommand,
-  type DocsSection,
-} from "./docs";
+// --- Docs command (now uses shared docs-registry) ---
+import { buildDocsCommand } from "./docs";
 
 // --- Reset pure functions ---
 import {
@@ -1392,143 +1386,12 @@ describe("buildListCommand", () => {
 });
 
 // ===========================================================================
-// buildDocsContent — documentation sections
+// buildDocsCommand — shared docs-registry pattern
 // ===========================================================================
-
-describe("buildDocsContent", () => {
-  test("returns an array of sections", () => {
-    const sections = buildDocsContent();
-    expect(Array.isArray(sections)).toBe(true);
-    expect(sections.length).toBeGreaterThan(0);
-  });
-
-  test("each section has id, title, and content", () => {
-    const sections = buildDocsContent();
-    for (const section of sections) {
-      expect(section).toHaveProperty("id");
-      expect(section).toHaveProperty("title");
-      expect(section).toHaveProperty("content");
-      expect(typeof section.id).toBe("string");
-      expect(typeof section.title).toBe("string");
-      expect(typeof section.content).toBe("string");
-    }
-  });
-
-  test("includes adding-features section", () => {
-    const sections = buildDocsContent();
-    const addingFeatures = sections.find(
-      (s) => s.id === "adding-features",
-    );
-    expect(addingFeatures).toBeDefined();
-  });
-
-  test("includes config-format section", () => {
-    const sections = buildDocsContent();
-    const configFormat = sections.find((s) => s.id === "config-format");
-    expect(configFormat).toBeDefined();
-  });
-
-  test("includes identity section", () => {
-    const sections = buildDocsContent();
-    const identity = sections.find((s) => s.id === "identity");
-    expect(identity).toBeDefined();
-  });
-});
-
-// ===========================================================================
-// formatDocs — render documentation for display
-// ===========================================================================
-
-describe("formatDocs", () => {
-  const sampleSections: DocsSection[] = [
-    {
-      id: "adding-features",
-      title: "Adding Features",
-      content: "Register in config.json under features.",
-    },
-    {
-      id: "config-format",
-      title: "Config Format",
-      content: "JSON with features and users keys.",
-    },
-    {
-      id: "identity",
-      title: "Identity",
-      content: "Resolved from env vars and git config.",
-    },
-  ];
-
-  test("shows all sections when no topic is provided", () => {
-    const output = formatDocs(sampleSections);
-    expect(output).toContain("Adding Features");
-    expect(output).toContain("Config Format");
-    expect(output).toContain("Identity");
-  });
-
-  test("shows only the requested section when topic is provided", () => {
-    const output = formatDocs(sampleSections, "config-format");
-    expect(output).toContain("Config Format");
-    expect(output).not.toContain("Adding Features");
-    expect(output).not.toContain("Identity");
-  });
-
-  test("includes section content", () => {
-    const output = formatDocs(sampleSections, "identity");
-    expect(output).toContain("Resolved from env vars");
-  });
-
-  test("returns all sections for unknown topic (graceful fallback)", () => {
-    // Design contract: unknown topics show all sections rather than an error,
-    // keeping the CLI forgiving.
-    const output = formatDocs(sampleSections, "nonexistent");
-    expect(output).toContain("Adding Features");
-    expect(output).toContain("Config Format");
-    expect(output).toContain("Identity");
-  });
-});
-
-// ===========================================================================
-// formatDocsJson — JSON output
-// ===========================================================================
-
-describe("formatDocsJson", () => {
-  const sampleSections: DocsSection[] = [
-    {
-      id: "adding-features",
-      title: "Adding Features",
-      content: "Register in config.json under features.",
-    },
-    {
-      id: "config-format",
-      title: "Config Format",
-      content: "JSON with features and users keys.",
-    },
-    {
-      id: "identity",
-      title: "Identity",
-      content: "Resolved from env vars and git config.",
-    },
-  ];
-
-  test("returns valid JSON of all sections when no topic", () => {
-    const output = formatDocsJson(sampleSections);
-    const parsed = JSON.parse(output);
-    expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed).toHaveLength(3);
-  });
-
-  test("returns filtered JSON when topic is provided", () => {
-    const output = formatDocsJson(sampleSections, "identity");
-    const parsed = JSON.parse(output);
-    expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed).toHaveLength(1);
-    expect(parsed[0].id).toBe("identity");
-  });
-});
-
-// ===========================================================================
-// buildDocsCommand — Commander structure
-// ===========================================================================
+// The docs command now uses the shared docs-registry pattern.
+// Testing the shared functions is done in docs-registry's own tests.
+// Here we test the dx-specific wiring: buildDocsCommand returns a
+// Command with the right structure and that docs files are loadable.
 
 describe("buildDocsCommand", () => {
   test("returns a Command instance", () => {
@@ -1541,17 +1404,11 @@ describe("buildDocsCommand", () => {
     expect(cmd.name()).toBe("docs");
   });
 
-  test("accepts an optional [topic] argument", () => {
+  test("has list and show subcommands", () => {
     const cmd = buildDocsCommand();
-    const args = (cmd as any)._args;
-    expect(args).toHaveLength(1);
-    expect(args[0].required).toBe(false);
-  });
-
-  test("has --json option", () => {
-    const cmd = buildDocsCommand();
-    const jsonOpt = cmd.options.find((o) => o.long === "--json");
-    expect(jsonOpt).toBeDefined();
+    const subcommands = cmd.commands.map((c: any) => c.name());
+    expect(subcommands).toContain("list");
+    expect(subcommands).toContain("show");
   });
 });
 

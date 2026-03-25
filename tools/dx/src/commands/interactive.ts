@@ -160,6 +160,9 @@ export async function runInteractive(
     if (changed > 0) {
       autoSync();
       process.stderr.write(`dx: updated ${changed} feature(s) (local)\n`);
+      process.stderr.write(
+        "    To persist across environments: dx --save\n",
+      );
     } else {
       process.stderr.write("dx: no changes\n");
     }

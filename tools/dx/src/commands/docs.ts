@@ -1,163 +1,136 @@
 /**
- * dx docs — inline documentation for dx usage and config format.
+ * dx docs — browse embedded documentation.
  *
- * Exports pure functions for building and formatting docs content,
- * plus a Commander command builder.
+ * Thin wrapper over the shared docs-registry. All core logic lives in
+ * tools/docs-registry/src/shared.ts. This module provides dx-specific
+ * configuration (docs directory, CLI name) and builds the Commander command
+ * using the local Commander version (v14) for compatibility with the parent
+ * program — the same approach effi-cli uses.
  *
- * Part of: ENG-3443
+ * Part of: ENG-3473
  */
 
 import { Command } from "commander";
-import { dxShouldOutputJson } from "../output";
+import { join, dirname } from "path";
+import {
+  loadAllDocs as loadSharedAllDocs,
+  findDoc,
+} from "../../../docs-registry/src/shared";
+import type { Doc } from "../../../docs-registry/src/shared";
 
-/** A single documentation section. */
-export interface DocsSection {
-  id: string;
-  title: string;
-  content: string;
+// ─── ANSI helpers ────────────────────────────────────────────────────────────
+
+const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
+const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
+
+// ─── dx-specific wiring ─────────────────────────────────────────────────────
+
+const CLI_NAME = "dx";
+
+/** Resolve docs directory relative to this CLI's package root. */
+function getDocsDir(internal = false): string {
+  const base = join(dirname(import.meta.dir), "..", "docs");
+  return internal ? join(base, "internal") : base;
 }
 
-/**
- * Build the full set of documentation sections.
- *
- * Returns sections for: adding-features, config-format, identity.
- */
-export function buildDocsContent(): DocsSection[] {
-  return [
-    {
-      id: "adding-features",
-      title: "Adding Features",
-      content: `To add a new feature toggle:
-
-1. Register the feature in \`.dx/config.json\` under the \`features\` key:
-   \`\`\`json
-   "my-feature": {
-     "description": "What this feature does",
-     "mechanism": "How it is gated (e.g. hook, SDK check)",
-     "default": true
-   }
-   \`\`\`
-
-2. Gate the feature in code using the SDK:
-   \`\`\`typescript
-   import dx from "../../dx/sdk";
-   if (dx.isEnabled("my-feature")) { /* ... */ }
-   \`\`\`
-
-3. Or gate in bash:
-   \`\`\`bash
-   if dx resolve my-feature --exit-code; then echo "on"; fi
-   \`\`\``,
-    },
-    {
-      id: "config-format",
-      title: "Config Format",
-      content: `The dx config lives in \`.dx/config.json\` with two top-level keys:
-
-**features** — registered feature toggles:
-  Each feature has \`description\`, \`mechanism\`, and \`default\` (boolean).
-
-**users** — per-person overrides:
-  Each user entry has \`aliases\` (array of strings for identity matching)
-  and \`overrides\` (map of feature name to boolean).
-
-Local overrides live in \`.dx/config.local.json\` (gitignored) with a single
-\`overrides\` key. Local overrides take highest priority in the three-layer merge:
-  default -> user-override -> local-override`,
-    },
-    {
-      id: "identity",
-      title: "Identity",
-      content: `dx resolves the current user from environment signals in this order:
-
-1. \`$DX_USER\` — explicit override (highest priority)
-2. \`$GITHUB_USER\` — GitHub username
-3. \`$USER\` — OS username
-4. \`whoami\` — system command output
-5. \`git config user.name\` — git user name
-6. \`git config user.email\` — email prefix (before @)
-
-Each signal is matched against user keys and aliases in config.json
-(case-insensitive). Use \`dx identify\` to see which signals are active
-and \`dx whoami\` to see the resolved identity.`,
-    },
-  ];
+/** Load user + internal docs from dx's docs directory. */
+export function loadAllDocs() {
+  return loadSharedAllDocs(getDocsDir);
 }
 
-/**
- * Format documentation sections for display.
- *
- * If topic is provided and matches a section id, returns only that section.
- * If no topic or unknown topic, returns all sections (graceful fallback).
- */
-export function formatDocs(
-  sections: DocsSection[],
-  topic?: string,
-): string {
-  const filtered = filterSections(sections, topic);
+// ─── Commander integration (local Command for version compat) ────────────────
 
-  const lines: string[] = [];
-  for (const section of filtered) {
-    lines.push(`# ${section.title}`);
-    lines.push("");
-    lines.push(section.content);
-    lines.push("");
+/** Format and print a list of docs with ANSI colors. Returns next number. */
+function formatAndPrint(docs: Doc[], startNum = 1): number {
+  for (let i = 0; i < docs.length; i++) {
+    const doc = docs[i];
+    const num = (startNum + i).toString().padStart(2);
+    const typeTag = `[${doc.meta.type}]`;
+
+    console.log(`${cyan(num)}  ${doc.meta.name.padEnd(58)} ${dim(typeTag)}`);
+    console.log(dim(`    ${doc.meta.context}`));
+
+    if (i < docs.length - 1) {
+      console.log();
+    }
   }
-
-  return lines.join("\n").trimEnd();
+  return startNum + docs.length;
 }
 
 /**
- * Format documentation sections as JSON.
+ * Build the `dx docs` Commander command using the shared docs-registry
+ * for data loading and the local Commander for command construction.
  *
- * Returns a JSON string of the sections (optionally filtered by topic).
- */
-export function formatDocsJson(
-  sections: DocsSection[],
-  topic?: string,
-): string {
-  const filtered = filterSections(sections, topic);
-  return JSON.stringify(filtered, null, 2);
-}
-
-/**
- * Filter sections by topic id. Returns all sections if topic is
- * not provided or doesn't match any section (graceful fallback).
- */
-function filterSections(sections: DocsSection[], topic?: string): DocsSection[] {
-  if (!topic) {
-    return sections;
-  }
-
-  const matched = sections.filter((s) => s.id === topic);
-  if (matched.length > 0) {
-    return matched;
-  }
-
-  process.stderr.write(`dx: topic "${topic}" not found, showing all sections\n`);
-  return sections;
-}
-
-/**
- * Build the `dx docs` Commander command.
- *
- * Optional `[topic]` argument to show a specific section.
+ * Provides `dx docs` (list), `dx docs show <handle>`, and `dx docs list`.
  */
 export function buildDocsCommand(): Command {
-  const cmd = new Command("docs")
-    .description("Show dx documentation")
-    .argument("[topic]", "Show a specific documentation topic")
-    .option("--json", "Output as JSON");
+  function runList(): void {
+    const { user, internal } = loadAllDocs();
 
-  cmd.action((topic: string | undefined, opts: { json?: boolean }) => {
-    const useJson = dxShouldOutputJson(opts);
-    const sections = buildDocsContent();
-
-    if (useJson) {
-      process.stdout.write(formatDocsJson(sections, topic) + "\n");
-    } else {
-      process.stderr.write(formatDocs(sections, topic) + "\n");
+    if (user.length === 0 && internal.length === 0) {
+      console.log(dim("No docs found."));
+      console.log(dim(`Add docs to: ${getDocsDir()}`));
+      return;
     }
+
+    let nextNum = 1;
+
+    if (user.length > 0) {
+      nextNum = formatAndPrint(user, nextNum);
+    }
+
+    if (internal.length > 0) {
+      if (user.length > 0) {
+        console.log();
+      }
+      console.log(dim("─── internal ───"));
+      console.log();
+      nextNum = formatAndPrint(internal, nextNum);
+    }
+
+    console.log();
+    console.log(dim(`Use: ${CLI_NAME} docs show <handle|number>`));
+  }
+
+  const listCmd = new Command("list")
+    .alias("ls")
+    .description("List available docs")
+    .action(() => {
+      runList();
+    });
+
+  const showCmd = new Command("show")
+    .alias("get")
+    .description("Show a doc by handle or number")
+    .argument("<ref>", "Doc handle or number from list")
+    .action((ref: string) => {
+      const { user, internal } = loadAllDocs();
+      const allDocs = [...user, ...internal];
+      const doc = findDoc(ref, allDocs);
+
+      if (!doc) {
+        console.error(`Doc not found: ${ref}\n`);
+        if (allDocs.length > 0) {
+          console.error("Available docs:");
+          for (let i = 0; i < allDocs.length; i++) {
+            console.error(dim(`  ${i + 1}  ${allDocs[i].meta.handle}`));
+          }
+        } else {
+          console.error(dim("No docs available."));
+        }
+        process.exit(1);
+      }
+
+      console.log(doc.content);
+    });
+
+  const cmd = new Command("docs")
+    .description("Browse embedded documentation")
+    .addCommand(listCmd)
+    .addCommand(showCmd);
+
+  cmd.action(() => {
+    runList();
   });
 
   return cmd;
