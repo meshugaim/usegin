@@ -104,19 +104,8 @@ export async function runInteractive(
     return;
   }
 
-  const config = buildMultiselectConfig(options);
-  const selected = await multiselect({
-    message: "Feature toggles",
-    ...config,
-  });
-
-  if (isCancel(selected)) {
-    process.stderr.write("dx: cancelled\n");
-    return;
-  }
-
-  // Determine write target: --save writes to config.json (user override),
-  // otherwise writes to config.local.json (local override).
+  // Resolve write target BEFORE showing the prompt so we can tell the
+  // user where changes will be saved in the picker message.
   let useSave = save;
   let user: string | null = null;
 
@@ -137,10 +126,25 @@ export async function runInteractive(
     }
   }
 
-  // Resolve localPath up front so we can fail early if needed.
   const localPath = ctx.localPath;
   if (!useSave && !localPath) {
     process.stderr.write("dx: cannot determine local config path\n");
+    return;
+  }
+
+  // Build a message that tells the user where changes will be saved
+  const target = useSave
+    ? `saving to config.json for ${user}`
+    : "saving locally (use dx --save to persist)";
+
+  const config = buildMultiselectConfig(options);
+  const selected = await multiselect({
+    message: `Feature toggles — ${target}`,
+    ...config,
+  });
+
+  if (isCancel(selected)) {
+    process.stderr.write("dx: cancelled\n");
     return;
   }
 
