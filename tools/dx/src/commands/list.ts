@@ -155,6 +155,7 @@ export function grepGateCounts(features: string[]): Record<string, number> {
       "--exclude-dir=node_modules",
       "--exclude-dir=.venv",
       "--exclude-dir=.next",
+      // Best-effort exclusion; authoritative filter is in parseGrepOutput
       "--exclude-dir=dx",
       "--exclude=*.test.ts",
       "--exclude=*.test.tsx",

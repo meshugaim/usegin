@@ -48,7 +48,7 @@ git config dx.ci-watcher       # prints "true" or "false"
 | `dx reset [feature]` | Reset features to defaults by clearing overrides (local; `--save` for config.json) |
 | `dx identify` | Show or set current user identity (`--as <name>` to set) |
 | `dx list` | Show all registered features with gate counts |
-| `dx docs [topic]` | Show inline documentation |
+| `dx docs` | List embedded documentation (`dx docs show <handle>` to read) |
 
 All read commands support `--json`. The CLI auto-detects headless contexts (non-TTY, `CLAUDECODE=1`) and defaults to JSON. Override with `DX_OUTPUT=json` or `DX_OUTPUT=human`.
 

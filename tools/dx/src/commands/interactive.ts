@@ -46,9 +46,9 @@ export function buildInteractiveOptions(
     // knows *why* a feature is on/off (and where the override lives).
     let hint = featureDef.description;
     if (info.source === "user-override") {
-      hint += ` (personal: ${info.enabled ? "on" : "off"})`;
+      hint += " (personal)";
     } else if (info.source === "local-override") {
-      hint += ` (local: ${info.enabled ? "on" : "off"})`;
+      hint += " (local)";
     }
 
     return {
@@ -137,53 +137,39 @@ export async function runInteractive(
     }
   }
 
+  // Resolve localPath up front so we can fail early if needed.
+  const localPath = ctx.localPath;
+  if (!useSave && !localPath) {
+    process.stderr.write("dx: cannot determine local config path\n");
+    return;
+  }
+
   // Compare selected to current state and write overrides for changes
   const selectedSet = new Set(selected as string[]);
+  let changed = 0;
 
-  if (!useSave) {
-    const localPath = ctx.localPath;
-    if (!localPath) {
-      process.stderr.write("dx: cannot determine local config path\n");
-      return;
-    }
-
-    let changed = 0;
-    for (const opt of options) {
-      const wasEnabled = opt.initialValue;
-      const nowEnabled = selectedSet.has(opt.value);
-      if (wasEnabled !== nowEnabled) {
-        writeLocalOverride(localPath, opt.value, nowEnabled);
-        changed++;
+  for (const opt of options) {
+    const wasEnabled = opt.initialValue;
+    const nowEnabled = selectedSet.has(opt.value);
+    if (wasEnabled !== nowEnabled) {
+      if (useSave) {
+        writeUserOverride(ctx.configPath!, user!, opt.value, nowEnabled);
+      } else {
+        writeLocalOverride(localPath!, opt.value, nowEnabled);
       }
+      changed++;
     }
+  }
 
-    if (changed > 0) {
-      autoSync();
-      process.stderr.write(`dx: updated ${changed} feature(s) (local)\n`);
-      process.stderr.write(
-        "    To persist across environments: dx --save\n",
-      );
+  if (changed > 0) {
+    autoSync();
+    if (useSave) {
+      process.stderr.write(`dx: updated ${changed} feature(s) (saved to config.json)\n`);
     } else {
-      process.stderr.write("dx: no changes\n");
+      process.stderr.write(`dx: updated ${changed} feature(s) (local)\n`);
+      process.stderr.write("    To persist: use dx enable/disable <feature> --save\n");
     }
   } else {
-    let changed = 0;
-    for (const opt of options) {
-      const wasEnabled = opt.initialValue;
-      const nowEnabled = selectedSet.has(opt.value);
-      if (wasEnabled !== nowEnabled) {
-        writeUserOverride(ctx.configPath!, user!, opt.value, nowEnabled);
-        changed++;
-      }
-    }
-
-    if (changed > 0) {
-      autoSync();
-      process.stderr.write(
-        `dx: updated ${changed} feature(s) (saved to config.json)\n`,
-      );
-    } else {
-      process.stderr.write("dx: no changes\n");
-    }
+    process.stderr.write("dx: no changes\n");
   }
 }

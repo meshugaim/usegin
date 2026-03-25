@@ -5,7 +5,13 @@
  * tools/docs-registry/src/shared.ts. This module provides dx-specific
  * configuration (docs directory, CLI name) and builds the Commander command
  * using the local Commander version (v14) for compatibility with the parent
- * program — the same approach effi-cli uses.
+ * program.
+ *
+ * Why not use `createDocsCommand` from docs-registry directly?
+ * docs-registry ships Commander v12; dx uses Commander v14. Mixing them in
+ * a single program tree causes instanceof mismatches and broken routing.
+ * So we import data helpers (loadAllDocs, findDoc) but construct the
+ * Command tree with our own Commander import.
  *
  * Part of: ENG-3473
  */
