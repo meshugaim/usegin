@@ -100,11 +100,10 @@ export function buildSyncCommand(): Command {
     .option("--json", "Output as JSON");
 
   cmd.action((opts: { dryRun?: boolean; json?: boolean }) => {
+    const useJson = dxShouldOutputJson(opts);
     const ctx = dx.getContext();
     const features = allFeatures(ctx);
     const entries = buildSyncEntries(features);
-
-    const useJson = dxShouldOutputJson(opts);
 
     if (opts.dryRun) {
       if (useJson) {

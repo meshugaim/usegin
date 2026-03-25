@@ -2,13 +2,18 @@
  * dx (bare, TTY) — interactive feature picker.
  *
  * Exports pure data transformation functions for building the
- * interactive multiselect options. The actual UI uses @clack/prompts
- * and is tested at the integration level, not here.
+ * interactive multiselect options, plus a `runInteractive` function
+ * that drives the full interactive flow (prompt, diff, write).
+ *
+ * The actual UI uses @clack/prompts and is tested at the integration
+ * level, not here.
  *
  * Part of: ENG-3443
  */
 
 import { getFeature, type DxContext } from "../core";
+import { writeLocalOverride } from "./enable-disable";
+import { autoSync } from "./sync";
 
 /** A single option for the interactive multiselect picker. */
 export interface InteractiveOption {
@@ -44,4 +49,61 @@ export function buildInteractiveOptions(
       initialValue: info.enabled,
     };
   });
+}
+
+/**
+ * Run the interactive feature toggle picker.
+ *
+ * Presents a multiselect prompt, diffs against current state,
+ * writes local overrides for any changes, and auto-syncs to git config.
+ */
+export async function runInteractive(ctx: DxContext): Promise<void> {
+  const { multiselect, isCancel } = await import("@clack/prompts");
+  const options = buildInteractiveOptions(ctx);
+
+  if (options.length === 0) {
+    process.stderr.write("No features registered.\n");
+    return;
+  }
+
+  const selected = await multiselect({
+    message: "Feature toggles",
+    options: options.map((o) => ({
+      value: o.value,
+      label: o.label,
+      hint: o.hint,
+      initialValue: o.initialValue,
+    })),
+  });
+
+  if (isCancel(selected)) {
+    process.stderr.write("dx: cancelled\n");
+    return;
+  }
+
+  // Compare selected to current state and write local overrides for changes
+  const selectedSet = new Set(selected as string[]);
+  const localPath = ctx.localPath;
+  if (!localPath) {
+    process.stderr.write("dx: cannot determine local config path\n");
+    return;
+  }
+
+  let changed = 0;
+  for (const opt of options) {
+    const wasEnabled = opt.initialValue;
+    const nowEnabled = selectedSet.has(opt.value);
+    if (wasEnabled !== nowEnabled) {
+      writeLocalOverride(localPath, opt.value, nowEnabled);
+      changed++;
+    }
+  }
+
+  if (changed > 0) {
+    // Auto-sync to git config
+    autoSync();
+    process.stderr.write(`dx: updated ${changed} feature(s)\n`);
+  } else {
+    process.stderr.write("dx: no changes\n");
+  }
 }

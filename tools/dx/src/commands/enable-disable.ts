@@ -183,7 +183,11 @@ function buildToggleCommand(name: "enable" | "disable", enabled: boolean): Comma
     }
 
     if (!saved) {
-      const localPath = ctx.localPath ?? (ctx.configPath ? resolve(dirname(ctx.configPath), "config.local.json") : null);
+      const localPath =
+        ctx.localPath ??
+        (ctx.configPath
+          ? resolve(dirname(ctx.configPath), "config.local.json")
+          : null);
       if (!localPath) throw new Error("dx: cannot determine local config path");
       writeLocalOverride(localPath, feature, enabled);
     }

@@ -70,6 +70,23 @@ export interface UserProvenance {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the prefix before `@` from an email address.
+ *
+ * Returns the prefix string, or null if the prefix is empty
+ * (e.g. "@domain.com"). If no `@` is present, returns the full string
+ * (treating it as a bare username).
+ */
+export function extractEmailPrefix(email: string): string | null {
+  const atIndex = email.indexOf("@");
+  const prefix = atIndex === -1 ? email : email.substring(0, atIndex);
+  return prefix.length > 0 ? prefix : null;
+}
+
+// ---------------------------------------------------------------------------
 // Functions
 // ---------------------------------------------------------------------------
 
@@ -110,13 +127,9 @@ export function resolveUserWithProvenance(ctx: DxContext): UserProvenance {
 
   // gitUserEmail — extract prefix before @
   if (ctx.gitUserEmail != null) {
-    const atIndex = ctx.gitUserEmail.indexOf("@");
-    const prefix =
-      atIndex === -1
-        ? ctx.gitUserEmail
-        : ctx.gitUserEmail.substring(0, atIndex);
+    const prefix = extractEmailPrefix(ctx.gitUserEmail);
 
-    if (prefix.length > 0) {
+    if (prefix !== null) {
       const result = matchSignalToUser(prefix, ctx.config.users);
       if (result !== null) {
         return { user: result.user, signal: "gitUserEmail", match: result.match };

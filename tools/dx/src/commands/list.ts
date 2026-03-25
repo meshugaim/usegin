@@ -26,7 +26,7 @@ export interface ListEntry {
  *
  * Takes the DxContext (for feature definitions) and a map of
  * feature name -> gate count (from grepping the codebase).
- * Returns entries with warning flags for 0 gates or >1 gates.
+ * Returns entries with warning flags for 0 gates or >2 gates.
  * Unknown features in grepResults are silently ignored.
  */
 export function buildListData(
@@ -41,8 +41,10 @@ export function buildListData(
     let warning: string | null = null;
     if (gateCount === 0) {
       warning = "registered but not gated anywhere";
-    } else if (gateCount > 1) {
-      warning = "multiple gate points";
+    } else if (gateCount > 2) {
+      // A feature gated in 2 places (e.g. hook + script) is normal.
+      // Only note when there are more than 2 gate points.
+      warning = "note: multiple gate points";
     }
 
     entries.push({
@@ -122,9 +124,9 @@ export function grepGateCounts(features: string[]): Record<string, number> {
 /**
  * Format the list entries as a human-readable table.
  *
- * Includes gate counts and warning markers:
+ * Includes gate counts and note markers:
  * - 0 gates: "registered but not gated"
- * - >1 gates: "multiple gate points"
+ * - >2 gates: "note: multiple gate points"
  */
 export function formatList(entries: ListEntry[]): string {
   if (entries.length === 0) {
@@ -141,7 +143,8 @@ export function formatList(entries: ListEntry[]): string {
     let line = `  ${entry.feature} ${dots} ${entry.gateCount} ${gateLabel}   ${entry.description}`;
 
     if (entry.warning) {
-      line += `\n    \u26A0 ${entry.warning}`;
+      const marker = entry.warning.startsWith("note:") ? "\u2139" : "\u26A0";
+      line += `\n    ${marker} ${entry.warning}`;
     }
 
     lines.push(line);

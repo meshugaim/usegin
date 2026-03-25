@@ -9,7 +9,7 @@
 
 import { Command } from "commander";
 import { readFileSync, writeFileSync } from "fs";
-import { matchSignalToUser, type DxContext } from "../core";
+import { extractEmailPrefix, matchSignalToUser, type DxContext } from "../core";
 import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
 
@@ -79,12 +79,9 @@ export function autoDetectUser(
     // For email signals, extract the prefix before @ to match how
     // core.ts resolves identity from gitUserEmail.
     if (s.signal === "gitUserEmail" && matchValue) {
-      const atIndex = matchValue.indexOf("@");
-      if (atIndex !== -1) {
-        matchValue = matchValue.substring(0, atIndex);
-      }
-      // Skip empty prefixes (e.g., "@domain.com")
-      if (matchValue.length === 0) continue;
+      const prefix = extractEmailPrefix(matchValue);
+      if (prefix === null) continue;
+      matchValue = prefix;
     }
 
     const result = matchSignalToUser(matchValue, users);

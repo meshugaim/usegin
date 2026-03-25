@@ -130,7 +130,12 @@ function filterSections(sections: DocsSection[], topic?: string): DocsSection[] 
   }
 
   const matched = sections.filter((s) => s.id === topic);
-  return matched.length > 0 ? matched : sections;
+  if (matched.length > 0) {
+    return matched;
+  }
+
+  process.stderr.write(`dx: topic "${topic}" not found, showing all sections\n`);
+  return sections;
 }
 
 /**

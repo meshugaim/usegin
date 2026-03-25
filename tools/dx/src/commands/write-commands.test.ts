@@ -985,7 +985,7 @@ describe("buildListData", () => {
     }
   });
 
-  test("warns when gate count exceeds 1", () => {
+  test("notes when gate count exceeds 2", () => {
     const ctx = makeContext();
     const entries = buildListData(ctx, { "ci-watcher": 3 });
     const ciEntry = entries.find((e) => e.feature === "ci-watcher");
@@ -996,6 +996,13 @@ describe("buildListData", () => {
   test("no warning when gate count is exactly 1", () => {
     const ctx = makeContext();
     const entries = buildListData(ctx, { "ci-watcher": 1 });
+    const ciEntry = entries.find((e) => e.feature === "ci-watcher");
+    expect(ciEntry!.warning).toBeNull();
+  });
+
+  test("no warning when gate count is exactly 2 (hook + script is normal)", () => {
+    const ctx = makeContext();
+    const entries = buildListData(ctx, { "ci-watcher": 2 });
     const ciEntry = entries.find((e) => e.feature === "ci-watcher");
     expect(ciEntry!.warning).toBeNull();
   });
@@ -1046,7 +1053,7 @@ describe("formatList", () => {
         feature: "ci-watcher",
         description: "Monitor CI",
         gateCount: 3,
-        warning: "multiple gate points",
+        warning: "note: multiple gate points",
       },
     ];
     const output = formatList(entries);
@@ -1066,13 +1073,13 @@ describe("formatList", () => {
     expect(output).toContain("not gated");
   });
 
-  test("shows warning marker for multiple gates", () => {
+  test("shows note marker for multiple gates", () => {
     const entries: ListEntry[] = [
       {
         feature: "ci-watcher",
         description: "Monitor CI",
         gateCount: 3,
-        warning: "multiple gate points",
+        warning: "note: multiple gate points",
       },
     ];
     const output = formatList(entries);

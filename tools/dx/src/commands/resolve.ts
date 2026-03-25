@@ -14,7 +14,10 @@ import dx from "../../sdk";
 /**
  * Format the resolve output for human display.
  *
- * Outputs "true" or "false".
+ * Outputs "true" or "false" to stdout (not stderr). This is intentional:
+ * `dx resolve` is designed for scripting (`if dx resolve feature; then ...`),
+ * so its output goes to stdout to be capturable, unlike other human-facing
+ * commands that write to stderr.
  *
  * @param _feature Feature name (unused in human output, kept for API symmetry with formatResolveJson)
  * @param info Resolved feature info
