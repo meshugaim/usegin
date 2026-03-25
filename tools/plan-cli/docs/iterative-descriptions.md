@@ -8,16 +8,53 @@ tags: [workflow, editing]
 
 # Iterative Issue Descriptions
 
-**TL;DR**: Write to `/tmp/ENG-123.md`, update with `--description-file`, edit with Claude's Edit tool, repeat.
+**TL;DR**: `plan checkout ENG-123` → edit the file → `plan push ENG-123`. Or use `plan watch` for auto-push.
 
-## Why
+## Recommended: checkout/push workflow
 
-Long descriptions passed inline are:
-- Hard to edit collaboratively
-- Awkward in shell history
-- Can't be iteratively refined
+The file-sync commands handle the ceremony for you:
 
-The temp file pattern lets you treat descriptions like code — edit, review, refine.
+```bash
+plan checkout ENG-123          # Fetches description → /tmp/linear/ENG-123/description.md
+# ... edit with Edit tool ...
+plan push ENG-123              # Pushes changes back to Linear
+```
+
+Or for hands-free editing:
+
+```bash
+plan watch ENG-123             # Auto-pushes on every file save (2s debounce, 30m idle timeout)
+# ... edit the file, changes auto-push ...
+plan unwatch ENG-123           # Stop when done
+```
+
+### Useful commands
+
+```bash
+plan status                    # See all checkouts and their state (clean/modified)
+plan checkout ENG-123 --force  # Re-fetch from Linear (overwrites local edits)
+plan push ENG-123              # Skips if no changes (hash-based no-op detection)
+plan watch ENG-123 --timeout 1h  # Custom idle timeout
+plan unwatch --all             # Stop all watchers
+```
+
+### How it works
+
+- `checkout` writes to `/tmp/linear/ENG-XXX/description.md` with a `.meta.json` sidecar
+- `push` compares the file hash to detect changes — skips if nothing changed
+- `push` warns (but still pushes) if the issue was edited on Linear since checkout
+- `watch` spawns a background process that debounces file changes and auto-pushes
+- `status` scans the checkout directory and shows clean/modified state
+
+## Alternative: manual temp file workflow
+
+The original pattern still works for simpler cases or when you prefer explicit control:
+
+1. Write to a temp file: `cat > /tmp/ENG-123.md << 'EOF' ... EOF`
+2. Apply: `plan update ENG-123 --description-file /tmp/ENG-123.md`
+3. Edit with Claude's Edit tool
+4. Re-apply: `plan update ENG-123 --description-file /tmp/ENG-123.md`
+5. Repeat
 
 ## Works well with
 
@@ -26,59 +63,7 @@ This pattern powers several Claude skills that write iteratively:
 - `writing-skills` — skill files built collaboratively
 - `implementing-specs` — progress tracked in Linear as you go
 
-## Steps
-
-1. Write initial description to temp file (use issue ID):
-   ```bash
-   cat > /tmp/ENG-123.md << 'EOF'
-   ## Context
-   ...
-   ## Requirements
-   ...
-   EOF
-   ```
-
-2. Apply to issue:
-   ```bash
-   plan update ENG-123 --description-file /tmp/ENG-123.md
-   ```
-
-3. Review on Linear, get feedback
-
-4. Edit `/tmp/ENG-123.md` using Claude's Edit tool
-
-5. Re-apply:
-   ```bash
-   plan update ENG-123 --description-file /tmp/ENG-123.md
-   ```
-
-6. Repeat until done
-
-## Tips
-
-- Use `/tmp/<issue-id>.md` — unique per issue, no conflicts
-- The file persists until reboot, so you can refine across sessions
-- Works great for specs, detailed bug reports, feature descriptions
-- Claude can read and edit the file directly without you copy-pasting
-
-## Example Session
-
-```
-You: Let's write the description for ENG-456
-
-Claude: I'll start with a draft.
-[Writes to /tmp/ENG-456.md]
-[Runs: plan update ENG-456 --description-file /tmp/ENG-456.md]
-
-You: Add more detail about the edge cases
-
-Claude: [Edits /tmp/ENG-456.md]
-[Runs: plan update ENG-456 --description-file /tmp/ENG-456.md]
-
-You: Looks good!
-```
-
 ## See also
 
-- `plan update --help` — all update options
+- `plan checkout --help`, `plan push --help`, `plan watch --help`
 - `plan docs show adding-docs` — how to add docs like this one

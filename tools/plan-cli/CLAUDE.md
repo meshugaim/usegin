@@ -36,6 +36,16 @@ plan update <id> --blocked-by <id>
 # Search
 plan search "query"                           # Text search across issues
 plan search "query" --limit 10
+
+# File sync (description editing)
+plan checkout <id>                            # Fetch description → /tmp/linear/ENG-XXX/description.md
+plan checkout <id> --force                    # Overwrite existing checkout
+plan push <id>                                # Push local edits back to Linear
+plan status                                   # Show all checkouts (clean/modified)
+plan watch <id>                               # Auto-push on file changes (2s debounce)
+plan watch <id> --timeout 1h                  # Custom idle timeout (default: 30m)
+plan unwatch <id>                             # Stop watching
+plan unwatch --all                            # Stop all watchers
 ```
 
 Short IDs work everywhere: `plan show 365` → `plan show ENG-365`.
