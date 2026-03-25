@@ -1,6 +1,6 @@
 /**
- * CLI write commands — tests for enable/disable, identify, interactive,
- * list, and docs.
+ * CLI write commands — tests for enable/disable, reset, identify,
+ * interactive, list, and docs.
  *
  * Tests pure formatting functions (layer 1) and Commander command
  * structure (layer 2), following the three-layer architecture.
@@ -1523,6 +1523,13 @@ describe("clearLocalOverride", () => {
     const content = JSON.parse(readFileSync(localPath, "utf-8"));
     expect(content.overrides).toEqual({ autosync: false });
   });
+
+  test("no error when file does not exist", () => {
+    const localPath = join(tempDir, "nonexistent", "config.local.json");
+    expect(() => {
+      clearLocalOverride(localPath, "ci-watcher");
+    }).not.toThrow();
+  });
 });
 
 // ===========================================================================
@@ -1725,12 +1732,18 @@ describe("clearAllUserOverrides", () => {
 describe("formatResetResult", () => {
   test("all features, local", () => {
     const output = formatResetResult(null, false, null);
-    expect(output).toBe("dx: reset to defaults (local)");
+    expect(output).toBe(
+      "dx: reset to defaults (local)\n" +
+      "    To persist across environments: dx reset --save",
+    );
   });
 
   test("single feature, local", () => {
     const output = formatResetResult("ci-watcher", false, null);
-    expect(output).toBe("dx: reset ci-watcher to default (local)");
+    expect(output).toBe(
+      "dx: reset ci-watcher to default (local)\n" +
+      "    To persist across environments: dx reset ci-watcher --save",
+    );
   });
 
   test("all features, saved for user", () => {
@@ -1800,6 +1813,11 @@ describe("buildResetCommand", () => {
   test("has name 'reset'", () => {
     const cmd = buildResetCommand();
     expect(cmd.name()).toBe("reset");
+  });
+
+  test("has correct description", () => {
+    const cmd = buildResetCommand();
+    expect(cmd.description()).toBe("Reset features to defaults by clearing overrides");
   });
 
   test("accepts an optional [feature] argument", () => {

@@ -27,6 +27,10 @@ import dx from "../../sdk";
  * If the key doesn't exist, this is a no-op (file is still rewritten).
  */
 export function clearLocalOverride(localPath: string, feature: string): void {
+  if (!existsSync(localPath)) {
+    return; // Nothing to clear
+  }
+
   const raw = readFileSync(localPath, "utf-8");
   const data = JSON.parse(raw);
 
@@ -122,7 +126,17 @@ export function formatResetResult(
   const who = saved && user ? ` for ${user}` : "";
   const where = saved ? "(saved)" : "(local)";
 
-  return `dx: reset ${what}${who} ${where}`;
+  const line = `dx: reset ${what}${who} ${where}`;
+
+  if (!saved) {
+    const resetArg = feature ? `${feature} ` : "";
+    return (
+      line + "\n" +
+      `    To persist across environments: dx reset ${resetArg}--save`
+    );
+  }
+
+  return line;
 }
 
 /**
@@ -176,6 +190,14 @@ export function buildResetCommand(): Command {
     const ctx = dx.getContext();
     const user = resolveUser(ctx);
 
+    // Warn if the feature is not registered (but still proceed — unknown
+    // features default to enabled, so overrides are valid)
+    if (feature && ctx.config.features && !(feature in ctx.config.features)) {
+      process.stderr.write(
+        `dx: warning: "${feature}" is not a registered feature\n`,
+      );
+    }
+
     let saved = false;
 
     if (opts.save) {
@@ -194,7 +216,7 @@ export function buildResetCommand(): Command {
         process.stderr.write(
           "dx: cannot --save: user not identified. Run `dx identify` first.\n",
         );
-        process.stderr.write("dx: clearing local config instead.\n");
+        process.stderr.write("dx: resetting local overrides instead.\n");
       }
     }
 
