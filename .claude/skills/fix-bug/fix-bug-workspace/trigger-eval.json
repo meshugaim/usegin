@@ -1,0 +1,22 @@
+[
+  {"query": "hey so the share modal is completely broken — I click the email field and nothing happens when I type, it was working yesterday", "should_trigger": true},
+  {"query": "we're seeing intermittent failures where files show as synced but Effi can't find them in search. maybe 1 in 10 uploads", "should_trigger": true},
+  {"query": "ENG-3500 needs to be fixed, can you take a look?", "should_trigger": true},
+  {"query": "the project settings page throws an error when I try to save, it just says something went wrong", "should_trigger": true},
+  {"query": "users are complaining that deleting a file doesn't actually remove it from search results", "should_trigger": true},
+  {"query": "there's a regression in the chat — messages disappear after refresh. started after yesterday's deploy", "should_trigger": true},
+  {"query": "I noticed the sync badge is missing on some files in the files manager, not sure why", "should_trigger": true},
+  {"query": "something is off with the auth flow, I keep getting logged out randomly after about 10 minutes", "should_trigger": true},
+  {"query": "the CSV export is producing corrupt files — Excel can't open them, started happening this week", "should_trigger": true},
+  {"query": "can you investigate why the API is returning 500s on the /projects endpoint? staging is down", "should_trigger": true},
+  {"query": "let's write a spec for the new dashboard feature we discussed", "should_trigger": false},
+  {"query": "can you implement the next slice of ENG-3400? the tests are already written", "should_trigger": false},
+  {"query": "review the PR at #247 and leave comments", "should_trigger": false},
+  {"query": "I want to add a feature toggle for the new chat sidebar", "should_trigger": false},
+  {"query": "run the e2e tests against staging and tell me what passes", "should_trigger": false},
+  {"query": "let's do a retro on the session we just finished", "should_trigger": false},
+  {"query": "what does the sync worker code do? walk me through it", "should_trigger": false},
+  {"query": "can you refactor the project-files service to use the new pattern?", "should_trigger": false},
+  {"query": "deploy the latest to staging please", "should_trigger": false},
+  {"query": "write an e2e test for the file upload flow", "should_trigger": false}
+]

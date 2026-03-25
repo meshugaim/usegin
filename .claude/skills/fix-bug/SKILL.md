@@ -1,6 +1,6 @@
 ---
 name: fix-bug
-description: Investigate and fix bugs with TDD, code review, and root cause analysis. Creates bug documentation and regression tests. Use this skill whenever the user reports a bug, wants to fix a bug, asks to investigate unexpected behavior, says something is broken, or references a bug issue from Linear. Even if the user doesn't say "bug" explicitly — if they describe something that should work but doesn't, this skill applies.
+description: Investigate and fix bugs using full quality workflow (liaison, companion, TDD, independent review). Use this skill for ANY of: user reports something broken or not working ("X is broken", "X doesn't work", "X stopped working"), unexpected errors or failures ("getting 500s", "throws an error", "fails intermittently"), regressions ("was working yesterday", "broke after deploy"), user references a bug issue ("ENG-XXXX needs fixing", "can you fix"), investigating why something behaves wrong ("why is X returning Y", "users see wrong data"), missing or incorrect UI behavior ("button doesn't respond", "shows wrong state", "data not showing up"). Trigger even when "bug" isn't said — broken behavior = this skill. Do NOT trigger for: feature requests, spec writing, code review of PRs, refactoring, test writing, deployments, retros, or code explanation.
 ---
 
 # Fix Bug
