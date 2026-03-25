@@ -23,9 +23,9 @@ plan push ENG-123              # Pushes changes back to Linear
 Or for hands-free editing:
 
 ```bash
-plan watch ENG-123             # Auto-pushes on every file save (2s debounce, 30m idle timeout)
+plan watch ENG-123             # Checks out if needed, then auto-pushes on save (30m idle timeout)
 # ... edit the file, changes auto-push ...
-plan unwatch ENG-123           # Stop when done
+plan unwatch ENG-123           # Flushes pending changes, then stops
 ```
 
 ### Useful commands
@@ -35,6 +35,7 @@ plan status                    # See all checkouts and their state (clean/modifi
 plan checkout ENG-123 --force  # Re-fetch from Linear (overwrites local edits)
 plan push ENG-123              # Skips if no changes (hash-based no-op detection)
 plan watch ENG-123 --timeout 1h  # Custom idle timeout
+plan watch ENG-123 --timeout none  # No idle timeout
 plan unwatch --all             # Stop all watchers
 ```
 
@@ -42,7 +43,7 @@ plan unwatch --all             # Stop all watchers
 
 - `checkout` writes to `/tmp/linear/ENG-XXX/description.md` with a `.meta.json` sidecar
 - `push` compares the file hash to detect changes — skips if nothing changed
-- `push` warns (but still pushes) if the issue was edited on Linear since checkout
+- `push` warns (but still pushes) if the issue was updated on Linear since checkout (any change — description, status, labels, comments)
 - `watch` spawns a background process that debounces file changes and auto-pushes
 - `status` scans the checkout directory and shows clean/modified state
 

@@ -40,13 +40,15 @@ plan search "query" --limit 10
 # File sync (description editing)
 plan checkout <id>                            # Fetch description → /tmp/linear/ENG-XXX/description.md
 plan checkout <id> --force                    # Overwrite existing checkout
-plan push <id>                                # Push local edits back to Linear
+plan push <id>                                # Push local edits back to Linear (skips if unchanged)
 plan status                                   # Show all checkouts (clean/modified)
-plan watch <id>                               # Auto-push on file changes (2s debounce)
-plan watch <id> --timeout 1h                  # Custom idle timeout (default: 30m)
+plan watch <id>                               # Auto-push on file changes (implicit checkout, 2s debounce)
+plan watch <id> --timeout 1h                  # Custom idle timeout (default: 30m, "none" to disable)
 plan unwatch <id>                             # Stop watching
 plan unwatch --all                            # Stop all watchers
 ```
+
+All file-sync commands support `--json` and `--quiet`. `checkout` and `push` also support `--stats`.
 
 Short IDs work everywhere: `plan show 365` → `plan show ENG-365`.
 
@@ -63,6 +65,8 @@ By default, `plan list` auto-detects the best output format:
 7. Otherwise → human table
 
 Agents get JSON automatically when running as sub-agents (no TTY + `CLAUDECODE=1`). Humans running `plan list` interactively inside Claude Code get the human table because the TTY check takes priority.
+
+`PLAN_CHECKOUT_DIR` overrides the default checkout directory (`/tmp/linear/`). Useful for test isolation or custom organization.
 
 ## Pagination (JSON only)
 
@@ -88,5 +92,5 @@ The response includes a `pagination` envelope:
 | Tempting | Reality |
 |---|---|
 | `--sort` | Use `--latest` or `--active` |
-| `--all` | Use `--show-done` for done sub-issues |
+| `--all` on `list` | Use `--show-done` for done sub-issues |
 | `--count` | Not available |
