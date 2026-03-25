@@ -17,6 +17,8 @@ import { createSearchCommand } from "./commands/search";
 import { createCheckoutCommand } from "./commands/checkout";
 import { createPushCommand } from "./commands/push";
 import { createStatusCommand } from "./commands/status";
+import { createWatchCommand } from "./commands/watch";
+import { createUnwatchCommand } from "./commands/unwatch";
 import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
 
@@ -56,6 +58,8 @@ program.addCommand(createSearchCommand());
 program.addCommand(createCheckoutCommand());
 program.addCommand(createPushCommand());
 program.addCommand(createStatusCommand());
+program.addCommand(createWatchCommand());
+program.addCommand(createUnwatchCommand());
 
 // Apply standard aliases (list→ls, show→get, search→find, create→new)
 // before parsing so aliases are available during command resolution.

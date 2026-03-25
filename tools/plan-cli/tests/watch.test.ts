@@ -77,7 +77,7 @@ function readRawMeta(issueDir: string): Record<string, unknown> | null {
 
 describe("plan watch command", () => {
   describe("CLI parsing", () => {
-    test.failing(
+    test(
       "ENG-3493: shows watch help with --timeout flag",
       async () => {
         const proc = Bun.spawn(["bun", CLI_PATH, "watch", "--help"], {
@@ -95,7 +95,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: requires an identifier argument",
       async () => {
         const proc = Bun.spawn(["bun", CLI_PATH, "watch"], {
@@ -112,7 +112,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: shows unwatch help",
       async () => {
         const proc = Bun.spawn(["bun", CLI_PATH, "unwatch", "--help"], {
@@ -136,7 +136,7 @@ describe("plan watch command", () => {
       return mod.parseDuration;
     }
 
-    test.failing(
+    test(
       "ENG-3493: parses '10m' to 600000ms",
       async () => {
         const parseDuration = await getDurationParser();
@@ -144,7 +144,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: parses '1h' to 3600000ms",
       async () => {
         const parseDuration = await getDurationParser();
@@ -152,7 +152,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: parses '30m' to 1800000ms (default timeout)",
       async () => {
         const parseDuration = await getDurationParser();
@@ -160,7 +160,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: parses 'none' to null or Infinity",
       async () => {
         const parseDuration = await getDurationParser();
@@ -172,7 +172,7 @@ describe("plan watch command", () => {
   });
 
   describe("watch behavior", () => {
-    test.failing(
+    test(
       "ENG-3493: spawns a process and writes PID to .meta.json",
       async () => {
         const description = "Description for watch test";
@@ -198,7 +198,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: watch with --timeout flag passes timeout to watcher",
       async () => {
         const description = "Description for timeout test";
@@ -225,7 +225,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: exits with code 2 on missing LINEAR_API_KEY",
       async () => {
         const description = "Description for api key test";
@@ -246,7 +246,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: implicitly checks out if not already checked out",
       async () => {
         // No setupCheckout — directory doesn't exist yet
@@ -278,7 +278,7 @@ describe("plan watch command", () => {
   });
 
   describe("watch output", () => {
-    test.failing(
+    test(
       "ENG-3493: human output contains 'Watching' and default timeout",
       async () => {
         const description = "Description for output test";
@@ -305,7 +305,7 @@ describe("plan watch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: JSON output contains identifier, pid, and timeout",
       async () => {
         const description = "Description for JSON output test";
@@ -340,7 +340,7 @@ describe("plan watch command", () => {
 
 describe("plan unwatch command", () => {
   describe("unwatch behavior", () => {
-    test.failing(
+    test(
       "ENG-3493: clears watcherPid from .meta.json",
       async () => {
         // Set up a checkout with a fake watcherPid
@@ -370,7 +370,7 @@ describe("plan unwatch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: exits 0 with message when not watching",
       async () => {
         // Set up a checkout without a watcherPid
@@ -397,7 +397,7 @@ describe("plan unwatch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: --all clears all watcher PIDs",
       async () => {
         // Set up multiple checkouts with fake watcherPids
@@ -429,7 +429,7 @@ describe("plan unwatch command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3493: JSON output contains identifier and stopped flag",
       async () => {
         setupCheckout("ENG-3493", "Description for JSON unwatch", {
@@ -461,7 +461,7 @@ describe("plan unwatch command", () => {
   });
 
   describe("unwatch output", () => {
-    test.failing(
+    test(
       "ENG-3493: human output contains 'Stopped watching'",
       async () => {
         setupCheckout("ENG-3493", "Description for human unwatch output", {

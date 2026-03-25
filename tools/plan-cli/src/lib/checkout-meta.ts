@@ -11,6 +11,7 @@ export interface CheckoutMeta {
   fetchedAt: string;
   descriptionHash: string;
   pushedAt?: string;
+  watcherPid?: number;
 }
 
 /**
