@@ -42,7 +42,7 @@ import {
 // --- List pure functions ---
 import {
   buildListData,
-  grepGateCounts,
+  parseGrepOutput,
   buildGatePattern,
   formatList,
   formatListJson,
@@ -1170,33 +1170,57 @@ describe("buildGatePattern", () => {
 });
 
 // ===========================================================================
-// grepGateCounts — grep the codebase for gate patterns
+// parseGrepOutput — parse grep stdout into per-feature counts
 // ===========================================================================
 
-describe("grepGateCounts", () => {
-  test(
-    "returns a record with a number for each feature",
-    () => {
-      const results = grepGateCounts(["ci-watcher", "autosync"]);
-      expect(typeof results).toBe("object");
-      expect(typeof results["ci-watcher"]).toBe("number");
-      expect(typeof results["autosync"]).toBe("number");
-    },
-    15000,
-  );
+describe("parseGrepOutput", () => {
+  test("counts occurrences of each feature in grep output", () => {
+    const output = [
+      'scripts/ci.sh:if dx resolve ci-watcher --exit-code; then',
+      'nextjs-app/src/hooks.ts:if (dx.isEnabled("autosync")) {',
+      '.husky/pre-push:dx resolve ci-watcher',
+    ].join("\n");
 
-  test(
-    "returns 0 for a feature name that does not exist in the codebase",
-    () => {
-      const results = grepGateCounts(["zzz-nonexistent-feature-xyz-12345"]);
-      expect(results["zzz-nonexistent-feature-xyz-12345"]).toBe(0);
-    },
-    15000,
-  );
+    const results = parseGrepOutput(output, ["ci-watcher", "autosync"]);
+    expect(results["ci-watcher"]).toBe(2);
+    expect(results["autosync"]).toBe(1);
+  });
 
-  test("handles empty feature list without crashing", () => {
-    const results = grepGateCounts([]);
+  test("returns 0 for all features when output is empty", () => {
+    const results = parseGrepOutput("", ["ci-watcher", "autosync"]);
+    expect(results["ci-watcher"]).toBe(0);
+    expect(results["autosync"]).toBe(0);
+  });
+
+  test("counts multiple matches for one feature correctly", () => {
+    const output = [
+      'scripts/ci.sh:dx resolve ci-watcher',
+      '.husky/pre-push:dx resolve ci-watcher --exit-code',
+      'nextjs-app/src/app.ts:if (dx.isEnabled("ci-watcher")) {',
+    ].join("\n");
+
+    const results = parseGrepOutput(output, ["ci-watcher", "autosync"]);
+    expect(results["ci-watcher"]).toBe(3);
+    expect(results["autosync"]).toBe(0);
+  });
+
+  test("handles empty feature list", () => {
+    const results = parseGrepOutput("some output", []);
     expect(results).toEqual({});
+  });
+
+  test("handles whitespace-only output", () => {
+    const results = parseGrepOutput("   \n  \n", ["ci-watcher"]);
+    expect(results["ci-watcher"]).toBe(0);
+  });
+
+  test("increments both features when a line mentions multiple", () => {
+    const output =
+      'scripts/migrate.sh:dx resolve ci-watcher && dx resolve autosync';
+
+    const results = parseGrepOutput(output, ["ci-watcher", "autosync"]);
+    expect(results["ci-watcher"]).toBe(1);
+    expect(results["autosync"]).toBe(1);
   });
 });
 

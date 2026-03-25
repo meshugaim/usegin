@@ -71,6 +71,40 @@ export function buildGatePattern(feature: string): string {
 }
 
 /**
+ * Parse raw grep output and tally occurrences per feature.
+ *
+ * Pure function: takes the raw stdout from a grep call and a list of
+ * feature names, returns a map of feature name -> matching line count.
+ * Each line is checked against all features, so a line mentioning
+ * multiple features increments both counters.
+ */
+export function parseGrepOutput(
+  output: string,
+  features: string[],
+): Record<string, number> {
+  const results: Record<string, number> = {};
+
+  for (const feature of features) {
+    results[feature] = 0;
+  }
+
+  if (!output.trim()) {
+    return results;
+  }
+
+  for (const line of output.trim().split("\n")) {
+    if (!line) continue;
+    for (const feature of features) {
+      if (line.includes(feature)) {
+        results[feature]++;
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
  * Grep the codebase for actual dx gate patterns per feature.
  *
  * For each feature, searches for SDK calls (`isEnabled`, `getFeature`),
@@ -84,15 +118,8 @@ export function buildGatePattern(feature: string): string {
  * Returns a map of feature name to matching line count.
  */
 export function grepGateCounts(features: string[]): Record<string, number> {
-  const results: Record<string, number> = {};
-
-  // Initialize all features to 0
-  for (const feature of features) {
-    results[feature] = 0;
-  }
-
   if (features.length === 0) {
-    return results;
+    return {};
   }
 
   // Build a single combined pattern that matches any feature.
@@ -133,20 +160,8 @@ export function grepGateCounts(features: string[]): Record<string, number> {
     { encoding: "utf-8", cwd: process.cwd() },
   );
 
-  if (result.status === 0 && result.stdout) {
-    for (const line of result.stdout.trim().split("\n")) {
-      if (!line) continue;
-      // Each matching line may reference one or more features.
-      // Check which feature(s) this line matches.
-      for (const feature of features) {
-        if (line.includes(feature)) {
-          results[feature]++;
-        }
-      }
-    }
-  }
-
-  return results;
+  const stdout = result.status === 0 ? (result.stdout ?? "") : "";
+  return parseGrepOutput(stdout, features);
 }
 
 /** Escape special regex characters in a string. */
