@@ -44,6 +44,7 @@ import {
 import {
   buildListData,
   parseGrepOutput,
+  grepGateCounts,
   buildGatePattern,
   formatList,
   formatListJson,
@@ -1280,6 +1281,46 @@ describe("parseGrepOutput", () => {
     const results = parseGrepOutput(output, ["ci-watcher", "autosync"]);
     expect(results["ci-watcher"]).toBe(1);
     expect(results["autosync"]).toBe(1);
+  });
+
+  test("does not count lines from tools/dx/ (own code)", () => {
+    const output = [
+      // Real gate (should count)
+      '.claude/hooks/spawn-ci-watcher-after-push.ts:  if (!dx.isEnabled("ci-watcher")) process.exit(0);',
+      // Test file in tools/dx (should NOT count — it's the dx tool testing itself)
+      'tools/dx/src/core.test.ts:    expect(isEnabled("ci-watcher", ctx, null)).toBe(true);',
+      'tools/dx/src/core.test.ts:    expect(isEnabled("ci-watcher", ctx, "nitsan")).toBe(false);',
+      // SDK comment (should NOT count)
+      'tools/dx/sdk.ts: *   dx.isEnabled("ci-watcher")  // → boolean',
+      // Write-commands test fixture (should NOT count)
+      'tools/dx/src/commands/write-commands.test.ts:    expect(regex.test(\'if (dx.isEnabled("ci-watcher"))\'))',
+    ].join("\n");
+
+    const results = parseGrepOutput(output, ["ci-watcher"]);
+    expect(results["ci-watcher"]).toBe(1); // Only the real gate
+  });
+});
+
+// ===========================================================================
+// grepGateCounts — integration smoke test
+// ===========================================================================
+
+describe("grepGateCounts", () => {
+  test("returns reasonable counts not inflated by own tests", () => {
+    // grepGateCounts searches relative to cwd. In the monorepo, it must
+    // run from the repo root so the search dirs (.claude/, tools/, etc.) resolve.
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(join(__dirname, "../../../.."));
+
+      // ci-watcher has exactly 1 real gate: .claude/hooks/spawn-ci-watcher-after-push.ts
+      // If this returns >5, the --exclude-dir flag is broken (grep's --exclude-dir
+      // matches directory *names* not paths, so "tools/dx" doesn't exclude anything).
+      const results = grepGateCounts(["ci-watcher"]);
+      expect(results["ci-watcher"]).toBeLessThanOrEqual(5);
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 });
 
