@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { existsSync, openSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+import { existsSync, openSync, closeSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 import { normalizeIssueId } from "../lib/identifier";
 import { shouldDefaultToJson } from "../lib/output-mode";
@@ -82,6 +82,9 @@ async function runWatch(
     }
   );
 
+  // FD was dup'd into the child — close our copy to avoid leaking it.
+  closeSync(logFd);
+
   const pid = child.pid;
 
   // Unref so parent can exit immediately
@@ -112,6 +115,8 @@ async function runWatch(
         2
       )
     );
+  } else if (timeoutStr === "none") {
+    console.log(`Watching ${identifier} — no idle timeout`);
   } else {
     console.log(
       `Watching ${identifier} — will auto-stop after ${timeoutStr} idle`

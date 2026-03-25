@@ -5,7 +5,7 @@
  * Watches `description.md` for changes, debounces writes, and pushes
  * the description to Linear. Exits after an idle timeout.
  *
- * Invocation:  bun watcher.ts <issueDir> <identifier> <timeoutMs> <apiKey> <checkoutDir>
+ * Invocation:  bun watcher.ts <issueDir> <identifier> <timeoutMs> <apiKey>
  *   - timeoutMs: "0" means no idle timeout
  */
 
@@ -116,11 +116,10 @@ try {
   // Graceful shutdown
   process.on("SIGTERM", async () => {
     log("Received SIGTERM — pushing pending changes and exiting");
+    if (idleTimer) clearTimeout(idleTimer);
+    if (debounceTimer) clearTimeout(debounceTimer);
     watcher.close();
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      await pushDescription();
-    }
+    await pushDescription();
     log("Watcher exiting (SIGTERM)");
     process.exit(0);
   });
