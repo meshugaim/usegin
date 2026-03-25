@@ -45,89 +45,99 @@ async function runPush(
     process.exit(1);
   }
 
-  // Read the local description file
-  const descPath = join(issueDir, "description.md");
-  const description = readFileSync(descPath, "utf-8");
-
-  // Check if there are changes to push
-  const currentHash = hashDescription(description);
-  if (currentHash === meta.descriptionHash) {
-    if (!opts.quiet) {
-      console.error(`No changes to push for ${identifier}`);
-    }
-    process.exit(0);
-  }
-
-  // Need API key for pushing
-  const apiKey = process.env.LINEAR_API_KEY;
-  if (!apiKey) {
-    console.error("Error: LINEAR_API_KEY environment variable is required");
-    console.error("Get your API key from: https://linear.app/settings/api");
-    process.exit(2);
-  }
-
-  const client = new LinearClient({ apiKey });
-
-  // Check staleness: fetch the issue and compare updatedAt to fetchedAt
-  let stale = false;
   try {
-    const issue = await client.getIssueByIdentifier(identifier);
-    if (issue && issue.updatedAt) {
-      const remoteUpdatedAt = new Date(issue.updatedAt).getTime();
-      const localFetchedAt = new Date(meta.fetchedAt).getTime();
-      if (remoteUpdatedAt > localFetchedAt) {
-        stale = true;
-        console.error(
-          `Warning: ${identifier} has been updated on Linear since your checkout. Pushing anyway.`
+    // Read the local description file
+    const descPath = join(issueDir, "description.md");
+    const description = readFileSync(descPath, "utf-8");
+
+    // Check if there are changes to push
+    const currentHash = hashDescription(description);
+    if (currentHash === meta.descriptionHash) {
+      if (!opts.quiet) {
+        console.error(`No changes to push for ${identifier}`);
+      }
+      process.exit(0);
+    }
+
+    // Need API key for pushing
+    const apiKey = process.env.LINEAR_API_KEY;
+    if (!apiKey) {
+      console.error("Error: LINEAR_API_KEY environment variable is required");
+      console.error("Get your API key from: https://linear.app/settings/api");
+      process.exit(2);
+    }
+
+    const client = new LinearClient({ apiKey });
+
+    // Check staleness: fetch the issue and compare updatedAt to fetchedAt
+    let stale = false;
+    try {
+      const issue = await client.getIssueByIdentifier(identifier);
+      if (issue && issue.updatedAt) {
+        const remoteUpdatedAt = new Date(issue.updatedAt).getTime();
+        const localFetchedAt = new Date(meta.fetchedAt).getTime();
+        if (remoteUpdatedAt > localFetchedAt) {
+          stale = true;
+          console.error(
+            `Warning: ${identifier} has been updated on Linear since your checkout. Pushing anyway.`
+          );
+        }
+      }
+    } catch {
+      // If we can't fetch the issue for staleness check, proceed anyway
+    }
+
+    // Push the description to Linear
+    await client.updateIssue(identifier, { description });
+
+    // Update meta with new hash and pushedAt
+    const pushedAt = new Date().toISOString();
+    writeCheckoutMeta(issueDir, {
+      ...meta,
+      descriptionHash: currentHash,
+      fetchedAt: pushedAt, // Reset fetchedAt to avoid false staleness on next push
+      pushedAt,
+    });
+
+    const bytes = Buffer.byteLength(description, "utf-8");
+
+    // Output
+    if (opts.quiet) {
+      // No output
+    } else {
+      const useJson = shouldDefaultToJson({
+        json: opts.json,
+        env: process.env,
+        isTTY: process.stdout.isTTY,
+      });
+
+      if (useJson) {
+        console.log(
+          JSON.stringify(
+            {
+              identifier,
+              bytes,
+              stale,
+              pushedAt,
+            },
+            null,
+            2
+          )
+        );
+      } else {
+        console.log(
+          `Pushed ${identifier} description (${bytes} bytes)`
         );
       }
     }
-  } catch {
-    // If we can't fetch the issue for staleness check, proceed anyway
-  }
 
-  // Push the description to Linear
-  await client.updateIssue(identifier, { description });
-
-  // Update meta with new hash and pushedAt
-  const pushedAt = new Date().toISOString();
-  writeCheckoutMeta(issueDir, {
-    ...meta,
-    descriptionHash: currentHash,
-    pushedAt,
-  });
-
-  const bytes = Buffer.byteLength(description, "utf-8");
-
-  // Output
-  if (opts.quiet) {
-    // No output
-  } else {
-    const useJson = shouldDefaultToJson({
-      json: opts.json,
-      env: process.env,
-      isTTY: process.stdout.isTTY,
-    });
-
-    if (useJson) {
-      console.log(
-        JSON.stringify(
-          {
-            identifier,
-            bytes,
-            stale,
-            pushedAt,
-          },
-          null,
-          2
-        )
-      );
+    printApiStats(client.apiCallCount, opts.stats ?? false);
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`Error: ${error.message}`);
     } else {
-      console.log(
-        `Pushed ${identifier} description (${bytes} bytes)`
-      );
+      console.error("An unknown error occurred");
     }
+    process.exit(1);
   }
-
-  printApiStats(client.apiCallCount, opts.stats ?? false);
 }
