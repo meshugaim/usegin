@@ -10,6 +10,7 @@ export interface CheckoutMeta {
   id: string;
   fetchedAt: string;
   descriptionHash: string;
+  pushedAt?: string;
 }
 
 /**

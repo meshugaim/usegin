@@ -51,7 +51,7 @@ function setupCheckout(
 
 describe("plan push command", () => {
   describe("CLI parsing", () => {
-    test.failing("ENG-3491: shows help with --help flag", async () => {
+    test("ENG-3491: shows help with --help flag", async () => {
       const proc = Bun.spawn(["bun", CLI_PATH, "push", "--help"], {
         env: process.env,
         stdout: "pipe",
@@ -67,7 +67,7 @@ describe("plan push command", () => {
       expect(stdout).toContain("--quiet");
     });
 
-    test.failing(
+    test(
       "ENG-3491: requires an issue identifier argument",
       async () => {
         const proc = Bun.spawn(["bun", CLI_PATH, "push"], {
@@ -87,7 +87,7 @@ describe("plan push command", () => {
   });
 
   describe("core behavior", () => {
-    test.failing(
+    test(
       "ENG-3491: pushes updated description and reports success",
       async () => {
         // Set up a checkout with one description, then modify the file
@@ -120,7 +120,7 @@ describe("plan push command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3491: skips push when file hash matches .meta.json descriptionHash (no-op)",
       async () => {
         // Set up a checkout where the file content matches the hash — no changes
@@ -148,7 +148,7 @@ describe("plan push command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3491: updates .meta.json with new descriptionHash and pushedAt after push",
       async () => {
         const original = "Original content before edit";
@@ -190,7 +190,7 @@ describe("plan push command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3491: errors when no checkout exists for the issue",
       async () => {
         // No setup — directory doesn't exist
@@ -216,7 +216,7 @@ describe("plan push command", () => {
   });
 
   describe("staleness warning", () => {
-    test.failing(
+    test(
       "ENG-3491: warns on stderr when issue was updated after checkout",
       async () => {
         // Set up a checkout with a very old fetchedAt to trigger the staleness warning
@@ -248,7 +248,7 @@ describe("plan push command", () => {
   });
 
   describe("error handling", () => {
-    test.failing(
+    test(
       "ENG-3491: exits with code 2 on missing LINEAR_API_KEY",
       async () => {
         // Set up a checkout so we get past the "no checkout" check
@@ -271,7 +271,7 @@ describe("plan push command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3491: exits with code 1 when checkout directory exists but .meta.json is missing",
       async () => {
         // Directory exists with description.md but no .meta.json — corrupted checkout
@@ -302,7 +302,7 @@ describe("plan push command", () => {
   });
 
   describe("output", () => {
-    test.failing(
+    test(
       "ENG-3491: JSON output contains identifier, bytes, stale, and pushedAt",
       async () => {
         const description = "Original for JSON output test";
@@ -338,7 +338,7 @@ describe("plan push command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3491: human output contains 'Pushed' and byte count",
       async () => {
         const description = "Original for human output test";
@@ -369,7 +369,7 @@ describe("plan push command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3491: --quiet flag suppresses stdout output",
       async () => {
         const description = "Original for quiet test";
@@ -399,7 +399,7 @@ describe("plan push command", () => {
   });
 
   describe("identifier normalization", () => {
-    test.failing(
+    test(
       "ENG-3491: numeric ID '3490' resolves to ENG-3490 checkout directory",
       async () => {
         // Set up checkout under the normalized name ENG-3490
