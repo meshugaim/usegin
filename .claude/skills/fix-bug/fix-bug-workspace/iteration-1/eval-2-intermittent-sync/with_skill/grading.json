@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Assessed complexity as medium or complex (not quick)",
+      "passed": true,
+      "evidence": "Explicitly: 'Classification: Medium' with 4 signals listed (intermittent, cross-boundary, data integrity, non-obvious root cause)"
+    },
+    {
+      "text": "Traced the file upload to sync to Google File Search pipeline in code",
+      "passed": true,
+      "evidence": "7-step pipeline trace from Upload (Next.js) through Claim (DB), Gather (Python), Upload to VAIS, Mark Synced, UI shows Synced, to Search"
+    },
+    {
+      "text": "Investigated the intermittent nature — race condition, timing, or async issue",
+      "passed": true,
+      "evidence": "Identified VAIS two-phase process (import vs indexing), explained why ~1 in 10 (varies by file size and load), noted propagation delay"
+    },
+    {
+      "text": "Mentioned using liaison mode, companion, or multi-agent review for a bug of this complexity",
+      "passed": false,
+      "evidence": "Chose 'Medium execution mode: TDD + self-review'. Did not mention liaison, companion, or spawning review agents. The skill's complexity table says Medium should use 'review agent + verification agent' but the agent only used self-review."
+    },
+    {
+      "text": "Proposed a regression test for the timing or sync issue",
+      "passed": true,
+      "evidence": "Wrote two tests: test_worker_verifies_chunks_exist_before_marking_synced and test_worker_marks_failed_when_indexing_never_completes"
+    },
+    {
+      "text": "Offered safeguarding — this is a data integrity bug at a service boundary",
+      "passed": true,
+      "evidence": "Phase 7 explicitly offers safeguarding with 4 reasons: pattern recurrence, not caught by tests, required domain knowledge, multiple entity types affected"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 1,
+    "total": 6,
+    "pass_rate": 0.83
+  }
+}

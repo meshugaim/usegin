@@ -1,0 +1,190 @@
+{
+  "metadata": {
+    "skill_name": "fix-bug",
+    "skill_path": "/workspaces/test-mvp/.claude/skills/fix-bug",
+    "executor_model": "claude-opus-4-6",
+    "analyzer_model": "claude-opus-4-6",
+    "timestamp": "2026-03-25T17:00:00Z",
+    "evals_run": [1, 2, 3],
+    "runs_per_configuration": 1
+  },
+
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "Share Modal Input (medium bug)",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 916.9,
+        "tokens": 96777,
+        "tool_calls": 88,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Checked recent git history for share modal files", "passed": true, "evidence": "Used git log --since=14d, found 2 relevant commits"},
+        {"text": "Read actual share modal component code before fixing", "passed": true, "evidence": "Read 15+ files including ShareChatModal, ShareProjectSection, ProjectCollaborators"},
+        {"text": "Articulated root cause before writing fix", "passed": true, "evidence": "Structured root cause statement with why-it-exists and blast-radius"},
+        {"text": "Wrote regression test that catches the bug", "passed": true, "evidence": "4 tests including critical post-Select-interaction typing test"},
+        {"text": "Performed code review step", "passed": true, "evidence": "Self-review with 4 skeptic questions"},
+        {"text": "Mentioned running full test suite", "passed": true, "evidence": "Listed bun test commands for full suite"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "Share Modal Input (medium bug)",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 1303.9,
+        "tokens": 2176,
+        "tool_calls": 113,
+        "errors": 1
+      },
+      "expectations": [
+        {"text": "Checked recent git history for share modal files", "passed": false, "evidence": "Agent hit 500 error before writing transcript — no output to evaluate"},
+        {"text": "Read actual share modal component code before fixing", "passed": false, "evidence": "Agent hit 500 error before writing transcript"},
+        {"text": "Articulated root cause before writing fix", "passed": false, "evidence": "Agent hit 500 error before writing transcript"},
+        {"text": "Wrote regression test that catches the bug", "passed": false, "evidence": "Agent hit 500 error before writing transcript"},
+        {"text": "Performed code review step", "passed": false, "evidence": "Agent hit 500 error before writing transcript"},
+        {"text": "Mentioned running full test suite", "passed": false, "evidence": "Agent hit 500 error before writing transcript"}
+      ],
+      "notes": ["Baseline agent hit API 500 error after 21min/113 tool calls. Re-spawned, waiting for retry."]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Intermittent Sync (complex bug)",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.83,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 731.4,
+        "tokens": 155202,
+        "tool_calls": 79,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Assessed complexity as medium or complex", "passed": true, "evidence": "Explicitly classified as Medium with 4 signals"},
+        {"text": "Traced upload-to-search pipeline", "passed": true, "evidence": "7-step pipeline trace across services"},
+        {"text": "Investigated intermittent nature (timing/race)", "passed": true, "evidence": "Identified VAIS two-phase process and propagation delay"},
+        {"text": "Mentioned liaison/companion/multi-agent review", "passed": false, "evidence": "Used self-review instead of spawning review agent as skill recommends for medium bugs"},
+        {"text": "Proposed regression test for sync issue", "passed": true, "evidence": "Two tests: verify-before-synced and timeout-marks-failed"},
+        {"text": "Offered safeguarding", "passed": true, "evidence": "Explicit offer with 4 reasons (pattern recurrence, not caught by tests, domain knowledge, multiple entity types)"}
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Intermittent Sync (complex bug)",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.50,
+        "passed": 3,
+        "failed": 3,
+        "total": 6,
+        "time_seconds": 641.1,
+        "tokens": 144023,
+        "tool_calls": 69,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Assessed complexity as medium or complex", "passed": false, "evidence": "No explicit complexity assessment or execution mode decision"},
+        {"text": "Traced upload-to-search pipeline", "passed": true, "evidence": "Detailed 7-step pipeline trace"},
+        {"text": "Investigated intermittent nature (timing/race)", "passed": true, "evidence": "Found indexing latency experiment with ~33s delay measurement"},
+        {"text": "Mentioned liaison/companion/multi-agent review", "passed": false, "evidence": "No mention of any orchestration patterns"},
+        {"text": "Proposed regression test for sync issue", "passed": true, "evidence": "6 test classes covering immediate, delayed, timeout, error, and failure scenarios"},
+        {"text": "Offered safeguarding", "passed": false, "evidence": "Listed follow-ups (monitoring, docs) but no safeguarding offer"}
+      ],
+      "notes": ["Baseline found the pre-existing experiment measuring the exact gap — impressive investigation depth without the skill"]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Typo Fix (quick bug)",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 359.6,
+        "tokens": 59031,
+        "tool_calls": 45,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Assessed complexity as quick", "passed": true, "evidence": "Explicitly: 'Level: Quick'"},
+        {"text": "Did NOT use liaison/companion/multi-agent", "passed": true, "evidence": "Direct investigation only"},
+        {"text": "Searched for other typo instances", "passed": true, "evidence": "Full codebase search for 'occured' case-insensitive, 25+ correct instances confirmed"},
+        {"text": "Fixed directly and proportionally", "passed": true, "evidence": "Correctly identified bug doesn't exist, asked for repro steps instead of fabricating a fix"},
+        {"text": "Skipped/minimized bug doc", "passed": true, "evidence": "Explicitly skipped: 'bug could not be reproduced'"},
+        {"text": "Did NOT offer safeguarding", "passed": true, "evidence": "Explicitly declined with 4 reasons"}
+      ],
+      "notes": ["Key win: correctly identified the bug doesn't exist and asked for repro steps instead of making unnecessary changes"]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Typo Fix (quick bug)",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.83,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 500.3,
+        "tokens": 72048,
+        "tool_calls": 61,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "Assessed complexity as quick", "passed": true, "evidence": "Explicitly: 'Quick fix'"},
+        {"text": "Did NOT use liaison/companion/multi-agent", "passed": true, "evidence": "Direct fix"},
+        {"text": "Searched for other typo instances", "passed": true, "evidence": "Searched for 'occured' broadly"},
+        {"text": "Fixed directly and proportionally", "passed": false, "evidence": "Changed error message from 'Failed to update project name' to 'An error occurred while saving project settings.' — unnecessary code change for a non-existent bug"},
+        {"text": "Skipped/minimized bug doc", "passed": true, "evidence": "'No documentation needed'"},
+        {"text": "Did NOT offer safeguarding", "passed": true, "evidence": "'Not a pattern that needs safeguarding'"}
+      ],
+      "notes": ["Key difference: baseline fabricated a fix for a non-existent bug by changing the error message"]
+    }
+  ],
+
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {"mean": 0.94, "stddev": 0.10, "min": 0.83, "max": 1.0},
+      "time_seconds": {"mean": 669.3, "stddev": 280.0, "min": 359.6, "max": 916.9},
+      "tokens": {"mean": 103670, "stddev": 48200, "min": 59031, "max": 155202}
+    },
+    "without_skill": {
+      "pass_rate": {"mean": 0.44, "stddev": 0.42, "min": 0.0, "max": 0.83},
+      "time_seconds": {"mean": 815.1, "stddev": 419.0, "min": 500.3, "max": 1303.9},
+      "tokens": {"mean": 72749, "stddev": 71100, "min": 2176, "max": 144023}
+    },
+    "delta": {
+      "pass_rate": "+0.50",
+      "time_seconds": "-145.8",
+      "tokens": "+30921"
+    }
+  },
+
+  "notes": [
+    "Eval 1 baseline hit API 500 error — scored 0/6 due to no output. Retry running. Excluding from summary would change baseline mean to 0.67.",
+    "Both with-skill and baseline found the same root cause for eval 2 (VAIS indexing latency). The skill's value-add was structured phases, safeguarding offer, and bug documentation.",
+    "Eval 3 strongest differentiator: with-skill correctly identified bug doesn't exist and asked for repro. Baseline fabricated a fix, changing production code unnecessarily.",
+    "The 'mentioned liaison/companion' assertion failed for eval 2 with-skill. The skill says medium bugs should use 'review agent + verification agent' but the agent chose self-review. Consider making this guidance stronger or removing it as an assertion.",
+    "With-skill uses more tokens (+30k avg) but produces more structured, higher-quality output with bug docs, safeguarding offers, and explicit phase tracking."
+  ]
+}

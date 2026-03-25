@@ -1,0 +1,13 @@
+{
+  "eval_id": 2,
+  "eval_name": "intermittent-sync",
+  "prompt": "We're getting reports from users that sometimes when they upload a file to a project, the file shows as 'synced' in the UI but Effi (the AI agent) can't actually find it when searching. It's intermittent — maybe 1 in 10 uploads. ENG-3500 has the details.",
+  "assertions": [
+    "Assessed complexity as medium or complex (not quick)",
+    "Traced the file upload to sync to Google File Search pipeline in code",
+    "Investigated the intermittent nature — race condition, timing, or async issue",
+    "Mentioned using liaison mode, companion, or multi-agent review for a bug of this complexity",
+    "Proposed a regression test for the timing or sync issue",
+    "Offered safeguarding — this is a data integrity bug at a service boundary"
+  ]
+}

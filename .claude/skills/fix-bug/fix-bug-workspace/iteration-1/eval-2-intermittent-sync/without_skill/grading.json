@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Assessed complexity as medium or complex (not quick)",
+      "passed": false,
+      "evidence": "No explicit complexity assessment. The depth of investigation implies medium/complex but there's no stated classification or execution mode decision."
+    },
+    {
+      "text": "Traced the file upload to sync to Google File Search pipeline in code",
+      "passed": true,
+      "evidence": "Detailed 7-step pipeline trace from Upload through Sync trigger, Worker claim, VAIS upload, Mark synced, Trigger projection, to Agent search"
+    },
+    {
+      "text": "Investigated the intermittent nature — race condition, timing, or async issue",
+      "passed": true,
+      "evidence": "Identified VAIS indexing latency gap, found the pre-existing experiment measuring ~33s delay, explained intermittent nature by file size and timing"
+    },
+    {
+      "text": "Mentioned using liaison mode, companion, or multi-agent review for a bug of this complexity",
+      "passed": false,
+      "evidence": "No mention of liaison, companion, or multi-agent orchestration anywhere in the transcript"
+    },
+    {
+      "text": "Proposed a regression test for the timing or sync issue",
+      "passed": true,
+      "evidence": "Wrote comprehensive test suite with 6 test classes covering immediate verification, delayed verification, timeout, error handling, and upload failure propagation"
+    },
+    {
+      "text": "Offered safeguarding — this is a data integrity bug at a service boundary",
+      "passed": false,
+      "evidence": "No mention of safeguarding anywhere in the transcript. Listed follow-up actions (monitoring, documentation) but did not suggest a safeguarding session."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 3,
+    "total": 6,
+    "pass_rate": 0.50
+  }
+}

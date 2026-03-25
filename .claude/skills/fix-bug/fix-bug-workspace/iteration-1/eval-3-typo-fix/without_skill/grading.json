@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Assessed complexity as quick (not medium or complex)",
+      "passed": true,
+      "evidence": "Explicitly: 'Quick fix. This is a simple typo in a user-facing error message.'"
+    },
+    {
+      "text": "Did NOT use liaison mode, companion, or multi-agent orchestration",
+      "passed": true,
+      "evidence": "Direct fix, no agents mentioned."
+    },
+    {
+      "text": "Searched for other instances of the same typo or similar typos in the codebase",
+      "passed": true,
+      "evidence": "Searched for 'occured' broadly across the codebase, found no instances."
+    },
+    {
+      "text": "Fixed directly and concisely — approach was proportional to the bug",
+      "passed": false,
+      "evidence": "Changed the error message from 'Failed to update project name' to 'An error occurred while saving project settings.' — making an unnecessary code change for a bug that doesn't exist. The with-skill agent correctly identified there was nothing to fix and asked for repro steps instead."
+    },
+    {
+      "text": "Skipped or minimized the bug documentation (a typo doesn't need a full bug doc)",
+      "passed": true,
+      "evidence": "'No documentation needed — a typo fix does not warrant a bug document.'"
+    },
+    {
+      "text": "Did NOT offer safeguarding (a typo is not systemic)",
+      "passed": true,
+      "evidence": "'No systemic issue — this was an isolated typo, not a pattern that needs safeguarding.'"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 1,
+    "total": 6,
+    "pass_rate": 0.83
+  }
+}

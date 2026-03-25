@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "share-modal-input",
+  "prompt": "Hey, I just noticed that when I try to share a project with someone, the share modal opens but the email input is completely unresponsive — I can click on it but nothing happens when I type. It was working yesterday. Can you take a look?",
+  "assertions": [
+    "Checked recent git history for files related to the share modal",
+    "Read the actual share modal component code before proposing a fix",
+    "Articulated a root cause statement before writing fix code",
+    "Proposed or wrote a regression test that would catch the bug",
+    "Performed a code review step (self-review of diff or mentioned spawning reviewer)",
+    "Mentioned running the full test suite to check for regressions"
+  ]
+}

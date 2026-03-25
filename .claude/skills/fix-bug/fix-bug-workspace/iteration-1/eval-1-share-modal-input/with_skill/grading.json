@@ -1,0 +1,40 @@
+{
+  "expectations": [
+    {
+      "text": "Checked recent git history for files related to the share modal",
+      "passed": true,
+      "evidence": "Transcript shows: 'git log --oneline --since=\"14d\"' and found commits 0f096b6a (share flow hardening) and 7698d769 (Radix Select refactor)"
+    },
+    {
+      "text": "Read the actual share modal component code before proposing a fix",
+      "passed": true,
+      "evidence": "Read ShareChatModal, ShareProjectSection, ProjectCollaborators, ui/select.tsx, ui/dialog.tsx, and 15+ related files before proposing the fix"
+    },
+    {
+      "text": "Articulated a root cause statement before writing fix code",
+      "passed": true,
+      "evidence": "Has explicit 'Root Cause Statement' section with structured root cause / why it exists / blast radius before Phase 3 (Fix)"
+    },
+    {
+      "text": "Proposed or wrote a regression test that would catch the bug",
+      "passed": true,
+      "evidence": "Wrote 4 regression tests including the critical 'email input accepts typed text after opening and closing role Select' test that directly reproduces the bug scenario"
+    },
+    {
+      "text": "Performed a code review step (self-review of diff or mentioned spawning reviewer)",
+      "passed": true,
+      "evidence": "Phase 4: Review has 4 skeptic questions answered: root cause vs symptom, could it break, simpler fix, debugging artifacts"
+    },
+    {
+      "text": "Mentioned running the full test suite to check for regressions",
+      "passed": true,
+      "evidence": "Phase 5 lists specific commands: 'bun test' and 'bun test tests/unit/pages/' and mentions manual browser verification"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  }
+}

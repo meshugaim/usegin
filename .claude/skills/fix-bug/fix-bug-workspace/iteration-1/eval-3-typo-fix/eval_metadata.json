@@ -1,0 +1,13 @@
+{
+  "eval_id": 3,
+  "eval_name": "typo-fix",
+  "prompt": "Quick one — the error toast when saving project settings says 'An error occured' instead of 'An error occurred'. Typo.",
+  "assertions": [
+    "Assessed complexity as quick (not medium or complex)",
+    "Did NOT use liaison mode, companion, or multi-agent orchestration",
+    "Searched for other instances of the same typo or similar typos in the codebase",
+    "Fixed directly and concisely — approach was proportional to the bug",
+    "Skipped or minimized the bug documentation (a typo doesn't need a full bug doc)",
+    "Did NOT offer safeguarding (a typo is not systemic)"
+  ]
+}
