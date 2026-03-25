@@ -1394,9 +1394,12 @@ describe("buildListCommand", () => {
 // Command with the right structure and that docs files are loadable.
 
 describe("buildDocsCommand", () => {
-  test("returns a Command instance", () => {
+  test("returns a Command-like object", () => {
     const cmd = buildDocsCommand();
-    expect(cmd).toBeInstanceOf(Command);
+    // Duck-type check: docs command is constructed by docs-registry's Commander,
+    // which may be a separate module instance even at the same version.
+    expect(typeof cmd.name).toBe("function");
+    expect(typeof cmd.parse).toBe("function");
   });
 
   test("has name 'docs'", () => {
