@@ -1,0 +1,47 @@
+{
+  "skill_name": "fix-bug",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Hey, I just noticed that when I try to share a project with someone, the share modal opens but the email input is completely unresponsive — I can click on it but nothing happens when I type. It was working yesterday. Can you take a look?",
+      "expected_output": "Should follow the fix-bug skill: orient (check recent changes to share modal code, check Sentry), investigate (reproduce, find root cause — likely a recent commit broke the input), plan (state DoD with regression test), fix with TDD (write failing test for share modal email input, fix, self-review), document in docs/bugs/, offer safeguarding if systemic.",
+      "files": [],
+      "expectations": [
+        "Checked recent git history for files related to the share modal",
+        "Read the actual share modal component code before proposing a fix",
+        "Articulated a root cause statement before writing fix code",
+        "Proposed or wrote a regression test that would catch the bug",
+        "Performed a code review step (self-review of diff or mentioned spawning reviewer)",
+        "Mentioned running the full test suite to check for regressions"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We're getting reports from users that sometimes when they upload a file to a project, the file shows as 'synced' in the UI but Effi (the AI agent) can't actually find it when searching. It's intermittent — maybe 1 in 10 uploads. ENG-3500 has the details.",
+      "expected_output": "Should follow fix-bug at medium/complex level: orient (read ENG-3500, check Sentry for related errors, check sync service logs), investigate deeply (trace the upload → sync → Google File Search pipeline, identify race condition or timing issue), plan with explicit DoD, use TDD with review agent and verification agent, create bug doc, offer safeguarding since this is a data integrity issue at a service boundary.",
+      "files": [],
+      "expectations": [
+        "Assessed complexity as medium or complex (not quick)",
+        "Traced the file upload to sync to Google File Search pipeline in code",
+        "Investigated the intermittent nature — race condition, timing, or async issue",
+        "Mentioned using liaison mode, companion, or multi-agent review for a bug of this complexity",
+        "Proposed a regression test for the timing or sync issue",
+        "Offered safeguarding — this is a data integrity bug at a service boundary"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Quick one — the error toast when saving project settings says 'An error occured' instead of 'An error occurred'. Typo.",
+      "expected_output": "Should recognize this as a quick bug: orient briefly, skip deep investigation (cause is obvious), fix directly with a regression test (or at minimum a grep to make sure there aren't other instances of the same typo), self-review, commit. Bug doc is optional for a typo — should use judgment. Should NOT over-engineer this with liaison mode, companion, or multi-agent review.",
+      "files": [],
+      "expectations": [
+        "Assessed complexity as quick (not medium or complex)",
+        "Did NOT use liaison mode, companion, or multi-agent orchestration",
+        "Searched for other instances of the same typo or similar typos in the codebase",
+        "Fixed directly and concisely — approach was proportional to the bug",
+        "Skipped or minimized the bug documentation (a typo doesn't need a full bug doc)",
+        "Did NOT offer safeguarding (a typo is not systemic)"
+      ]
+    }
+  ]
+}
