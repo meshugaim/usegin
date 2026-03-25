@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "commander": "^12.1.0"
+    "commander": "^14.0.2"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.4.0",
