@@ -78,47 +78,80 @@ export function buildGatePattern(feature: string): string {
  * across .ts, .tsx, and .sh files. Excludes `tools/dx/` itself so the
  * dx tool's own code doesn't inflate counts.
  *
+ * Uses a single grep call with alternation to avoid spawning one process
+ * per feature, which is significantly faster on large codebases.
+ *
  * Returns a map of feature name to matching line count.
  */
 export function grepGateCounts(features: string[]): Record<string, number> {
   const results: Record<string, number> = {};
 
+  // Initialize all features to 0
   for (const feature of features) {
-    const pattern = buildGatePattern(feature);
+    results[feature] = 0;
+  }
 
-    // grep -rE for extended regex, -c for counts per file.
-    // --exclude-dir to skip the dx tool's own source.
-    // Exit code 1 means no matches (not an error).
-    const result = spawnSync(
-      "grep",
-      [
-        "-rE",
-        "--include=*.ts",
-        "--include=*.tsx",
-        "--include=*.sh",
-        "--exclude-dir=tools/dx",
-        "-c",
-        pattern,
-        ".",
-      ],
-      { encoding: "utf-8", cwd: process.cwd() },
-    );
+  if (features.length === 0) {
+    return results;
+  }
 
-    if (result.status === 0 && result.stdout) {
-      let total = 0;
-      for (const line of result.stdout.trim().split("\n")) {
-        const match = line.match(/:(\d+)$/);
-        if (match) {
-          total += parseInt(match[1], 10);
+  // Build a single combined pattern that matches any feature.
+  // Each matching line is then checked against individual features to tally.
+  const featureAlt = features.map(escapeRegex).join("|");
+  const combinedPattern =
+    `(isEnabled|getFeature).*"(${featureAlt})"` +
+    `|(dx resolve|dx\\.resolve).*(${featureAlt})` +
+    `|git config dx\\.(${featureAlt})`;
+
+  // Single grep call: -rE for extended regex, output matching lines.
+  // --exclude-dir to skip the dx tool's own source.
+  // Search only directories where gates would realistically live.
+  // Exit code 1 means no matches (not an error).
+  const searchDirs = [
+    ".claude/",
+    ".husky/",
+    "scripts/",
+    "tools/",
+    "nextjs-app/",
+    "python-services/",
+  ];
+
+  const result = spawnSync(
+    "grep",
+    [
+      "-rE",
+      "--include=*.ts",
+      "--include=*.tsx",
+      "--include=*.sh",
+      "--exclude-dir=node_modules",
+      "--exclude-dir=.venv",
+      "--exclude-dir=.next",
+      "--exclude-dir=tools/dx",
+      combinedPattern,
+      ...searchDirs,
+    ],
+    { encoding: "utf-8", cwd: process.cwd() },
+  );
+
+  if (result.status === 0 && result.stdout) {
+    for (const line of result.stdout.trim().split("\n")) {
+      if (!line) continue;
+      // Each matching line may reference one or more features.
+      // Check which feature(s) this line matches.
+      for (const feature of features) {
+        if (line.includes(feature)) {
+          results[feature]++;
         }
       }
-      results[feature] = total;
-    } else {
-      results[feature] = 0;
     }
   }
 
   return results;
+}
+
+/** Escape special regex characters in a string. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**

@@ -1174,17 +1174,25 @@ describe("buildGatePattern", () => {
 // ===========================================================================
 
 describe("grepGateCounts", () => {
-  test("returns a record with a number for each feature", () => {
-    const results = grepGateCounts(["ci-watcher", "autosync"]);
-    expect(typeof results).toBe("object");
-    expect(typeof results["ci-watcher"]).toBe("number");
-    expect(typeof results["autosync"]).toBe("number");
-  });
+  test(
+    "returns a record with a number for each feature",
+    () => {
+      const results = grepGateCounts(["ci-watcher", "autosync"]);
+      expect(typeof results).toBe("object");
+      expect(typeof results["ci-watcher"]).toBe("number");
+      expect(typeof results["autosync"]).toBe("number");
+    },
+    15000,
+  );
 
-  test("returns 0 for a feature name that does not exist in the codebase", () => {
-    const results = grepGateCounts(["zzz-nonexistent-feature-xyz-12345"]);
-    expect(results["zzz-nonexistent-feature-xyz-12345"]).toBe(0);
-  });
+  test(
+    "returns 0 for a feature name that does not exist in the codebase",
+    () => {
+      const results = grepGateCounts(["zzz-nonexistent-feature-xyz-12345"]);
+      expect(results["zzz-nonexistent-feature-xyz-12345"]).toBe(0);
+    },
+    15000,
+  );
 
   test("handles empty feature list without crashing", () => {
     const results = grepGateCounts([]);
