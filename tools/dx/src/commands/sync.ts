@@ -121,6 +121,13 @@ export function buildSyncCommand(): Command {
     // Write all features, collecting errors instead of aborting on first failure
     const errors = writeSyncEntries(entries);
 
+    // Clean up legacy git config keys (migrated to dx)
+    const legacyKeys = ["autosync.enabled", "autopull.enabled"];
+    for (const key of legacyKeys) {
+      spawnSync("git", ["config", "--local", "--unset", key], { encoding: "utf-8" });
+      // Ignore errors — key may not exist
+    }
+
     const syncedCount = entries.length - errors.length;
 
     if (useJson) {
