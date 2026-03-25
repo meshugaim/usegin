@@ -12,9 +12,6 @@ import {
   type CheckoutMeta,
 } from "../lib/checkout-meta";
 
-// Re-export so tests can import { writeCheckoutMeta } from "../src/commands/checkout"
-export { writeCheckoutMeta } from "../lib/checkout-meta";
-
 const DEFAULT_CHECKOUT_DIR = "/tmp/linear/";
 
 export function createCheckoutCommand(): Command {
@@ -23,8 +20,8 @@ export function createCheckoutCommand(): Command {
     .argument("<id>", "Issue identifier (e.g., ENG-123 or just 123)")
     .option("--force", "Overwrite existing checkout")
     .option("--json", "Output as JSON")
+    .option("--quiet", "No output on success")
     .option("--stats", "Show API call statistics")
-    .showHelpAfterError()
     .action(async (id: string, opts) => {
       await runCheckout(normalizeIssueId(id), opts);
     });
@@ -37,6 +34,7 @@ async function runCheckout(
   opts: {
     force?: boolean;
     json?: boolean;
+    quiet?: boolean;
     stats?: boolean;
   }
 ): Promise<void> {
@@ -44,6 +42,7 @@ async function runCheckout(
 
   if (!apiKey) {
     console.error("Error: LINEAR_API_KEY environment variable is required");
+    console.error("Get your API key from: https://linear.app/settings/api");
     process.exit(2);
   }
 
@@ -82,26 +81,31 @@ async function runCheckout(
     writeCheckoutMeta(issueDir, meta);
 
     // Output
-    const useJson = shouldDefaultToJson({
-      json: opts.json,
-      env: process.env,
-      isTTY: process.stdout.isTTY,
-    });
-
-    if (useJson) {
-      console.log(
-        JSON.stringify(
-          {
-            identifier,
-            path: descPath,
-            fetchedAt,
-          },
-          null,
-          2
-        )
-      );
+    if (opts.quiet) {
+      // No output
     } else {
-      console.log(`Checked out ${identifier} description → ${descPath}`);
+      const useJson = shouldDefaultToJson({
+        json: opts.json,
+        env: process.env,
+        isTTY: process.stdout.isTTY,
+      });
+
+      if (useJson) {
+        console.log(
+          JSON.stringify(
+            {
+              id: issue.id,
+              identifier,
+              path: descPath,
+              fetchedAt,
+            },
+            null,
+            2
+          )
+        );
+      } else {
+        console.log(`Checked out ${identifier} description → ${descPath}`);
+      }
     }
 
     printApiStats(client.apiCallCount, opts.stats ?? false);

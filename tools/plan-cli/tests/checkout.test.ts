@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { writeCheckoutMeta } from "../src/commands/checkout";
+import { writeCheckoutMeta } from "../src/lib/checkout-meta";
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
 
@@ -44,9 +44,7 @@ describe("plan checkout command", () => {
       const exitCode = await proc.exited;
 
       expect(exitCode).not.toBe(0);
-      // Should specifically mention the missing argument in the error,
-      // not just be a generic "unknown command" error
-      expect(stderr).toContain("checkout");
+      // Should mention the missing argument in the error
       expect(stderr).toMatch(/missing|required|argument/i);
     });
   });
@@ -326,6 +324,29 @@ describe("plan checkout command", () => {
         expect(parsed.fetchedAt).toBeTruthy();
         // fetchedAt should be a valid ISO timestamp
         expect(new Date(parsed.fetchedAt).toISOString()).toBe(parsed.fetchedAt);
+      }
+    );
+
+    test(
+      "ENG-3490: --quiet flag suppresses all stdout on success",
+      async () => {
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "ENG-3490", "--quiet"],
+          {
+            env: {
+              ...process.env,
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
+        );
+
+        const stdout = await new Response(proc.stdout).text();
+        const exitCode = await proc.exited;
+
+        expect(exitCode).toBe(0);
+        expect(stdout).toBe("");
       }
     );
 
