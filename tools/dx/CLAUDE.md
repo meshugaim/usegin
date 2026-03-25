@@ -45,6 +45,7 @@ git config dx.ci-watcher       # prints "true" or "false"
 | `dx whoami` | Show resolved identity |
 | `dx enable <feature>` | Enable a feature (local override; `--save` for config.json) |
 | `dx disable <feature>` | Disable a feature (local override; `--save` for config.json) |
+| `dx reset [feature]` | Reset features to defaults by clearing overrides (local; `--save` for config.json) |
 | `dx identify` | Show or set current user identity (`--as <name>` to set) |
 | `dx list` | Show all registered features with gate counts |
 | `dx docs [topic]` | Show inline documentation |
