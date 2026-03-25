@@ -25,10 +25,12 @@ export interface StatusData {
 /**
  * Format the status output for human display (TTY).
  *
- * Shows a table with override markers:
- * - `*` = user override (differs from default)
- * - `~` = local override (temporary)
- * - Shows "User: <name>" or "User: unknown"
+ * Shows a table with inline source labels for overridden features:
+ * - `(personal)` = user override (persisted in config.json)
+ * - `(local)` = local override (temporary, gitignored)
+ * - No label for features at their default value
+ *
+ * Shows "User: <name>" or "User: unknown".
  */
 export function formatStatus(data: StatusData): string {
   const lines: string[] = [];
@@ -56,7 +58,7 @@ export function formatStatus(data: StatusData): string {
       stateLabel = stateLabel.toUpperCase();
     }
 
-    // Override marker
+    // Override marker (for quick visual scanning)
     let marker = " ";
     if (feat.source === "user-override") {
       marker = "*";
@@ -64,22 +66,20 @@ export function formatStatus(data: StatusData): string {
       marker = "~";
     }
 
+    // Inline source label (self-documenting, supplements the marker)
+    let sourceLabel = "";
+    if (feat.source === "user-override") {
+      sourceLabel = " (personal)";
+    } else if (feat.source === "local-override") {
+      sourceLabel = " (local)";
+    }
+
     // Dot-fill between name and state
     const dots = dotFill(name, maxNameLen);
 
     lines.push(
-      `  ${name} ${dots} ${stateLabel}${marker}  ${feat.description}`,
+      `  ${name} ${dots} ${stateLabel}${marker}${sourceLabel}  ${feat.description}`,
     );
-  }
-
-  // Legend
-  const sources = Object.values(data.features).map((f) => f.source);
-  const hasUserOverride = sources.includes("user-override");
-  const hasLocalOverride = sources.includes("local-override");
-  if (hasUserOverride || hasLocalOverride) {
-    lines.push("");
-    if (hasUserOverride) lines.push("  * = personal override");
-    if (hasLocalOverride) lines.push("  ~ = local override");
   }
 
   return lines.join("\n");

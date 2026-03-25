@@ -28,7 +28,8 @@ const program = new Command()
   .description(
     "Developer experience configuration -- per-person automation toggles",
   )
-  .version("0.1.0");
+  .version("0.1.0")
+  .option("--save", "Persist changes to config.json (personal override)");
 
 // Bare `dx` with no args: if headless -> JSON status, if TTY -> interactive picker or help
 program.action(async () => {
@@ -43,7 +44,7 @@ program.action(async () => {
     // (isTTY being true implies not headless — isHeadless() requires !isTTY)
     const { runInteractive } = await import("./commands/interactive");
     const ctx = dx.getContext();
-    await runInteractive(ctx);
+    await runInteractive(ctx, program.opts().save);
   } else {
     program.help();
   }
