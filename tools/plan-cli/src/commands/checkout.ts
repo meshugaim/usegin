@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { LinearClient } from "../lib/linear-client";
 import { printApiStats } from "../lib/stats";

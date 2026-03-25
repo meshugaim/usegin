@@ -26,7 +26,11 @@ export function writeCheckoutMeta(dir: string, meta: CheckoutMeta): void {
 export function readCheckoutMeta(dir: string): CheckoutMeta | null {
   const metaPath = join(dir, ".meta.json");
   if (!existsSync(metaPath)) return null;
-  return JSON.parse(readFileSync(metaPath, "utf-8"));
+  try {
+    return JSON.parse(readFileSync(metaPath, "utf-8"));
+  } catch {
+    return null;
+  }
 }
 
 /**

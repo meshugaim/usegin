@@ -1,18 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
+import { writeCheckoutMeta } from "../src/commands/checkout";
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
-
-/**
- * Lazy import for the checkout module.
- * The module doesn't exist yet — tests use test.failing() so import errors
- * are expected and won't break CI.
- */
-async function getCheckoutModule() {
-  const mod = await import("../src/commands/checkout");
-  return mod;
-}
 
 // Use unique temp dirs per test run to avoid conflicts with parallel agents
 const TEST_BASE_DIR = `/tmp/linear-test-${Date.now()}`;
@@ -93,9 +84,7 @@ describe("plan checkout command", () => {
     test(
       "ENG-3490: creates .meta.json sidecar with correct fields",
       async () => {
-        // Test via lazy import of a writeCheckoutMeta helper.
-        // The helper should write a .meta.json sidecar with the expected shape.
-        const { writeCheckoutMeta } = await getCheckoutModule();
+        // writeCheckoutMeta should write a .meta.json sidecar with the expected shape.
 
         const issueDir = join(TEST_BASE_DIR, "ENG-200");
         mkdirSync(issueDir, { recursive: true });
