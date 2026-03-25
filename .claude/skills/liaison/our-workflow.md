@@ -10,15 +10,37 @@ Agents commit and push their own work. The liaison does not commit — agents ar
 
 Liaison's judgment. Not forced tiny, not forced large. Right-sized for the task — enough scope to be meaningful, small enough to stay focused and produce reviewable diffs.
 
-## TDD — Required, Strict
+## TDD — Required, Strict, Three Distinct Phases
 
-Red-green-refactor. Every implementation step.
+Red-green-refactor. Every implementation step. **Each phase is a distinct step with its own review-fix loop.**
 
-- **Red**: Write a failing test first. The test must fail for the _right reason_ — it tests the behavior you're about to build, not a missing import or syntax error. If red doesn't mean something, it's not TDD.
-- **Green**: Make the test pass. Minimal code to satisfy the test.
-- **Refactor**: Clean up. Don't skip this step. Look for duplication, naming, structure.
+### Phase 1: Red
 
-Red and green can be separate agents (one writes the failing test, the next makes it pass). Splitting is optional — use judgment based on task complexity. When committing red-phase tests, mark them as expected-to-fail so CI stays green — see the `tdd-ci` skill.
+Write a failing test first. The test must fail for the _right reason_ — it tests the behavior you're about to build, not a missing import or syntax error. If red doesn't mean something, it's not TDD.
+
+Mark as expected-to-fail so CI stays green — see the `tdd-ci` skill.
+
+**Review-fix loop:** Spawn reviewers on the test code. Are the tests testing the right thing? Are assertions precise? Are edge cases covered? Fix → re-review until clean. Commit.
+
+### Phase 2: Green
+
+Make the tests pass. Minimal code to satisfy the tests. Don't go beyond what the tests require.
+
+**Review-fix loop:** Spawn reviewers on the production code. Is the implementation correct? Are invariants preserved? Any regressions? Fix → re-review until clean. Commit.
+
+### Phase 3: Refactor
+
+Clean up. This is a separate, explicit step — not absorbed into review. Look for:
+- Duplication (in both production code and tests)
+- Naming (do names communicate intent?)
+- Structure (is the code in the right place?)
+- Comments/docstrings (accurate after the changes?)
+
+**Review-fix loop:** Spawn reviewers on the refactoring diff. Did the refactor preserve behavior? Is it actually cleaner? Fix → re-review until clean. Commit.
+
+### Splitting across agents
+
+Red and green can be separate agents (one writes the failing test, the next makes it pass). Splitting is optional — use judgment based on task complexity.
 
 ## Verification Agents
 
@@ -46,9 +68,10 @@ Spawned at session start. Watches for drift against this workflow. Updated when 
 
 - per issue / slice decide in advance how to manually verify it works and fits with rest of system
 - review->fix infinite loop until nitpick level - fixing all (unless completely wrong)
-- wait for companion, dont continue before seeing its inputs
-- tdd cycle can be made stricter by separate agents do 1. write the tests (including review fix infinite loop) 2. impl production code (again infinite loop)
+- wait for companion before phase transitions (red→green, green→refactor, refactor→next slice, closing issues). Read-only agents (reviewers, verifiers) can be spawned while companion processes.
+- when companion gives input on past work - go back and fix it; don't just take it for future work
 - FYI - other agents might be working in parallel on other things; only commit your own changes - tell your agents
+- before committing: run `git status` and verify only files you modified are staged. Unstage anything that isn't yours.
 
 ## What Stays the Same from SKILL.md
 
