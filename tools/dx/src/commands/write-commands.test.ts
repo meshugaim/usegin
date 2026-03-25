@@ -36,6 +36,7 @@ import {
 // --- Interactive pure functions ---
 import {
   buildInteractiveOptions,
+  buildMultiselectConfig,
   type InteractiveOption,
 } from "./interactive";
 
@@ -928,6 +929,53 @@ describe("buildInteractiveOptions", () => {
     });
     const options = buildInteractiveOptions(ctx);
     expect(options).toEqual([]);
+  });
+});
+
+// ===========================================================================
+// buildMultiselectConfig — transform options into @clack/prompts shape
+// ===========================================================================
+
+describe("buildMultiselectConfig", () => {
+  test("returns initialValues array with enabled feature names", () => {
+    // ci-watcher default=true, autosync default=false;
+    // nitsan overrides ci-watcher=false, so for nitsan both are off.
+    // Use a context where ci-watcher is enabled (no user override).
+    const ctx = makeContext({ env: { USER: "unknown-user" } });
+    const options = buildInteractiveOptions(ctx);
+
+    const config = buildMultiselectConfig(options);
+
+    // ci-watcher has default=true and no user override for unknown-user
+    expect(config.initialValues).toContain("ci-watcher");
+    // autosync has default=false
+    expect(config.initialValues).not.toContain("autosync");
+    // initialValues should be an array, not per-option booleans
+    expect(Array.isArray(config.initialValues)).toBe(true);
+  });
+
+  test("returns options with descriptions in labels", () => {
+    const ctx = makeContext();
+    const options = buildInteractiveOptions(ctx);
+
+    const config = buildMultiselectConfig(options);
+
+    const ciOpt = config.options.find((o) => o.value === "ci-watcher");
+    const syncOpt = config.options.find((o) => o.value === "autosync");
+
+    // Labels should include the description so users can see what each feature does
+    expect(ciOpt!.label).toContain("Monitor CI");
+    expect(syncOpt!.label).toContain("Push to origin");
+  });
+
+  test("returns empty initialValues when all features disabled", () => {
+    // nitsan has ci-watcher=false override, autosync default=false
+    const ctx = makeContext({ env: { USER: "nitsan" } });
+    const options = buildInteractiveOptions(ctx);
+
+    const config = buildMultiselectConfig(options);
+
+    expect(config.initialValues).toEqual([]);
   });
 });
 

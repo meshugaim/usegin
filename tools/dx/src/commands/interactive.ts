@@ -52,6 +52,20 @@ export function buildInteractiveOptions(
 }
 
 /**
+ * Build the exact config object that `@clack/prompts` multiselect expects.
+ *
+ * Transforms the per-option `initialValue` booleans into a top-level
+ * `initialValues` array of enabled feature names, and ensures
+ * descriptions are visible in each option's label.
+ */
+export function buildMultiselectConfig(options: InteractiveOption[]): {
+  options: Array<{ value: string; label: string }>;
+  initialValues: string[];
+} {
+  throw new Error("Not implemented");
+}
+
+/**
  * Run the interactive feature toggle picker.
  *
  * Presents a multiselect prompt, diffs against current state,
