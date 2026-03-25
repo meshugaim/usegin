@@ -60,6 +60,17 @@ import {
   type DocsSection,
 } from "./docs";
 
+// --- Reset pure functions ---
+import {
+  clearLocalOverride,
+  clearAllLocalOverrides,
+  clearUserOverride,
+  clearAllUserOverrides,
+  formatResetResult,
+  formatResetResultJson,
+  buildResetCommand,
+} from "./reset";
+
 // --- Shared test fixtures ---
 import { makeConfig, makeContext } from "../test-fixtures";
 
@@ -1453,6 +1464,359 @@ describe("buildDocsCommand", () => {
 
   test("has --json option", () => {
     const cmd = buildDocsCommand();
+    const jsonOpt = cmd.options.find((o) => o.long === "--json");
+    expect(jsonOpt).toBeDefined();
+  });
+});
+
+// ===========================================================================
+// clearLocalOverride — remove a single key from .dx/config.local.json
+// ===========================================================================
+
+describe("clearLocalOverride", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "dx-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test("removes specified key and preserves other overrides", () => {
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(
+      localPath,
+      JSON.stringify({ overrides: { "ci-watcher": true, autosync: false } }),
+    );
+
+    clearLocalOverride(localPath, "ci-watcher");
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.overrides).toEqual({ autosync: false });
+  });
+
+  test("clearing the last override leaves empty overrides object", () => {
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(
+      localPath,
+      JSON.stringify({ overrides: { "ci-watcher": true } }),
+    );
+
+    clearLocalOverride(localPath, "ci-watcher");
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.overrides).toEqual({});
+  });
+
+  test("clearing a key that does not exist is a no-op", () => {
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(
+      localPath,
+      JSON.stringify({ overrides: { autosync: false } }),
+    );
+
+    // Should not throw
+    clearLocalOverride(localPath, "nonexistent-feature");
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.overrides).toEqual({ autosync: false });
+  });
+});
+
+// ===========================================================================
+// clearAllLocalOverrides — reset local config to empty overrides
+// ===========================================================================
+
+describe("clearAllLocalOverrides", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "dx-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test("clears all overrides to empty object", () => {
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(
+      localPath,
+      JSON.stringify({
+        overrides: { "ci-watcher": true, autosync: false },
+      }),
+    );
+
+    clearAllLocalOverrides(localPath);
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.overrides).toEqual({});
+  });
+
+  test("no error when file does not exist", () => {
+    const localPath = join(tempDir, "nonexistent", "config.local.json");
+
+    // Should not throw — missing file is a no-op
+    expect(() => {
+      clearAllLocalOverrides(localPath);
+    }).not.toThrow();
+  });
+});
+
+// ===========================================================================
+// clearUserOverride — remove a single key from users[user].overrides
+// ===========================================================================
+
+describe("clearUserOverride", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "dx-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test("removes specified key and preserves other user overrides", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: {
+            aliases: ["Nitsan Avni"],
+            overrides: { "ci-watcher": false, autosync: true },
+          },
+        },
+      }),
+    );
+
+    clearUserOverride(configPath, "nitsan", "ci-watcher");
+
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(content.users.nitsan.overrides).toEqual({ autosync: true });
+  });
+
+  test("clearing the last override leaves empty overrides object", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: {
+            aliases: [],
+            overrides: { "ci-watcher": false },
+          },
+        },
+      }),
+    );
+
+    clearUserOverride(configPath, "nitsan", "ci-watcher");
+
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(content.users.nitsan.overrides).toEqual({});
+  });
+
+  test("clearing a key that does not exist is a no-op", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: {
+            aliases: [],
+            overrides: { autosync: true },
+          },
+        },
+      }),
+    );
+
+    // Should not throw
+    clearUserOverride(configPath, "nitsan", "nonexistent-feature");
+
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(content.users.nitsan.overrides).toEqual({ autosync: true });
+  });
+
+  test("throws if user does not exist in config", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: { aliases: [], overrides: {} },
+        },
+      }),
+    );
+
+    expect(() => {
+      clearUserOverride(configPath, "unknown-user", "ci-watcher");
+    }).toThrow();
+  });
+});
+
+// ===========================================================================
+// clearAllUserOverrides — remove all overrides for a user
+// ===========================================================================
+
+describe("clearAllUserOverrides", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "dx-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test("clears all overrides for a user to empty object", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: {
+            aliases: ["Nitsan Avni"],
+            overrides: { "ci-watcher": false, autosync: true },
+          },
+        },
+      }),
+    );
+
+    clearAllUserOverrides(configPath, "nitsan");
+
+    const content = JSON.parse(readFileSync(configPath, "utf-8"));
+    expect(content.users.nitsan.overrides).toEqual({});
+    // Should preserve aliases
+    expect(content.users.nitsan.aliases).toEqual(["Nitsan Avni"]);
+  });
+
+  test("throws if user does not exist in config", () => {
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {},
+        users: {
+          nitsan: { aliases: [], overrides: {} },
+        },
+      }),
+    );
+
+    expect(() => {
+      clearAllUserOverrides(configPath, "unknown-user");
+    }).toThrow();
+  });
+});
+
+// ===========================================================================
+// formatResetResult — human-readable confirmation
+// ===========================================================================
+
+describe("formatResetResult", () => {
+  test("all features, local", () => {
+    const output = formatResetResult(null, false, null);
+    expect(output).toBe("dx: reset to defaults (local)");
+  });
+
+  test("single feature, local", () => {
+    const output = formatResetResult("ci-watcher", false, null);
+    expect(output).toBe("dx: reset ci-watcher to default (local)");
+  });
+
+  test("all features, saved for user", () => {
+    const output = formatResetResult(null, true, "nitsan");
+    expect(output).toBe("dx: reset to defaults for nitsan (saved)");
+  });
+
+  test("single feature, saved for user", () => {
+    const output = formatResetResult("ci-watcher", true, "nitsan");
+    expect(output).toBe("dx: reset ci-watcher to default for nitsan (saved)");
+  });
+});
+
+// ===========================================================================
+// formatResetResultJson — JSON confirmation
+// ===========================================================================
+
+describe("formatResetResultJson", () => {
+  test("all features, local target", () => {
+    const output = formatResetResultJson(null, false, null);
+    const parsed = JSON.parse(output);
+    expect(parsed.feature).toBe("*");
+    expect(parsed.target).toBe("local");
+    expect(parsed).not.toHaveProperty("user");
+  });
+
+  test("single feature, local target", () => {
+    const output = formatResetResultJson("ci-watcher", false, null);
+    const parsed = JSON.parse(output);
+    expect(parsed.feature).toBe("ci-watcher");
+    expect(parsed.target).toBe("local");
+    expect(parsed).not.toHaveProperty("user");
+  });
+
+  test("all features, config target with user", () => {
+    const output = formatResetResultJson(null, true, "nitsan");
+    const parsed = JSON.parse(output);
+    expect(parsed.feature).toBe("*");
+    expect(parsed.target).toBe("config");
+    expect(parsed.user).toBe("nitsan");
+  });
+
+  test("single feature, config target with user", () => {
+    const output = formatResetResultJson("ci-watcher", true, "nitsan");
+    const parsed = JSON.parse(output);
+    expect(parsed.feature).toBe("ci-watcher");
+    expect(parsed.target).toBe("config");
+    expect(parsed.user).toBe("nitsan");
+  });
+
+  test("returns valid JSON string", () => {
+    const output = formatResetResultJson("autosync", false, null);
+    expect(() => JSON.parse(output)).not.toThrow();
+  });
+});
+
+// ===========================================================================
+// buildResetCommand — Commander structure
+// ===========================================================================
+
+describe("buildResetCommand", () => {
+  test("returns a Command instance", () => {
+    const cmd = buildResetCommand();
+    expect(cmd).toBeInstanceOf(Command);
+  });
+
+  test("has name 'reset'", () => {
+    const cmd = buildResetCommand();
+    expect(cmd.name()).toBe("reset");
+  });
+
+  test("accepts an optional [feature] argument", () => {
+    const cmd = buildResetCommand();
+    const args = (cmd as any)._args;
+    expect(args).toHaveLength(1);
+    expect(args[0].required).toBe(false);
+  });
+
+  test("has --save option", () => {
+    const cmd = buildResetCommand();
+    const saveOpt = cmd.options.find((o) => o.long === "--save");
+    expect(saveOpt).toBeDefined();
+  });
+
+  test("has --json option", () => {
+    const cmd = buildResetCommand();
     const jsonOpt = cmd.options.find((o) => o.long === "--json");
     expect(jsonOpt).toBeDefined();
   });
