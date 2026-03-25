@@ -62,7 +62,15 @@ export function buildMultiselectConfig(options: InteractiveOption[]): {
   options: Array<{ value: string; label: string }>;
   initialValues: string[];
 } {
-  throw new Error("Not implemented");
+  return {
+    options: options.map((o) => ({
+      value: o.value,
+      label: `${o.label} — ${o.hint}`,
+    })),
+    initialValues: options
+      .filter((o) => o.initialValue)
+      .map((o) => o.value),
+  };
 }
 
 /**
@@ -80,14 +88,10 @@ export async function runInteractive(ctx: DxContext): Promise<void> {
     return;
   }
 
+  const config = buildMultiselectConfig(options);
   const selected = await multiselect({
     message: "Feature toggles",
-    options: options.map((o) => ({
-      value: o.value,
-      label: o.label,
-      hint: o.hint,
-      initialValue: o.initialValue,
-    })),
+    ...config,
   });
 
   if (isCancel(selected)) {
