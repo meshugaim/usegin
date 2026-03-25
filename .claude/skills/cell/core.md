@@ -23,6 +23,7 @@ Shared by spawner and workers.
 - Watch tests fail first
 - Minimal code to pass
 - Backend + frontend both need tests
+- Committing red-phase tests? Mark as expected-to-fail so CI stays green — see `tdd-ci` skill
 
 **Linting and coverage:**
 - Run linter/typecheck before pushing

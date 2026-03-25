@@ -154,7 +154,8 @@ For each slice, follow this exact sequence:
 3. **Design the test** — Before writing ANY code, decide: what test file, what test cases, what assertions? This is your first code action after orient.
 4. **Write the test file FIRST** — Create the test file and write failing tests. This MUST happen before touching any implementation file.
 5. **Run the tests — watch them fail** — Confirms they're actually testing something. If they pass without implementation, your tests are wrong.
-6. **Implement** — Minimal code to make tests pass. Now you can write the implementation files.
+6. **Commit the failing tests** — If red and green are separate steps (or separate agents), commit the failing tests with `test.failing` / `xfail` marks so CI stays green. See the `tdd-ci` skill for the pattern.
+7. **Implement** — Minimal code to make tests pass. Now you can write the implementation files.
 7. **Self-verify** — Run all tests, check nothing else broke.
 
 ### Concrete Example

@@ -18,7 +18,7 @@ Red-green-refactor. Every implementation step.
 - **Green**: Make the test pass. Minimal code to satisfy the test.
 - **Refactor**: Clean up. Don't skip this step. Look for duplication, naming, structure.
 
-Red and green can be separate agents (one writes the failing test, the next makes it pass). Splitting is optional — use judgment based on task complexity.
+Red and green can be separate agents (one writes the failing test, the next makes it pass). Splitting is optional — use judgment based on task complexity. When committing red-phase tests, mark them as expected-to-fail so CI stays green — see the `tdd-ci` skill.
 
 ## Verification Agents
 
