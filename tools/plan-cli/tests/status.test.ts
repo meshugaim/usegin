@@ -50,7 +50,7 @@ function setupCheckout(
 
 describe("plan status command", () => {
   describe("CLI parsing", () => {
-    test.failing("ENG-3492: shows help with --help flag", async () => {
+    test("ENG-3492: shows help with --help flag", async () => {
       const proc = Bun.spawn(["bun", CLI_PATH, "status", "--help"], {
         env: process.env,
         stdout: "pipe",
@@ -66,7 +66,7 @@ describe("plan status command", () => {
       expect(stdout).toContain("--quiet");
     });
 
-    test.failing(
+    test(
       "ENG-3492: takes no arguments (no <id> required)",
       async () => {
         // status with no arguments should succeed (unlike checkout/push which require an id)
@@ -89,7 +89,7 @@ describe("plan status command", () => {
   });
 
   describe("core behavior", () => {
-    test.failing(
+    test(
       "ENG-3492: shows 'No issues checked out' when PLAN_CHECKOUT_DIR is empty",
       async () => {
         mkdirSync(TEST_BASE_DIR, { recursive: true });
@@ -111,7 +111,7 @@ describe("plan status command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3492: lists a single checked-out issue with correct identifier and path",
       async () => {
         const { issueDir } = setupCheckout(
@@ -137,7 +137,7 @@ describe("plan status command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3492: shows 'modified' for an issue where file hash differs from meta",
       async () => {
         const { descPath } = setupCheckout(
@@ -165,7 +165,7 @@ describe("plan status command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3492: shows 'clean' for an issue where file hash matches meta",
       async () => {
         // Description content matches the hash in .meta.json (no local edits)
@@ -188,7 +188,7 @@ describe("plan status command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3492: lists multiple checked-out issues",
       async () => {
         setupCheckout("ENG-400", "First issue description");
@@ -216,7 +216,7 @@ describe("plan status command", () => {
   });
 
   describe("output", () => {
-    test.failing(
+    test(
       "ENG-3492: JSON output contains checkouts array with correct fields",
       async () => {
         const fetchedAt = "2026-03-20T12:00:00.000Z";
@@ -258,7 +258,7 @@ describe("plan status command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3492: human output contains identifier and modification state",
       async () => {
         const description = "Description for human output test";
@@ -292,7 +292,7 @@ describe("plan status command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3492: --quiet flag suppresses all output",
       async () => {
         setupCheckout("ENG-700", "Some description");
@@ -319,7 +319,7 @@ describe("plan status command", () => {
   });
 
   describe("edge cases", () => {
-    test.failing(
+    test(
       "ENG-3492: gracefully handles corrupted .meta.json (skips entry, does not crash)",
       async () => {
         // Set up a valid checkout
@@ -352,7 +352,7 @@ describe("plan status command", () => {
       }
     );
 
-    test.failing(
+    test(
       "ENG-3492: handles directory with no .meta.json (skips, does not crash)",
       async () => {
         // Set up a valid checkout

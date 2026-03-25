@@ -16,6 +16,7 @@ import { createHistoryCommand } from "./commands/history";
 import { createSearchCommand } from "./commands/search";
 import { createCheckoutCommand } from "./commands/checkout";
 import { createPushCommand } from "./commands/push";
+import { createStatusCommand } from "./commands/status";
 import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
 
@@ -54,6 +55,7 @@ program.addCommand(createHistoryCommand());
 program.addCommand(createSearchCommand());
 program.addCommand(createCheckoutCommand());
 program.addCommand(createPushCommand());
+program.addCommand(createStatusCommand());
 
 // Apply standard aliases (list→ls, show→get, search→find, create→new)
 // before parsing so aliases are available during command resolution.
