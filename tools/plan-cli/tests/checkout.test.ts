@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { $ } from "bun";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
@@ -28,11 +27,19 @@ afterEach(() => {
 describe("plan checkout command", () => {
   describe("CLI parsing", () => {
     test.failing("ENG-3490: shows help with --help flag", async () => {
-      const result = await $`bun ${CLI_PATH} checkout --help`.text();
+      const result = await Bun.spawn(["bun", CLI_PATH, "checkout", "--help"], {
+        env: process.env,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
 
-      expect(result).toContain("checkout");
-      expect(result).toContain("--force");
-      expect(result).toContain("--json");
+      const stdout = await new Response(result.stdout).text();
+      const exitCode = await result.exited;
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("checkout");
+      expect(stdout).toContain("--force");
+      expect(stdout).toContain("--json");
     });
 
     test.failing("ENG-3490: requires an issue identifier argument", async () => {
@@ -57,50 +64,91 @@ describe("plan checkout command", () => {
     test.failing(
       "ENG-3490: creates description.md at correct path with issue description content",
       async () => {
-        const { createCheckoutCommand } = await getCheckoutModule();
+        // Spawn the real CLI — this will fail until the command is implemented.
+        // When it works, it should fetch the issue from Linear and write
+        // its description to PLAN_CHECKOUT_DIR/ENG-123/description.md.
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "ENG-123"],
+          {
+            env: {
+              ...process.env,
+              LINEAR_API_KEY: "test-key",
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
+        );
 
-        // The checkout command should fetch the issue from Linear and write
-        // its description to /tmp/linear/ENG-XXX/description.md.
-        // We test via CLI invocation to verify the full flow.
-        // This will need a mock Linear API or test API key —
-        // for now, verifying the module exports and command structure.
-        const cmd = createCheckoutCommand();
-        expect(cmd.name()).toBe("checkout");
+        const exitCode = await proc.exited;
+        expect(exitCode).toBe(0);
 
-        // Verify the command accepts an <id> argument
-        const args = cmd.registeredArguments;
-        expect(args.length).toBeGreaterThanOrEqual(1);
+        const descPath = join(TEST_BASE_DIR, "ENG-123", "description.md");
+        expect(existsSync(descPath)).toBe(true);
+
+        const content = readFileSync(descPath, "utf-8");
+        // description.md should contain the issue description (non-empty for a real issue)
+        expect(content.length).toBeGreaterThan(0);
       }
     );
 
     test.failing(
       "ENG-3490: creates .meta.json sidecar with correct fields",
       async () => {
-        const { createCheckoutCommand } = await getCheckoutModule();
+        // Test via lazy import of a writeCheckoutMeta helper.
+        // The helper should write a .meta.json sidecar with the expected shape.
+        const { writeCheckoutMeta } = await getCheckoutModule();
 
-        // The .meta.json sidecar should contain:
-        // - identifier: the issue identifier (e.g., "ENG-123")
-        // - id: the Linear issue UUID
-        // - fetchedAt: ISO timestamp of when description was fetched
-        // - descriptionHash: hash of the description content for change detection
-        const cmd = createCheckoutCommand();
-        expect(cmd.name()).toBe("checkout");
+        const issueDir = join(TEST_BASE_DIR, "ENG-200");
+        mkdirSync(issueDir, { recursive: true });
 
-        // When implementation exists, we'd invoke the command with a mock client
-        // and verify the sidecar file contents. For now, assert the command exists.
-        expect(cmd.description()).toBeTruthy();
+        const now = new Date().toISOString();
+        await writeCheckoutMeta(issueDir, {
+          identifier: "ENG-200",
+          id: "uuid-200",
+          fetchedAt: now,
+          descriptionHash: "sha256-abc123",
+        });
+
+        const metaPath = join(issueDir, ".meta.json");
+        expect(existsSync(metaPath)).toBe(true);
+
+        const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+        expect(meta.identifier).toBe("ENG-200");
+        expect(meta.id).toBe("uuid-200");
+        expect(meta.fetchedAt).toBe(now);
+        expect(meta.descriptionHash).toBe("sha256-abc123");
       }
     );
 
     test.failing(
       "ENG-3490: creates empty description.md when issue has no description",
       async () => {
-        const { createCheckoutCommand } = await getCheckoutModule();
+        // Spawn CLI for an issue that has a null/empty description.
+        // The command should still create description.md — just empty.
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "ENG-999"],
+          {
+            env: {
+              ...process.env,
+              LINEAR_API_KEY: "test-key",
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
+        );
 
-        // Issues with null or empty description should still produce a
-        // description.md file — it should just be empty.
-        const cmd = createCheckoutCommand();
-        expect(cmd.name()).toBe("checkout");
+        const exitCode = await proc.exited;
+        expect(exitCode).toBe(0);
+
+        const descPath = join(TEST_BASE_DIR, "ENG-999", "description.md");
+        expect(existsSync(descPath)).toBe(true);
+
+        // File should exist but may be empty (null description case).
+        // We verify the file was created regardless of content.
+        const content = readFileSync(descPath, "utf-8");
+        expect(typeof content).toBe("string");
       }
     );
 
@@ -150,16 +198,45 @@ describe("plan checkout command", () => {
     test.failing(
       "ENG-3490: overwrites when --force is used on existing checkout",
       async () => {
-        const { createCheckoutCommand } = await getCheckoutModule();
+        // Set up existing checkout with known content
+        const issueDir = join(TEST_BASE_DIR, "ENG-100");
+        mkdirSync(issueDir, { recursive: true });
+        writeFileSync(join(issueDir, "description.md"), "stale content");
+        writeFileSync(
+          join(issueDir, ".meta.json"),
+          JSON.stringify({
+            identifier: "ENG-100",
+            id: "uuid-100",
+            fetchedAt: "2020-01-01T00:00:00.000Z",
+            descriptionHash: "old-hash",
+          })
+        );
 
         // With --force, the command should overwrite existing files
-        const cmd = createCheckoutCommand();
-
-        // Verify --force option exists
-        const forceOpt = cmd.options.find(
-          (o) => o.long === "--force"
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "ENG-100", "--force"],
+          {
+            env: {
+              ...process.env,
+              LINEAR_API_KEY: "test-key",
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
         );
-        expect(forceOpt).toBeDefined();
+
+        const exitCode = await proc.exited;
+        expect(exitCode).toBe(0);
+
+        // description.md should have been overwritten (content differs from "stale content")
+        const content = readFileSync(join(issueDir, "description.md"), "utf-8");
+        expect(content).not.toBe("stale content");
+
+        // .meta.json should have a newer fetchedAt timestamp
+        const meta = JSON.parse(readFileSync(join(issueDir, ".meta.json"), "utf-8"));
+        expect(meta.fetchedAt).not.toBe("2020-01-01T00:00:00.000Z");
+        expect(meta.identifier).toBe("ENG-100");
       }
     );
   });
@@ -180,54 +257,119 @@ describe("plan checkout command", () => {
         expect(exitCode).toBe(2);
       }
     );
+
+    test.failing(
+      "ENG-3490: exits with code 3 when issue is not found",
+      async () => {
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "ENG-99999"],
+          {
+            env: {
+              ...process.env,
+              LINEAR_API_KEY: "test-key",
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
+        );
+
+        const stderr = await new Response(proc.stderr).text();
+        const exitCode = await proc.exited;
+
+        expect(exitCode).toBe(3);
+        expect(stderr).toMatch(/not found|does not exist/i);
+      }
+    );
+  });
+
+  describe("identifier normalization", () => {
+    test.failing(
+      "ENG-3490: numeric ID '123' produces directory named ENG-123",
+      async () => {
+        // `plan checkout 123` should normalize to ENG-123 and create
+        // PLAN_CHECKOUT_DIR/ENG-123/, not PLAN_CHECKOUT_DIR/123/
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "123"],
+          {
+            env: {
+              ...process.env,
+              LINEAR_API_KEY: "test-key",
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
+        );
+
+        const exitCode = await proc.exited;
+        expect(exitCode).toBe(0);
+
+        // Should use normalized identifier ENG-123, not raw "123"
+        const normalizedDir = join(TEST_BASE_DIR, "ENG-123");
+        const rawDir = join(TEST_BASE_DIR, "123");
+
+        expect(existsSync(normalizedDir)).toBe(true);
+        expect(existsSync(rawDir)).toBe(false);
+      }
+    );
   });
 
   describe("output", () => {
     test.failing(
       "ENG-3490: JSON output contains identifier, path, and fetchedAt",
       async () => {
-        const { createCheckoutCommand } = await getCheckoutModule();
-
-        // When --json is used, the output should be:
-        // { "identifier": "ENG-XXX", "path": "/tmp/linear/ENG-XXX/description.md", "fetchedAt": "..." }
-        const cmd = createCheckoutCommand();
-
-        // Verify the --json option exists on the command
-        const jsonOpt = cmd.options.find(
-          (o) => o.long === "--json"
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "ENG-123", "--json"],
+          {
+            env: {
+              ...process.env,
+              LINEAR_API_KEY: "test-key",
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
         );
-        expect(jsonOpt).toBeDefined();
+
+        const stdout = await new Response(proc.stdout).text();
+        const exitCode = await proc.exited;
+
+        expect(exitCode).toBe(0);
+
+        const parsed = JSON.parse(stdout);
+        expect(parsed.identifier).toBe("ENG-123");
+        expect(parsed.path).toContain("ENG-123");
+        expect(parsed.path).toContain("description.md");
+        expect(parsed.fetchedAt).toBeTruthy();
+        // fetchedAt should be a valid ISO timestamp
+        expect(new Date(parsed.fetchedAt).toISOString()).toBe(parsed.fetchedAt);
       }
     );
 
     test.failing(
       "ENG-3490: human output contains 'Checked out' and file path",
       async () => {
-        const { createCheckoutCommand } = await getCheckoutModule();
+        const proc = Bun.spawn(
+          ["bun", CLI_PATH, "checkout", "ENG-123"],
+          {
+            env: {
+              ...process.env,
+              LINEAR_API_KEY: "test-key",
+              PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            },
+            stderr: "pipe",
+            stdout: "pipe",
+          }
+        );
 
-        // Human-readable output should say something like:
-        // "Checked out ENG-XXX description -> /tmp/linear/ENG-XXX/description.md"
-        const cmd = createCheckoutCommand();
-        expect(cmd.name()).toBe("checkout");
-      }
-    );
-  });
+        const stdout = await new Response(proc.stdout).text();
+        const exitCode = await proc.exited;
 
-  describe("integration with existing commands", () => {
-    test.failing(
-      "ENG-3490: plan update --description-file still works with checked-out file path",
-      async () => {
-        // This test verifies that the checkout path is compatible with
-        // the existing --description-file flag on plan update.
-        // The checked-out description.md should be readable by plan update.
-        const { createCheckoutCommand } = await getCheckoutModule();
-
-        const cmd = createCheckoutCommand();
-        expect(cmd.name()).toBe("checkout");
-
-        // The path format /tmp/linear/ENG-XXX/description.md should be
-        // a valid path for: plan update ENG-XXX --description-file <path>
-        // This is a design constraint, not a runtime test.
+        expect(exitCode).toBe(0);
+        expect(stdout).toMatch(/checked out/i);
+        expect(stdout).toContain("ENG-123");
+        expect(stdout).toContain("description.md");
       }
     );
   });
