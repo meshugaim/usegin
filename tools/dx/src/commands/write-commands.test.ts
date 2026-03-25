@@ -942,6 +942,24 @@ describe("buildInteractiveOptions", () => {
     const options = buildInteractiveOptions(ctx);
     expect(options).toEqual([]);
   });
+
+  test("includes source info in hint for overridden features", () => {
+    const ctx = makeContext({
+      config: makeConfig(),
+      local: { overrides: { autosync: true } },
+      env: { USER: "nitsan" },
+    });
+
+    const options = buildInteractiveOptions(ctx);
+
+    // ci-watcher is user-overridden for nitsan (OFF) — hint should indicate source
+    const ciWatcher = options.find((o) => o.value === "ci-watcher")!;
+    expect(ciWatcher.hint).toContain("personal");
+
+    // autosync has a local override — hint should indicate source
+    const autosync = options.find((o) => o.value === "autosync")!;
+    expect(autosync.hint).toContain("local");
+  });
 });
 
 // ===========================================================================
@@ -988,6 +1006,33 @@ describe("buildMultiselectConfig", () => {
     const config = buildMultiselectConfig(options);
 
     expect(config.initialValues).toEqual([]);
+  });
+
+  test("includes source info in labels for overridden features", () => {
+    // End-to-end: build options from a context where ci-watcher has a
+    // user-override and autosync has a local override, then transform
+    // through buildMultiselectConfig. The final picker labels should
+    // surface the source so the user knows *why* a feature is on/off.
+    const ctx = makeContext({
+      config: makeConfig(),
+      local: { overrides: { autosync: true } },
+      env: { USER: "nitsan" },
+    });
+
+    const options = buildInteractiveOptions(ctx);
+    const config = buildMultiselectConfig(options);
+
+    // ci-watcher is user-overridden for nitsan — label should say "(personal)"
+    const ciLabel = config.options.find(
+      (o) => o.value === "ci-watcher",
+    )!.label;
+    expect(ciLabel).toContain("personal");
+
+    // autosync has a local override — label should say "(local)"
+    const syncLabel = config.options.find(
+      (o) => o.value === "autosync",
+    )!.label;
+    expect(syncLabel).toContain("local");
   });
 });
 

@@ -216,6 +216,45 @@ describe("formatStatus", () => {
     // Should still show user, just no feature rows
     expect(output).toContain("User: nitsan");
   });
+
+  test("includes source labels for non-default features", () => {
+    const data: StatusData = {
+      user: "nitsan",
+      features: {
+        "ci-watcher": {
+          enabled: false,
+          source: "user-override",
+          description: "Monitor CI",
+        },
+        autopull: {
+          enabled: true,
+          source: "local-override",
+          description: "Poll main",
+        },
+        autosync: {
+          enabled: false,
+          source: "default",
+          description: "Push after commit",
+        },
+      },
+    };
+
+    const output = formatStatus(data);
+    const lines = output.split("\n");
+
+    // User-overridden features should show "(personal)" on the feature line
+    const ciLine = lines.find((l) => l.includes("ci-watcher"))!;
+    expect(ciLine).toContain("(personal)");
+
+    // Local-overridden features should show "(local)" on the feature line
+    const pullLine = lines.find((l) => l.includes("autopull"))!;
+    expect(pullLine).toContain("(local)");
+
+    // Default features should NOT show a source label
+    const syncLine = lines.find((l) => l.includes("autosync"))!;
+    expect(syncLine).not.toContain("(personal)");
+    expect(syncLine).not.toContain("(local)");
+  });
 });
 
 // ===========================================================================
