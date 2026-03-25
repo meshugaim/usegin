@@ -94,6 +94,8 @@ export function parseGrepOutput(
 
   for (const line of output.trim().split("\n")) {
     if (!line) continue;
+    // Skip the dx tool's own code — tests and SDK docs inflate counts
+    if (line.startsWith("tools/dx/")) continue;
     for (const feature of features) {
       if (line.includes(feature)) {
         results[feature]++;
@@ -153,7 +155,9 @@ export function grepGateCounts(features: string[]): Record<string, number> {
       "--exclude-dir=node_modules",
       "--exclude-dir=.venv",
       "--exclude-dir=.next",
-      "--exclude-dir=tools/dx",
+      "--exclude-dir=dx",
+      "--exclude=*.test.ts",
+      "--exclude=*.test.tsx",
       combinedPattern,
       ...searchDirs,
     ],
