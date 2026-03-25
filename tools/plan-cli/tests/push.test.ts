@@ -272,8 +272,14 @@ describe("plan push command", () => {
     );
 
     test.failing(
-      "ENG-3491: exits with code 1 when no checkout directory exists",
+      "ENG-3491: exits with code 1 when checkout directory exists but .meta.json is missing",
       async () => {
+        // Directory exists with description.md but no .meta.json — corrupted checkout
+        const issueDir = join(TEST_BASE_DIR, "ENG-77777");
+        mkdirSync(issueDir, { recursive: true });
+        writeFileSync(join(issueDir, "description.md"), "orphaned file");
+        // No .meta.json written
+
         const proc = Bun.spawn(
           ["bun", CLI_PATH, "push", "ENG-77777"],
           {
@@ -290,7 +296,6 @@ describe("plan push command", () => {
         const exitCode = await proc.exited;
 
         expect(exitCode).toBe(1);
-        // Must be a push-specific error about the missing checkout, not a generic CLI error
         expect(stderr).toMatch(/no checkout|not checked out|not found/i);
       }
     );
@@ -389,6 +394,36 @@ describe("plan push command", () => {
 
         expect(exitCode).toBe(0);
         expect(stdout).toBe("");
+      }
+    );
+  });
+
+  describe("identifier normalization", () => {
+    test.failing(
+      "ENG-3491: numeric ID '3490' resolves to ENG-3490 checkout directory",
+      async () => {
+        // Set up checkout under the normalized name ENG-3490
+        const description = "Content for normalization test";
+        const { descPath } = setupCheckout("ENG-3490", description);
+        writeFileSync(descPath, "Updated via numeric ID");
+
+        // Push using the short numeric ID
+        const proc = Bun.spawn(["bun", CLI_PATH, "push", "3490"], {
+          env: {
+            ...process.env,
+            PLAN_CHECKOUT_DIR: TEST_BASE_DIR,
+            PLAN_OUTPUT: "human",
+          },
+          stderr: "pipe",
+          stdout: "pipe",
+        });
+
+        const stdout = await new Response(proc.stdout).text();
+        const exitCode = await proc.exited;
+
+        expect(exitCode).toBe(0);
+        expect(stdout).toMatch(/pushed/i);
+        expect(stdout).toContain("ENG-3490");
       }
     );
   });
