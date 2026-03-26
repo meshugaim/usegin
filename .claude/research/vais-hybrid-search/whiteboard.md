@@ -1,49 +1,156 @@
-# Research: Making VAIS Hybrid Search Functional
+# Research: VAIS Hybrid Search — Complete Findings
 
-## Current State
-Phase: COMPLETE | Status: PROVEN — hybrid search works, with caveats
-Last checkpoint: Phase 3 confirmed ordering changes with larger corpus (12 queries, 3 trials, 100% consistent)
+**Date:** 2026-03-26
+**Status:** COMPLETE
+**Experiments:** `python-services/experiments/vais_hybrid_*.py`, `vais_keyword_retrieval_test.py`
 
-## Verdict
+---
 
-**VAIS hybrid search IS functional.** The `ranking_expression` with `RANK_BY_FORMULA` works as documented. Our original experiment had two flaws that made it appear broken:
+## Executive Summary
 
-1. **We read `chunk.relevance_score`** — this is ALWAYS pinned to `semantic_similarity_score`, regardless of the formula. It never reflects the composite score. This is by design.
-2. **Our corpus was too small** — only 2 relevant results where keyword-strong already ranked #1 on both signals, so reordering was invisible.
+VAIS (Vertex AI Search / Discovery Engine) performs **hybrid retrieval by default** — both keyword (BM25) and semantic (embedding) retrieval run in parallel on every search. This is baked into the architecture, not configurable, and has been active since we started using VAIS. No production code changes are needed to get hybrid search.
 
-## Proven Facts
+The `ranking_expression` feature (ENG-3474) was a ranking-layer optimization on top of already-hybrid retrieval. It was reverted because it solved a problem that didn't exist: keyword-matching documents were already being retrieved.
 
-| Claim | Status | Evidence |
-|-------|--------|----------|
-| `RANK_BY_FORMULA` is a real feature | PROVEN | GA since Aug 2025, documented, formula evaluated internally |
-| `semantic_similarity_score` and `keyword_similarity_score` are valid variables | PROVEN | `rank_signals` returns real floats (0.87, 2.86, etc.) |
-| The formula changes result ordering | PROVEN | 1-position swap at positions 4-5 across 12 queries, 100% consistent |
-| `chunk.relevance_score` reflects the formula | DISPROVEN | Always equals `semantic_similarity_score` regardless of formula |
-| NaN handling (`fill_nan`) is needed | DISPROVEN | Both signals are populated floats for our data |
-| `embedding_spec` is needed | DISPROVEN | Only needed for `RANK_BY_EMBEDDING` mode (different pipeline) |
+---
 
-## Key Insight
+## What VAIS Does On Every Search
 
-The effect is **modest** (1-position swap out of 6 results) because VAIS's embedding model already captures term-level signal. Keyword-dense docs score high on BOTH semantic AND keyword axes (keyword-only-1 got the highest semantic score at 0.875). The hybrid formula provides incremental benefit at the margins, not dramatic reordering.
+```
+Query
+  │
+  ├──► Keyword retrieval (BM25/topicality) ──► candidates
+  │                                               │
+  ├──► Semantic retrieval (embeddings)     ──► candidates ──► merge ──► rank ──► results
+  │
+  └──► (both run in parallel, always)
+```
 
-## Production Recommendations
+| Stage | What happens | Configurable? | Our status |
+|-------|-------------|---------------|------------|
+| **Retrieval** | Keyword + semantic in parallel, merged | Thresholds via `relevanceFilterSpec` (v1alpha only) | Default (both active) |
+| **Ranking** | Default VAIS ranking or custom `ranking_expression` | Yes, via `RANK_BY_FORMULA` | Default (reverted custom formula) |
+| **Scoring** | `chunk.relevance_score` = semantic similarity always | No | As-is |
 
-1. **Current ranking expression is correct and functional.** No code change needed for the formula itself. The `ranking_expression` and `RANK_BY_FORMULA` in `search_service.py` work.
+---
 
-2. **Consider reading `rank_signals` for composite score.** If we want the displayed relevance score to reflect the hybrid formula (not just semantic similarity), read `result.rank_signals.relevance_score` instead of `chunk.relevance_score`. Optional — depends on whether consumers care about the score value vs just ordering.
+## Proven Facts (with experimental evidence)
 
-3. **Consider reciprocal rank formula.** Google's own example uses `rr()`: `0.2 * rr(semantic_similarity_score, 16) + 0.8 * rr(keyword_similarity_score, 16)`. This normalizes the two signals to comparable scales. Our raw `* 0.5 + * 0.5` formula works but the signals have different ranges (semantic: 0-1, keyword: 0-3+), so keyword may dominate in practice. Worth tuning on staging.
+### 1. Keyword retrieval is independently active
 
-4. **No urgent production changes needed.** The formula is working — it just has modest impact because VAIS embeddings already capture keyword signal.
+**Experiment:** Uploaded a gardening plant catalog (`doc-garden-keywords`) containing query terms "budget", "pricing", "cost", "infrastructure" as field labels — zero semantic relevance to finance/technology.
 
-## Phases
+**Result:** Appeared at rank #4 (score 0.685) when searching for "budget pricing cost infrastructure". A document about plants was surfaced purely because it contained query terms.
 
-1. **Documentation & SDK analysis** — DONE (phase-01a-web-docs.md, phase-01b-sdk-proto.md)
-2. **Diagnostic experiment** — DONE (phase-02-diagnostic.md, experiments/vais_hybrid_diagnostic.py)
-3. **Ordering confirmation** — DONE (phase-03-ordering.md, experiments/vais_hybrid_ordering.py)
+**Evidence:** `experiments/vais_keyword_retrieval_test.py` — Test 1
 
-## Dead Ends
-- `ranking_expression` without `RANK_BY_FORMULA` → requires `embedding_spec` (wrong backend)
-- `fill_nan()` — not needed, signals are real floats
-- Comparing `chunk.relevance_score` across conditions — always pinned to semantic score
-- Prior experiments (product_gaps, vertex_ai_search) tested wrong variables and wrong backend
+### 2. Two retrieval paths are independently controllable
+
+**Experiment:** Used `relevanceFilterSpec` (v1alpha REST API) to selectively block each path.
+
+| Condition | Results | Gardening doc | Semantic-only docs |
+|-----------|---------|---------------|-------------------|
+| Default (both paths) | 7 results | Present (rank #4) | Present |
+| Block semantic (`semanticSearchThreshold: HIGH`) | 4 results | **Survives** | **Vanish** |
+| Block keyword (`keywordSearchThreshold: HIGH`) | 6 results | **Vanishes** | **Survive** |
+
+The gardening doc survives when semantic is blocked (keyword path retrieved it) and vanishes when keyword is blocked (semantic path didn't retrieve it). Two independent pipelines, proven.
+
+**Evidence:** `experiments/vais_keyword_retrieval_test.py` — Test 2
+
+### 3. ranking_expression with RANK_BY_FORMULA works (but is optional)
+
+**Experiment:** Compared result ordering with and without `ranking_expression` across 12 queries, 3 trials each.
+
+**Result:** 1-position swap at positions 4-5, 100% consistent. The formula is evaluated and reorders results. Effect is modest because VAIS embeddings already capture keyword signal — keyword-dense docs score high on both axes.
+
+**Key detail:** `chunk.relevance_score` is always pinned to `semantic_similarity_score` regardless of formula. The formula only affects ordering, not the reported score. Composite score available via `result.rank_signals.relevance_score`.
+
+**Evidence:** `experiments/vais_hybrid_ordering.py`, `experiments/vais_hybrid_diagnostic.py`
+
+### 4. rank_signals expose both scoring components
+
+**Experiment:** Inspected `result.rank_signals` on search responses.
+
+**Available signals:**
+- `semantic_similarity_score` — embedding similarity (range: 0-1)
+- `keyword_similarity_score` — BM25/topicality (range: 0-3+)
+- `relevance_score` — composite (shifts with formula)
+- `topicality_rank`, `document_age`, `boosting_factor`, `default_rank`, `pctr_rank`, `custom_signals`
+
+Both keyword and semantic scores are real floats (not NaN). `fill_nan()` is not needed for our data.
+
+**Evidence:** `experiments/vais_hybrid_diagnostic.py`
+
+---
+
+## relevanceFilterSpec — Future Tuning Capability
+
+`relevanceFilterSpec` (Public Preview since Dec 2025) lets you control each retrieval path's aggressiveness independently:
+
+```json
+{
+  "relevanceFilterSpec": {
+    "semanticSearchThreshold": {"relevanceThreshold": "HIGH"},
+    "keywordSearchThreshold": {"relevanceThreshold": "LOW"}
+  }
+}
+```
+
+Threshold values: `LOW`, `MEDIUM`, `HIGH` (higher = stricter = fewer candidates from that path).
+
+**Current status:** v1alpha REST only. Not in our Python SDK (`google-cloud-discoveryengine` v0.16.0). To use it today, we'd need raw REST calls with service account token auth. Worth revisiting when it hits v1 or v1beta.
+
+**Use cases:**
+- Raise keyword threshold if getting too many noisy keyword matches
+- Raise semantic threshold if embeddings surface loosely related content
+- Could help tune precision vs recall per retrieval path
+
+---
+
+## History of Misunderstandings
+
+| Date | What happened | What was wrong |
+|------|---------------|----------------|
+| 2026-02-09 | `vertex_ai_search_experiment.py` phase 9 tested `ranking_expression="relevance_score"` | Used wrong backend (defaulted to `RANK_BY_EMBEDDING`), concluded feature requires `embedding_spec` |
+| 2026-03-12 | `vais_product_gaps_experiment.py` tested `ranking_expression` with metadata fields | Same wrong backend, same wrong conclusion: "FAILED — requires embedding_spec" |
+| 2026-03-25 | ENG-3474 added `RANK_BY_FORMULA` + `ranking_expression` to production | Correct backend, but unit test mocked SDK — no real verification |
+| 2026-03-26 | This research: compared `chunk.relevance_score` across conditions | Wrong field — always pinned to semantic score, made feature look broken |
+| 2026-03-26 | Inspected `rank_signals`, ran larger corpus test | Proved formula works, but effect is modest |
+| 2026-03-26 | Investigated retrieval layer | Discovered VAIS already does hybrid retrieval by default — the whole ranking exercise was unnecessary |
+| 2026-03-26 | Reverted ENG-3474 | Ranking formula was optional optimization on top of already-hybrid retrieval |
+
+---
+
+## Production Status
+
+**Current state (after revert):**
+- Hybrid retrieval: **active** (always on, by architecture)
+- Hybrid ranking: **default VAIS ranking** (no custom formula)
+- No production code changes needed
+
+**Optional future improvements (not urgent):**
+1. `relevanceFilterSpec` — tune keyword vs semantic retrieval aggressiveness (when SDK supports it)
+2. `ranking_expression` — re-add if we find specific cases where default ranking produces poor results
+3. `rank_signals` — read composite score if consumers need it for display/filtering
+
+---
+
+## Experiment Files
+
+| File | What it does |
+|------|-------------|
+| `experiments/vais_hybrid_search_experiment.py` | Initial 3-doc verification (showed feature appeared broken) |
+| `experiments/vais_hybrid_diagnostic.py` | Inspects rank_signals, tests fill_nan/rr formulas |
+| `experiments/vais_hybrid_ordering.py` | Proves ordering changes with 8-doc corpus |
+| `experiments/vais_keyword_retrieval_test.py` | Proves independent keyword retrieval path via gardening doc + relevanceFilterSpec |
+| `.claude/research/vais-hybrid-search/phases/` | Detailed phase findings (gitignored) |
+
+---
+
+## Test Infrastructure (still alive on effi-vais-v1-dev)
+
+- DataStore: `hybrid-exp-cd64300f`
+- Engine: `hybrid-eng-cd64300f`
+- 9 docs indexed (3 original + 5 ordering test + 1 gardening)
+- Clean up with: `uv run python experiments/vais_hybrid_search_experiment.py` (without `--no-cleanup`)
