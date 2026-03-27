@@ -7,7 +7,15 @@
     "gfs-sync-emails": {
       "whiteboard": ".claude/builds/gfs-sync-emails/whiteboard.md",
       "skill": ".claude/skills/build-liaison/SKILL.md"
+    },
+    "file-content-tools": {
+      "whiteboard": ".claude/builds/file-content-tools/whiteboard.md",
+      "skill": ".claude/skills/build-orchestrate/SKILL.md"
     }
   },
-  "current": "gfs-sync-emails"
+  "current": "file-content-tools",
+  "research": {
+    "whiteboard": ".claude/research/vais-hybrid-search/whiteboard.md",
+    "skill": ".claude/skills/research/SKILL.md"
+  }
 }
