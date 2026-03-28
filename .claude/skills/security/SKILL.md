@@ -244,6 +244,25 @@ Check in with the companion before delivering.
 
 ---
 
+## Tool Failures — Escalate Immediately
+
+External tools (Supabase MCP, Sentry CLI, Railway CLI) sometimes fail for reasons outside your control — MCP disconnected, auth token expired, service unreachable. These are trivial for the user to fix but impossible for you to resolve.
+
+**If any external tool fails on first attempt:**
+1. **Stop.** Do not retry more than once.
+2. **Tell the user immediately** what failed and what you need: "The Supabase MCP returned a connection error. Can you check if it's connected? I need it to query RLS policies."
+3. **Continue investigating other areas** that don't depend on the broken tool. Don't block the entire investigation on one tool.
+4. **When the user confirms it's fixed**, resume the blocked investigation.
+
+**Do not** spend time debugging MCP connections, re-authenticating services, or trying creative workarounds. The user can fix these in seconds. Every minute you spend spinning on a tool failure is a minute wasted. Escalate and move on.
+
+Common failures and what to tell the user:
+- **Supabase MCP**: "Supabase MCP seems disconnected — can you check the MCP connection?"
+- **Sentry CLI**: "Sentry CLI is returning auth errors — can you run `! sentry login` or check the token?"
+- **Railway CLI**: "Railway CLI needs authentication — can you run `! railway login`?"
+
+---
+
 ## Tools & MCPs
 
 | Tool/MCP | Use for |
