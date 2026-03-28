@@ -1,0 +1,99 @@
+{
+  "skill_name": "spec",
+  "evals": [
+    {
+      "id": 1,
+      "name": "notifications",
+      "prompt": "we need to add notification preferences per project — email, slack, or both. right now everyone gets email for everything",
+      "expected_output": "A complete spec with ACs covering: preference CRUD, per-project scoping, channel types (email/slack/both), default behavior, migration for existing users, UI for the preferences panel, notification delivery respecting preferences, edge cases (invalid channel, project deletion)",
+      "files": [],
+      "assertions": [
+        "Spec contains a numbered acceptance criteria table with #, Criterion, and Level columns",
+        "Every AC has a valid test level (one of: unit, integration-db, integration-browser, integration-llm, e2e, visual)",
+        "Spec has at least 8 acceptance criteria",
+        "Spec has an Overview section explaining the feature purpose and mental model",
+        "Spec references specific files from the codebase (actual paths, not hypothetical)",
+        "Spec includes a Data Model section with table/column changes",
+        "ACs cover core happy path: user sets preference and notifications follow it",
+        "ACs cover at least one error/failure scenario",
+        "ACs cover edge cases (e.g. project deletion, no preference set = default behavior)",
+        "ACs explicitly address per-project scoping (not just global preferences)",
+        "ACs cover all three channel modes: email-only, slack-only, and both",
+        "Spec addresses migration from current behavior to new system",
+        "Spec does not prescribe test code, mock strategies, or specific function signatures"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "action-items",
+      "prompt": "spec for: auto-extract action items from synced meetings and create tasks in the user's Linear workspace",
+      "expected_output": "A complete spec with ACs covering: LLM extraction from transcripts, task creation via Linear API, duplicate detection, mapping assignees, error handling (Linear auth failure, no transcript), extraction quality, UI for review/approval, toggle behavior",
+      "files": [],
+      "assertions": [
+        "Spec contains a numbered acceptance criteria table with #, Criterion, and Level columns",
+        "Every AC has a valid test level",
+        "Spec has at least 8 acceptance criteria",
+        "Spec has an Overview section",
+        "Spec references specific files from the codebase",
+        "Spec includes a Data Model section with table/column changes",
+        "ACs cover LLM-based action item extraction from meeting transcripts",
+        "ACs cover task creation in Linear via API",
+        "ACs cover error scenarios (e.g. Linear auth failure, no transcript, extraction failure)",
+        "ACs address duplicate detection or re-extraction behavior",
+        "ACs cover UI for reviewing or managing extracted action items",
+        "Spec defines when extraction triggers (on sync? on demand? on enrichment completion?)",
+        "Spec does not prescribe test code, mock strategies, or specific function signatures"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "bucket-prefixes",
+      "prompt": "the file upload stores everything in one bucket. we need workspace-scoped bucket prefixes and migrate existing files",
+      "expected_output": "A complete spec with ACs covering: new upload path with workspace prefix, read/serve from new paths, migration strategy for existing files, backwards compatibility during migration, RLS implications, error handling, rollback plan",
+      "files": [],
+      "assertions": [
+        "Spec contains a numbered acceptance criteria table with #, Criterion, and Level columns",
+        "Every AC has a valid test level",
+        "Spec has at least 8 acceptance criteria",
+        "Spec has an Overview section",
+        "Spec references specific files from the codebase",
+        "Spec includes a Data Model or storage changes section",
+        "ACs cover new uploads going to workspace-scoped prefixes",
+        "ACs cover reading/serving files from the new paths",
+        "ACs cover migration strategy for existing files",
+        "ACs address backwards compatibility during migration",
+        "ACs cover error/edge cases (e.g. missing workspace, file not found during migration)",
+        "Spec addresses RLS or access control implications",
+        "Spec does not prescribe test code, mock strategies, or specific function signatures"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "meeting-rules",
+      "prompt": "The current meeting scoping system is too noisy — it uses bootstrap mode, a ≥2 project members algorithm, and a blocklist. We need to replace all of that with user-defined inclusion rules. Two types: people rules (match meetings by attendee emails, with two groups for 'A met with B' patterns) and topic rules (match meetings by subject matter using LLM). Rules should be additive — each rule can only include, never exclude. Manual overrides still work. When a match is uncertain (fuzzy name match or LLM unsure), the meeting should be flagged as 'unsure' and stay excluded until the user confirms.",
+      "expected_output": "A spec comparable to docs/specs/meeting-inclusion-rules.md — covering rules engine, evaluation logic, confidence model, data model, UI for rule management, migration from old system, re-evaluation semantics, and comprehensive ACs",
+      "files": ["docs/specs/meeting-inclusion-rules.md"],
+      "assertions": [
+        "Spec contains a numbered acceptance criteria table with #, Criterion, and Level columns",
+        "Every AC has a valid test level",
+        "Spec has at least 15 acceptance criteria",
+        "Spec has an Overview section with exclude-by-default mental model",
+        "Spec references specific codebase files (meeting_scoping.py, fathom.py, meeting tables, etc.)",
+        "Spec includes a Data Model section with new tables and column changes",
+        "ACs cover people rule matching with both groups populated (A AND B)",
+        "ACs cover people rule matching with one empty group",
+        "ACs cover people rule with both groups empty (matches nothing)",
+        "ACs cover topic rule with confident LLM match → included",
+        "ACs cover topic rule with uncertain LLM match → unsure",
+        "ACs cover manual force-include and force-exclude overrides",
+        "ACs cover re-evaluation on rule changes and new meeting sync",
+        "Spec distinguishes high vs low confidence → included vs unsure",
+        "ACs cover rule deletion triggering re-evaluation",
+        "ACs cover additive rule semantics (union of matches)",
+        "Spec addresses removal of old system (bootstrap, ≥2 members, blocklist)",
+        "Spec includes UI section for rule management interface",
+        "Spec does not prescribe test code, mock strategies, or specific function signatures"
+      ]
+    }
+  ]
+}
