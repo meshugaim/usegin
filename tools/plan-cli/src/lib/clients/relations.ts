@@ -4,6 +4,7 @@
 
 import type { LinearClient as LinearSDK } from "@linear/sdk";
 import type { PlanIssue } from "../../types";
+import { addActorToComment } from "../session-tracking";
 
 export class RelationsClient {
   constructor(
@@ -135,7 +136,7 @@ export class RelationsClient {
     this.trackCall();
     await this.sdk.createComment({
       issueId: issue.id,
-      body,
+      body: addActorToComment(body),
     });
   }
 }
