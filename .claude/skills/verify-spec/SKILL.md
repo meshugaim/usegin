@@ -7,7 +7,7 @@ description: Verify a completed spec's implementation against its acceptance cri
 
 Systematically verify a completed spec's implementation against its acceptance criteria — through automated test checks and targeted manual testing via sub-agents.
 
-**Pipeline:** `writing-specs` → `slicing-specs` → `implementing-specs` (via `auto-implement` CLI) → **`verify-spec`** (you are here)
+**Pipeline:** `spec` → `slicing-specs` → `implementing-specs` (via `auto-implement` CLI) → **`verify-spec`** (you are here)
 
 **Prerequisites:** All slices are done (closed in Linear), tests are passing, code is pushed. Typically triggered after `auto-implement` completes with outcome `complete`, or after manual implementation finishes.
 

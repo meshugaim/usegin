@@ -7,7 +7,7 @@ description: This skill guides implementation from spec documents. Triggered by 
 
 Turn specs into working software through vertical slices, TDD, and continuous alignment.
 
-**Pipeline:** `writing-specs` → `slicing-specs` → **`implementing-specs`** (you are here)
+**Pipeline:** `spec` → `slicing-specs` → **`implementing-specs`** (you are here)
 
 **When to use this vs alternatives:** This skill is for human-collaborative implementation — the user is present, guiding priorities, and making decisions. For autonomous execution of well-understood work, consider `cell` or `teamwork`. For pure TDD loops on isolated modules, consider `worker-reviewer`.
 

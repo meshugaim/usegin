@@ -1,9 +1,13 @@
 ---
 name: writing-specs
-description: This skill writes spec documents interactively. Triggered by "let's write a spec", "spec for XXX", "document this feature", or "create a spec".
+description: "DEPRECATED — use the `spec` skill instead. This skill is kept for reference only. The `spec` skill replaces writing-specs with a conversation-first approach that minimizes human reading time."
 ---
 
-# Writing Specs
+# Writing Specs (DEPRECATED)
+
+**This skill is deprecated. Use `spec` instead.** The `spec` skill replaces this with a conversation-first approach — the human aligns on acceptance criteria through discussion, then the agent writes the full spec autonomously.
+
+---
 
 Build specs collaboratively through understanding, questioning, and section-by-section refinement.
 
