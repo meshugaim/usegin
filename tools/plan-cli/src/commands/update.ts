@@ -5,7 +5,7 @@ import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
 import { normalizeIssueId } from "../lib/identifier";
 import { shouldDefaultToJson } from "../lib/output-mode";
-import { parseMeta, buildMetaDescription } from "../lib/plan-meta";
+import { parseMeta, buildMetaDescription, type PlanMeta } from "../lib/plan-meta";
 
 export function createUpdateCommand(): Command {
   const cmd = new Command("update")

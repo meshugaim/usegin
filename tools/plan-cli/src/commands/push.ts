@@ -10,7 +10,7 @@ import {
   readCheckoutMeta,
   hashDescription,
 } from "../lib/checkout-meta";
-import { parseMeta, buildMetaDescription } from "../lib/plan-meta";
+import { parseMeta, buildMetaDescription, type PlanMeta } from "../lib/plan-meta";
 
 const DEFAULT_CHECKOUT_DIR = "/tmp/linear/";
 
