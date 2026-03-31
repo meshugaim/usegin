@@ -158,10 +158,7 @@ describe("plan-meta update: --append-description preserves meta (AC-8)", () => {
         ["update", identifier, "--description", "Hello"],
         { CLAUDE_SESSION_ID: "session-append-1" }
       );
-      // Note: this update may or may not preserve meta depending on current impl.
-      // We just need the description to be "Hello" with some meta block.
-      // If the update doesn't preserve meta, we'll set it up differently.
-      // For robustness, let's check and only require the AC-8 specific behavior.
+      expect(setDescExit).toBe(0);
 
       // Step 2: Append "World" with a different session
       const { exitCode: appendExit } = await runPlan(
@@ -183,6 +180,9 @@ describe("plan-meta update: --append-description preserves meta (AC-8)", () => {
 
       // last_session should be the append session
       expect(metaAfter!.last_session).toBe("session-append-2");
+
+      // created_by_session should be preserved from original creation
+      expect(metaAfter!.created_by_session).toBe("session-append-1");
 
       // sessions should contain the append session
       expect(metaAfter!.sessions).toContain("session-append-2");
@@ -415,6 +415,8 @@ describe("plan-meta show: JSON output includes meta field (AC-13)", () => {
     expect(parsed.description).not.toContain("<!-- plan:meta");
   });
 
+  // Not test.failing: the baseline no-meta behavior already works —
+  // formatShowJson returns the raw description, and meta field is absent.
   test("AC-13: formatShowJson with no meta block returns meta as null or undefined", () => {
     const mockIssueNoMeta: PlanIssueDetail = {
       id: "issue-no-meta",
