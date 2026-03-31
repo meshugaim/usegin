@@ -191,6 +191,21 @@ describe("parseMeta", () => {
     }
   );
 
+  test("parses sessions from inline comma-separated format", () => {
+    const input = [
+      "Description",
+      "",
+      "<!-- plan:meta",
+      "created_by_session: abc123",
+      "sessions: abc123, def456, ghi789",
+      "-->",
+    ].join("\n");
+
+    const result = parseMeta(input);
+    expect(result.meta).not.toBeNull();
+    expect(result.meta!.sessions).toEqual(["abc123", "def456", "ghi789"]);
+  });
+
   test(
     "ENG-3763: handles meta block without sessions field (older format)",
     () => {

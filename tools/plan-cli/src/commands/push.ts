@@ -109,6 +109,7 @@ async function runPush(
       // Create fresh meta (without created_by_session since we don't know who created it)
       const now = new Date().toISOString();
       const freshMeta: PlanMeta = {
+        created_at: now,
         last_session: sessionId,
         updated_at: now,
         sessions: [sessionId],
