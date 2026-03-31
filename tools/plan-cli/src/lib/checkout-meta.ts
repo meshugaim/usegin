@@ -1,5 +1,6 @@
 import { writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { parseMeta } from "./plan-meta";
 
 /**
  * Metadata sidecar for a checked-out issue description.
@@ -39,7 +40,8 @@ export function readCheckoutMeta(dir: string): CheckoutMeta | null {
  * Compute a sha256 hash of the description content using Bun.CryptoHasher.
  */
 export function hashDescription(content: string): string {
+  const clean = parseMeta(content).description;
   const hasher = new Bun.CryptoHasher("sha256");
-  hasher.update(content);
+  hasher.update(clean);
   return hasher.digest("hex");
 }

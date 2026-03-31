@@ -1,30 +1,15 @@
 import { describe, test, expect } from "bun:test";
-
-/**
- * Failing tests for the plan-meta module (ENG-3763).
- *
- * The module under test (`../src/lib/plan-meta.ts`) does not exist yet.
- * Every test uses `test.failing` so CI stays green while the RED phase
- * documents the expected behavior.
- */
-
-// Lazy import — module doesn't exist yet (TDD red phase).
-// Every test.failing catches the ModuleNotFound error as the expected failure.
-// Convert to static import once plan-meta.ts is created in the green phase.
-async function getPlanMeta() {
-  return await import("../src/lib/plan-meta");
-}
+import { parseMeta, serializeMeta, attachMeta } from "../src/lib/plan-meta";
+import { hashDescription } from "../src/lib/checkout-meta";
 
 // ---------------------------------------------------------------------------
 // parseMeta
 // ---------------------------------------------------------------------------
 
 describe("parseMeta", () => {
-  test.failing(
+  test(
     "ENG-3763: extracts meta block from end of description, returns {description, meta}",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const input = [
         "Fix the login bug",
         "",
@@ -47,11 +32,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: returns meta: null for description with no meta block",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const result = parseMeta("Just a plain description with no metadata.");
 
       expect(result.description).toBe("Just a plain description with no metadata.");
@@ -59,11 +42,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: returns meta: null for empty string",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const result = parseMeta("");
 
       expect(result.description).toBe("");
@@ -71,11 +52,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: handles non-plan HTML comments — leaves them in description, returns meta: null",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const input = "Some content\n\n<!-- TODO: fix this later -->";
 
       const result = parseMeta(input);
@@ -85,11 +64,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: returns meta: null for malformed YAML inside meta block (resilient, no throw)",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const input = [
         "Description here",
         "",
@@ -109,11 +86,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: does NOT match meta block in the middle of content (only end-of-string)",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const input = [
         "Before the block",
         "",
@@ -132,11 +107,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: tolerates trailing whitespace/newlines after -->",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const input = [
         "Description",
         "",
@@ -155,11 +128,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: parses sessions array from YAML list syntax",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const input = [
         "Description",
         "",
@@ -179,10 +150,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: handles multiple blank lines before meta block",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
+    () => {
       const input = "Description\n\n\n\n<!-- plan:meta\nlast_session: sess-1\n-->";
       const result = parseMeta(input);
       expect(result.description).toBe("Description");
@@ -191,10 +161,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: returns duplicate session IDs faithfully — dedup is caller's job",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
+    () => {
       const input = [
         "Description",
         "",
@@ -210,10 +179,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: handles undefined/null input gracefully",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
+    () => {
       const result1 = parseMeta(undefined as any);
       expect(result1.description).toBe("");
       expect(result1.meta).toBeNull();
@@ -223,11 +191,9 @@ describe("parseMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: handles meta block without sessions field (older format)",
-    async () => {
-      const { parseMeta } = await getPlanMeta();
-
+    () => {
       const input = [
         "Description",
         "",
@@ -252,11 +218,9 @@ describe("parseMeta", () => {
 // ---------------------------------------------------------------------------
 
 describe("serializeMeta", () => {
-  test.failing(
+  test(
     "ENG-3763: produces correct <!-- plan:meta\\n...\\n--> format",
-    async () => {
-      const { serializeMeta } = await getPlanMeta();
-
+    () => {
       const result = serializeMeta({
         created_by_session: "abc123",
         created_at: "2026-03-30T12:00:00.000Z",
@@ -271,11 +235,9 @@ describe("serializeMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: omits undefined/null fields",
-    async () => {
-      const { serializeMeta } = await getPlanMeta();
-
+    () => {
       const result = serializeMeta({
         created_by_session: "abc123",
         // created_at, last_session, updated_at are all undefined
@@ -289,11 +251,9 @@ describe("serializeMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: quotes timestamp values",
-    async () => {
-      const { serializeMeta } = await getPlanMeta();
-
+    () => {
       const result = serializeMeta({
         created_at: "2026-03-30T12:00:00.000Z",
         updated_at: "2026-03-30T14:30:00.000Z",
@@ -304,11 +264,9 @@ describe("serializeMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: serializes sessions array as YAML - value list",
-    async () => {
-      const { serializeMeta } = await getPlanMeta();
-
+    () => {
       const result = serializeMeta({
         created_by_session: "abc123",
         sessions: ["abc123", "def456"],
@@ -320,10 +278,9 @@ describe("serializeMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: fields are ordered: created_by_session, created_at, last_session, updated_at, sessions",
-    async () => {
-      const { serializeMeta } = await getPlanMeta();
+    () => {
       const result = serializeMeta({
         updated_at: "2026-03-30T14:30:00.000Z",
         created_by_session: "abc123",
@@ -346,11 +303,9 @@ describe("serializeMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: omits sessions when empty array or undefined",
-    async () => {
-      const { serializeMeta } = await getPlanMeta();
-
+    () => {
       const resultEmpty = serializeMeta({
         created_by_session: "abc123",
         sessions: [],
@@ -370,11 +325,9 @@ describe("serializeMeta", () => {
 // ---------------------------------------------------------------------------
 
 describe("attachMeta", () => {
-  test.failing(
+  test(
     "ENG-3763: appends meta block to clean description with blank line separator",
-    async () => {
-      const { attachMeta, parseMeta } = await getPlanMeta();
-
+    () => {
       const description = "Fix the login bug";
       const meta = {
         created_by_session: "abc123",
@@ -394,10 +347,9 @@ describe("attachMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: handles empty description",
-    async () => {
-      const { attachMeta, parseMeta } = await getPlanMeta();
+    () => {
       const result = attachMeta("", { created_by_session: "abc123" });
       // Empty description: meta block follows directly (no leading blank line needed)
       expect(result).toContain("<!-- plan:meta");
@@ -410,10 +362,9 @@ describe("attachMeta", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-3763: does not strip existing meta — caller must pass clean description",
-    async () => {
-      const { attachMeta, parseMeta } = await getPlanMeta();
+    () => {
       // If caller passes description that already has meta, attachMeta double-appends.
       // This documents that stripping is the caller's responsibility.
       const descWithMeta = "Content\n\n<!-- plan:meta\ncreated_by_session: old\n-->";
@@ -432,11 +383,9 @@ describe("attachMeta", () => {
 // ---------------------------------------------------------------------------
 
 describe("round-trip", () => {
-  test.failing(
+  test(
     "ENG-3763: parseMeta(attachMeta(description, meta)) returns original description and meta",
-    async () => {
-      const { parseMeta, attachMeta } = await getPlanMeta();
-
+    () => {
       const description = "A multi-line description\n\nWith paragraphs and **markdown**.";
       const meta = {
         created_by_session: "add7985c-2393-4d54-800a-6fc0030bb0a2",
@@ -468,11 +417,9 @@ describe("round-trip", () => {
 // ---------------------------------------------------------------------------
 
 describe("hashDescription with plan:meta awareness", () => {
-  test.failing(
+  test(
     "ENG-3763: hash of description with meta === hash of same description without meta",
-    async () => {
-      const { hashDescription } = await import("../src/lib/checkout-meta");
-
+    () => {
       const cleanDescription = "Fix the login bug";
       const descriptionWithMeta = [
         "Fix the login bug",
@@ -492,9 +439,7 @@ describe("hashDescription with plan:meta awareness", () => {
 
   test(
     "ENG-3763: hash of two different descriptions with same meta are different",
-    async () => {
-      const { hashDescription } = await import("../src/lib/checkout-meta");
-
+    () => {
       const metaBlock = [
         "",
         "<!-- plan:meta",
@@ -511,9 +456,7 @@ describe("hashDescription with plan:meta awareness", () => {
 
   test(
     "ENG-3763: existing hashDescription behavior unchanged for descriptions without meta",
-    async () => {
-      const { hashDescription } = await import("../src/lib/checkout-meta");
-
+    () => {
       // For descriptions without a meta block, hashDescription should produce
       // the same result as a plain SHA256 hash of the content.
       const content = "A plain description with no meta block";
