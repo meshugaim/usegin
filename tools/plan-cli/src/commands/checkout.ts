@@ -11,6 +11,7 @@ import {
   hashDescription,
   type CheckoutMeta,
 } from "../lib/checkout-meta";
+import { parseMeta } from "../lib/plan-meta";
 
 const DEFAULT_CHECKOUT_DIR = "/tmp/linear/";
 
@@ -65,7 +66,9 @@ async function runCheckout(
       process.exit(3);
     }
 
-    const description = issue.description ?? "";
+    const rawDescription = issue.description ?? "";
+    // Strip plan-meta block from local file — meta lives on Linear only
+    const { description } = parseMeta(rawDescription);
     const fetchedAt = new Date().toISOString();
 
     // Create directory and write files

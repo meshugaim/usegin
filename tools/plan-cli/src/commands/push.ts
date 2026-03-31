@@ -10,6 +10,7 @@ import {
   readCheckoutMeta,
   hashDescription,
 } from "../lib/checkout-meta";
+import { parseMeta, attachMeta, type PlanMeta } from "../lib/plan-meta";
 
 const DEFAULT_CHECKOUT_DIR = "/tmp/linear/";
 
@@ -71,6 +72,7 @@ async function runPush(
 
     // Check staleness: fetch the issue and compare updatedAt to fetchedAt
     let stale = false;
+    let existingMeta: PlanMeta | null = null;
     try {
       const issue = await client.getIssueByIdentifier(identifier);
       if (issue && issue.updatedAt) {
@@ -83,12 +85,42 @@ async function runPush(
           );
         }
       }
+      if (issue) {
+        existingMeta = parseMeta(issue.description ?? "").meta;
+      }
     } catch {
       // If we can't fetch the issue for staleness check, proceed anyway
     }
 
+    // Build the final description with meta if applicable
+    const sessionId = process.env.CLAUDE_SESSION_ID;
+    let finalDescription = description;
+
+    if (sessionId && existingMeta) {
+      // Update existing meta
+      const updatedMeta: PlanMeta = {
+        ...existingMeta,
+        last_session: sessionId,
+        updated_at: new Date().toISOString(),
+        sessions: [...new Set([...(existingMeta.sessions ?? []), sessionId])],
+      };
+      finalDescription = attachMeta(description, updatedMeta);
+    } else if (sessionId && !existingMeta) {
+      // Create fresh meta (without created_by_session since we don't know who created it)
+      const now = new Date().toISOString();
+      const freshMeta: PlanMeta = {
+        last_session: sessionId,
+        updated_at: now,
+        sessions: [sessionId],
+      };
+      finalDescription = attachMeta(description, freshMeta);
+    } else if (existingMeta) {
+      // No session ID but existing meta — preserve it unchanged
+      finalDescription = attachMeta(description, existingMeta);
+    }
+
     // Push the description to Linear
-    await client.updateIssue(identifier, { description });
+    await client.updateIssue(identifier, { description: finalDescription });
 
     // Update meta with new hash and pushedAt
     const pushedAt = new Date().toISOString();

@@ -265,16 +265,14 @@ describe("serializeMeta", () => {
   );
 
   test(
-    "ENG-3763: serializes sessions array as YAML - value list",
+    "ENG-3763: serializes sessions array as comma-separated inline list",
     () => {
       const result = serializeMeta({
         created_by_session: "abc123",
         sessions: ["abc123", "def456"],
       });
 
-      expect(result).toContain("sessions:");
-      expect(result).toContain("  - abc123");
-      expect(result).toContain("  - def456");
+      expect(result).toContain("sessions: abc123, def456");
     }
   );
 

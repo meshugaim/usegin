@@ -52,8 +52,14 @@ export function parseMeta(description: string): {
       const rawValue = line.slice(colonIdx + 1).trim();
 
       if (key === "sessions") {
-        inSessions = true;
-        sessionsList = [];
+        if (rawValue) {
+          // Inline comma-separated format: sessions: id1, id2, id3
+          sessionsList = rawValue.split(",").map(s => stripQuotes(s.trim())).filter(Boolean);
+        } else {
+          // YAML list format (legacy): sessions:\n  - id1\n  - id2
+          inSessions = true;
+          sessionsList = [];
+        }
         continue;
       }
 
@@ -94,10 +100,9 @@ export function serializeMeta(meta: PlanMeta): string {
     if (field === "sessions") {
       const arr = value as string[];
       if (arr.length === 0) continue;
-      lines.push("sessions:");
-      for (const entry of arr) {
-        lines.push(`  - ${entry}`);
-      }
+      // Use comma-separated inline format to avoid Linear markdown mangling
+      // (Linear converts `  - item` YAML lists into `* item` markdown lists)
+      lines.push(`sessions: ${arr.join(", ")}`);
       continue;
     }
 

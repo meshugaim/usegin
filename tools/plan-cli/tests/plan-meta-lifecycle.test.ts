@@ -84,7 +84,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe("plan-meta lifecycle: create", () => {
-  test.failing(
+  test(
     "AC-5: create with CLAUDE_SESSION_ID attaches meta block to description",
     async () => {
       // Create a real issue with CLAUDE_SESSION_ID set
@@ -177,7 +177,7 @@ describe("plan-meta lifecycle: checkout", () => {
     createdIdentifiers.push(checkoutIssueId);
   }, { timeout: 30_000 });
 
-  test.failing(
+  test(
     "AC-10: checkout strips meta block from local description.md",
     async () => {
       // First confirm the issue has a meta block on Linear
@@ -230,7 +230,7 @@ describe("plan-meta lifecycle: push", () => {
     createdIdentifiers.push(pushIssueId);
   }, { timeout: 30_000 });
 
-  test.failing(
+  test(
     "AC-11: push reattaches meta with updated session after local edit",
     async () => {
       // Verify the issue has meta with session-1
