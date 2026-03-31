@@ -5,6 +5,7 @@ import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
 import { normalizeIssueId } from "../lib/identifier";
 import { shouldDefaultToJson } from "../lib/output-mode";
+import { parseMeta, attachMeta, type PlanMeta } from "../lib/plan-meta";
 
 export function createUpdateCommand(): Command {
   const cmd = new Command("update")
@@ -107,8 +108,72 @@ async function runUpdate(
         console.error(`Error: Issue ${identifier} not found`);
         process.exit(3);
       }
-      const existing = issue.description ?? "";
-      finalDescription = existing + (existing ? "\n\n" : "") + opts.appendDescription;
+      const existingRaw = issue.description ?? "";
+      const { description: existingClean, meta: existingMeta } = parseMeta(existingRaw);
+      finalDescription = existingClean + (existingClean ? "\n\n" : "") + opts.appendDescription;
+
+      // Reattach meta (updated or preserved)
+      const sessionId = process.env.CLAUDE_SESSION_ID;
+      if (sessionId && existingMeta) {
+        const updatedMeta: PlanMeta = {
+          ...existingMeta,
+          last_session: sessionId,
+          updated_at: new Date().toISOString(),
+          sessions: [...new Set([...(existingMeta.sessions ?? []), sessionId])],
+        };
+        finalDescription = attachMeta(finalDescription, updatedMeta);
+      } else if (sessionId && !existingMeta) {
+        const now = new Date().toISOString();
+        const freshMeta: PlanMeta = {
+          created_at: now,
+          last_session: sessionId,
+          updated_at: now,
+          sessions: [sessionId],
+        };
+        finalDescription = attachMeta(finalDescription, freshMeta);
+      } else if (existingMeta) {
+        // No session ID but existing meta — preserve unchanged
+        finalDescription = attachMeta(finalDescription, existingMeta);
+      }
+    } else if (finalDescription !== undefined) {
+      // --description or --description-file path: fetch existing meta from Linear
+      let existingMeta: PlanMeta | null = null;
+      try {
+        const issue = await client.getIssueByIdentifier(identifier);
+        if (issue) {
+          existingMeta = parseMeta(issue.description ?? "").meta;
+        }
+      } catch {
+        // If fetch fails, proceed without meta
+      }
+
+      // Strip any meta that might be in the new content (defensive)
+      const { description: cleanNew } = parseMeta(finalDescription);
+      finalDescription = cleanNew;
+
+      // Attach meta (updated or preserved)
+      const sessionId = process.env.CLAUDE_SESSION_ID;
+      if (sessionId && existingMeta) {
+        const updatedMeta: PlanMeta = {
+          ...existingMeta,
+          last_session: sessionId,
+          updated_at: new Date().toISOString(),
+          sessions: [...new Set([...(existingMeta.sessions ?? []), sessionId])],
+        };
+        finalDescription = attachMeta(finalDescription, updatedMeta);
+      } else if (sessionId && !existingMeta) {
+        const now = new Date().toISOString();
+        const freshMeta: PlanMeta = {
+          created_at: now,
+          last_session: sessionId,
+          updated_at: now,
+          sessions: [sessionId],
+        };
+        finalDescription = attachMeta(finalDescription, freshMeta);
+      } else if (existingMeta) {
+        // No session ID but existing meta — preserve unchanged
+        finalDescription = attachMeta(finalDescription, existingMeta);
+      }
     }
 
     // Update opts.description for downstream logic

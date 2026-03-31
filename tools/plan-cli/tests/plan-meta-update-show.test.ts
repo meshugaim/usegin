@@ -80,7 +80,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe("plan-meta update: --description preserves meta (AC-7)", () => {
-  test.failing(
+  test(
     "AC-7: update --description preserves existing created_by_session, updates last_session and sessions",
     async () => {
       // Step 1: Create an issue with meta from session-A
@@ -132,7 +132,7 @@ describe("plan-meta update: --description preserves meta (AC-7)", () => {
 });
 
 describe("plan-meta update: --append-description preserves meta (AC-8)", () => {
-  test.failing(
+  test(
     "AC-8: update --append-description strips meta before appending, then reattaches updated meta",
     async () => {
       // Step 1: Create an issue with meta and a description
@@ -192,7 +192,7 @@ describe("plan-meta update: --append-description preserves meta (AC-8)", () => {
 });
 
 describe("plan-meta update: --description-file preserves meta (AC-9)", () => {
-  test.failing(
+  test(
     "AC-9: update --description-file behaves the same as --description for meta handling",
     async () => {
       // Step 1: Create an issue with meta from session-D-create
@@ -256,7 +256,7 @@ describe("plan-meta update: --description-file preserves meta (AC-9)", () => {
 });
 
 describe("plan-meta update: no CLAUDE_SESSION_ID preserves meta (AC-15)", () => {
-  test.failing(
+  test(
     "AC-15: update without CLAUDE_SESSION_ID still preserves any existing meta block",
     async () => {
       // Step 1: Create an issue with meta from session-E
@@ -340,7 +340,7 @@ describe("plan-meta show: human output displays session ID (AC-12)", () => {
     blocks: [],
   };
 
-  test.failing("AC-12: formatShowHuman displays session ID line when meta is present", () => {
+  test("AC-12: formatShowHuman displays session ID line when meta is present", () => {
     const output = formatShowHuman(mockIssueWithMeta);
     const plain = stripAnsi(output);
 
@@ -352,7 +352,7 @@ describe("plan-meta show: human output displays session ID (AC-12)", () => {
     expect(plain).toContain("abc12345");
   });
 
-  test.failing("AC-12: formatShowHuman strips meta block from rendered description", () => {
+  test("AC-12: formatShowHuman strips meta block from rendered description", () => {
     const output = formatShowHuman(mockIssueWithMeta);
     const plain = stripAnsi(output);
 
@@ -392,7 +392,7 @@ describe("plan-meta show: JSON output includes meta field (AC-13)", () => {
     blocks: [],
   };
 
-  test.failing("AC-13: formatShowJson includes parsed meta as a separate field", () => {
+  test("AC-13: formatShowJson includes parsed meta as a separate field", () => {
     const output = formatShowJson(mockIssueWithMeta);
     const parsed = JSON.parse(output);
 
@@ -406,7 +406,7 @@ describe("plan-meta show: JSON output includes meta field (AC-13)", () => {
     expect(parsed.meta.sessions).toContain("session-json-2");
   });
 
-  test.failing("AC-13: formatShowJson description field is clean (no meta block)", () => {
+  test("AC-13: formatShowJson description field is clean (no meta block)", () => {
     const output = formatShowJson(mockIssueWithMeta);
     const parsed = JSON.parse(output);
 

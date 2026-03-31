@@ -8,6 +8,7 @@ import {
 } from "../colors";
 import { renderMarkdown } from "../markdown";
 import { formatRelativeTime, formatListField } from "./shared";
+import { parseMeta } from "../plan-meta";
 
 /**
  * Format labels as a comma-separated string
@@ -66,12 +67,21 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
     lines.push(`${colors.fieldName("Project:")} ${issue.project}`);
   }
 
+  // Parse meta from description
+  const { description: cleanDescription, meta } = parseMeta(issue.description ?? "");
+
+  // Session (from meta, if present)
+  if (meta?.last_session) {
+    const truncated = meta.last_session.slice(0, 8);
+    lines.push(`${colors.fieldName("Session:")} ${truncated}`);
+  }
+
   // Description
-  if (issue.description) {
+  if (cleanDescription) {
     lines.push("");
     lines.push(colors.fieldName("Description:"));
     // Render markdown with terminal formatting and indent
-    lines.push(renderMarkdown(issue.description, "  "));
+    lines.push(renderMarkdown(cleanDescription, "  "));
   }
 
   // Sub-issues
@@ -112,12 +122,14 @@ export function formatShowHuman(issue: PlanIssueDetail): string {
  * Format a single issue for `plan show` - JSON output
  */
 export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEntry[], treeContext?: IssueTreeContext): string {
+  const { description: cleanDescription, meta: issueMeta } = parseMeta(issue.description ?? "");
+
   const output: Record<string, unknown> = {
     id: issue.id,
     identifier: issue.identifier,
     title: issue.title,
     url: issue.url,
-    description: issue.description,
+    description: cleanDescription,
     status: issue.status,
     sortOrder: issue.sortOrder,
     position: issue.position,
@@ -133,6 +145,7 @@ export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEnt
     blockedBy: issue.blockedBy,
     blocks: issue.blocks,
     commentCount: issue.commentCount,
+    meta: issueMeta ?? undefined,
   };
 
   // Include comments if present
