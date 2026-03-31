@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
+import { LinearClient as LinearSDK } from "@linear/sdk";
 import { parseMeta } from "../src/lib/plan-meta";
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
@@ -8,9 +9,8 @@ const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
 // Use unique temp dirs per test run to avoid conflicts with parallel agents
 const TEST_BASE_DIR = `/tmp/linear-test-meta-lifecycle-${Date.now()}`;
 
-// Track created issue identifiers for cleanup/reuse across tests
-let issueWithMeta: string | null = null;
-let issueWithoutMeta: string | null = null;
+// Track created issue identifiers for cleanup after all tests
+const createdIdentifiers: string[] = [];
 
 /**
  * Helper: spawn the plan CLI with given args and env overrides.
@@ -38,6 +38,13 @@ async function runPlan(
 /**
  * Helper: fetch an issue's description via `plan show <id> --json`.
  * Returns the raw description string (which may contain a plan:meta block).
+ *
+ * WARNING: This fetches raw description via `plan show --json`.
+ * Currently, show --json includes the full description with meta block.
+ * When ENG-3765 implements AC-13 (show --json strips meta into separate field),
+ * this helper will return the CLEAN description instead of raw.
+ * Tests that assert remoteDescription contains "<!-- plan:meta" will need
+ * to be updated to use the Linear SDK directly or read the raw description.
  */
 async function fetchIssueDescription(identifier: string): Promise<string> {
   const { stdout, exitCode } = await runPlan(["show", identifier, "--json"]);
@@ -48,10 +55,27 @@ async function fetchIssueDescription(identifier: string): Promise<string> {
   return parsed.description ?? "";
 }
 
-afterAll(() => {
+afterAll(async () => {
   // Clean up temp directories
   if (existsSync(TEST_BASE_DIR)) {
     rmSync(TEST_BASE_DIR, { recursive: true, force: true });
+  }
+
+  // Clean up created Linear issues
+  if (createdIdentifiers.length > 0 && process.env.LINEAR_API_KEY) {
+    const sdk = new LinearSDK({ apiKey: process.env.LINEAR_API_KEY });
+    console.log(`Cleaning up ${createdIdentifiers.length} lifecycle test issues...`);
+    for (const identifier of createdIdentifiers) {
+      try {
+        const issue = await sdk.issue(identifier);
+        if (issue.id) {
+          await sdk.deleteIssue(issue.id);
+          console.log(`  Cleaned up ${identifier}`);
+        }
+      } catch (e) {
+        console.warn(`  Failed to clean up ${identifier}:`, e);
+      }
+    }
   }
 });
 
@@ -74,7 +98,7 @@ describe("plan-meta lifecycle: create", () => {
       // --quiet outputs just the identifier
       const identifier = stdout.trim();
       expect(identifier).toMatch(/^ENG-\d+$/);
-      issueWithMeta = identifier;
+      createdIdentifiers.push(identifier);
 
       // Fetch the issue description from Linear
       const description = await fetchIssueDescription(identifier);
@@ -111,7 +135,7 @@ describe("plan-meta lifecycle: create", () => {
 
       const identifier = stdout.trim();
       expect(identifier).toMatch(/^ENG-\d+$/);
-      issueWithoutMeta = identifier;
+      createdIdentifiers.push(identifier);
 
       // Fetch the issue description from Linear
       const description = await fetchIssueDescription(identifier);
@@ -136,6 +160,10 @@ describe("plan-meta lifecycle: checkout", () => {
   let checkoutIssueId: string;
 
   beforeAll(async () => {
+    // NOTE: This beforeAll depends on AC-5 (create attaches meta).
+    // Until create is implemented, the test will fail at the first meta
+    // assertion in the test body, not at the checkout-specific assertion.
+
     // Create an issue with meta for checkout testing.
     // This uses the same pattern as AC-5 but is independent.
     const { stdout, exitCode } = await runPlan(
@@ -146,6 +174,7 @@ describe("plan-meta lifecycle: checkout", () => {
       throw new Error("Failed to create issue for checkout test");
     }
     checkoutIssueId = stdout.trim();
+    createdIdentifiers.push(checkoutIssueId);
   }, { timeout: 30_000 });
 
   test.failing(
@@ -198,6 +227,7 @@ describe("plan-meta lifecycle: push", () => {
       throw new Error("Failed to create issue for push test");
     }
     pushIssueId = stdout.trim();
+    createdIdentifiers.push(pushIssueId);
   }, { timeout: 30_000 });
 
   test.failing(
@@ -211,6 +241,7 @@ describe("plan-meta lifecycle: push", () => {
       expect(metaBefore!.created_by_session).toBe("session-1");
 
       // Checkout the issue (meta stripped from local file)
+      // --force in case a previous test run left a checkout for this issue
       const { exitCode: checkoutExit } = await runPlan(
         ["checkout", pushIssueId, "--force"],
         { PLAN_CHECKOUT_DIR: TEST_BASE_DIR }
