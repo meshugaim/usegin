@@ -36,23 +36,13 @@ async function runPlan(
 }
 
 /**
- * Helper: fetch an issue's description via `plan show <id> --json`.
- * Returns the raw description string (which may contain a plan:meta block).
- *
- * WARNING: This fetches raw description via `plan show --json`.
- * Currently, show --json includes the full description with meta block.
- * When ENG-3765 implements AC-13 (show --json strips meta into separate field),
- * this helper will return the CLEAN description instead of raw.
- * Tests that assert remoteDescription contains "<!-- plan:meta" will need
- * to be updated to use the Linear SDK directly or read the raw description.
+ * Helper: fetch an issue's raw description directly via the Linear SDK.
+ * Returns the full description string including any plan:meta block.
  */
 async function fetchIssueDescription(identifier: string): Promise<string> {
-  const { stdout, exitCode } = await runPlan(["show", identifier, "--json"]);
-  if (exitCode !== 0) {
-    throw new Error(`plan show ${identifier} --json failed with exit code ${exitCode}`);
-  }
-  const parsed = JSON.parse(stdout);
-  return parsed.description ?? "";
+  const sdk = new LinearSDK({ apiKey: process.env.LINEAR_API_KEY! });
+  const issue = await sdk.issue(identifier);
+  return issue.description ?? "";
 }
 
 afterAll(async () => {
