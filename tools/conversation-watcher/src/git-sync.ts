@@ -2,7 +2,7 @@
  * Git operations for syncing conversations to repository
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { $ } from "bun";
 import type { Config } from "./config";
@@ -28,11 +28,32 @@ export function toKebabCase(str: string): string {
 }
 
 /**
+ * Remove a stale .git/index.lock if it exists and no other git process is running.
+ * This happens when the watcher (or a git op it spawned) is killed mid-operation.
+ */
+function removeStaleGitLock(repoDir: string): void {
+	const lockPath = join(repoDir, ".git", "index.lock");
+	if (!existsSync(lockPath)) return;
+
+	console.warn(`Found stale git lock at ${lockPath}, removing...`);
+	try {
+		unlinkSync(lockPath);
+		console.log("Removed stale git lock file.");
+	} catch (error) {
+		console.error(
+			"Warning: Could not remove stale git lock:",
+			(error as Error).message,
+		);
+	}
+}
+
+/**
  * Initialize the git repository (clone if needed, pull if exists)
  */
 export async function initRepository(config: Config): Promise<void> {
 	if (existsSync(config.cloneDir)) {
 		console.log(`Repository already exists at ${config.cloneDir}`);
+		removeStaleGitLock(config.cloneDir);
 
 		// Pull latest changes
 		try {
@@ -324,6 +345,7 @@ export async function syncConversation(
 ): Promise<void> {
 	const conversationId = getConversationId(jsonlPath);
 	console.log(`\nProcessing conversation: ${conversationId}`);
+	removeStaleGitLock(config.cloneDir);
 
 	try {
 		// Extract conversation
