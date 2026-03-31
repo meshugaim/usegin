@@ -1,9 +1,9 @@
 # Meeting Inclusion Rules — Build Whiteboard
 
 ## Current State
-Slice: 1 (ENG-3740) infra | Step: TDD refactor | Status: green complete, entering refactor
-Last checkpoint: Migration + types written, 25 tests pass, 2 reviewers PASS, 1 finding fixed
-Next: Refactor phase — review for cleanup, then commit + push
+Slice: 1 (ENG-3740) infra | Step: DONE | Status: closed
+Last checkpoint: All tests green, pushed, ENG-3740 closed
+Next: Start Slice 2 (ENG-3741) — people rules
 
 ## Auto-Inject (re-injected after every agent return)
 - our-workflow.md overrides: agents commit+push, liaison does not
@@ -14,7 +14,7 @@ Next: Refactor phase — review for cleanup, then commit + push
 - Before committing: git status, verify only owned files staged
 
 ## Slices
-1. ENG-3740: infra — DB migration + shared types [IN PROGRESS]
+1. ENG-3740: infra — DB migration + shared types [DONE ✓]
 2. ENG-3741: people-rules — create rule → evaluate → display
 3. ENG-3742: topic-rules — LLM evaluation + editor
 4. ENG-3743: evaluation-display — cross-rule integration + status badges
