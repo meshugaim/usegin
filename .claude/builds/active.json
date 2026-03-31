@@ -31,10 +31,15 @@
     "sharepoint-infra": {
       "whiteboard": ".claude/builds/sharepoint-infra/whiteboard.md",
       "skill": ".claude/skills/build-liaison/SKILL.md"
+    },
+    "sharepoint-connect-browse": {
+      "whiteboard": ".claude/builds/sharepoint-connect-browse/whiteboard.md",
+      "skill": ".claude/skills/build-liaison/SKILL.md"
     }
   },
-  "current": "meeting-inclusion-rules",
+  "current": "sharepoint-connect-browse",
   "_previous_current": "sharepoint-infra",
+  "_previous_current": "queue-resync-extract",
   "research": {
     "whiteboard": ".claude/research/drive-audit-for-sharepoint/whiteboard.md",
     "skill": ".claude/skills/research/SKILL.md"
