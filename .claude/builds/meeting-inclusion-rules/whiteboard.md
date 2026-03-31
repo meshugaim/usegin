@@ -1,9 +1,9 @@
 # Meeting Inclusion Rules — Build Whiteboard
 
 ## Current State
-Slice: 2 (ENG-3741) people-rules | Step: DONE | Status: closed
-Last checkpoint: ENG-3741 closed, all tests green
-Next: Start Slice 3 (ENG-3742) — topic rules
+Slice: 3 (ENG-3742) topic-rules | Step: implement step-3 RED | Status: in-progress
+Last checkpoint: Step 2 complete (endpoint wiring — full TDD cycle, companion approved)
+Next: TDD red phase — failing tests for TopicRuleEditor component
 
 ## Auto-Inject (re-injected after every agent return)
 - our-workflow.md overrides: agents commit+push, liaison does not
@@ -16,31 +16,28 @@ Next: Start Slice 3 (ENG-3742) — topic rules
 ## Slices
 1. ENG-3740: infra — DB migration + shared types [DONE ✓]
 2. ENG-3741: people-rules — create rule → evaluate → display [DONE ✓]
-3. ENG-3742: topic-rules — LLM evaluation + editor
+3. ENG-3742: topic-rules — LLM evaluation + editor [IN PROGRESS]
 4. ENG-3743: evaluation-display — cross-rule integration + status badges
 5. ENG-3744: re-evaluation — triggers + progress + feedback
 6. ENG-3745: overrides — unsure UX + manual overrides + validation
 
-## Decisions
-- Sequential execution (bottom-up, infra first)
-- Companion watches for workflow drift
-- Spec kept from prior session (reviewed by 2 agents, 6 findings incorporated)
+## Slice 3 Implementation Steps
+1. **Topic rule evaluator** — `evaluate_topic_rule()` [DONE ✓]
+2. **Wire into evaluate_scoping** — endpoint loop [DONE ✓]
+   - RED: 7 tests → reviewed → 5 findings fixed
+   - GREEN: 7 pass + 8 existing → reviewed → 0 BLOCKING + 6 IMPROVEMENT
+   - REFACTOR: 4 fixed, 3 deferred → 8 integration tests pass
+3. **Frontend** — `TopicRuleEditor` component + component tests
+   - RED: in progress
 
-## Baselines (2026-03-31, Slice 2 start)
-- Python unit: 2713 passed, 3 skipped (+4 from parallel work)
-- JS unit: 2555 passed, 4 skip, 7 todo (-7 from parallel work)
-- Python DB integration: 395 passed, 1 skipped (includes Slice 1's 25 tests)
-
-## Slice 2 Steps
-1. GFS transition helper extraction (refactor)
-2. People rule evaluator (evaluate_people_rule)
-3. Rule CRUD API endpoints
-4. Replace evaluate_scoping endpoint
-5. Old code removal + DROP TABLE
-6. Frontend (server actions + people rule editor UI)
+## Baselines
+- Python unit: 2767 passed, 3 skipped
+- Python DB integration (meeting rules): 49 passed (41 + 8 topic)
+- JS unit: 2582 passed, 7 failed (pre-existing), 4 skip, 7 todo
 
 ## Quality Log
-- Red phase: 18 tests → reviewed → 9 findings → 25 tests. Zero errors.
-- Companion caught: missing commit, stale whiteboard. Fixed before green.
-- Green: 1 finding (string|null → RuleMatchStatus|null). Fixed.
-- Companion pattern: commits consistently not happening. Fixed by committing after each phase.
+### Slice 3 Step 1
+- Red: 10→17 tests, Green: 17 pass, Refactor: 18 tests
+### Slice 3 Step 2
+- Red: 6→7 tests, Green: 7+8 pass, Refactor: 8+8 pass, access_level test added
+- Key fix: don't persist eval rows for failed LLM calls

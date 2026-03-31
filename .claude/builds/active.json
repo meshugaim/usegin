@@ -33,8 +33,8 @@
       "skill": ".claude/skills/build-liaison/SKILL.md"
     }
   },
-  "current": "sharepoint-infra",
-  "_previous_current": "queue-resync-extract",
+  "current": "meeting-inclusion-rules",
+  "_previous_current": "sharepoint-infra",
   "research": {
     "whiteboard": ".claude/research/drive-audit-for-sharepoint/whiteboard.md",
     "skill": ".claude/skills/research/SKILL.md"
