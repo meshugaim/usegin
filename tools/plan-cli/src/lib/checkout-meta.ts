@@ -36,9 +36,7 @@ export function readCheckoutMeta(dir: string): CheckoutMeta | null {
   }
 }
 
-/**
- * Compute a sha256 hash of the description content using Bun.CryptoHasher.
- */
+/** Compute a sha256 hash of the description content, stripping any plan:meta block first. */
 export function hashDescription(content: string): string {
   const clean = parseMeta(content).description;
   const hasher = new Bun.CryptoHasher("sha256");

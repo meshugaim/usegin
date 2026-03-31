@@ -17,6 +17,7 @@ const FIELD_ORDER = [
 ] as const;
 
 const QUOTED_FIELDS = new Set(["created_at", "updated_at"]);
+const VALID_SCALAR_FIELDS = new Set<string>(FIELD_ORDER.filter(f => f !== "sessions"));
 
 export function parseMeta(description: string): {
   description: string;
@@ -56,7 +57,7 @@ export function parseMeta(description: string): {
         continue;
       }
 
-      if (FIELD_ORDER.includes(key as any)) {
+      if (VALID_SCALAR_FIELDS.has(key)) {
         (meta as any)[key] = stripQuotes(rawValue);
       }
     }
