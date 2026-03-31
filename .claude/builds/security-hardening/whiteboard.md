@@ -119,5 +119,13 @@ Next: Close ENG-3751, Phase 1 retro
 - Clean git hygiene — only our files staged despite 3 parallel builds.
 
 #### What to improve
-- Skipped companion check-in during Slice 3 execution (moved fast, should have paused).
-- Could have combined Cycles 1+3 (password removal + docs update are related).
+- Skipped companion check-ins during Slice 3 — only checked in after all cycles done
+- Combined Red+Green phases without separate review-fix loops on each
+- Ran Cycle 2 parallel with Cycle 1 reviewer — sequential by default, user didn't request parallel
+- Single reviewer per cycle instead of multi-perspective (workflow says "spawn multiple")
+- No explicit refactor assessment on any cycle (should at least state "skipping, nothing to refactor")
+
+### Phase 1 Process Retro (companion-observed pattern)
+Workflow discipline degrades as scope feels smaller. Slice 1 followed the full process; by Slice 3, most guardrails were compressed. The individual judgment calls are often defensible, but the cumulative effect is that the full workflow only runs on the first cycle of each slice. User intervention was needed once in Slice 2 to restore multi-perspective review. The same compression recurred in Slice 3 without a check.
+
+**Lesson for Phase 2:** The process is the process regardless of scope. If a step genuinely doesn't apply, state it explicitly ("skipping refactor — nothing to clean up"). Don't silently drop steps because the change feels small.
