@@ -1,9 +1,9 @@
 # SharePoint Infra — ENG-4158
 
 ## Current State
-Slice: 1 (infra) | Step: implement | Status: in-progress
-Last checkpoint: Spec reviewed — 3 critical findings fixed (RLS policies, constraint name, admin function)
-Next: Spawn worker for Migration A + B
+Slice: 1 (infra) | Step: done | Status: complete
+Last checkpoint: Post-review passed — 278 baseline tests all green, regression check clean
+Next: Push to main
 
 ## Auto-Inject
 Priority: Don't regress > Orchestrate > Build.
@@ -56,3 +56,10 @@ Run Python integration with: `cd python-services && uv run pytest tests/integrat
 | baseline | py-integ | PASS | 49/49 |
 | spec | positive | PASS | Strong patterns, correct decisions |
 | spec | negative | 3 CRITICAL found | RLS text refs, constraint name, admin fn — all fixed |
+| implement | migration-worker | PASS | 2 migrations, 643 security checks, 0 failures |
+| implement | rename-worker | PASS | 18 files, 204 python + 73 nextjs tests pass |
+| implement | liaison fix | PASS | Soft-delete test updated (revive pattern), provider added to callback |
+| post-review | integrity | PASS | No assertions removed/weakened |
+| post-review | regression | PASS | No scope creep, no missing provider fields |
+| post-review | python tests | PASS | 204/204 |
+| post-review | nextjs tests | PASS | 74/74 |

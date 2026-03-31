@@ -35,7 +35,6 @@
   },
   "current": "sharepoint-infra",
   "_previous_current": "queue-resync-extract",
-  "_previous_current": "drive-vais-getter",
   "research": {
     "whiteboard": ".claude/research/drive-audit-for-sharepoint/whiteboard.md",
     "skill": ".claude/skills/research/SKILL.md"
