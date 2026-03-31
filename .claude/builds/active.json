@@ -21,7 +21,13 @@
       "skill": ".claude/skills/build-liaison/SKILL.md"
     }
   },
-  "current": "meeting-inclusion-rules",
+    "drive-vais-getter": {
+      "whiteboard": ".claude/builds/drive-vais-getter/whiteboard.md",
+      "skill": ".claude/skills/build-liaison/SKILL.md"
+    }
+  },
+  "current": "drive-vais-getter",
+  "_previous_current": "meeting-inclusion-rules",
   "research": {
     "whiteboard": ".claude/research/drive-audit-for-sharepoint/whiteboard.md",
     "skill": ".claude/skills/research/SKILL.md"
