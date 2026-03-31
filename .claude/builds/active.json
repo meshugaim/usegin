@@ -35,9 +35,13 @@
     "sharepoint-connect-browse": {
       "whiteboard": ".claude/builds/sharepoint-connect-browse/whiteboard.md",
       "skill": ".claude/skills/build-liaison/SKILL.md"
+    },
+    "sharepoint-scope-download": {
+      "whiteboard": ".claude/builds/sharepoint-scope-download/whiteboard.md",
+      "skill": ".claude/skills/build-liaison/SKILL.md"
     }
   },
-  "current": "sharepoint-connect-browse",
+  "current": "sharepoint-scope-download",
   "_previous_current": "sharepoint-infra",
   "_previous_current": "queue-resync-extract",
   "research": {
