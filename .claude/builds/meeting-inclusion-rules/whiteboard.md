@@ -1,9 +1,9 @@
 # Meeting Inclusion Rules — Build Whiteboard
 
 ## Current State
-Slice: 1 (ENG-3740) infra | Step: TDD green | Status: red complete, entering green
-Last checkpoint: 25 xfail tests written, reviewed (2 reviewers), fixed (9 findings), verified
-Next: Write migration SQL + shared types to make tests pass
+Slice: 1 (ENG-3740) infra | Step: TDD refactor | Status: green complete, entering refactor
+Last checkpoint: Migration + types written, 25 tests pass, 2 reviewers PASS, 1 finding fixed
+Next: Refactor phase — review for cleanup, then commit + push
 
 ## Auto-Inject (re-injected after every agent return)
 - our-workflow.md overrides: agents commit+push, liaison does not
@@ -35,3 +35,5 @@ Next: Write migration SQL + shared types to make tests pass
 ## Quality Log
 - Red phase: 18 tests → reviewed → 9 findings → 25 tests. Zero errors.
 - Companion caught: missing commit, stale whiteboard. Fixed before green.
+- Green: 1 finding (string|null → RuleMatchStatus|null). Fixed.
+- Companion pattern: commits consistently not happening. Fixed by committing after each phase.
