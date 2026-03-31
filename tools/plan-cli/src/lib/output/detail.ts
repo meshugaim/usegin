@@ -145,8 +145,11 @@ export function formatShowJson(issue: PlanIssueDetail, history?: IssueHistoryEnt
     blockedBy: issue.blockedBy,
     blocks: issue.blocks,
     commentCount: issue.commentCount,
-    meta: issueMeta ?? undefined,
   };
+
+  if (issueMeta) {
+    output.meta = issueMeta;
+  }
 
   // Include comments if present
   if (issue.comments) {

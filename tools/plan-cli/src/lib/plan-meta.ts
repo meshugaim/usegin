@@ -123,3 +123,45 @@ export function attachMeta(description: string, meta: PlanMeta): string {
   if (description === "") return block;
   return `${description}\n\n${block}`;
 }
+
+/**
+ * Build the final description with meta attached.
+ * Reads CLAUDE_SESSION_ID from process.env.
+ * - If session + existing meta: updates last_session, updated_at, dedupes sessions
+ * - If session + no meta: creates fresh meta (no created_by_session)
+ * - If no session + existing meta: preserves unchanged
+ * - If no session + no meta: returns description as-is
+ */
+export function buildMetaDescription(
+  description: string,
+  existingMeta: PlanMeta | null,
+): string {
+  const sessionId = process.env.CLAUDE_SESSION_ID;
+
+  if (sessionId && existingMeta) {
+    const updatedMeta: PlanMeta = {
+      ...existingMeta,
+      last_session: sessionId,
+      updated_at: new Date().toISOString(),
+      sessions: [...new Set([...(existingMeta.sessions ?? []), sessionId])],
+    };
+    return attachMeta(description, updatedMeta);
+  }
+
+  if (sessionId && !existingMeta) {
+    const now = new Date().toISOString();
+    const freshMeta: PlanMeta = {
+      created_at: now,
+      last_session: sessionId,
+      updated_at: now,
+      sessions: [sessionId],
+    };
+    return attachMeta(description, freshMeta);
+  }
+
+  if (existingMeta) {
+    return attachMeta(description, existingMeta);
+  }
+
+  return description;
+}
