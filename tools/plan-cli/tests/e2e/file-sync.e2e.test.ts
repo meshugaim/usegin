@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import { $ } from "bun";
 import { LinearClient as LinearSDK } from "@linear/sdk";
 import { existsSync, writeFileSync, rmSync } from "fs";
+import { parseMeta } from "../../src/lib/plan-meta";
 
 const CLI_PATH = new URL("../../src/index.ts", import.meta.url).pathname;
 
@@ -81,7 +82,8 @@ describe("E2E: file-sync checkout -> edit -> push", () => {
 
       // 5. Verify the description was updated on Linear
       const issue = await sdk.issue(TEST_ISSUE);
-      expect(issue.description).toBe(testContent);
+      const { description: cleanDescription } = parseMeta(issue.description ?? "");
+      expect(cleanDescription).toBe(testContent);
     },
     15_000
   );
