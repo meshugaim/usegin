@@ -11,9 +11,17 @@
     "file-content-tools": {
       "whiteboard": ".claude/builds/file-content-tools/whiteboard.md",
       "skill": ".claude/skills/build-orchestrate/SKILL.md"
+    },
+    "security-hardening": {
+      "whiteboard": ".claude/builds/security-hardening/whiteboard.md",
+      "skill": ".claude/skills/build-liaison/SKILL.md"
+    },
+    "meeting-inclusion-rules": {
+      "whiteboard": ".claude/builds/meeting-inclusion-rules/whiteboard.md",
+      "skill": ".claude/skills/build-liaison/SKILL.md"
     }
   },
-  "current": "file-content-tools",
+  "current": "meeting-inclusion-rules",
   "research": {
     "whiteboard": ".claude/research/drive-audit-for-sharepoint/whiteboard.md",
     "skill": ".claude/skills/research/SKILL.md"
