@@ -8,6 +8,9 @@ import { describe, test, expect } from "bun:test";
  * documents the expected behavior.
  */
 
+// Lazy import — module doesn't exist yet (TDD red phase).
+// Every test.failing catches the ModuleNotFound error as the expected failure.
+// Convert to static import once plan-meta.ts is created in the green phase.
 async function getPlanMeta() {
   return await import("../src/lib/plan-meta");
 }
@@ -98,6 +101,9 @@ describe("parseMeta", () => {
       // Should not throw
       const result = parseMeta(input);
 
+      // Design choice: when delimiters match but YAML is invalid,
+      // the block is still stripped from description (meta: null).
+      // The block matched structurally — we just couldn't parse its content.
       expect(result.description).toBe("Description here");
       expect(result.meta).toBeNull();
     }
@@ -170,6 +176,50 @@ describe("parseMeta", () => {
 
       expect(result.meta).not.toBeNull();
       expect(result.meta!.sessions).toEqual(["abc123", "def456", "ghi789"]);
+    }
+  );
+
+  test.failing(
+    "ENG-3763: handles multiple blank lines before meta block",
+    async () => {
+      const { parseMeta } = await getPlanMeta();
+      const input = "Description\n\n\n\n<!-- plan:meta\nlast_session: sess-1\n-->";
+      const result = parseMeta(input);
+      expect(result.description).toBe("Description");
+      expect(result.meta).not.toBeNull();
+      expect(result.meta!.last_session).toBe("sess-1");
+    }
+  );
+
+  test.failing(
+    "ENG-3763: returns duplicate session IDs faithfully — dedup is caller's job",
+    async () => {
+      const { parseMeta } = await getPlanMeta();
+      const input = [
+        "Description",
+        "",
+        "<!-- plan:meta",
+        "sessions:",
+        "  - abc123",
+        "  - abc123",
+        "  - def456",
+        "-->",
+      ].join("\n");
+      const result = parseMeta(input);
+      expect(result.meta!.sessions).toEqual(["abc123", "abc123", "def456"]);
+    }
+  );
+
+  test.failing(
+    "ENG-3763: handles undefined/null input gracefully",
+    async () => {
+      const { parseMeta } = await getPlanMeta();
+      const result1 = parseMeta(undefined as any);
+      expect(result1.description).toBe("");
+      expect(result1.meta).toBeNull();
+      const result2 = parseMeta(null as any);
+      expect(result2.description).toBe("");
+      expect(result2.meta).toBeNull();
     }
   );
 
@@ -271,6 +321,32 @@ describe("serializeMeta", () => {
   );
 
   test.failing(
+    "ENG-3763: fields are ordered: created_by_session, created_at, last_session, updated_at, sessions",
+    async () => {
+      const { serializeMeta } = await getPlanMeta();
+      const result = serializeMeta({
+        updated_at: "2026-03-30T14:30:00.000Z",
+        created_by_session: "abc123",
+        sessions: ["abc123"],
+        last_session: "abc123",
+        created_at: "2026-03-30T12:00:00.000Z",
+      });
+      const lines = result.split("\n");
+      const fieldLines = lines.filter(l => l.match(/^\w/) || l.match(/^  -/));
+      // Find indices of field names
+      const createdByIdx = fieldLines.findIndex(l => l.startsWith("created_by_session"));
+      const createdAtIdx = fieldLines.findIndex(l => l.startsWith("created_at"));
+      const lastSessionIdx = fieldLines.findIndex(l => l.startsWith("last_session"));
+      const updatedAtIdx = fieldLines.findIndex(l => l.startsWith("updated_at"));
+      const sessionsIdx = fieldLines.findIndex(l => l.startsWith("sessions"));
+      expect(createdByIdx).toBeLessThan(createdAtIdx);
+      expect(createdAtIdx).toBeLessThan(lastSessionIdx);
+      expect(lastSessionIdx).toBeLessThan(updatedAtIdx);
+      expect(updatedAtIdx).toBeLessThan(sessionsIdx);
+    }
+  );
+
+  test.failing(
     "ENG-3763: omits sessions when empty array or undefined",
     async () => {
       const { serializeMeta } = await getPlanMeta();
@@ -321,15 +397,32 @@ describe("attachMeta", () => {
   test.failing(
     "ENG-3763: handles empty description",
     async () => {
-      const { attachMeta } = await getPlanMeta();
-
-      const result = attachMeta("", {
-        created_by_session: "abc123",
-      });
-
-      // Should still produce a valid meta block (possibly with leading newline separator)
+      const { attachMeta, parseMeta } = await getPlanMeta();
+      const result = attachMeta("", { created_by_session: "abc123" });
+      // Empty description: meta block follows directly (no leading blank line needed)
       expect(result).toContain("<!-- plan:meta");
       expect(result).toContain("created_by_session: abc123");
+      // Must be parseable back
+      const parsed = parseMeta(result);
+      expect(parsed.description).toBe("");
+      expect(parsed.meta).not.toBeNull();
+      expect(parsed.meta!.created_by_session).toBe("abc123");
+    }
+  );
+
+  test.failing(
+    "ENG-3763: does not strip existing meta — caller must pass clean description",
+    async () => {
+      const { attachMeta, parseMeta } = await getPlanMeta();
+      // If caller passes description that already has meta, attachMeta double-appends.
+      // This documents that stripping is the caller's responsibility.
+      const descWithMeta = "Content\n\n<!-- plan:meta\ncreated_by_session: old\n-->";
+      const newMeta = { created_by_session: "new" };
+      const result = attachMeta(descWithMeta, newMeta);
+      // The result has two meta blocks — parseMeta would only parse the last one
+      // This is intentionally NOT handled — callers must use parseMeta first.
+      expect(result).toContain("created_by_session: old");
+      expect(result).toContain("created_by_session: new");
     }
   );
 });
