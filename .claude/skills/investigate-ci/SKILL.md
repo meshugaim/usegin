@@ -110,36 +110,7 @@ After step 2, present updated findings and wait for user decision again. Do not 
 
 ## Active Reproduction in CI
 
-When the failure smells like infra/environment (credentials, secrets, CI-only behavior), don't just read logs — **reproduce it actively** using the debug-runner workflow.
-
-### The debug-runner workflow
-
-`.github/workflows/debug-runner.yml` is a lightweight workflow-dispatch that sets up the Python environment with CI secrets and runs either an arbitrary shell command or a Claude SDK prompt. Use it as-is or as a pattern for building a custom reproduction workflow.
-
-```bash
-# Test if OAuth credentials work in CI
-gh workflow run debug-runner.yml -f prompt="Say hi" -f auth_mode=oauth
-
-# Test API key auth
-gh workflow run debug-runner.yml -f prompt="Say hi" -f auth_mode=api_key
-
-# Run an arbitrary command with CI secrets
-gh workflow run debug-runner.yml -f command='uv run pytest tests/integration/claude/test_auth_switching.py -v -k test_oauth'
-
-# Check what env vars are available
-gh workflow run debug-runner.yml -f command='env | grep -E "CLAUDE|ANTHROPIC|APP_" | sed "s/=.*/=***/"'
-```
-
-Then watch the result:
-
-```bash
-gh run list --workflow=debug-runner.yml --limit 2
-gh run view <run-id> --log | grep -E "(Auth:|Response:|SUCCESS|FAIL|Error)"
-```
-
-### When to build a custom workflow
-
-If the debug-runner doesn't cover your case (e.g., needs Supabase, Next.js, or browser), consider creating a temporary workflow-dispatch workflow tailored to the issue. Read `debug-runner.yml` for the pattern — it's minimal and fast (~30s setup).
+When the failure looks like infra/environment (credentials, secrets, CI-only behavior), don't just read logs — reproduce it actively. See [active-reproduction.md](active-reproduction.md) for the debug-runner workflow, examples, and when to build a custom reproduction workflow.
 
 ## Tips
 
