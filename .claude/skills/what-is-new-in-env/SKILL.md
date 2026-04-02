@@ -138,21 +138,55 @@ If you catch yourself writing any of these, stop and translate to business langu
 
 This is for an agent that will systematically verify the deployment works. It needs to be concrete and actionable. Technical detail is welcome here — this is the right audience for it.
 
-For each feature/bug fix, include:
+The verification agent has access to the app (via browser automation), the API, Sentry, and Railway logs — but it doesn't have credentials to third-party OAuth providers, and it can't set up test data from scratch. Write verification steps that account for this.
+
+### Structure
+
+Start the verification guide with a **discovery preamble** — steps the agent should take first to orient itself:
+
+```markdown
+## Verification Guide
+
+### Prerequisites
+1. Identify a test project: visit `/projects` and pick one with active data connections
+2. Check which integrations are connected: Google Drive, SharePoint, email
+3. Note: steps requiring OAuth flows (connect SharePoint, connect Drive) need a human — flag these as "Manual only" and verify the post-connection state instead
+```
+
+Then for each feature/bug fix, include:
 
 - **Issue reference** — `ENG-XXX: Title` with Linear URL
 - **What changed** — technical summary: which parts of the app were affected (pages, API endpoints, database, background jobs)
 - **Acceptance criteria** — pulled directly from the Linear issue description. These are the primary verification targets.
-- **How to verify** — specific, actionable steps:
+- **How to verify** — specific, actionable steps with pass/fail criteria:
   - Which pages to visit (use relative paths, the agent knows the base URL)
   - Which API endpoints to call
   - What behavior to look for
+  - **What failure looks like** — how to distinguish "broken" from "not set up" or "slow"
   - What edge cases to check
+- **Requires human?** — flag steps that need OAuth flows, third-party credentials, or manual data setup. The agent should verify the post-action state, not perform the action itself.
 - **Related issues** — siblings or children that provide additional context
 
-The verification guide should be thorough enough that an agent with access to the environment can work through it without needing additional context.
+### Prioritization
 
-**Scaling guidance:**
+Assign each verification item a priority:
+- **P0 — Regression risk:** Core flows that worked before and must still work (existing features touched by this release)
+- **P1 — New feature verification:** New capabilities that need end-to-end confirmation
+- **P2 — Edge cases and polish:** Error handling, empty states, UI details
+
+The agent should work through P0 first, then P1, then P2. If time is limited, P0 alone is valuable.
+
+### Pass/fail criteria
+
+Every verification step should have an observable outcome. Don't write "verify it works" — write what "works" looks like:
+
+| Weak | Strong |
+|------|--------|
+| "Verify the scope picker works" | "Open scope picker → expand a site → should see libraries with file counts within 5s. If spinner persists >10s or tree is empty, flag as broken." |
+| "Check Sentry for errors" | "Search Sentry for `AttributeError` in the last hour. Zero new events = pass. Any new events = fail with link." |
+| "Test the search" | "Ask Effi 'what files do we have about Q4?' — should return results within 10s. If 'no results found' for a workspace with known data, flag as broken." |
+
+### Scaling guidance
 - **Small delta (<10 issues):** Full detail for every issue.
 - **Medium delta (10-20 issues):** Full detail for features and bugs. One-liner for chores.
 - **Large delta (20+ issues):** Group related issues under their parent epic with combined verification steps. Don't repeat shared context across sibling issues. Chores and docs get a summary table, not individual sections.
