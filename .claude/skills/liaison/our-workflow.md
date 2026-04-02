@@ -1,5 +1,7 @@
 # Our Workflow — Liaison Flavor
 
+> **DEPRECATED (2026-04-02):** This file has been consolidated into `SKILL.md`. All overrides from this file are now the single source of truth in the main skill. This file is kept for reference only.
+
 Overrides and additions to the base `SKILL.md`. When in conflict, this file wins.
 
 ## Agents Commit
