@@ -306,6 +306,48 @@ Append a slice map to the parent spec issue:
 
 ---
 
+## Phase 7: Coherence Check
+
+Sub-agents create the issues, and small things fall between the cracks — an AC that got paraphrased into ambiguity, a seam contract that references a column name from an earlier draft, a verification expectation that landed in no slice. This final pass catches those gaps before an implementer hits them mid-session.
+
+After all sub-issues are created and the slice map is appended to the parent:
+
+### 1. Re-read Everything
+
+Read the parent spec issue and every slice sub-issue from Linear (not from your working memory — from what's actually written):
+
+```bash
+plan show <spec-issue-id>
+plan show <slice-1-id>
+plan show <slice-2-id>
+# ... every slice
+```
+
+### 2. Check for Coherence
+
+Walk through these checks against the actual written content:
+
+- **AC coverage:** Every spec-level AC maps to at least one slice. No orphans.
+- **AC fidelity:** Slice-level ACs faithfully represent the spec-level ACs they decompose — nothing lost in paraphrasing, no meaning drift.
+- **Seam consistency:** Column names, type names, function signatures, and table schemas match across slices that reference each other. If slice 2 says it provides `evaluate_rules(meeting_id)` and slice 3 says it depends on `eval_meeting_rules(meeting_id)`, that's a crack.
+- **Ordering holds:** Dependencies declared in seam contracts align with the slice ordering in the map.
+- **No dangling references:** Issue IDs in seam contracts and the slice map match actual created issues.
+- **Implementation context is reachable:** File paths mentioned in slices exist in the codebase.
+
+### 3. Fix What You Find
+
+If anything is off — a mismatched name, a missing AC, a stale reference — update the affected issues directly:
+
+```bash
+plan update <issue-id> --description "..."
+```
+
+Then update the slice map on the parent if the fix affects ordering or coverage.
+
+Report to the user what you found and fixed. If you found nothing, say so — that's a good sign.
+
+---
+
 ## Slice Description Template
 
 Each sub-issue contains:
