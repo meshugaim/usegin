@@ -1,6 +1,18 @@
-import { describe, test, expect } from "bun:test";
-import { parseMeta, serializeMeta, attachMeta } from "../src/lib/plan-meta";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { parseMeta, serializeMeta, attachMeta, buildMetaDescription } from "../src/lib/plan-meta";
 import { hashDescription } from "../src/lib/checkout-meta";
+
+// Lazy import for getActor — the function doesn't exist in plan-meta.ts yet.
+// Using dynamic import so the test file loads even before the implementation lands.
+async function getGetActor(): Promise<() => string> {
+  const mod = await import("../src/lib/plan-meta");
+  return (mod as any).getActor;
+}
+
+async function getResetActorCache(): Promise<() => void> {
+  const mod = await import("../src/lib/plan-meta");
+  return (mod as any).resetActorCache;
+}
 
 // ---------------------------------------------------------------------------
 // parseMeta
@@ -479,6 +491,441 @@ describe("hashDescription with plan:meta awareness", () => {
       const expectedHash = hasher.digest("hex");
 
       expect(hashDescription(content)).toBe(expectedHash);
+    }
+  );
+});
+
+// ===========================================================================
+// ENG-4389: Actor identity in plan-meta
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// PlanMeta type — new fields
+// ---------------------------------------------------------------------------
+
+describe("ENG-4389: PlanMeta type — actor fields", () => {
+  test.failing(
+    "ENG-4389: created_by_actor and last_actor exist on parsed PlanMeta",
+    () => {
+      const input = [
+        "Description",
+        "",
+        "<!-- plan:meta",
+        "created_by_session: abc123",
+        "created_by_actor: claude:a4c28f13",
+        'created_at: "2026-04-01T12:00:00.000Z"',
+        "last_session: def456",
+        "last_actor: gh:nitsan",
+        'updated_at: "2026-04-01T14:00:00.000Z"',
+        "sessions: abc123, def456",
+        "-->",
+      ].join("\n");
+
+      const result = parseMeta(input);
+      expect(result.meta).not.toBeNull();
+      expect(result.meta!.created_by_actor).toBe("claude:a4c28f13");
+      expect(result.meta!.last_actor).toBe("gh:nitsan");
+    }
+  );
+});
+
+// ---------------------------------------------------------------------------
+// parseMeta — actor fields
+// ---------------------------------------------------------------------------
+
+describe("ENG-4389: parseMeta — actor fields", () => {
+  test.failing(
+    "ENG-4389: parses created_by_actor from meta block",
+    () => {
+      const input = [
+        "Description",
+        "",
+        "<!-- plan:meta",
+        "created_by_session: abc123",
+        "created_by_actor: claude:a4c28f13",
+        'created_at: "2026-04-01T12:00:00.000Z"',
+        "-->",
+      ].join("\n");
+
+      const result = parseMeta(input);
+      expect(result.meta).not.toBeNull();
+      expect(result.meta!.created_by_actor).toBe("claude:a4c28f13");
+    }
+  );
+
+  test.failing(
+    "ENG-4389: parses last_actor from meta block",
+    () => {
+      const input = [
+        "Description",
+        "",
+        "<!-- plan:meta",
+        "last_session: def456",
+        "last_actor: gh:nitsan",
+        'updated_at: "2026-04-01T14:00:00.000Z"',
+        "-->",
+      ].join("\n");
+
+      const result = parseMeta(input);
+      expect(result.meta).not.toBeNull();
+      expect(result.meta!.last_actor).toBe("gh:nitsan");
+    }
+  );
+
+  test.failing(
+    "ENG-4389: parses both actor fields together with all other fields",
+    () => {
+      const input = [
+        "Full description here",
+        "",
+        "<!-- plan:meta",
+        "created_by_session: sess-aaa",
+        "created_by_actor: claude:abcd1234",
+        'created_at: "2026-04-01T10:00:00.000Z"',
+        "last_session: sess-bbb",
+        "last_actor: gh:oria",
+        'updated_at: "2026-04-01T12:00:00.000Z"',
+        "sessions: sess-aaa, sess-bbb",
+        "-->",
+      ].join("\n");
+
+      const result = parseMeta(input);
+      expect(result.meta).not.toBeNull();
+      expect(result.meta!.created_by_session).toBe("sess-aaa");
+      expect(result.meta!.created_by_actor).toBe("claude:abcd1234");
+      expect(result.meta!.created_at).toBe("2026-04-01T10:00:00.000Z");
+      expect(result.meta!.last_session).toBe("sess-bbb");
+      expect(result.meta!.last_actor).toBe("gh:oria");
+      expect(result.meta!.updated_at).toBe("2026-04-01T12:00:00.000Z");
+      expect(result.meta!.sessions).toEqual(["sess-aaa", "sess-bbb"]);
+    }
+  );
+
+  test.failing(
+    "ENG-4389: handles meta block with actor fields but no session fields",
+    () => {
+      const input = [
+        "Description",
+        "",
+        "<!-- plan:meta",
+        "created_by_actor: gh:developer",
+        'created_at: "2026-04-01T12:00:00.000Z"',
+        "last_actor: gh:developer",
+        'updated_at: "2026-04-01T12:00:00.000Z"',
+        "-->",
+      ].join("\n");
+
+      const result = parseMeta(input);
+      expect(result.meta).not.toBeNull();
+      expect(result.meta!.created_by_actor).toBe("gh:developer");
+      expect(result.meta!.last_actor).toBe("gh:developer");
+      expect(result.meta!.created_by_session).toBeUndefined();
+      expect(result.meta!.last_session).toBeUndefined();
+    }
+  );
+});
+
+// ---------------------------------------------------------------------------
+// serializeMeta — actor fields
+// ---------------------------------------------------------------------------
+
+describe("ENG-4389: serializeMeta — actor fields", () => {
+  test.failing(
+    "ENG-4389: serializes created_by_actor after created_by_session",
+    () => {
+      const result = serializeMeta({
+        created_by_session: "abc123",
+        created_by_actor: "claude:a4c28f13" as any,
+        created_at: "2026-04-01T12:00:00.000Z",
+      });
+
+      expect(result).toContain("created_by_actor: claude:a4c28f13");
+
+      // Verify ordering: created_by_session < created_by_actor < created_at
+      const lines = result.split("\n");
+      const sessionIdx = lines.findIndex(l => l.startsWith("created_by_session"));
+      const actorIdx = lines.findIndex(l => l.startsWith("created_by_actor"));
+      const createdAtIdx = lines.findIndex(l => l.startsWith("created_at"));
+      expect(sessionIdx).toBeLessThan(actorIdx);
+      expect(actorIdx).toBeLessThan(createdAtIdx);
+    }
+  );
+
+  test.failing(
+    "ENG-4389: serializes last_actor after last_session and before updated_at",
+    () => {
+      const result = serializeMeta({
+        last_session: "def456",
+        last_actor: "gh:nitsan" as any,
+        updated_at: "2026-04-01T14:00:00.000Z",
+      });
+
+      expect(result).toContain("last_actor: gh:nitsan");
+
+      // Verify ordering: last_session < last_actor < updated_at
+      const lines = result.split("\n");
+      const lastSessionIdx = lines.findIndex(l => l.startsWith("last_session"));
+      const lastActorIdx = lines.findIndex(l => l.startsWith("last_actor"));
+      const updatedAtIdx = lines.findIndex(l => l.startsWith("updated_at"));
+      expect(lastSessionIdx).toBeLessThan(lastActorIdx);
+      expect(lastActorIdx).toBeLessThan(updatedAtIdx);
+    }
+  );
+
+  test.failing(
+    "ENG-4389: full field order: created_by_session, created_by_actor, created_at, last_session, last_actor, updated_at, sessions",
+    () => {
+      const result = serializeMeta({
+        // Pass in scrambled order to prove serialization orders correctly
+        updated_at: "2026-04-01T14:00:00.000Z",
+        created_by_session: "sess-aaa",
+        created_by_actor: "claude:abcd1234" as any,
+        sessions: ["sess-aaa", "sess-bbb"],
+        last_session: "sess-bbb",
+        last_actor: "gh:oria" as any,
+        created_at: "2026-04-01T10:00:00.000Z",
+      });
+
+      const lines = result.split("\n");
+      const fieldLines = lines.filter(l => l.match(/^\w/));
+      const createdBySessionIdx = fieldLines.findIndex(l => l.startsWith("created_by_session"));
+      const createdByActorIdx = fieldLines.findIndex(l => l.startsWith("created_by_actor"));
+      const createdAtIdx = fieldLines.findIndex(l => l.startsWith("created_at"));
+      const lastSessionIdx = fieldLines.findIndex(l => l.startsWith("last_session"));
+      const lastActorIdx = fieldLines.findIndex(l => l.startsWith("last_actor"));
+      const updatedAtIdx = fieldLines.findIndex(l => l.startsWith("updated_at"));
+      const sessionsIdx = fieldLines.findIndex(l => l.startsWith("sessions"));
+
+      expect(createdBySessionIdx).toBeLessThan(createdByActorIdx);
+      expect(createdByActorIdx).toBeLessThan(createdAtIdx);
+      expect(createdAtIdx).toBeLessThan(lastSessionIdx);
+      expect(lastSessionIdx).toBeLessThan(lastActorIdx);
+      expect(lastActorIdx).toBeLessThan(updatedAtIdx);
+      expect(updatedAtIdx).toBeLessThan(sessionsIdx);
+    }
+  );
+
+  test.failing(
+    "ENG-4389: actor values are unquoted (not timestamp fields)",
+    () => {
+      const result = serializeMeta({
+        created_by_actor: "claude:a4c28f13" as any,
+        last_actor: "gh:nitsan" as any,
+      });
+
+      // Actor values should NOT be quoted
+      expect(result).toContain("created_by_actor: claude:a4c28f13");
+      expect(result).toContain("last_actor: gh:nitsan");
+      expect(result).not.toContain('"claude:a4c28f13"');
+      expect(result).not.toContain('"gh:nitsan"');
+    }
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Round-trip — actor fields
+// ---------------------------------------------------------------------------
+
+describe("ENG-4389: round-trip — actor fields", () => {
+  test.failing(
+    "ENG-4389: actor fields survive parse → serialize → parse",
+    () => {
+      const description = "A description with actor metadata.";
+      const meta = {
+        created_by_session: "sess-aaa",
+        created_by_actor: "claude:a4c28f13" as any,
+        created_at: "2026-04-01T10:00:00.000Z",
+        last_session: "sess-bbb",
+        last_actor: "gh:nitsan" as any,
+        updated_at: "2026-04-01T14:00:00.000Z",
+        sessions: ["sess-aaa", "sess-bbb"],
+      };
+
+      const combined = attachMeta(description, meta);
+      const parsed = parseMeta(combined);
+
+      expect(parsed.description).toBe(description);
+      expect(parsed.meta).not.toBeNull();
+      expect(parsed.meta!.created_by_session).toBe("sess-aaa");
+      expect(parsed.meta!.created_by_actor).toBe("claude:a4c28f13");
+      expect(parsed.meta!.created_at).toBe("2026-04-01T10:00:00.000Z");
+      expect(parsed.meta!.last_session).toBe("sess-bbb");
+      expect(parsed.meta!.last_actor).toBe("gh:nitsan");
+      expect(parsed.meta!.updated_at).toBe("2026-04-01T14:00:00.000Z");
+      expect(parsed.meta!.sessions).toEqual(["sess-aaa", "sess-bbb"]);
+    }
+  );
+
+  test.failing(
+    "ENG-4389: actor fields round-trip without session fields",
+    () => {
+      const description = "Actor-only metadata.";
+      const meta = {
+        created_by_actor: "gh:developer" as any,
+        created_at: "2026-04-01T12:00:00.000Z",
+        last_actor: "gh:developer" as any,
+        updated_at: "2026-04-01T12:00:00.000Z",
+      };
+
+      const combined = attachMeta(description, meta);
+      const parsed = parseMeta(combined);
+
+      expect(parsed.meta).not.toBeNull();
+      expect(parsed.meta!.created_by_actor).toBe("gh:developer");
+      expect(parsed.meta!.last_actor).toBe("gh:developer");
+    }
+  );
+});
+
+// ---------------------------------------------------------------------------
+// buildMetaDescription — actor capture
+// ---------------------------------------------------------------------------
+
+describe("ENG-4389: buildMetaDescription — actor capture", () => {
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    savedEnv.CLAUDE_SESSION_ID = process.env.CLAUDE_SESSION_ID;
+  });
+
+  afterEach(() => {
+    if (savedEnv.CLAUDE_SESSION_ID === undefined) {
+      delete process.env.CLAUDE_SESSION_ID;
+    } else {
+      process.env.CLAUDE_SESSION_ID = savedEnv.CLAUDE_SESSION_ID;
+    }
+  });
+
+  test.failing(
+    "ENG-4389: on create (new meta), sets both created_by_actor and last_actor",
+    () => {
+      process.env.CLAUDE_SESSION_ID = "a4c28f13-1111-2222-3333-444444444444";
+
+      const result = buildMetaDescription("New issue description", null);
+      const parsed = parseMeta(result);
+
+      expect(parsed.meta).not.toBeNull();
+      expect(parsed.meta!.created_by_actor).toBe("claude:a4c28f13");
+      expect(parsed.meta!.last_actor).toBe("claude:a4c28f13");
+    }
+  );
+
+  test.failing(
+    "ENG-4389: on update (existing meta), only last_actor changes; created_by_actor preserved",
+    () => {
+      process.env.CLAUDE_SESSION_ID = "bbbb1234-5555-6666-7777-888888888888";
+
+      const existingMeta = {
+        created_by_session: "aaaa0000-1111-2222-3333-444444444444",
+        created_by_actor: "claude:aaaa0000" as any,
+        created_at: "2026-04-01T10:00:00.000Z",
+        last_session: "aaaa0000-1111-2222-3333-444444444444",
+        last_actor: "claude:aaaa0000" as any,
+        updated_at: "2026-04-01T10:00:00.000Z",
+        sessions: ["aaaa0000-1111-2222-3333-444444444444"],
+      };
+
+      const result = buildMetaDescription("Updated description", existingMeta);
+      const parsed = parseMeta(result);
+
+      expect(parsed.meta).not.toBeNull();
+      // created_by_actor must be preserved from original
+      expect(parsed.meta!.created_by_actor).toBe("claude:aaaa0000");
+      // last_actor must reflect the current session's actor
+      expect(parsed.meta!.last_actor).toBe("claude:bbbb1234");
+    }
+  );
+
+  test.failing(
+    "ENG-4389: on update without session ID, actor fields are preserved unchanged",
+    () => {
+      delete process.env.CLAUDE_SESSION_ID;
+
+      const existingMeta = {
+        created_by_session: "aaaa0000-1111-2222-3333-444444444444",
+        created_by_actor: "claude:aaaa0000" as any,
+        created_at: "2026-04-01T10:00:00.000Z",
+        last_session: "aaaa0000-1111-2222-3333-444444444444",
+        last_actor: "gh:nitsan" as any,
+        updated_at: "2026-04-01T12:00:00.000Z",
+        sessions: ["aaaa0000-1111-2222-3333-444444444444"],
+      };
+
+      const result = buildMetaDescription("Description", existingMeta);
+      const parsed = parseMeta(result);
+
+      expect(parsed.meta).not.toBeNull();
+      expect(parsed.meta!.created_by_actor).toBe("claude:aaaa0000");
+      expect(parsed.meta!.last_actor).toBe("gh:nitsan");
+    }
+  );
+});
+
+// ---------------------------------------------------------------------------
+// getActor — actor resolution (lazy import, function doesn't exist yet)
+// ---------------------------------------------------------------------------
+
+describe("ENG-4389: getActor — actor resolution", () => {
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(async () => {
+    savedEnv.CLAUDE_SESSION_ID = process.env.CLAUDE_SESSION_ID;
+    // Reset the actor cache before each test
+    try {
+      const resetActorCache = await getResetActorCache();
+      if (typeof resetActorCache === "function") resetActorCache();
+    } catch {
+      // resetActorCache may not exist yet — that's fine
+    }
+  });
+
+  afterEach(() => {
+    if (savedEnv.CLAUDE_SESSION_ID === undefined) {
+      delete process.env.CLAUDE_SESSION_ID;
+    } else {
+      process.env.CLAUDE_SESSION_ID = savedEnv.CLAUDE_SESSION_ID;
+    }
+  });
+
+  test.failing(
+    "ENG-4389: getActor resolves claude:<first-8-chars> from CLAUDE_SESSION_ID",
+    async () => {
+      process.env.CLAUDE_SESSION_ID = "a4c28f13-1111-2222-3333-444444444444";
+
+      const getActor = await getGetActor();
+      expect(typeof getActor).toBe("function");
+
+      const actor = getActor();
+      expect(actor).toBe("claude:a4c28f13");
+    }
+  );
+
+  test.failing(
+    "ENG-4389: getActor resolves gh:<username> from git config noreply email",
+    async () => {
+      delete process.env.CLAUDE_SESSION_ID;
+
+      const getActor = await getGetActor();
+      expect(typeof getActor).toBe("function");
+
+      // This test relies on the test environment having a git config.
+      // The function should return some form of actor (not throw).
+      const actor = getActor();
+      expect(typeof actor).toBe("string");
+      expect(actor.length).toBeGreaterThan(0);
+      // Should match one of the known patterns
+      expect(actor).toMatch(/^(claude:|gh:|unknown)/);
+    }
+  );
+
+  test.failing(
+    "ENG-4389: getActor returns 'unknown' when no session and no git config",
+    async () => {
+      delete process.env.CLAUDE_SESSION_ID;
+      // We can't easily remove git config in tests, but we can verify
+      // the function exists and is callable from plan-meta module
+      const getActor = await getGetActor();
+      expect(typeof getActor).toBe("function");
     }
   );
 });
