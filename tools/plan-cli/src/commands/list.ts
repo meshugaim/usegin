@@ -122,6 +122,18 @@ async function runList(opts: {
     process.exit(1);
   }
 
+  // --session cannot be combined with most filter flags (--team is OK)
+  if (opts.session && (opts.status || opts.label?.length || opts.assignee || opts.project)) {
+    console.error("Error: --session cannot be combined with --status, --label, --assignee, or --project");
+    process.exit(1);
+  }
+
+  // Session prefix must be at least 8 characters
+  if (opts.session && opts.session.length < 8) {
+    console.error("Error: --session prefix must be at least 8 characters");
+    process.exit(1);
+  }
+
   // Parse page/pageSize once (validation above guarantees these are valid if set)
   const page = opts.page ? parseInt(opts.page, 10) : undefined;
   const pageSize = opts.pageSize ? parseInt(opts.pageSize, 10) : DEFAULT_PAGE_SIZE;
@@ -185,7 +197,9 @@ async function runList(opts: {
     if (opts.session) {
       const candidates = await client.searchIssues({
         query: opts.session,
+        team,
         includeCompleted: true,
+        limit: 200,
       });
       issues = filterBySession(candidates, opts.session);
     } else {
