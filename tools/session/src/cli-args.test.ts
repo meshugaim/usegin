@@ -907,6 +907,7 @@ describe("parseMainArgs — --issues flag (ENG-4391)", () => {
     it.failing("ENG-4391: --issues flag sets issues to true", () => {
       const result = parseMainArgs(["abc12345", "--issues"]);
       expect(result.issues).toBe(true);
+      expect(result.file).toBe("abc12345");
     });
 
     it.failing("ENG-4391: issues defaults to false when not provided", () => {
@@ -914,28 +915,35 @@ describe("parseMainArgs — --issues flag (ENG-4391)", () => {
       expect(result.issues).toBe(false);
     });
 
-    it.failing("ENG-4391: --issues works alongside session id", () => {
-      const result = parseMainArgs(["abc12345", "--issues"]);
-      expect(result.file).toBe("abc12345");
+    it.failing("ENG-4391: --issues with no session id", () => {
+      const result = parseMainArgs(["--issues"]);
       expect(result.issues).toBe(true);
+      expect(result.file).toBe("");
+    });
+
+    it.failing("ENG-4391: --issues works alongside compatible flags", () => {
+      const result = parseMainArgs(["abc12345", "--issues", "--debug"]);
+      expect(result.issues).toBe(true);
+      expect(result.debug).toBe(true);
     });
   });
 
   describe("mutual exclusion with format/output flags", () => {
     it.failing("ENG-4391: --issues is mutually exclusive with --full", () => {
-      expect(() => parseMainArgs(["abc12345", "--issues", "--full"])).toThrow();
+      expect(() => parseMainArgs(["abc12345", "--issues", "--full"]))
+        .toThrow("Cannot use --issues with --full");
     });
 
     it.failing("ENG-4391: --issues is mutually exclusive with --format", () => {
       expect(() =>
         parseMainArgs(["abc12345", "--issues", "--format", "narrative"])
-      ).toThrow();
+      ).toThrow("Cannot use --issues with --format");
     });
 
     it.failing("ENG-4391: --issues is mutually exclusive with --timeline", () => {
       expect(() =>
         parseMainArgs(["abc12345", "--issues", "--timeline"])
-      ).toThrow();
+      ).toThrow("Cannot use --issues with --timeline");
     });
   });
 });
@@ -949,18 +957,10 @@ describe("buildIssuesCommand (ENG-4391)", () => {
     expect(result).toEqual(["plan", "list", "--session", "abc12345", "--json"]);
   });
 
-  it.failing("ENG-4391: builds hint string for stderr", async () => {
+  it.failing("ENG-4391: returns command array for empty session id", async () => {
     const { buildIssuesCommand } = await import("./cli-args-main");
-    const cmd = buildIssuesCommand("abc12345");
-    // The hint printed to stderr should be the command joined with spaces
-    expect(cmd.join(" ")).toBe("plan list --session abc12345 --json");
-  });
-
-  it.failing("ENG-4391: uses the exact session id passed in", async () => {
-    const { buildIssuesCommand } = await import("./cli-args-main");
-    const longId = "502de9c7-684a-4724-b592-34aa88aac626";
-    const result = buildIssuesCommand(longId);
-    expect(result).toEqual(["plan", "list", "--session", longId, "--json"]);
+    const result = buildIssuesCommand("");
+    expect(result).toEqual(["plan", "list", "--session", "", "--json"]);
   });
 });
 
