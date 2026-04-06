@@ -176,9 +176,9 @@ After a feature or phase completes, spawn multiple reviewers. Each reviewer brin
 
 **Critical: do not seed reviewers with directions, ideas, or things to look for.** We want independent thinking, not confirmation of the liaison's assumptions. Give them the diff and context, let them think big.
 
-Review cycles: review → fix → review → fix, until only nitpick-level findings remain.
+Review cycles: review → fix → review → fix, until only nitpick-level findings remain. **Nitpicks get fixed too** — don't skip them or dismiss them as "non-blocking." Fix them, then move on.
 
-**Fix everything.** Every issue AND every suggestion gets addressed — no selectivity, no "non-blocking" dismissals. If a reviewer says it would make the code better, we do it. The codebase gets better one small choice at a time. The only findings that don't get fixed are ones the re-reviewers themselves downgrade to nitpick on the next pass.
+**Fix everything.** Every issue, every suggestion, every nitpick gets addressed — no selectivity, no "non-blocking" dismissals. If a reviewer says it would make the code better, we do it. The codebase gets better one small choice at a time.
 
 **Capturing learnings**: Review findings relevant to future agents (patterns, anti-patterns, architectural insights) may be captured in repo documents. Scope and location decided case by case — the user is in the loop on what gets remembered and where it goes.
 
