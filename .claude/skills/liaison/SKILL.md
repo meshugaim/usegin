@@ -99,6 +99,20 @@ Clean up. This is a separate, explicit step — not absorbed into review. Look f
 
 **Review-fix loop:** Spawn reviewers on the refactoring diff. Did the refactor preserve behavior? Is it actually cleaner? Fix → re-review until clean. Commit.
 
+### Bugs found during review
+
+When a reviewer finds a **behavioral bug** (wrong behavior, edge case, null handling, missing guard), it must go through its own mini TDD cycle before being fixed:
+
+1. **Red** — Write a `test.failing` test that reproduces the bug. This proves the bug is real and creates a regression guard.
+2. **Green** — Fix the bug to make the test pass. Remove the `test.failing` mark.
+3. **Commit** — Both the test and fix get committed.
+
+**Structural issues** (wrong types, stale comments, missing imports, alignment) can be fixed directly — no test needed.
+
+The liaison decides which category a finding falls into. If in doubt, write the test. The cost of an unnecessary test is low; the cost of an unguarded bug fix is a future regression.
+
+*Origin: ENG-4521 session — reviewer found a `profileName!` non-null assertion bug that was fixed directly without a regression test.*
+
 ### Splitting across agents
 
 Red and green can be separate agents (one writes the failing test, the next makes it pass). Splitting is optional — use judgment based on task complexity.
