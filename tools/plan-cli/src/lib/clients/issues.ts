@@ -7,7 +7,7 @@ import type { PlanIssue, PlanIssueDetail, PlanComment, ListOptions, IssueHistory
 import { buildIssueFields } from "../utils/graphql-builder";
 import { transformGqlIssue, type GqlIssue } from "../utils/transformers";
 import type { MetadataClient } from "./metadata";
-import { addActorToDescription } from "../session-tracking";
+
 
 export class IssuesClient {
   constructor(
@@ -459,13 +459,11 @@ export class IssuesClient {
       stateId = id;
     }
 
-    // Create the issue (with actor tracking in description)
-    const trackedDescription = addActorToDescription(options.description, "created");
     this.trackCall();
     const result = await this.sdk.createIssue({
       teamId,
       title: options.title,
-      description: trackedDescription,
+      description: options.description,
       parentId,
       labelIds,
       projectId,
@@ -530,11 +528,8 @@ export class IssuesClient {
       input.title = options.title;
     }
 
-    // Actor tracking: add contributing actor to the description metadata footer.
-    // If the caller provided a new description, track on that; otherwise track on current.
-    {
-      const baseDescription = options.description ?? issue.description;
-      input.description = addActorToDescription(baseDescription, "contributed");
+    if (options.description !== undefined) {
+      input.description = options.description;
     }
 
     if (options.status !== undefined) {

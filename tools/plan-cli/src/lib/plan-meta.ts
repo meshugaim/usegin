@@ -133,9 +133,6 @@ export function attachMeta(description: string, meta: PlanMeta): string {
 // Cache the resolved actor for the lifetime of the process
 let cachedActor: string | null = null;
 
-// TODO(ENG-4392): getActor is duplicated from session-tracking.ts.
-// Slice 4 removes session-tracking.ts — this becomes the single source.
-
 /**
  * Resolve the current actor identity.
  * Claude sessions: "claude:<first-8-chars-of-session-id>"
