@@ -1,26 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import type { PlanMeta } from "../src/lib/plan-meta";
-import { parseMeta, serializeMeta, attachMeta, buildMetaDescription, resetActorCache } from "../src/lib/plan-meta";
+import { parseMeta, serializeMeta, attachMeta, buildMetaDescription, resetActorCache, getActor } from "../src/lib/plan-meta";
 import { hashDescription } from "../src/lib/checkout-meta";
-
-// Lazy import for getActor — the function doesn't exist in plan-meta.ts yet.
-// Using dynamic import so the test file loads even before the implementation lands.
-async function getGetActor(): Promise<() => string> {
-  const mod = await import("../src/lib/plan-meta");
-  return (mod as any).getActor;
-}
-
-async function getResetActorCache(): Promise<() => void> {
-  const mod = await import("../src/lib/plan-meta");
-  return (mod as any).resetActorCache;
-}
-
-// Temporary type extension for Red phase — actor fields don't exist on PlanMeta yet.
-// Remove this and use PlanMeta directly once the type is updated in Green phase.
-type PlanMetaWithActor = PlanMeta & {
-  created_by_actor?: string;
-  last_actor?: string;
-};
 
 // Shared env save/restore for tests that modify CLAUDE_SESSION_ID
 function withSessionEnv() {
@@ -660,7 +641,7 @@ describe("serializeMeta — actor fields", () => {
         created_by_session: "abc123",
         created_by_actor: "claude:a4c28f13",
         created_at: "2026-04-01T12:00:00.000Z",
-      } as PlanMetaWithActor);
+      });
 
       expect(result).toContain("created_by_actor: claude:a4c28f13");
 
@@ -681,7 +662,7 @@ describe("serializeMeta — actor fields", () => {
         last_session: "def456",
         last_actor: "gh:nitsan",
         updated_at: "2026-04-01T14:00:00.000Z",
-      } as PlanMetaWithActor);
+      });
 
       expect(result).toContain("last_actor: gh:nitsan");
 
@@ -707,7 +688,7 @@ describe("serializeMeta — actor fields", () => {
         last_session: "sess-bbb",
         last_actor: "gh:oria",
         created_at: "2026-04-01T10:00:00.000Z",
-      } as PlanMetaWithActor);
+      });
 
       const lines = result.split("\n");
       const fieldLines = lines.filter(l => l.match(/^\w/));
@@ -734,7 +715,7 @@ describe("serializeMeta — actor fields", () => {
       const result = serializeMeta({
         created_by_actor: "claude:a4c28f13",
         last_actor: "gh:nitsan",
-      } as PlanMetaWithActor);
+      });
 
       // Actor values should NOT be quoted
       expect(result).toContain("created_by_actor: claude:a4c28f13");
@@ -754,7 +735,7 @@ describe("round-trip — actor fields", () => {
     "ENG-4389: actor fields survive parse → serialize → parse",
     () => {
       const description = "A description with actor metadata.";
-      const meta: PlanMetaWithActor = {
+      const meta: PlanMeta = {
         created_by_session: "sess-aaa",
         created_by_actor: "claude:a4c28f13",
         created_at: "2026-04-01T10:00:00.000Z",
@@ -783,7 +764,7 @@ describe("round-trip — actor fields", () => {
     "ENG-4389: actor fields round-trip without session fields",
     () => {
       const description = "Actor-only metadata.";
-      const meta: PlanMetaWithActor = {
+      const meta: PlanMeta = {
         created_by_actor: "gh:developer",
         created_at: "2026-04-01T12:00:00.000Z",
         last_actor: "gh:developer",
@@ -831,7 +812,7 @@ describe("buildMetaDescription — actor capture", () => {
     () => {
       process.env.CLAUDE_SESSION_ID = "bbbb1234-5555-6666-7777-888888888888";
 
-      const existingMeta: PlanMetaWithActor = {
+      const existingMeta: PlanMeta = {
         created_by_session: "aaaa0000-1111-2222-3333-444444444444",
         created_by_actor: "claude:aaaa0000",
         created_at: "2026-04-01T10:00:00.000Z",
@@ -857,7 +838,7 @@ describe("buildMetaDescription — actor capture", () => {
     () => {
       delete process.env.CLAUDE_SESSION_ID;
 
-      const existingMeta: PlanMetaWithActor = {
+      const existingMeta: PlanMeta = {
         created_by_session: "aaaa0000-1111-2222-3333-444444444444",
         created_by_actor: "claude:aaaa0000",
         created_at: "2026-04-01T10:00:00.000Z",
@@ -878,33 +859,24 @@ describe("buildMetaDescription — actor capture", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getActor — actor resolution (lazy import, function doesn't exist yet)
+// getActor — actor resolution
 // ---------------------------------------------------------------------------
 
-// getActor is currently in session-tracking.ts. ENG-4389 moves/re-exports it from
-// plan-meta.ts to centralize the meta API surface. These tests verify the plan-meta export.
 describe("getActor — actor resolution", () => {
   const env = withSessionEnv();
 
-  beforeEach(async () => {
+  beforeEach(() => {
     env.save();
-    // Reset the actor cache before each test
-    try {
-      const resetActorCache = await getResetActorCache();
-      if (typeof resetActorCache === "function") resetActorCache();
-    } catch {
-      // resetActorCache may not exist yet — that's fine
-    }
+    resetActorCache();
   });
 
   afterEach(() => env.restore());
 
   test(
     "ENG-4389: getActor resolves claude:<first-8-chars> from CLAUDE_SESSION_ID",
-    async () => {
+    () => {
       process.env.CLAUDE_SESSION_ID = "a4c28f13-1111-2222-3333-444444444444";
 
-      const getActor = await getGetActor();
       expect(typeof getActor).toBe("function");
 
       const actor = getActor();
@@ -914,10 +886,9 @@ describe("getActor — actor resolution", () => {
 
   test(
     "ENG-4389: getActor resolves gh:<username> from git config noreply email",
-    async () => {
+    () => {
       delete process.env.CLAUDE_SESSION_ID;
 
-      const getActor = await getGetActor();
       expect(typeof getActor).toBe("function");
 
       // This test relies on the test environment having a git config.
@@ -932,11 +903,10 @@ describe("getActor — actor resolution", () => {
 
   test(
     "ENG-4389: getActor is exported from plan-meta module",
-    async () => {
+    () => {
       delete process.env.CLAUDE_SESSION_ID;
       // We can't easily remove git config in tests, but we can verify
       // the function exists and is callable from plan-meta module
-      const getActor = await getGetActor();
       expect(typeof getActor).toBe("function");
     }
   );
