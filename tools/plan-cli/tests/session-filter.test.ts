@@ -14,7 +14,7 @@ const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
  * This forces the import error to surface inside test.failing assertions.
  */
 async function getFilterBySession(): Promise<
-  (issues: Array<{ description: string }>, sessionQuery: string) => Array<{ description: string }>
+  <T extends { description: string }>(issues: T[], sessionQuery: string) => T[]
 > {
   const mod = await import("../src/lib/session-filter");
   return (mod as any).filterBySession;
@@ -204,10 +204,85 @@ describe("filterBySession", () => {
 
       const result = filterBySession(issues, targetSession);
 
+      // filterBySession is a pure filter — it preserves input order.
       expect(result).toHaveLength(3);
       expect(result[0].description).toContain("First matching issue");
       expect(result[1].description).toContain("Second matching issue");
       expect(result[2].description).toContain("Third matching issue");
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // 7. Prefix ambiguity — same 8-char prefix, different sessions
+  // -------------------------------------------------------------------------
+  test.failing(
+    "ENG-4390: prefix ambiguity — two sessions sharing the same 8-char prefix both match",
+    async () => {
+      const filterBySession = await getFilterBySession();
+
+      const sessionA = "a4c28f13-AAAA-1111-2222-333333333333";
+      const sessionB = "a4c28f13-BBBB-4444-5555-666666666666";
+      const sharedPrefix = "a4c28f13"; // first 8 chars, shared by both
+
+      const issues = [
+        issueWithSessions("Issue from session A", [sessionA]),
+        issueWithSessions("Issue from session B", [sessionB]),
+        issueWithSessions("Issue from unrelated session", ["deadbeef-0000-1111-2222-333333333333"]),
+      ];
+
+      // Prefix match is a convenience that can return multiple sessions.
+      const result = filterBySession(issues, sharedPrefix);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].description).toContain("Issue from session A");
+      expect(result[1].description).toContain("Issue from session B");
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // 8. Short prefix rejection — fewer than 8 chars returns empty
+  // -------------------------------------------------------------------------
+  test.failing(
+    "ENG-4390: short prefix rejection — prefix shorter than 8 chars returns empty results",
+    async () => {
+      const filterBySession = await getFilterBySession();
+
+      const fullSession = "a4c28f13-1111-2222-3333-444444444444";
+      const tooShortPrefix = "a4c2"; // only 4 chars — below the 8-char minimum
+
+      const issues = [
+        issueWithSessions("Should not match with short prefix", [fullSession]),
+      ];
+
+      // Design intent: 8+ chars are needed for meaningful prefix matching.
+      const result = filterBySession(issues, tooShortPrefix);
+
+      expect(result).toHaveLength(0);
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // 9. Null/undefined description — does not throw
+  // -------------------------------------------------------------------------
+  test.failing(
+    "ENG-4390: null/undefined description — issues with missing descriptions are skipped, not thrown",
+    async () => {
+      const filterBySession = await getFilterBySession();
+
+      const targetSession = "a4c28f13-1111-2222-3333-444444444444";
+
+      const issues = [
+        { description: null as unknown as string },
+        { description: undefined as unknown as string },
+        issueWithSessions("Valid issue with session", [targetSession]),
+        { description: null as unknown as string },
+      ];
+
+      // Should not throw — null/undefined descriptions are skipped gracefully.
+      const result = filterBySession(issues, targetSession);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].description).toContain("Valid issue with session");
     },
   );
 });
