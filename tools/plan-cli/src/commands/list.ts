@@ -6,6 +6,7 @@ import { formatIssuesForFzf, extractIdentifier } from "./browse";
 import { printApiStats } from "../lib/stats";
 import { shouldDefaultToJson } from "../lib/output-mode";
 import { dim } from "../lib/colors";
+import { filterBySession } from "../lib/session-filter";
 import type { ListOptions, PlanIssue } from "../types";
 
 export const DEFAULT_PAGE_SIZE = 25;
@@ -47,6 +48,7 @@ export function createListCommand(): Command {
     .option("--limit <n>", "Maximum number of top-level issues to show")
     .option("--page <n>", "Page number (1-indexed, JSON mode only)")
     .option("--page-size <n>", `Items per page (default ${DEFAULT_PAGE_SIZE}, JSON mode only)`)
+    .option("--session <id>", "Filter by session ID (full UUID or 8+ char prefix)")
     .option("--show-done", "Show Done sub-issues (hidden by default)")
     .option("--stats", "Show API call statistics")
     .action(async (opts) => {
@@ -66,6 +68,7 @@ async function runList(opts: {
   project?: string;
   label?: string[];
   search?: string;
+  session?: string;
   groupBy?: string;
   depth?: string;
   status?: string;
@@ -110,6 +113,12 @@ async function runList(opts: {
   // --page and --limit are mutually exclusive
   if (opts.page && opts.limit) {
     console.error("Error: --page and --limit cannot be used together");
+    process.exit(1);
+  }
+
+  // --session and --search are mutually exclusive
+  if (opts.session && opts.search) {
+    console.error("Error: --session and --search cannot be used together");
     process.exit(1);
   }
 
@@ -171,7 +180,17 @@ async function runList(opts: {
       assignee: opts.assignee,
     };
 
-    let issues = await client.listIssues(options);
+    let issues: PlanIssue[];
+
+    if (opts.session) {
+      const candidates = await client.searchIssues({
+        query: opts.session,
+        includeCompleted: true,
+      });
+      issues = filterBySession(candidates, opts.session);
+    } else {
+      issues = await client.listIssues(options);
+    }
 
     if (issues.length === 0) {
       if (useJson) {

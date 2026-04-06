@@ -2,23 +2,13 @@ import { describe, test, expect } from "bun:test";
 import { $ } from "bun";
 import { attachMeta } from "../src/lib/plan-meta";
 import type { PlanMeta } from "../src/lib/plan-meta";
+import { filterBySession } from "../src/lib/session-filter";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 const CLI_PATH = new URL("../src/index.ts", import.meta.url).pathname;
-
-/**
- * Lazy-load the filterBySession function that doesn't exist yet.
- * This forces the import error to surface inside test.failing assertions.
- */
-async function getFilterBySession(): Promise<
-  <T extends { description: string }>(issues: T[], sessionQuery: string) => T[]
-> {
-  const mod = await import("../src/lib/session-filter");
-  return (mod as any).filterBySession;
-}
 
 /**
  * Build a realistic issue description with a plan:meta block containing
@@ -57,11 +47,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 1. Exact match
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: exact match — filters to issues whose meta.sessions contains the full session ID",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const targetSession = "a4c28f13-1111-2222-3333-444444444444";
       const otherSession = "bbbb0000-5555-6666-7777-888888888888";
 
@@ -82,11 +70,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 2. Prefix match (8+ chars)
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: prefix match — short prefix (8+ chars) matches via startsWith on sessions entries",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const fullSession = "a4c28f13-1111-2222-3333-444444444444";
       const shortPrefix = "a4c28f13"; // first 8 chars
 
@@ -105,11 +91,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 3. False positive rejection
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: false positive rejection — session ID mentioned in prose but NOT in meta.sessions is filtered out",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const targetSession = "a4c28f13-1111-2222-3333-444444444444";
       const differentSession = "cccc9999-aaaa-bbbb-cccc-dddddddddddd";
 
@@ -133,11 +117,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 4. No meta block
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: no meta block — issue without <!-- plan:meta --> is filtered out",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const targetSession = "a4c28f13-1111-2222-3333-444444444444";
 
       const issues = [
@@ -155,11 +137,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 5. Empty sessions array
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: empty sessions — issue with meta but empty sessions array is filtered out",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const targetSession = "a4c28f13-1111-2222-3333-444444444444";
 
       // Build an issue with meta that has an empty sessions array.
@@ -188,11 +168,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 6. Multiple matches
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: multiple matches — all matching issues are returned",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const targetSession = "a4c28f13-1111-2222-3333-444444444444";
 
       const issues = [
@@ -215,11 +193,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 7. Prefix ambiguity — same 8-char prefix, different sessions
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: prefix ambiguity — two sessions sharing the same 8-char prefix both match",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const sessionA = "a4c28f13-AAAA-1111-2222-333333333333";
       const sessionB = "a4c28f13-BBBB-4444-5555-666666666666";
       const sharedPrefix = "a4c28f13"; // first 8 chars, shared by both
@@ -242,11 +218,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 8. Short prefix rejection — fewer than 8 chars returns empty
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: short prefix rejection — prefix shorter than 8 chars returns empty results",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const fullSession = "a4c28f13-1111-2222-3333-444444444444";
       const tooShortPrefix = "a4c2"; // only 4 chars — below the 8-char minimum
 
@@ -264,11 +238,9 @@ describe("filterBySession", () => {
   // -------------------------------------------------------------------------
   // 9. Null/undefined description — does not throw
   // -------------------------------------------------------------------------
-  test.failing(
+  test(
     "ENG-4390: null/undefined description — issues with missing descriptions are skipped, not thrown",
     async () => {
-      const filterBySession = await getFilterBySession();
-
       const targetSession = "a4c28f13-1111-2222-3333-444444444444";
 
       const issues = [
@@ -292,7 +264,7 @@ describe("filterBySession", () => {
 // ===========================================================================
 
 describe("plan list --session CLI option", () => {
-  test.failing(
+  test(
     "ENG-4390: --session appears in plan list --help output",
     async () => {
       const result = await $`bun ${CLI_PATH} list --help`.text();
