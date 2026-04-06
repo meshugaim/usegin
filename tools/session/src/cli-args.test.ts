@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "bun:test";
 import { parseFindArgs, parseListArgs, parsePickArgs, parseFetchArgs, parseResumeArgs } from "./cli-args";
-import { parseMainArgs } from "./cli-args-main";
+import { parseMainArgs, buildIssuesCommand } from "./cli-args-main";
 
 describe("parseFindArgs", () => {
   describe("--project validation", () => {
@@ -904,24 +904,24 @@ describe("parseFetchArgs", () => {
 
 describe("parseMainArgs — --issues flag (ENG-4391)", () => {
   describe("argument parsing", () => {
-    it.failing("ENG-4391: --issues flag sets issues to true", () => {
+    it("ENG-4391: --issues flag sets issues to true", () => {
       const result = parseMainArgs(["abc12345", "--issues"]);
       expect(result.issues).toBe(true);
       expect(result.file).toBe("abc12345");
     });
 
-    it.failing("ENG-4391: issues defaults to false when not provided", () => {
+    it("ENG-4391: issues defaults to false when not provided", () => {
       const result = parseMainArgs(["abc12345"]);
       expect(result.issues).toBe(false);
     });
 
-    it.failing("ENG-4391: --issues with no session id", () => {
+    it("ENG-4391: --issues with no session id", () => {
       const result = parseMainArgs(["--issues"]);
       expect(result.issues).toBe(true);
       expect(result.file).toBe("");
     });
 
-    it.failing("ENG-4391: --issues works alongside compatible flags", () => {
+    it("ENG-4391: --issues works alongside compatible flags", () => {
       const result = parseMainArgs(["abc12345", "--issues", "--debug"]);
       expect(result.issues).toBe(true);
       expect(result.debug).toBe(true);
@@ -929,18 +929,18 @@ describe("parseMainArgs — --issues flag (ENG-4391)", () => {
   });
 
   describe("mutual exclusion with format/output flags", () => {
-    it.failing("ENG-4391: --issues is mutually exclusive with --full", () => {
+    it("ENG-4391: --issues is mutually exclusive with --full", () => {
       expect(() => parseMainArgs(["abc12345", "--issues", "--full"]))
         .toThrow("Cannot use --issues with --full");
     });
 
-    it.failing("ENG-4391: --issues is mutually exclusive with --format", () => {
+    it("ENG-4391: --issues is mutually exclusive with --format", () => {
       expect(() =>
         parseMainArgs(["abc12345", "--issues", "--format", "narrative"])
       ).toThrow("Cannot use --issues with --format");
     });
 
-    it.failing("ENG-4391: --issues is mutually exclusive with --timeline", () => {
+    it("ENG-4391: --issues is mutually exclusive with --timeline", () => {
       expect(() =>
         parseMainArgs(["abc12345", "--issues", "--timeline"])
       ).toThrow("Cannot use --issues with --timeline");
@@ -949,16 +949,12 @@ describe("parseMainArgs — --issues flag (ENG-4391)", () => {
 });
 
 describe("buildIssuesCommand (ENG-4391)", () => {
-  // Import will fail until the function is implemented
-  // We use a dynamic import inside it.failing so the test framework handles it
-  it.failing("ENG-4391: builds correct delegation command array", async () => {
-    const { buildIssuesCommand } = await import("./cli-args-main");
+  it("ENG-4391: builds correct delegation command array", () => {
     const result = buildIssuesCommand("abc12345");
     expect(result).toEqual(["plan", "list", "--session", "abc12345", "--json"]);
   });
 
-  it.failing("ENG-4391: returns command array for empty session id", async () => {
-    const { buildIssuesCommand } = await import("./cli-args-main");
+  it("ENG-4391: returns command array for empty session id", () => {
     const result = buildIssuesCommand("");
     expect(result).toEqual(["plan", "list", "--session", "", "--json"]);
   });

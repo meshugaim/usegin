@@ -70,6 +70,8 @@ export interface MainArgs {
   sinceTimestamp?: string;
   /** Show only turns at or after the timestamp of the given git commit SHA. */
   sinceCommit?: string;
+  /** Delegate to `plan list --session <id> --json` instead of parsing. */
+  issues: boolean;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -92,6 +94,7 @@ export function parseMainArgs(args: string[]): MainArgs {
     help: false,
     commits: false,
     excludeNotifications: false,
+    issues: false,
   };
 
   // Track whether --format was explicitly provided (takes precedence over --full)
@@ -174,6 +177,8 @@ export function parseMainArgs(args: string[]): MainArgs {
       }
       result.last = n;
       i++;
+    } else if (arg === "--issues") {
+      result.issues = true;
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";
     }
@@ -184,10 +189,22 @@ export function parseMainArgs(args: string[]): MainArgs {
     throw new Error("Cannot use --tool and --tools together");
   }
 
+  // --issues is mutually exclusive with output-shaping flags
+  if (result.issues && result.full) throw new Error("Cannot use --issues with --full");
+  if (result.issues && formatExplicit) throw new Error("Cannot use --issues with --format");
+  if (result.issues && result.timeline) throw new Error("Cannot use --issues with --timeline");
+
   // --full sets format to narrative, unless --format was explicitly provided
   if (result.full && !formatExplicit) {
     result.format = "narrative";
   }
 
   return result;
+}
+
+/**
+ * Build the command array that delegates --issues to `plan list`.
+ */
+export function buildIssuesCommand(sessionId: string): string[] {
+  return ["plan", "list", "--session", sessionId, "--json"];
 }

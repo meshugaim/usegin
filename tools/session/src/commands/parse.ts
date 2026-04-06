@@ -11,6 +11,7 @@ import { sliceTurns, formatPositionHeader } from "../incremental";
 import { filterNotifications } from "../filter-notifications";
 import { parseTimestampArg, filterByTimestamp, resolveCommitTimestamp } from "../filter-by-timestamp";
 import type { MainArgs } from "../cli-args-main";
+import { buildIssuesCommand } from "../cli-args-main";
 
 /**
  * Check if debug mode is enabled via --debug flag or DEBUG=session env var
@@ -52,6 +53,18 @@ export async function runParse(args: MainArgs) {
         console.log(line);
       }
       return;
+    }
+
+    // --issues: delegate to `plan list --session <id> --json`
+    if (args.issues) {
+      const cmd = buildIssuesCommand(args.file);
+      console.error(`→ ${cmd.join(" ")}`);
+      const proc = Bun.spawn(cmd, {
+        stdout: "inherit",
+        stderr: "inherit",
+      });
+      const exitCode = await proc.exited;
+      process.exit(exitCode);
     }
 
     const debug = isDebugEnabled(args);
