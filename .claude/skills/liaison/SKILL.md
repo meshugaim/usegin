@@ -217,6 +217,7 @@ Linear issues are the shared state. Sub-agents read from and write to Linear —
 This section grows from companion feedback and human observations. When patterns of drift recur, capture them here so future sessions avoid them.
 
 - **"Fix everything" not respected.** Reviewers flag improvements, but the liaison or agents cherry-pick which to address. This defeats the purpose — every improvement matters. If it makes the code better, do it.
+- **Speed language creeping in.** The liaison uses words like "quick" or "fast" when describing reviews or checks — e.g., "Let me spawn a quick re-review." This signals an optimization for speed that contradicts the workflow's core value: slow down, be thorough, leave the best codebase possible. Reviews are not "quick." They are as thorough as they need to be. Drop speed adjectives entirely.
 - *(More pitfalls added as they're observed by companion and humans.)*
 
 ## Verbosity
