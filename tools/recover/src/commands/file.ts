@@ -22,7 +22,10 @@ export function createFileCommand(): Command {
     .description("Un-stick a single sync item by entity_type + entity_id")
     .argument("<entity_type>", "one of: file, email, attachment, drive, meeting_summary, meeting_transcript, sharepoint")
     .argument("<entity_id>", "UUID of the entity")
-    .requiredOption("-e, --env <environment>", "production or staging")
+    // Intentionally NOT .requiredOption: we let parseEnv throw the friendly
+    // "must be one of: production, staging" message instead of commander's
+    // default "required option not specified".
+    .option("-e, --env <environment>", "production or staging")
     .option("--execute", "actually perform the reset (default: dry-run)", false)
     .option("--yes-i-am-sure", "required for production + --execute", false)
     .option("--actor <name>", "recorded as triggered_by on the event", "recover_cli")

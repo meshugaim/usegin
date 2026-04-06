@@ -27,6 +27,32 @@ recover project f0c450db-... -e production --execute --yes-i-am-sure
 recover project f0c450db-... -e staging --json | jq .
 ```
 
+## Prerequisites — the migration has to reach the target DB first
+
+The CLI is a **local dev tool**: it runs from your terminal on `main`, calls
+the Supabase Management API directly, and never gets "deployed" anywhere.
+`git pull` on main is enough to start using it.
+
+The **RPC it calls** (`reset_stuck_sync_item`) is a regular migration, and it
+only exists in a database that has received that migration. Promotion happens
+through the normal flow:
+
+```
+main (agent writes migration)  →  staging (human promotes)  →  production (human promotes)
+```
+
+If you run `recover file ... -e production --execute` against a database that
+doesn't have migration `20260406083041_reset_stuck_sync_item_rpc.sql` applied,
+the CLI detects the `42883 function does not exist` response and prints:
+
+> The reset_stuck_sync_item RPC is not present in project `<ref>`. Ensure
+> migration 20260406083041 has been applied to the target database via the
+> normal main → staging → production promotion flow.
+
+In that case: promote the migration first, then re-run the command. The CLI
+itself is unchanged between environments — only the database state matters.
+
+
 ## Safety Model
 
 | Guard | What it enforces |

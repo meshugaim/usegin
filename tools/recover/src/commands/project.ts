@@ -25,7 +25,10 @@ export function createProjectCommand(): Command {
   return new Command("project")
     .description("Un-stick every stuck sync item in a project")
     .argument("<project_id>", "UUID of the project")
-    .requiredOption("-e, --env <environment>", "production or staging")
+    // Intentionally NOT .requiredOption: we let parseEnv throw the friendly
+    // "must be one of: production, staging" message instead of commander's
+    // default "required option not specified".
+    .option("-e, --env <environment>", "production or staging")
     .option(
       "--entity <type>",
       "limit to one entity type (drive, file, email, attachment, sharepoint, meeting_summary, meeting_transcript)"

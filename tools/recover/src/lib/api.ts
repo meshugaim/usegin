@@ -18,7 +18,10 @@ const UUID_RE =
 /** Validate a UUID to prevent SQL injection. Throws on invalid input. */
 export function validateUuid(value: string, label = "value"): string {
   if (!UUID_RE.test(value)) {
-    throw new Error(`Invalid UUID for ${label}: ${value}`);
+    throw new Error(
+      `Invalid UUID for ${label}: '${value}' ` +
+        `(expected 8-4-4-4-12 hex, e.g. f52c2f20-5748-4493-98c3-e3747f586d6f)`
+    );
   }
   return value;
 }
@@ -68,6 +71,25 @@ export async function executeSql<T = Record<string, unknown>>(
 
   if (!resp.ok) {
     const body = await resp.text();
+
+    // Friendly translation: the reset_stuck_sync_item RPC is not present in
+    // the target database. This is the most common "why doesn't this work?"
+    // for a new environment because the CLI is dev-local but the RPC is a
+    // migration that has to land in the target DB separately. Matches Postgres
+    // error code 42883 (undefined_function) against our specific RPC name.
+    if (
+      body.includes("reset_stuck_sync_item") &&
+      (body.includes("42883") || body.includes("does not exist"))
+    ) {
+      throw new Error(
+        `The reset_stuck_sync_item RPC is not present in project ${projectRef}. ` +
+          `Ensure migration 20260406083041_reset_stuck_sync_item_rpc.sql has been ` +
+          `applied to the target database via the normal main → staging → production ` +
+          `promotion flow. (The CLI is a local dev tool; only the migration has to ` +
+          `reach the target.)`
+      );
+    }
+
     throw new Error(
       `SQL query failed (${projectRef}): ${resp.status} ${body}`
     );

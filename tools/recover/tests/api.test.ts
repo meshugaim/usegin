@@ -31,6 +31,14 @@ describe("validateUuid", () => {
   it("includes the label in the error", () => {
     expect(() => validateUuid("nope", "project_id")).toThrow(/project_id/);
   });
+
+  it("shows the expected format in the error", () => {
+    // The hint helps users who don't know UUIDs are 8-4-4-4-12 hex.
+    expect(() => validateUuid("short")).toThrow(/8-4-4-4-12 hex/);
+    expect(() => validateUuid("short")).toThrow(
+      /f52c2f20-5748-4493-98c3-e3747f586d6f/
+    );
+  });
 });
 
 describe("sqlLiteral", () => {
@@ -170,6 +178,34 @@ describe("resetStuckSyncItem (HTTP)", () => {
         "actor"
       )
     ).rejects.toThrow(/403.*permission denied/);
+  });
+
+  it("translates 'function does not exist' into a migration-promotion hint", async () => {
+    // Postgres undefined_function error code is 42883. The Management API
+    // passes these through as a 400 with a JSON body. This test exercises
+    // the common "tried to run recover against an env that hasn't received
+    // the migration yet" case.
+    globalThis.fetch = mock(async () => {
+      return new Response(
+        JSON.stringify({
+          code: "42883",
+          message:
+            "function public.reset_stuck_sync_item(gfs_entity_type, uuid, text) does not exist",
+        }),
+        { status: 400 }
+      );
+    }) as unknown as typeof globalThis.fetch;
+
+    const promise = resetStuckSyncItem(
+      "test-ref",
+      "drive",
+      "f52c2f20-5748-4493-98c3-e3747f586d6f",
+      "actor"
+    );
+
+    await expect(promise).rejects.toThrow(/reset_stuck_sync_item RPC is not present/);
+    await expect(promise).rejects.toThrow(/migration 20260406083041/);
+    await expect(promise).rejects.toThrow(/main → staging → production/);
   });
 });
 
