@@ -4,7 +4,7 @@ import { printApiStats } from "../lib/stats";
 import { colors, dim } from "../lib/colors";
 import { normalizeIssueId, getTeamKey } from "../lib/identifier";
 import { shouldDefaultToJson } from "../lib/output-mode";
-import { attachMeta, type PlanMeta } from "../lib/plan-meta";
+import { attachMeta, getActor, type PlanMeta } from "../lib/plan-meta";
 
 export function createCreateCommand(): Command {
   const cmd = new Command("create")
@@ -83,10 +83,13 @@ async function runCreate(
     const sessionId = process.env.CLAUDE_SESSION_ID;
     if (sessionId) {
       const now = new Date().toISOString();
+      const actor = getActor();
       const meta: PlanMeta = {
         created_by_session: sessionId,
+        created_by_actor: actor,
         created_at: now,
         last_session: sessionId,
+        last_actor: actor,
         updated_at: now,
         sessions: [sessionId],
       };
