@@ -11,10 +11,12 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.7.2"
+    "@types/bun": "latest"
   },
   "dependencies": {
-    "commander": "^14.0.2"
+    "commander": "^14.0.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
   }
 }

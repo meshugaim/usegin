@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@linear/sdk": "^29.0.0",
-    "commander": "^14.0.2",
+    "commander": "^14.0.3",
     "marked": "15",
     "marked-terminal": "^7.3.0"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.7.2"
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
   }
 }
