@@ -103,9 +103,8 @@ Clean up. This is a separate, explicit step — not absorbed into review. Look f
 
 When a reviewer finds a **behavioral bug**, it goes through its own mini TDD cycle:
 
-1. **Red** — Write a `test.failing` test that reproduces the bug
-2. **Green** — Fix the bug, remove `test.failing`
-3. **Commit and push** after each phase
+1. **Red** — Write a `test.failing` test that reproduces the bug. Commit and push.
+2. **Green** — Fix the bug, remove `test.failing`. Commit and push.
 
 ### Splitting across agents
 
