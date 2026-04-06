@@ -105,6 +105,7 @@ When a reviewer finds a **behavioral bug**, it goes through its own mini TDD cyc
 
 1. **Red** — Write a `test.failing` test that reproduces the bug. Commit and push.
 2. **Green** — Fix the bug, remove `test.failing`. Commit and push.
+3. **Refactor** — Clean up if needed. Commit and push.
 
 ### Splitting across agents
 
