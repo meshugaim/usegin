@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import type { PlanMeta } from "../src/lib/plan-meta";
 import { parseMeta, serializeMeta, attachMeta, buildMetaDescription } from "../src/lib/plan-meta";
 import { hashDescription } from "../src/lib/checkout-meta";
 
@@ -12,6 +13,28 @@ async function getGetActor(): Promise<() => string> {
 async function getResetActorCache(): Promise<() => void> {
   const mod = await import("../src/lib/plan-meta");
   return (mod as any).resetActorCache;
+}
+
+// Temporary type extension for Red phase — actor fields don't exist on PlanMeta yet.
+// Remove this and use PlanMeta directly once the type is updated in Green phase.
+type PlanMetaWithActor = PlanMeta & {
+  created_by_actor?: string;
+  last_actor?: string;
+};
+
+// Shared env save/restore for tests that modify CLAUDE_SESSION_ID
+function withSessionEnv() {
+  const saved: Record<string, string | undefined> = {};
+  return {
+    save() { saved.CLAUDE_SESSION_ID = process.env.CLAUDE_SESSION_ID; },
+    restore() {
+      if (saved.CLAUDE_SESSION_ID === undefined) {
+        delete process.env.CLAUDE_SESSION_ID;
+      } else {
+        process.env.CLAUDE_SESSION_ID = saved.CLAUDE_SESSION_ID;
+      }
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -503,7 +526,7 @@ describe("hashDescription with plan:meta awareness", () => {
 // PlanMeta type — new fields
 // ---------------------------------------------------------------------------
 
-describe("ENG-4389: PlanMeta type — actor fields", () => {
+describe("PlanMeta type — actor fields", () => {
   test.failing(
     "ENG-4389: created_by_actor and last_actor exist on parsed PlanMeta",
     () => {
@@ -533,7 +556,7 @@ describe("ENG-4389: PlanMeta type — actor fields", () => {
 // parseMeta — actor fields
 // ---------------------------------------------------------------------------
 
-describe("ENG-4389: parseMeta — actor fields", () => {
+describe("parseMeta — actor fields", () => {
   test.failing(
     "ENG-4389: parses created_by_actor from meta block",
     () => {
@@ -629,15 +652,15 @@ describe("ENG-4389: parseMeta — actor fields", () => {
 // serializeMeta — actor fields
 // ---------------------------------------------------------------------------
 
-describe("ENG-4389: serializeMeta — actor fields", () => {
+describe("serializeMeta — actor fields", () => {
   test.failing(
     "ENG-4389: serializes created_by_actor after created_by_session",
     () => {
       const result = serializeMeta({
         created_by_session: "abc123",
-        created_by_actor: "claude:a4c28f13" as any,
+        created_by_actor: "claude:a4c28f13",
         created_at: "2026-04-01T12:00:00.000Z",
-      });
+      } as PlanMetaWithActor);
 
       expect(result).toContain("created_by_actor: claude:a4c28f13");
 
@@ -656,9 +679,9 @@ describe("ENG-4389: serializeMeta — actor fields", () => {
     () => {
       const result = serializeMeta({
         last_session: "def456",
-        last_actor: "gh:nitsan" as any,
+        last_actor: "gh:nitsan",
         updated_at: "2026-04-01T14:00:00.000Z",
-      });
+      } as PlanMetaWithActor);
 
       expect(result).toContain("last_actor: gh:nitsan");
 
@@ -679,12 +702,12 @@ describe("ENG-4389: serializeMeta — actor fields", () => {
         // Pass in scrambled order to prove serialization orders correctly
         updated_at: "2026-04-01T14:00:00.000Z",
         created_by_session: "sess-aaa",
-        created_by_actor: "claude:abcd1234" as any,
+        created_by_actor: "claude:abcd1234",
         sessions: ["sess-aaa", "sess-bbb"],
         last_session: "sess-bbb",
-        last_actor: "gh:oria" as any,
+        last_actor: "gh:oria",
         created_at: "2026-04-01T10:00:00.000Z",
-      });
+      } as PlanMetaWithActor);
 
       const lines = result.split("\n");
       const fieldLines = lines.filter(l => l.match(/^\w/));
@@ -709,9 +732,9 @@ describe("ENG-4389: serializeMeta — actor fields", () => {
     "ENG-4389: actor values are unquoted (not timestamp fields)",
     () => {
       const result = serializeMeta({
-        created_by_actor: "claude:a4c28f13" as any,
-        last_actor: "gh:nitsan" as any,
-      });
+        created_by_actor: "claude:a4c28f13",
+        last_actor: "gh:nitsan",
+      } as PlanMetaWithActor);
 
       // Actor values should NOT be quoted
       expect(result).toContain("created_by_actor: claude:a4c28f13");
@@ -726,17 +749,17 @@ describe("ENG-4389: serializeMeta — actor fields", () => {
 // Round-trip — actor fields
 // ---------------------------------------------------------------------------
 
-describe("ENG-4389: round-trip — actor fields", () => {
+describe("round-trip — actor fields", () => {
   test.failing(
     "ENG-4389: actor fields survive parse → serialize → parse",
     () => {
       const description = "A description with actor metadata.";
-      const meta = {
+      const meta: PlanMetaWithActor = {
         created_by_session: "sess-aaa",
-        created_by_actor: "claude:a4c28f13" as any,
+        created_by_actor: "claude:a4c28f13",
         created_at: "2026-04-01T10:00:00.000Z",
         last_session: "sess-bbb",
-        last_actor: "gh:nitsan" as any,
+        last_actor: "gh:nitsan",
         updated_at: "2026-04-01T14:00:00.000Z",
         sessions: ["sess-aaa", "sess-bbb"],
       };
@@ -760,10 +783,10 @@ describe("ENG-4389: round-trip — actor fields", () => {
     "ENG-4389: actor fields round-trip without session fields",
     () => {
       const description = "Actor-only metadata.";
-      const meta = {
-        created_by_actor: "gh:developer" as any,
+      const meta: PlanMetaWithActor = {
+        created_by_actor: "gh:developer",
         created_at: "2026-04-01T12:00:00.000Z",
-        last_actor: "gh:developer" as any,
+        last_actor: "gh:developer",
         updated_at: "2026-04-01T12:00:00.000Z",
       };
 
@@ -781,24 +804,17 @@ describe("ENG-4389: round-trip — actor fields", () => {
 // buildMetaDescription — actor capture
 // ---------------------------------------------------------------------------
 
-describe("ENG-4389: buildMetaDescription — actor capture", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    savedEnv.CLAUDE_SESSION_ID = process.env.CLAUDE_SESSION_ID;
-  });
-
-  afterEach(() => {
-    if (savedEnv.CLAUDE_SESSION_ID === undefined) {
-      delete process.env.CLAUDE_SESSION_ID;
-    } else {
-      process.env.CLAUDE_SESSION_ID = savedEnv.CLAUDE_SESSION_ID;
-    }
-  });
+describe("buildMetaDescription — actor capture", () => {
+  const env = withSessionEnv();
+  beforeEach(() => env.save());
+  afterEach(() => env.restore());
 
   test.failing(
     "ENG-4389: on create (new meta), sets both created_by_actor and last_actor",
     () => {
+      // Note: buildMetaDescription on create currently doesn't set created_by_session either
+      // (only last_session). The actor fields follow the same pattern — both are set on create
+      // because there's no "previous actor" to distinguish from.
       process.env.CLAUDE_SESSION_ID = "a4c28f13-1111-2222-3333-444444444444";
 
       const result = buildMetaDescription("New issue description", null);
@@ -815,12 +831,12 @@ describe("ENG-4389: buildMetaDescription — actor capture", () => {
     () => {
       process.env.CLAUDE_SESSION_ID = "bbbb1234-5555-6666-7777-888888888888";
 
-      const existingMeta = {
+      const existingMeta: PlanMetaWithActor = {
         created_by_session: "aaaa0000-1111-2222-3333-444444444444",
-        created_by_actor: "claude:aaaa0000" as any,
+        created_by_actor: "claude:aaaa0000",
         created_at: "2026-04-01T10:00:00.000Z",
         last_session: "aaaa0000-1111-2222-3333-444444444444",
-        last_actor: "claude:aaaa0000" as any,
+        last_actor: "claude:aaaa0000",
         updated_at: "2026-04-01T10:00:00.000Z",
         sessions: ["aaaa0000-1111-2222-3333-444444444444"],
       };
@@ -841,12 +857,12 @@ describe("ENG-4389: buildMetaDescription — actor capture", () => {
     () => {
       delete process.env.CLAUDE_SESSION_ID;
 
-      const existingMeta = {
+      const existingMeta: PlanMetaWithActor = {
         created_by_session: "aaaa0000-1111-2222-3333-444444444444",
-        created_by_actor: "claude:aaaa0000" as any,
+        created_by_actor: "claude:aaaa0000",
         created_at: "2026-04-01T10:00:00.000Z",
         last_session: "aaaa0000-1111-2222-3333-444444444444",
-        last_actor: "gh:nitsan" as any,
+        last_actor: "gh:nitsan",
         updated_at: "2026-04-01T12:00:00.000Z",
         sessions: ["aaaa0000-1111-2222-3333-444444444444"],
       };
@@ -865,11 +881,13 @@ describe("ENG-4389: buildMetaDescription — actor capture", () => {
 // getActor — actor resolution (lazy import, function doesn't exist yet)
 // ---------------------------------------------------------------------------
 
-describe("ENG-4389: getActor — actor resolution", () => {
-  const savedEnv: Record<string, string | undefined> = {};
+// getActor is currently in session-tracking.ts. ENG-4389 moves/re-exports it from
+// plan-meta.ts to centralize the meta API surface. These tests verify the plan-meta export.
+describe("getActor — actor resolution", () => {
+  const env = withSessionEnv();
 
   beforeEach(async () => {
-    savedEnv.CLAUDE_SESSION_ID = process.env.CLAUDE_SESSION_ID;
+    env.save();
     // Reset the actor cache before each test
     try {
       const resetActorCache = await getResetActorCache();
@@ -879,13 +897,7 @@ describe("ENG-4389: getActor — actor resolution", () => {
     }
   });
 
-  afterEach(() => {
-    if (savedEnv.CLAUDE_SESSION_ID === undefined) {
-      delete process.env.CLAUDE_SESSION_ID;
-    } else {
-      process.env.CLAUDE_SESSION_ID = savedEnv.CLAUDE_SESSION_ID;
-    }
-  });
+  afterEach(() => env.restore());
 
   test.failing(
     "ENG-4389: getActor resolves claude:<first-8-chars> from CLAUDE_SESSION_ID",
@@ -919,7 +931,7 @@ describe("ENG-4389: getActor — actor resolution", () => {
   );
 
   test.failing(
-    "ENG-4389: getActor returns 'unknown' when no session and no git config",
+    "ENG-4389: getActor is exported from plan-meta module",
     async () => {
       delete process.env.CLAUDE_SESSION_ID;
       // We can't easily remove git config in tests, but we can verify
