@@ -193,6 +193,7 @@ export function parseMainArgs(args: string[]): MainArgs {
   if (result.issues && result.full) throw new Error("Cannot use --issues with --full");
   if (result.issues && formatExplicit) throw new Error("Cannot use --issues with --format");
   if (result.issues && result.timeline) throw new Error("Cannot use --issues with --timeline");
+  if (result.issues && result.stream) throw new Error("Cannot use --issues with --stream");
 
   // --full sets format to narrative, unless --format was explicitly provided
   if (result.full && !formatExplicit) {

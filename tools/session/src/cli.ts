@@ -135,6 +135,7 @@ OPTIONS:
   --subagents        Include subagent transcripts (appended at end)
   --include-warmups  Include warmup subagents (excluded by default)
   --list-files       List all related files (main + subagents), one per line
+  --issues           Show Linear issues touched by this session (delegates to plan list --session)
   --debug            Show timing and progress info (also: DEBUG=session env var)
   --timeout <secs>   Timeout in seconds (default: 30, 0 to disable)
   --help, -h         Show this help
