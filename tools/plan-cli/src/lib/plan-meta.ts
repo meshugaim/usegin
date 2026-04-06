@@ -1,7 +1,11 @@
+import { execSync } from "child_process";
+
 export type PlanMeta = {
   created_by_session?: string;
+  created_by_actor?: string;
   created_at?: string;
   last_session?: string;
+  last_actor?: string;
   updated_at?: string;
   sessions?: string[];
 };
@@ -10,8 +14,10 @@ const META_REGEX = /\n?<!-- plan:meta\n([\s\S]*?)\n-->\s*$/;
 
 const FIELD_ORDER = [
   "created_by_session",
+  "created_by_actor",
   "created_at",
   "last_session",
+  "last_actor",
   "updated_at",
   "sessions",
 ] as const;
@@ -124,11 +130,61 @@ export function attachMeta(description: string, meta: PlanMeta): string {
   return `${description}\n\n${block}`;
 }
 
+// Cache the resolved actor for the lifetime of the process
+let cachedActor: string | null = null;
+
+/**
+ * Resolve the current actor identity.
+ * Claude sessions: "claude:<first-8-chars-of-session-id>"
+ * Humans: "gh:<github-login>" or "gh:<git-user-name>"
+ * Fallback: "unknown"
+ */
+export function getActor(): string {
+  if (cachedActor) return cachedActor;
+
+  const sessionId = process.env.CLAUDE_SESSION_ID;
+  if (sessionId) {
+    cachedActor = `claude:${sessionId.slice(0, 8)}`;
+    return cachedActor;
+  }
+
+  try {
+    const email = execSync("git config user.email", { encoding: "utf-8" }).trim();
+    const ghMatch = email.match(/^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$/);
+    if (ghMatch) {
+      cachedActor = `gh:${ghMatch[1]}`;
+      return cachedActor;
+    }
+  } catch {
+    // git not available or no config
+  }
+
+  try {
+    const name = execSync("git config user.name", { encoding: "utf-8" }).trim();
+    if (name) {
+      cachedActor = `gh:${name}`;
+      return cachedActor;
+    }
+  } catch {
+    // git not available
+  }
+
+  cachedActor = "unknown";
+  return cachedActor;
+}
+
+/**
+ * Reset cached actor (for testing).
+ */
+export function resetActorCache(): void {
+  cachedActor = null;
+}
+
 /**
  * Build the final description with meta attached.
  * Reads CLAUDE_SESSION_ID from process.env.
- * - If session + existing meta: updates last_session, updated_at, dedupes sessions
- * - If session + no meta: creates fresh meta (no created_by_session)
+ * - If session + existing meta: updates last_session, last_actor, updated_at, dedupes sessions
+ * - If session + no meta: creates fresh meta with actor fields
  * - If no session + existing meta: preserves unchanged
  * - If no session + no meta: returns description as-is
  */
@@ -139,9 +195,11 @@ export function buildMetaDescription(
   const sessionId = process.env.CLAUDE_SESSION_ID;
 
   if (sessionId && existingMeta) {
+    const actor = getActor();
     const updatedMeta: PlanMeta = {
       ...existingMeta,
       last_session: sessionId,
+      last_actor: actor,
       updated_at: new Date().toISOString(),
       sessions: [...new Set([...(existingMeta.sessions ?? []), sessionId])],
     };
@@ -149,10 +207,13 @@ export function buildMetaDescription(
   }
 
   if (sessionId && !existingMeta) {
+    const actor = getActor();
     const now = new Date().toISOString();
     const freshMeta: PlanMeta = {
+      created_by_actor: actor,
       created_at: now,
       last_session: sessionId,
+      last_actor: actor,
       updated_at: now,
       sessions: [sessionId],
     };

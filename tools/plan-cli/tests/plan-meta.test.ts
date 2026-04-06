@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import type { PlanMeta } from "../src/lib/plan-meta";
-import { parseMeta, serializeMeta, attachMeta, buildMetaDescription } from "../src/lib/plan-meta";
+import { parseMeta, serializeMeta, attachMeta, buildMetaDescription, resetActorCache } from "../src/lib/plan-meta";
 import { hashDescription } from "../src/lib/checkout-meta";
 
 // Lazy import for getActor — the function doesn't exist in plan-meta.ts yet.
@@ -527,7 +527,7 @@ describe("hashDescription with plan:meta awareness", () => {
 // ---------------------------------------------------------------------------
 
 describe("PlanMeta type — actor fields", () => {
-  test.failing(
+  test(
     "ENG-4389: created_by_actor and last_actor exist on parsed PlanMeta",
     () => {
       const input = [
@@ -557,7 +557,7 @@ describe("PlanMeta type — actor fields", () => {
 // ---------------------------------------------------------------------------
 
 describe("parseMeta — actor fields", () => {
-  test.failing(
+  test(
     "ENG-4389: parses created_by_actor from meta block",
     () => {
       const input = [
@@ -576,7 +576,7 @@ describe("parseMeta — actor fields", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: parses last_actor from meta block",
     () => {
       const input = [
@@ -595,7 +595,7 @@ describe("parseMeta — actor fields", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: parses both actor fields together with all other fields",
     () => {
       const input = [
@@ -624,7 +624,7 @@ describe("parseMeta — actor fields", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: handles meta block with actor fields but no session fields",
     () => {
       const input = [
@@ -653,7 +653,7 @@ describe("parseMeta — actor fields", () => {
 // ---------------------------------------------------------------------------
 
 describe("serializeMeta — actor fields", () => {
-  test.failing(
+  test(
     "ENG-4389: serializes created_by_actor after created_by_session",
     () => {
       const result = serializeMeta({
@@ -674,7 +674,7 @@ describe("serializeMeta — actor fields", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: serializes last_actor after last_session and before updated_at",
     () => {
       const result = serializeMeta({
@@ -695,7 +695,7 @@ describe("serializeMeta — actor fields", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: full field order: created_by_session, created_by_actor, created_at, last_session, last_actor, updated_at, sessions",
     () => {
       const result = serializeMeta({
@@ -728,7 +728,7 @@ describe("serializeMeta — actor fields", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: actor values are unquoted (not timestamp fields)",
     () => {
       const result = serializeMeta({
@@ -750,7 +750,7 @@ describe("serializeMeta — actor fields", () => {
 // ---------------------------------------------------------------------------
 
 describe("round-trip — actor fields", () => {
-  test.failing(
+  test(
     "ENG-4389: actor fields survive parse → serialize → parse",
     () => {
       const description = "A description with actor metadata.";
@@ -779,7 +779,7 @@ describe("round-trip — actor fields", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: actor fields round-trip without session fields",
     () => {
       const description = "Actor-only metadata.";
@@ -806,10 +806,10 @@ describe("round-trip — actor fields", () => {
 
 describe("buildMetaDescription — actor capture", () => {
   const env = withSessionEnv();
-  beforeEach(() => env.save());
+  beforeEach(() => { env.save(); resetActorCache(); });
   afterEach(() => env.restore());
 
-  test.failing(
+  test(
     "ENG-4389: on create (new meta), sets both created_by_actor and last_actor",
     () => {
       // Note: buildMetaDescription on create currently doesn't set created_by_session either
@@ -826,7 +826,7 @@ describe("buildMetaDescription — actor capture", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: on update (existing meta), only last_actor changes; created_by_actor preserved",
     () => {
       process.env.CLAUDE_SESSION_ID = "bbbb1234-5555-6666-7777-888888888888";
@@ -852,7 +852,7 @@ describe("buildMetaDescription — actor capture", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: on update without session ID, actor fields are preserved unchanged",
     () => {
       delete process.env.CLAUDE_SESSION_ID;
@@ -899,7 +899,7 @@ describe("getActor — actor resolution", () => {
 
   afterEach(() => env.restore());
 
-  test.failing(
+  test(
     "ENG-4389: getActor resolves claude:<first-8-chars> from CLAUDE_SESSION_ID",
     async () => {
       process.env.CLAUDE_SESSION_ID = "a4c28f13-1111-2222-3333-444444444444";
@@ -912,7 +912,7 @@ describe("getActor — actor resolution", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: getActor resolves gh:<username> from git config noreply email",
     async () => {
       delete process.env.CLAUDE_SESSION_ID;
@@ -930,7 +930,7 @@ describe("getActor — actor resolution", () => {
     }
   );
 
-  test.failing(
+  test(
     "ENG-4389: getActor is exported from plan-meta module",
     async () => {
       delete process.env.CLAUDE_SESSION_ID;
