@@ -101,17 +101,11 @@ Clean up. This is a separate, explicit step — not absorbed into review. Look f
 
 ### Bugs found during review
 
-When a reviewer finds a **behavioral bug** (wrong behavior, edge case, null handling, missing guard), it must go through its own mini TDD cycle before being fixed:
+When a reviewer finds a **behavioral bug**, it goes through its own mini TDD cycle:
 
-1. **Red** — Write a `test.failing` test that reproduces the bug. This proves the bug is real and creates a regression guard.
-2. **Green** — Fix the bug to make the test pass. Remove the `test.failing` mark.
-3. **Commit** — Both the test and fix get committed.
-
-**Structural issues** (wrong types, stale comments, missing imports, alignment) can be fixed directly — no test needed.
-
-The liaison decides which category a finding falls into. If in doubt, write the test. The cost of an unnecessary test is low; the cost of an unguarded bug fix is a future regression.
-
-*Origin: ENG-4521 session — reviewer found a `profileName!` non-null assertion bug that was fixed directly without a regression test.*
+1. **Red** — Write a `test.failing` test that reproduces the bug
+2. **Green** — Fix the bug, remove `test.failing`
+3. **Commit and push** after each phase
 
 ### Splitting across agents
 
