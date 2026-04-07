@@ -9,4 +9,4 @@ context: When tracing what work happened in a Claude session
 or updated during a specific Claude session. Pairs well with `session list`
 to find the session ID first.
 
-Use `plan list --session latest` for the most recent session.
+Tip: `session list` shows IDs — copy the 8-char prefix to use here.

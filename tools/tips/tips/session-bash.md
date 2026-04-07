@@ -9,4 +9,4 @@ context: When looking for a command you ran previously
 Press Ctrl-R to run a command directly from the browser, or Enter to
 copy it.
 
-Add `--since 3d` or `--session <id>` to narrow the search.
+Add a session ID to scope: `session bash 502de9c7`, or `--grep` to filter.

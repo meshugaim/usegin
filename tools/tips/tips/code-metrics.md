@@ -9,4 +9,4 @@ context: When investigating code hot spots
 metrics. Great for finding high-churn, high-complexity files that are
 prime refactoring candidates.
 
-Run `code-metrics --since 30d` to focus on recent activity.
+Try `code-metrics churn` or `code-metrics recency` to find hot spots.
