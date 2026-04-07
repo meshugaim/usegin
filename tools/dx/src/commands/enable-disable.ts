@@ -164,23 +164,23 @@ function buildToggleCommand(name: "enable" | "disable", enabled: boolean): Comma
 
     warnUnregisteredFeature(feature, ctx);
 
-    const { saved, user, localPath } = resolveWriteTarget(ctx, !!opts.save);
+    const target = resolveWriteTarget(ctx, !!opts.save);
 
-    if (saved) {
-      writeUserOverride(ctx.configPath!, user!, feature, enabled);
+    if (target.saved) {
+      writeUserOverride(target.configPath, target.user, feature, enabled);
     } else {
-      writeLocalOverride(localPath, feature, enabled);
+      writeLocalOverride(target.localPath, feature, enabled);
     }
 
     autoSync();
 
     if (useJson) {
       process.stdout.write(
-        formatEnableDisableResultJson(feature, enabled, saved, user) + "\n",
+        formatEnableDisableResultJson(feature, enabled, target.saved, target.user) + "\n",
       );
     } else {
       process.stderr.write(
-        formatEnableDisableResult(feature, enabled, saved, user) + "\n",
+        formatEnableDisableResult(feature, enabled, target.saved, target.user) + "\n",
       );
     }
   });

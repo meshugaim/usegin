@@ -4,15 +4,14 @@
  * Exports pure functions for clearing overrides and formatting output,
  * plus a Commander command builder.
  *
- * Part of: ENG-3465
+ * Part of: ENG-3465, ENG-4687
  */
 
 import { Command } from "commander";
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { dirname, resolve } from "path";
 import { dxShouldOutputJson } from "../output";
-import { resolveUser } from "../core";
 import { autoSync } from "./sync";
+import { resolveWriteTarget, warnUnregisteredFeature } from "./write-target";
 import dx from "../../sdk";
 
 // ---------------------------------------------------------------------------
@@ -188,63 +187,38 @@ export function buildResetCommand(): Command {
   cmd.action((feature: string | undefined, opts: { save?: boolean; json?: boolean }) => {
     const useJson = dxShouldOutputJson(opts);
     const ctx = dx.getContext();
-    const user = resolveUser(ctx);
 
-    // Warn if the feature is not registered (but still proceed — unknown
-    // features default to enabled, so overrides are valid)
-    if (feature && ctx.config.features && !(feature in ctx.config.features)) {
-      process.stderr.write(
-        `dx: warning: "${feature}" is not a registered feature\n`,
-      );
+    if (feature) {
+      warnUnregisteredFeature(feature, ctx);
     }
 
-    let saved = false;
+    const target = resolveWriteTarget(ctx, !!opts.save, {
+      fallbackMessage: "dx: resetting local overrides instead.",
+    });
 
-    if (opts.save) {
-      if (user) {
-        if (!ctx.configPath) {
-          throw new Error("dx: configPath not set in context — cannot --save");
-        }
-        if (feature) {
-          clearUserOverride(ctx.configPath, user, feature);
-        } else {
-          clearAllUserOverrides(ctx.configPath, user);
-        }
-        saved = true;
-      } else {
-        // --save requires a known user; fall back to local with a warning
-        process.stderr.write(
-          "dx: cannot --save: user not identified. Run `dx identify` first.\n",
-        );
-        process.stderr.write("dx: resetting local overrides instead.\n");
-      }
-    }
-
-    if (!saved) {
-      const localPath =
-        ctx.localPath ??
-        (ctx.configPath
-          ? resolve(dirname(ctx.configPath), "config.local.json")
-          : null);
-      if (!localPath) throw new Error("dx: cannot determine local config path");
-
+    if (target.saved) {
       if (feature) {
-        clearLocalOverride(localPath, feature);
+        clearUserOverride(target.configPath, target.user, feature);
       } else {
-        clearAllLocalOverrides(localPath);
+        clearAllUserOverrides(target.configPath, target.user);
+      }
+    } else {
+      if (feature) {
+        clearLocalOverride(target.localPath, feature);
+      } else {
+        clearAllLocalOverrides(target.localPath);
       }
     }
 
-    // Auto-sync to git config so `git config dx.<feature>` stays current
     autoSync();
 
     if (useJson) {
       process.stdout.write(
-        formatResetResultJson(feature ?? null, saved, user) + "\n",
+        formatResetResultJson(feature ?? null, target.saved, target.user) + "\n",
       );
     } else {
       process.stderr.write(
-        formatResetResult(feature ?? null, saved, user) + "\n",
+        formatResetResult(feature ?? null, target.saved, target.user) + "\n",
       );
     }
   });

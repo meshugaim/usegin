@@ -12,13 +12,33 @@ import type { DxContext } from "../core";
 import { resolveUser } from "../core";
 
 /** Result of resolving where a write command should persist its override. */
-export interface WriteTarget {
-  /** Whether the override will be saved to config.json (user override). */
-  saved: boolean;
-  /** Resolved user key, or null if unknown. */
-  user: string | null;
-  /** Absolute path to the local config file (always resolved, even when saved=true). */
-  localPath: string;
+export type WriteTarget =
+  | {
+      /** Override will be saved to config.json (user override). */
+      saved: true;
+      /** Resolved user key (guaranteed non-null when saved). */
+      user: string;
+      /** Absolute path to config.json. */
+      configPath: string;
+      /** Absolute path to the local config file (always resolved). */
+      localPath: string;
+    }
+  | {
+      /** Override will be written to local config only. */
+      saved: false;
+      /** Resolved user key, or null if unknown. */
+      user: string | null;
+      /** Absolute path to the local config file. */
+      localPath: string;
+    };
+
+/** Options for customizing the fallback message when --save cannot proceed. */
+export interface ResolveWriteTargetOptions {
+  /**
+   * Message printed when --save falls back to local.
+   * Defaults to "dx: writing to local config instead."
+   */
+  fallbackMessage?: string;
 }
 
 /**
@@ -34,6 +54,7 @@ export interface WriteTarget {
 export function resolveWriteTarget(
   ctx: DxContext,
   save: boolean,
+  opts?: ResolveWriteTargetOptions,
 ): WriteTarget {
   const user = resolveUser(ctx);
 
@@ -44,14 +65,16 @@ export function resolveWriteTarget(
       }
 
       const localPath = resolveLocalPath(ctx);
-      return { saved: true, user, localPath };
+      return { saved: true, user, configPath: ctx.configPath, localPath };
     }
 
     // --save requires a known user; fall back to local with a warning
     process.stderr.write(
       "dx: cannot --save: user not identified. Run `dx identify` first.\n",
     );
-    process.stderr.write("dx: writing to local config instead.\n");
+    process.stderr.write(
+      (opts?.fallbackMessage ?? "dx: writing to local config instead.") + "\n",
+    );
   }
 
   const localPath = resolveLocalPath(ctx);
