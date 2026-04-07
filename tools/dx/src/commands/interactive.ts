@@ -11,7 +11,7 @@
  * Part of: ENG-3443
  */
 
-import { getFeature, resolveUser, type DxContext } from "../core";
+import { getFeature, resolveUser, type DxContext, type FeatureValue } from "../core";
 import { writeLocalOverride, writeUserOverride } from "./enable-disable";
 import { autoSync } from "./sync";
 
@@ -21,6 +21,10 @@ export interface InteractiveOption {
   label: string;
   hint: string;
   initialValue: boolean;
+  /** True for non-boolean features — shown read-only with current value. */
+  readOnly: boolean;
+  /** The resolved typed value (used for read-only display). */
+  currentValue: FeatureValue;
 }
 
 /**
@@ -41,6 +45,7 @@ export function buildInteractiveOptions(
   return featureNames.map((name) => {
     const featureDef = ctx.config.features[name];
     const info = getFeature(name, ctx);
+    const isBoolean = typeof info.value === "boolean";
 
     // Append source info to the hint for overridden features so the user
     // knows *why* a feature is on/off (and where the override lives).
@@ -56,6 +61,8 @@ export function buildInteractiveOptions(
       label: name,
       hint,
       initialValue: info.enabled,
+      readOnly: !isBoolean,
+      currentValue: info.value,
     };
   });
 }
@@ -66,20 +73,43 @@ export function buildInteractiveOptions(
  * Transforms the per-option `initialValue` booleans into a top-level
  * `initialValues` array of enabled feature names, and ensures
  * descriptions are visible in each option's label.
+ *
+ * Read-only (non-boolean) features are excluded from the multiselect
+ * options — they cannot be meaningfully toggled via a checkbox.
  */
 export function buildMultiselectConfig(options: InteractiveOption[]): {
   options: Array<{ value: string; label: string }>;
   initialValues: string[];
 } {
+  const toggleable = options.filter((o) => !o.readOnly);
+
   return {
-    options: options.map((o) => ({
+    options: toggleable.map((o) => ({
       value: o.value,
       label: `${o.label} — ${o.hint}`,
     })),
-    initialValues: options
+    initialValues: toggleable
       .filter((o) => o.initialValue)
       .map((o) => o.value),
   };
+}
+
+/**
+ * Format non-boolean features as read-only display lines.
+ *
+ * Returns an array of human-readable strings like:
+ *   "    tips.show-duration = 10m  (use `dx set` to change)"
+ *
+ * These are displayed below the multiselect picker so users know
+ * these features exist but must use `dx set` to change them.
+ */
+export function formatReadOnlyFeatures(options: InteractiveOption[]): string[] {
+  const readOnly = options.filter((o) => o.readOnly);
+  if (readOnly.length === 0) return [];
+
+  return readOnly.map(
+    (o) => `    ${o.label} = ${o.currentValue}  (use \`dx set\` to change)`,
+  );
 }
 
 /**
@@ -137,7 +167,23 @@ export async function runInteractive(
     ? `saving to config.json for ${user}`
     : "saving locally (use dx --save to persist)";
 
+  // Show non-boolean features as read-only info before the picker
+  const readOnlyLines = formatReadOnlyFeatures(options);
+  if (readOnlyLines.length > 0) {
+    process.stderr.write("\n  Non-toggleable features:\n");
+    for (const line of readOnlyLines) {
+      process.stderr.write(line + "\n");
+    }
+    process.stderr.write("\n");
+  }
+
   const config = buildMultiselectConfig(options);
+
+  if (config.options.length === 0) {
+    process.stderr.write("No toggleable features registered.\n");
+    return;
+  }
+
   const selected = await multiselect({
     message: `Feature toggles — ${target}`,
     ...config,
@@ -149,10 +195,13 @@ export async function runInteractive(
   }
 
   // Compare selected to current state and write overrides for changes
+  // Only consider toggleable (boolean) options — read-only ones aren't
+  // in the multiselect and can't change here.
   const selectedSet = new Set(selected as string[]);
+  const toggleable = options.filter((o) => !o.readOnly);
   let changed = 0;
 
-  for (const opt of options) {
+  for (const opt of toggleable) {
     const wasEnabled = opt.initialValue;
     const nowEnabled = selectedSet.has(opt.value);
     if (wasEnabled !== nowEnabled) {
