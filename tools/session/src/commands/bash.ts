@@ -66,6 +66,7 @@ export function buildBashFzfArgs(): string[] {
     "--bind", "ctrl-u:preview-half-page-up",
     "--bind", "ctrl-d:preview-half-page-down",
     "--expect", EXPECT_KEY,
+    "--tiebreak", "index",
   ];
 }
 

@@ -95,6 +95,11 @@ describe("extractCommandFromSelection", () => {
     const selected = "$ git log --oneline | head -5";
     expect(extractCommandFromSelection(selected)).toBe("git log --oneline | head -5");
   });
+
+  it("trims trailing whitespace from the command", () => {
+    const selected = "$ bun test  \n[2025-03-18 10:30]  Description";
+    expect(extractCommandFromSelection(selected)).toBe("bun test");
+  });
 });
 
 // =============================================================================
