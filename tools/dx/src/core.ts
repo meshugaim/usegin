@@ -9,15 +9,17 @@
 // Types
 // ---------------------------------------------------------------------------
 
+export type FeatureValue = boolean | string | number;
+
 export interface FeatureDefinition {
   description: string;
   mechanism: string;
-  default: boolean;
+  default: FeatureValue;
 }
 
 export interface UserDefinition {
   aliases: string[];
-  overrides: Record<string, boolean>;
+  overrides: Record<string, FeatureValue>;
 }
 
 export interface DxConfig {
@@ -26,7 +28,7 @@ export interface DxConfig {
 }
 
 export interface DxLocalConfig {
-  overrides: Record<string, boolean>;
+  overrides: Record<string, FeatureValue>;
 }
 
 export interface DxContext {
@@ -46,6 +48,7 @@ export interface DxContext {
 export type FeatureSource = "default" | "user-override" | "local-override";
 
 export interface FeatureInfo {
+  value: FeatureValue;
   enabled: boolean;
   source: FeatureSource;
 }
@@ -175,6 +178,20 @@ export function matchSignalToUser(
   return null;
 }
 
+/**
+ * Coerce a typed feature value to a boolean.
+ *
+ * Rules:
+ * - boolean: returned as-is
+ * - string: true if non-empty
+ * - number: true if not zero (including -0)
+ */
+export function toEnabled(value: FeatureValue): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value.length > 0;
+  return value !== 0;
+}
+
 export function isEnabled(featureName: string, ctx: DxContext, user?: string | null): boolean {
   return getFeature(featureName, ctx, user).enabled;
 }
@@ -191,25 +208,25 @@ export function getFeature(featureName: string, ctx: DxContext, user?: string | 
   }
 
   // Start with default
-  let enabled = isUnknown ? true : feature.default;
+  let value: FeatureValue = isUnknown ? true : feature.default;
   let source: FeatureSource = "default";
 
   // User override layer
   if (resolvedUser !== null) {
     const userDef = ctx.config.users[resolvedUser];
     if (userDef !== undefined && featureName in userDef.overrides) {
-      enabled = userDef.overrides[featureName];
+      value = userDef.overrides[featureName];
       source = "user-override";
     }
   }
 
   // Local override layer (highest priority)
   if (ctx.local?.overrides && featureName in ctx.local.overrides) {
-    enabled = ctx.local.overrides[featureName];
+    value = ctx.local.overrides[featureName];
     source = "local-override";
   }
 
-  return { enabled, source };
+  return { value, enabled: toEnabled(value), source };
 }
 
 export function allFeatures(ctx: DxContext, user?: string | null): Record<string, FeatureInfo> {
@@ -218,5 +235,17 @@ export function allFeatures(ctx: DxContext, user?: string | null): Record<string
     result[featureName] = getFeature(featureName, ctx, user);
   }
   return result;
+}
+
+/**
+ * Get the typed value of a feature, or undefined if the feature is not registered.
+ *
+ * Unlike `isEnabled` (which returns `true` for unknown features), `getValue`
+ * returns `undefined` — there's no meaningful typed default for an unregistered feature.
+ */
+export function getValue(featureName: string, ctx: DxContext, user?: string | null): FeatureValue | undefined {
+  const feature = ctx.config.features[featureName];
+  if (!feature) return undefined;
+  return getFeature(featureName, ctx, user).value;
 }
 

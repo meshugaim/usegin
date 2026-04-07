@@ -681,19 +681,19 @@ describe("getFeature", () => {
   test("returns source 'default' when no overrides apply", () => {
     const ctx = makeCtx();
     const result = getFeature("ci-watcher", ctx, null);
-    expect(result).toEqual({ enabled: true, source: "default" });
+    expect(result).toEqual({ value: true, enabled: true, source: "default" });
   });
 
   test("returns source 'default' for default-false feature", () => {
     const ctx = makeCtx();
     const result = getFeature("autosync", ctx, null);
-    expect(result).toEqual({ enabled: false, source: "default" });
+    expect(result).toEqual({ value: false, enabled: false, source: "default" });
   });
 
   test("returns source 'user-override' when user overrides", () => {
     const ctx = makeCtx();
     const result = getFeature("ci-watcher", ctx, "nitsan");
-    expect(result).toEqual({ enabled: false, source: "user-override" });
+    expect(result).toEqual({ value: false, enabled: false, source: "user-override" });
   });
 
   test("returns source 'local-override' when local overrides", () => {
@@ -701,7 +701,7 @@ describe("getFeature", () => {
       local: { overrides: { "ci-watcher": false } },
     });
     const result = getFeature("ci-watcher", ctx, null);
-    expect(result).toEqual({ enabled: false, source: "local-override" });
+    expect(result).toEqual({ value: false, enabled: false, source: "local-override" });
   });
 
   test("local-override source wins over user-override", () => {
@@ -710,7 +710,7 @@ describe("getFeature", () => {
     });
     // nitsan overrides ci-watcher to false, but local says true
     const result = getFeature("ci-watcher", ctx, "nitsan");
-    expect(result).toEqual({ enabled: true, source: "local-override" });
+    expect(result).toEqual({ value: true, enabled: true, source: "local-override" });
   });
 
   test("user-override source when user overrides default", () => {
@@ -724,7 +724,7 @@ describe("getFeature", () => {
     });
     const ctx = makeCtx({ config });
     const result = getFeature("autosync", ctx, "nitsan");
-    expect(result).toEqual({ enabled: true, source: "user-override" });
+    expect(result).toEqual({ value: true, enabled: true, source: "user-override" });
   });
 
   test("unknown feature returns enabled true with source 'default'", () => {
@@ -738,21 +738,21 @@ describe("getFeature", () => {
   test("resolves user automatically when user param is not provided", () => {
     const ctx = makeCtx({ env: { DX_USER: "nitsan" } });
     const result = getFeature("ci-watcher", ctx);
-    expect(result).toEqual({ enabled: false, source: "user-override" });
+    expect(result).toEqual({ value: false, enabled: false, source: "user-override" });
   });
 
   test("getFeature with undefined auto-resolves user", () => {
     const ctx = makeCtx({ env: { DX_USER: "nitsan" } });
     // undefined triggers auto-resolution
     const result = getFeature("ci-watcher", ctx, undefined);
-    expect(result).toEqual({ enabled: false, source: "user-override" });
+    expect(result).toEqual({ value: false, enabled: false, source: "user-override" });
   });
 
   test("getFeature with null does not auto-resolve user", () => {
     const ctx = makeCtx({ env: { DX_USER: "nitsan" } });
     // null means "no user" — skips user override layer
     const result = getFeature("ci-watcher", ctx, null);
-    expect(result).toEqual({ enabled: true, source: "default" });
+    expect(result).toEqual({ value: true, enabled: true, source: "default" });
   });
 });
 
@@ -774,8 +774,8 @@ describe("allFeatures", () => {
     const ctx = makeCtx();
     const result = allFeatures(ctx, null);
 
-    expect(result["ci-watcher"]).toEqual({ enabled: true, source: "default" });
-    expect(result.autosync).toEqual({ enabled: false, source: "default" });
+    expect(result["ci-watcher"]).toEqual({ value: true, enabled: true, source: "default" });
+    expect(result.autosync).toEqual({ value: false, enabled: false, source: "default" });
   });
 
   test("reflects user overrides", () => {
@@ -783,11 +783,12 @@ describe("allFeatures", () => {
     const result = allFeatures(ctx, "nitsan");
 
     expect(result["ci-watcher"]).toEqual({
+      value: false,
       enabled: false,
       source: "user-override",
     });
     // nitsan has no autosync override, so it stays at default
-    expect(result.autosync).toEqual({ enabled: false, source: "default" });
+    expect(result.autosync).toEqual({ value: false, enabled: false, source: "default" });
   });
 
   test("reflects local overrides", () => {
@@ -795,11 +796,13 @@ describe("allFeatures", () => {
     const result = allFeatures(ctx, null);
 
     expect(result.autosync).toEqual({
+      value: true,
       enabled: true,
       source: "local-override",
     });
     // ci-watcher is not in local overrides, stays at default
     expect(result["ci-watcher"]).toEqual({
+      value: true,
       enabled: true,
       source: "default",
     });
@@ -812,6 +815,7 @@ describe("allFeatures", () => {
     const result = allFeatures(ctx, "nitsan");
 
     expect(result["ci-watcher"]).toEqual({
+      value: true,
       enabled: true,
       source: "local-override",
     });
@@ -830,6 +834,7 @@ describe("allFeatures", () => {
     const result = allFeatures(ctx);
 
     expect(result["ci-watcher"]).toEqual({
+      value: false,
       enabled: false,
       source: "user-override",
     });
@@ -942,13 +947,13 @@ describe("edge cases", () => {
     const result = allFeatures(ctx, "dev");
 
     // a: default true, no overrides → true, source: default
-    expect(result.a).toEqual({ enabled: true, source: "default" });
+    expect(result.a).toEqual({ value: true, enabled: true, source: "default" });
     // b: default false, user: true → true, source: user-override
-    expect(result.b).toEqual({ enabled: true, source: "user-override" });
+    expect(result.b).toEqual({ value: true, enabled: true, source: "user-override" });
     // c: default true, user: false, local: true → true, source: local-override
-    expect(result.c).toEqual({ enabled: true, source: "local-override" });
+    expect(result.c).toEqual({ value: true, enabled: true, source: "local-override" });
     // d: default false, no user, local: true → true, source: local-override
-    expect(result.d).toEqual({ enabled: true, source: "local-override" });
+    expect(result.d).toEqual({ value: true, enabled: true, source: "local-override" });
   });
 
   test("local config with empty overrides object", () => {

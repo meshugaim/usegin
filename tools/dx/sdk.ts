@@ -18,6 +18,7 @@ import {
   type DxLocalConfig,
   type DxContext,
   type FeatureInfo,
+  type FeatureValue,
 } from "./src/core";
 
 // Find repo root (walk up from this file to find .dx/)
@@ -84,6 +85,10 @@ const dx = {
   isEnabled: (feature: string) => coreIsEnabled(feature, getContext()),
   resolveUser: () => coreResolveUser(getContext()),
   getFeature: (feature: string) => coreGetFeature(feature, getContext()),
+  getValue: (feature: string) => {
+    const info = coreGetFeature(feature, getContext());
+    return info.value;
+  },
   allFeatures: () => coreAllFeatures(getContext()),
   reload,
   /** Escape hatch: get the raw context for advanced usage */
@@ -92,4 +97,4 @@ const dx = {
 
 export default dx;
 export { reload };
-export type { DxConfig, DxLocalConfig, DxContext, FeatureInfo };
+export type { DxConfig, DxLocalConfig, DxContext, FeatureInfo, FeatureValue };
