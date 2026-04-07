@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { parseTipFrontmatter, loadTips, pickRandom, formatTipForTerminal } from "../src/core";
+import { SEED_TIPS_DIR, stripAnsi, runCli } from "./helpers";
 
 /**
  * Tests for the tip system core module and CLI.
@@ -13,13 +14,6 @@ import { parseTipFrontmatter, loadTips, pickRandom, formatTipForTerminal } from 
 // ---------------------------------------------------------------------------
 // Test data
 // ---------------------------------------------------------------------------
-
-/** Path to the seed tips directory shipped with this tool. */
-const SEED_TIPS_DIR = join(import.meta.dir, "..", "tips");
-
-/** Strip ANSI escape codes for content assertions. */
-// eslint-disable-next-line no-control-regex
-const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const VALID_TIP_ALL_FIELDS = `---
 title: Query local traces from terminal
@@ -256,18 +250,12 @@ describe("CLI", () => {
   test(
     "ENG-4579: running cli.ts with no args exits 0 and produces output",
     () => {
-      const result = Bun.spawnSync({
-        cmd: ["bun", join(import.meta.dir, "..", "src", "cli.ts")],
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      const { stdout, stderr, exitCode } = runCli();
 
-      expect(result.exitCode).toBe(0);
+      expect(exitCode).toBe(0);
       // stdout should have content (a random tip or help text)
-      const stdout = result.stdout.toString();
       expect(stdout.length).toBeGreaterThan(0);
       // stderr should not contain errors
-      const stderr = result.stderr.toString();
       expect(stderr).not.toContain("Error");
     },
   );

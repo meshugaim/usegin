@@ -1,5 +1,4 @@
 import { describe, test, expect } from "bun:test";
-import { join } from "path";
 import {
   filterByTag,
   searchTips,
@@ -8,42 +7,13 @@ import {
   allTags,
   parseTipFrontmatter,
 } from "../src/core";
+import { stripAnsi, runCli } from "./helpers";
 
 /**
  * Tests for Slice 2: CLI subcommands — list, show, search, topic filter, empty states.
  *
  * Part of: ENG-4580
- *
- * Tests for Slice 2 CLI subcommands and core functions.
- * Existing Slice 1 tests are NOT modified.
  */
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const CLI_PATH = join(import.meta.dir, "..", "src", "cli.ts");
-const SEED_TIPS_DIR = join(import.meta.dir, "..", "tips");
-
-/** Strip ANSI escape codes for content assertions. */
-// eslint-disable-next-line no-control-regex
-const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
-
-/** Run the tip CLI with given args and return { stdout, stderr, exitCode }. */
-function runCli(
-  ...args: string[]
-): { stdout: string; stderr: string; exitCode: number } {
-  const result = Bun.spawnSync({
-    cmd: ["bun", CLI_PATH, ...args],
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  return {
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-    exitCode: result.exitCode,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Fixture tips for deterministic testing
