@@ -3,7 +3,7 @@
  *
  * Exports pure formatting functions and a Commander command builder.
  *
- * Part of: ENG-3442
+ * Part of: ENG-3442, ENG-4687
  */
 
 import { Command } from "commander";

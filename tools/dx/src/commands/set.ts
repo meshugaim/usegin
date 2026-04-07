@@ -9,12 +9,11 @@
  */
 
 import { Command } from "commander";
-import { dirname, resolve } from "path";
 import type { FeatureValue } from "../core";
-import { resolveUser } from "../core";
 import { dxShouldOutputJson } from "../output";
 import { writeLocalOverride, writeUserOverride } from "./enable-disable";
 import { autoSync } from "./sync";
+import { resolveWriteTarget, warnUnregisteredFeature } from "./write-target";
 import dx from "../../sdk";
 
 /**
@@ -123,45 +122,18 @@ export function buildSetCommand(): Command {
   cmd.action((feature: string, rawValue: string, opts: { save?: boolean; json?: boolean }) => {
     const useJson = dxShouldOutputJson(opts);
     const ctx = dx.getContext();
-    const user = resolveUser(ctx);
     const value = parseCliValue(rawValue);
 
-    // Warn if the feature is not registered (but still proceed)
-    if (ctx.config.features && !(feature in ctx.config.features)) {
-      process.stderr.write(
-        `dx: warning: "${feature}" is not a registered feature\n`,
-      );
-    }
+    warnUnregisteredFeature(feature, ctx);
 
-    let saved = false;
+    const { saved, user, localPath } = resolveWriteTarget(ctx, !!opts.save);
 
-    if (opts.save) {
-      if (user) {
-        if (!ctx.configPath) {
-          throw new Error("dx: configPath not set in context -- cannot --save");
-        }
-        writeUserOverride(ctx.configPath, user, feature, value);
-        saved = true;
-      } else {
-        // --save requires a known user; fall back to local with a warning
-        process.stderr.write(
-          "dx: cannot --save: user not identified. Run `dx identify` first.\n",
-        );
-        process.stderr.write("dx: writing to local config instead.\n");
-      }
-    }
-
-    if (!saved) {
-      const localPath =
-        ctx.localPath ??
-        (ctx.configPath
-          ? resolve(dirname(ctx.configPath), "config.local.json")
-          : null);
-      if (!localPath) throw new Error("dx: cannot determine local config path");
+    if (saved) {
+      writeUserOverride(ctx.configPath!, user!, feature, value);
+    } else {
       writeLocalOverride(localPath, feature, value);
     }
 
-    // Auto-sync to git config so `git config dx.<feature>` stays current
     autoSync();
 
     if (useJson) {
