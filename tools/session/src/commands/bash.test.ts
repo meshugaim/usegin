@@ -16,7 +16,7 @@ import {
 // =============================================================================
 
 describe("buildBashFzfArgs", () => {
-  it.failing("includes basic fzf flags", () => {
+  it("includes basic fzf flags", () => {
     const args = buildBashFzfArgs();
     expect(args).toContain("--read0");
     expect(args).toContain("--ansi");
@@ -177,7 +177,7 @@ describe("parseBashFzfOutput", () => {
     expect(result).toEqual({ action: "copy", command: "git status" });
   });
 
-  it.failing("handles extra trailing whitespace on selection lines", () => {
+  it("handles extra trailing whitespace on selection lines", () => {
     const output = "ctrl-r\n$ bun test  \n[2025-03-18 10:30]  Run tests  \n  ";
     const result = parseBashFzfOutput(output);
     expect(result).toEqual({ action: "run", command: "bun test" });

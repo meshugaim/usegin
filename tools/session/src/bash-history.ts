@@ -87,15 +87,15 @@ export function extractBashCommands(turns: Turn[]): BashCommand[] {
 /**
  * Format a BashCommand as a multi-line fzf entry.
  *
- * Line 1: [timestamp]  description
- * Line 2: $ command
+ * Line 1: $ command        (fzf ranks by first-line match quality)
+ * Line 2: [timestamp]  description
  */
 export function formatBashEntry(cmd: BashCommand): string {
   const ts = cmd.timestamp
     ? new Date(cmd.timestamp).toISOString().slice(0, 16).replace("T", " ")
     : "           ";
   const desc = cmd.description || "(no description)";
-  return `[${ts}]  ${desc}\n$ ${cmd.command}`;
+  return `$ ${cmd.command}\n[${ts}]  ${desc}`;
 }
 
 /**

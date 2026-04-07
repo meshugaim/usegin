@@ -120,7 +120,7 @@ describe("extractBashCommands", () => {
 });
 
 describe("formatBashEntry", () => {
-  it.failing("renders command first, then timestamp + description", () => {
+  it("renders command first, then timestamp + description", () => {
     const entry = formatBashEntry({
       timestamp: "2025-03-18T10:30:00Z",
       description: "Run the test suite",

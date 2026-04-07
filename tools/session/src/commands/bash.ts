@@ -60,7 +60,6 @@ export function buildBashFzfArgs(): string[] {
     "fzf",
     "--read0",
     "--ansi",
-    "--no-sort",
     "--header", "enter: copy │ ctrl-r: run │ ctrl-u/d: scroll preview",
     "--preview", "echo {+2..}",
     "--preview-window", "right:50%:wrap",
@@ -78,8 +77,8 @@ export function buildBashFzfArgs(): string[] {
  * Extract the bare command text from an fzf selection.
  *
  * The selection contains multi-line text like:
- *   [2025-03-18 10:30]  Run the test suite
  *   $ bun test src/parser.test.ts
+ *   [2025-03-18 10:30]  Run the test suite
  *
  * Returns the command without the "$ " prefix, or the raw selection
  * if no command line is found.
@@ -88,7 +87,7 @@ export function extractCommandFromSelection(selected: string): string {
   const lines = selected.split("\n");
   const commandLine = lines.find((l) => l.startsWith("$ "));
   if (commandLine) {
-    return commandLine.slice(2);
+    return commandLine.slice(2).trim();
   }
   return selected;
 }
