@@ -1,23 +1,13 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { rmSync } from "fs";
 import { join } from "path";
+import { parseTipFrontmatter, loadTips, pickRandom, formatTipForTerminal } from "../src/core";
 
 /**
  * Tests for the tip system core module and CLI.
  *
- * All tests are marked test.failing because the implementation doesn't
- * exist yet (Red phase of TDD).
- *
  * Part of: ENG-4579
  */
-
-// ---------------------------------------------------------------------------
-// Lazy imports — modules don't exist yet, so we defer to test body
-// ---------------------------------------------------------------------------
-
-async function getCore() {
-  return await import("../src/core");
-}
 
 // ---------------------------------------------------------------------------
 // Test data
@@ -84,83 +74,53 @@ This tip is missing the tags field entirely.
 // =============================================================================
 
 describe("parseTipFrontmatter", () => {
-  test(
-    "ENG-4579: parses valid tip with all fields",
-    async () => {
-      const { parseTipFrontmatter } = await getCore();
+  test("ENG-4579: parses valid tip with all fields", () => {
+    const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS);
 
-      const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS);
+    expect(tip).not.toBeNull();
+    expect(tip!.title).toBe("Query local traces from terminal");
+    expect(tip!.handle).toBe("spotlight-traces");
+    expect(tip!.tags).toEqual(["debugging", "sentry", "performance"]);
+    expect(tip!.context).toBe(
+      "When investigating slow requests or errors locally",
+    );
+    expect(tip!.body).toContain("spotlight-dev traces --slow");
+  });
 
-      expect(tip).not.toBeNull();
-      expect(tip!.title).toBe("Query local traces from terminal");
-      expect(tip!.handle).toBe("spotlight-traces");
-      expect(tip!.tags).toEqual(["debugging", "sentry", "performance"]);
-      expect(tip!.context).toBe(
-        "When investigating slow requests or errors locally",
-      );
-      expect(tip!.body).toContain("spotlight-dev traces --slow");
-    },
-  );
+  test("ENG-4579: parses valid tip with only required fields (no context)", () => {
+    const tip = parseTipFrontmatter(VALID_TIP_REQUIRED_ONLY);
 
-  test(
-    "ENG-4579: parses valid tip with only required fields (no context)",
-    async () => {
-      const { parseTipFrontmatter } = await getCore();
+    expect(tip).not.toBeNull();
+    expect(tip!.title).toBe("Daily cross-reference digest");
+    expect(tip!.handle).toBe("daybook");
+    expect(tip!.tags).toEqual(["daily", "digest", "sessions", "git"]);
+    expect(tip!.context).toBeUndefined();
+    expect(tip!.body).toContain("daybook");
+  });
 
-      const tip = parseTipFrontmatter(VALID_TIP_REQUIRED_ONLY);
+  test("ENG-4579: returns null for tip missing required field (no handle)", () => {
+    const tip = parseTipFrontmatter(INVALID_TIP_MISSING_HANDLE);
 
-      expect(tip).not.toBeNull();
-      expect(tip!.title).toBe("Daily cross-reference digest");
-      expect(tip!.handle).toBe("daybook");
-      expect(tip!.tags).toEqual(["daily", "digest", "sessions", "git"]);
-      expect(tip!.context).toBeUndefined();
-      expect(tip!.body).toContain("daybook");
-    },
-  );
+    expect(tip).toBeNull();
+  });
 
-  test(
-    "ENG-4579: returns null for tip missing required field (no handle)",
-    async () => {
-      const { parseTipFrontmatter } = await getCore();
+  test("ENG-4579: returns null for tip with empty tags array", () => {
+    const tip = parseTipFrontmatter(INVALID_TIP_EMPTY_TAGS);
 
-      const tip = parseTipFrontmatter(INVALID_TIP_MISSING_HANDLE);
+    expect(tip).toBeNull();
+  });
 
-      expect(tip).toBeNull();
-    },
-  );
+  test("ENG-4579: returns null for tip missing title", () => {
+    const tip = parseTipFrontmatter(INVALID_TIP_MISSING_TITLE);
 
-  test(
-    "ENG-4579: returns null for tip with empty tags array",
-    async () => {
-      const { parseTipFrontmatter } = await getCore();
+    expect(tip).toBeNull();
+  });
 
-      const tip = parseTipFrontmatter(INVALID_TIP_EMPTY_TAGS);
+  test("ENG-4579: returns null for tip missing tags entirely", () => {
+    const tip = parseTipFrontmatter(INVALID_TIP_MISSING_TAGS);
 
-      expect(tip).toBeNull();
-    },
-  );
-
-  test(
-    "ENG-4579: returns null for tip missing title",
-    async () => {
-      const { parseTipFrontmatter } = await getCore();
-
-      const tip = parseTipFrontmatter(INVALID_TIP_MISSING_TITLE);
-
-      expect(tip).toBeNull();
-    },
-  );
-
-  test(
-    "ENG-4579: returns null for tip missing tags entirely",
-    async () => {
-      const { parseTipFrontmatter } = await getCore();
-
-      const tip = parseTipFrontmatter(INVALID_TIP_MISSING_TAGS);
-
-      expect(tip).toBeNull();
-    },
-  );
+    expect(tip).toBeNull();
+  });
 });
 
 // =============================================================================
@@ -181,79 +141,61 @@ describe("loadTips", () => {
     tempDirs.length = 0;
   });
 
-  test(
-    "ENG-4579: loads all seed tips from directory",
-    async () => {
-      const { loadTips } = await getCore();
+  test("ENG-4579: loads all seed tips from directory", () => {
+    const tips = loadTips(SEED_TIPS_DIR);
 
-      const tips = await loadTips(SEED_TIPS_DIR);
+    expect(tips.length).toBeGreaterThanOrEqual(3);
+    // Verify each tip has the required shape
+    for (const tip of tips) {
+      expect(tip.title).toBeDefined();
+      expect(tip.handle).toBeDefined();
+      expect(tip.tags.length).toBeGreaterThan(0);
+      expect(tip.body.length).toBeGreaterThan(0);
+    }
+  });
 
-      expect(tips.length).toBeGreaterThanOrEqual(3);
-      // Verify each tip has the required shape
-      for (const tip of tips) {
-        expect(tip.title).toBeDefined();
-        expect(tip.handle).toBeDefined();
-        expect(tip.tags.length).toBeGreaterThan(0);
-        expect(tip.body.length).toBeGreaterThan(0);
-      }
-    },
-  );
+  test("ENG-4579: returns only valid tips when directory has mix of valid and invalid files", () => {
+    const { mkdtempSync, writeFileSync } = require("fs");
+    const { tmpdir } = require("os");
 
-  test(
-    "ENG-4579: returns only valid tips when directory has mix of valid and invalid files",
-    async () => {
-      const { loadTips } = await getCore();
-      const { mkdtempSync, writeFileSync } = await import("fs");
-      const { tmpdir } = await import("os");
+    // Create a temp dir with one valid and one invalid tip
+    const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
+    tempDirs.push(tempDir);
+    writeFileSync(
+      join(tempDir, "valid.md"),
+      VALID_TIP_ALL_FIELDS,
+    );
+    writeFileSync(
+      join(tempDir, "invalid.md"),
+      INVALID_TIP_MISSING_HANDLE,
+    );
 
-      // Create a temp dir with one valid and one invalid tip
-      const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
-      tempDirs.push(tempDir);
-      writeFileSync(
-        join(tempDir, "valid.md"),
-        VALID_TIP_ALL_FIELDS,
-      );
-      writeFileSync(
-        join(tempDir, "invalid.md"),
-        INVALID_TIP_MISSING_HANDLE,
-      );
+    const tips = loadTips(tempDir);
 
-      const tips = await loadTips(tempDir);
+    expect(tips).toHaveLength(1);
+    expect(tips[0]!.handle).toBe("spotlight-traces");
+  });
 
-      expect(tips).toHaveLength(1);
-      expect(tips[0]!.handle).toBe("spotlight-traces");
-    },
-  );
+  test("ENG-4579: returns empty array for nonexistent directory", () => {
+    const tips = loadTips("/nonexistent/path/that/does/not/exist");
 
-  test(
-    "ENG-4579: returns empty array for nonexistent directory",
-    async () => {
-      const { loadTips } = await getCore();
+    expect(tips).toEqual([]);
+  });
 
-      const tips = await loadTips("/nonexistent/path/that/does/not/exist");
+  test("ENG-4579: ignores non-markdown files in tips directory", () => {
+    const { mkdtempSync, writeFileSync } = require("fs");
+    const { tmpdir } = require("os");
 
-      expect(tips).toEqual([]);
-    },
-  );
+    const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
+    tempDirs.push(tempDir);
+    writeFileSync(join(tempDir, "valid.md"), VALID_TIP_ALL_FIELDS);
+    writeFileSync(join(tempDir, "notes.txt"), "This is not a tip file");
 
-  test(
-    "ENG-4579: ignores non-markdown files in tips directory",
-    async () => {
-      const { loadTips } = await getCore();
-      const { mkdtempSync, writeFileSync } = await import("fs");
-      const { tmpdir } = await import("os");
+    const tips = loadTips(tempDir);
 
-      const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
-      tempDirs.push(tempDir);
-      writeFileSync(join(tempDir, "valid.md"), VALID_TIP_ALL_FIELDS);
-      writeFileSync(join(tempDir, "notes.txt"), "This is not a tip file");
-
-      const tips = await loadTips(tempDir);
-
-      expect(tips).toHaveLength(1);
-      expect(tips[0]!.handle).toBe("spotlight-traces");
-    },
-  );
+    expect(tips).toHaveLength(1);
+    expect(tips[0]!.handle).toBe("spotlight-traces");
+  });
 });
 
 // =============================================================================
@@ -261,37 +203,27 @@ describe("loadTips", () => {
 // =============================================================================
 
 describe("pickRandom", () => {
-  test(
-    "ENG-4579: returns one of the tips from a non-empty array",
-    async () => {
-      const { pickRandom, parseTipFrontmatter } = await getCore();
+  test("ENG-4579: returns one of the tips from a non-empty array", () => {
+    const tip1 = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
+    const tip2 = parseTipFrontmatter(VALID_TIP_REQUIRED_ONLY)!;
+    const tips = [tip1, tip2];
 
-      const tip1 = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
-      const tip2 = parseTipFrontmatter(VALID_TIP_REQUIRED_ONLY)!;
-      const tips = [tip1, tip2];
+    // Call 20 times and verify randomness — at least 2 distinct results
+    const handles = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const picked = pickRandom(tips);
+      expect(picked).not.toBeNull();
+      expect(tips).toContainEqual(picked);
+      handles.add(picked!.handle);
+    }
+    expect(handles.size).toBeGreaterThanOrEqual(2);
+  });
 
-      // Call 20 times and verify randomness — at least 2 distinct results
-      const handles = new Set<string>();
-      for (let i = 0; i < 20; i++) {
-        const picked = pickRandom(tips);
-        expect(picked).not.toBeNull();
-        expect(tips).toContainEqual(picked);
-        handles.add(picked!.handle);
-      }
-      expect(handles.size).toBeGreaterThanOrEqual(2);
-    },
-  );
+  test("ENG-4579: returns null for empty array", () => {
+    const picked = pickRandom([]);
 
-  test(
-    "ENG-4579: returns null for empty array",
-    async () => {
-      const { pickRandom } = await getCore();
-
-      const picked = pickRandom([]);
-
-      expect(picked).toBeNull();
-    },
-  );
+    expect(picked).toBeNull();
+  });
 });
 
 // =============================================================================
@@ -299,46 +231,36 @@ describe("pickRandom", () => {
 // =============================================================================
 
 describe("formatTipForTerminal", () => {
-  test(
-    "ENG-4579: includes title, body, and tags in output",
-    async () => {
-      const { formatTipForTerminal, parseTipFrontmatter } = await getCore();
+  test("ENG-4579: includes title, body, and tags in output", () => {
+    const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
+    const output = formatTipForTerminal(tip);
 
-      const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
-      const output = formatTipForTerminal(tip);
+    // Strip ANSI codes for content assertions
+    const stripped = output.replace(
+      // eslint-disable-next-line no-control-regex
+      /\x1b\[[0-9;]*m/g,
+      "",
+    );
 
-      // Strip ANSI codes for content assertions
-      const stripped = output.replace(
-        // eslint-disable-next-line no-control-regex
-        /\x1b\[[0-9;]*m/g,
-        "",
-      );
+    expect(stripped).toContain("Query local traces from terminal");
+    expect(stripped).toContain("spotlight-dev traces --slow");
+    expect(stripped).toContain("debugging");
+  });
 
-      expect(stripped).toContain("Query local traces from terminal");
-      expect(stripped).toContain("spotlight-dev traces --slow");
-      expect(stripped).toContain("debugging");
-    },
-  );
+  test("ENG-4579: includes context when present", () => {
+    const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
+    const output = formatTipForTerminal(tip);
 
-  test(
-    "ENG-4579: includes context when present",
-    async () => {
-      const { formatTipForTerminal, parseTipFrontmatter } = await getCore();
+    const stripped = output.replace(
+      // eslint-disable-next-line no-control-regex
+      /\x1b\[[0-9;]*m/g,
+      "",
+    );
 
-      const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
-      const output = formatTipForTerminal(tip);
-
-      const stripped = output.replace(
-        // eslint-disable-next-line no-control-regex
-        /\x1b\[[0-9;]*m/g,
-        "",
-      );
-
-      expect(stripped).toContain(
-        "When investigating slow requests or errors locally",
-      );
-    },
-  );
+    expect(stripped).toContain(
+      "When investigating slow requests or errors locally",
+    );
+  });
 });
 
 // =============================================================================

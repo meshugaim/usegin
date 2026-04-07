@@ -32,6 +32,9 @@ const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
  * Returns null if any required field is missing or tags is empty.
  */
 export function parseTipFrontmatter(content: string): Tip | null {
+  // Normalize CRLF to LF before parsing (Windows-edited files)
+  content = content.replace(/\r\n/g, "\n");
+
   const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) return null;
 
@@ -46,12 +49,12 @@ export function parseTipFrontmatter(content: string): Tip | null {
     const key = line.slice(0, colonIdx).trim();
     let value: unknown = line.slice(colonIdx + 1).trim();
 
-    // Handle inline arrays like [tag1, tag2]
+    // Handle inline arrays like [tag1, tag2] or ["tag1", "tag2"]
     if (typeof value === "string" && value.startsWith("[") && value.endsWith("]")) {
       value = value
         .slice(1, -1)
         .split(",")
-        .map((s) => s.trim())
+        .map((s) => s.trim().replace(/^["']|["']$/g, ""))
         .filter((s) => s.length > 0);
     }
 
@@ -67,11 +70,14 @@ export function parseTipFrontmatter(content: string): Tip | null {
   if (typeof handle !== "string" || !handle) return null;
   if (!Array.isArray(tags) || tags.length === 0) return null;
 
+  const body = rawBody!.trim();
+  if (!body) return null; // A tip without a body isn't actionable
+
   const tip: Tip = {
     title,
     handle,
     tags,
-    body: rawBody!.trim(),
+    body,
   };
 
   // Optional context
@@ -90,7 +96,7 @@ export function parseTipFrontmatter(content: string): Tip | null {
  * Read all `.md` files from a directory, parse each as a tip, and return
  * only the valid ones. Returns an empty array if the directory doesn't exist.
  */
-export async function loadTips(tipsDir: string): Promise<Tip[]> {
+export function loadTips(tipsDir: string): Tip[] {
   if (!existsSync(tipsDir)) return [];
 
   const tips: Tip[] = [];

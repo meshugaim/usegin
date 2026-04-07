@@ -12,8 +12,8 @@ const program = new Command()
   .version("0.1.0");
 
 // Default action (no subcommand): show a random tip
-program.action(async () => {
-  const tips = await loadTips(tipsDir);
+program.action(() => {
+  const tips = loadTips(tipsDir);
 
   if (tips.length === 0) {
     console.log("No tips found. Add tip files to tools/tips/tips/");
