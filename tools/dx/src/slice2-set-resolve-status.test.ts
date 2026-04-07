@@ -32,6 +32,7 @@ import {
   formatResolveJson,
 } from "./commands/resolve";
 import {
+  buildStatusData,
   formatStatus,
   formatStatusJson,
   type StatusData,
@@ -44,60 +45,75 @@ import {
 describe("parseCliValue", () => {
   // Lazy import: the set module does not exist yet.
   // Every test in this block will fail at require() time.
-  function getParseCliValue(): (raw: string) => boolean | string | number {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require("./commands/set");
-    return mod.parseCliValue;
+  // Cached at describe level so the require() isn't repeated in every test.
+  let parseCliValue: (raw: string) => boolean | string | number;
+
+  function ensureImported() {
+    if (!parseCliValue) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require("./commands/set");
+      parseCliValue = mod.parseCliValue;
+    }
   }
 
   test.failing('"true" -> true (boolean)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("true")).toBe(true);
   });
 
   test.failing('"false" -> false (boolean)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("false")).toBe(false);
   });
 
   test.failing('"TRUE" -> true (case-insensitive)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("TRUE")).toBe(true);
   });
 
   test.failing('"42" -> 42 (number)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("42")).toBe(42);
   });
 
   test.failing('"0" -> 0 (number)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("0")).toBe(0);
   });
 
   test.failing('"3.14" -> 3.14 (number)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("3.14")).toBe(3.14);
   });
 
   test.failing('"-1" -> -1 (number)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("-1")).toBe(-1);
   });
 
   test.failing('"10m" -> "10m" (string — not a number)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("10m")).toBe("10m");
   });
 
   test.failing('"" -> "" (empty string)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("")).toBe("");
   });
 
   test.failing('"hello" -> "hello" (string)', () => {
-    const parseCliValue = getParseCliValue();
+    ensureImported();
     expect(parseCliValue("hello")).toBe("hello");
+  });
+
+  test.failing('"Infinity" -> "Infinity" (string, not a number — Number.isFinite check)', () => {
+    ensureImported();
+    expect(parseCliValue("Infinity")).toBe("Infinity");
+  });
+
+  test.failing('"NaN" -> "NaN" (string, not a number)', () => {
+    ensureImported();
+    expect(parseCliValue("NaN")).toBe("NaN");
   });
 });
 
@@ -225,6 +241,19 @@ describe("dx set — format output", () => {
     expect(parsed.target).toBe("config");
     expect(parsed.user).toBe("nitsan");
   });
+
+  test.failing("formatSetResultJson returns valid JSON", () => {
+    const formatSetResultJson = getFormatSetResultJson();
+    const output = formatSetResultJson("ci-watcher", true, false, null);
+    expect(() => JSON.parse(output)).not.toThrow();
+  });
+
+  test.failing("local (non-saved) output includes persistence hint", () => {
+    const formatSetResult = getFormatSetResult();
+    const output = formatSetResult("tips.show-duration", "5m", false, null);
+    // Hint tells the user how to persist across environments
+    expect(output).toContain("dx set");
+  });
 });
 
 describe("dx set — typed persistence", () => {
@@ -298,14 +327,26 @@ describe("dx set — typed persistence", () => {
     const content = JSON.parse(readFileSync(configPath, "utf-8"));
     expect(content.users.nitsan.overrides["tips.show-duration"]).toBe("5m");
   });
+
+  test.failing("creates local config file when it doesn't exist yet", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { writeTypedLocalOverride } = require("./commands/set");
+    const localPath = join(tempDir, "config.local.json");
+    // Intentionally NOT seeding the file — it shouldn't exist yet.
+
+    writeTypedLocalOverride(localPath, "tips.show-duration", "10m");
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.overrides["tips.show-duration"]).toBe("10m");
+  });
 });
 
 // ===========================================================================
 // dx resolve — typed output (AC 8)
 //
-// After Slice 2, FeatureInfo gains a `value` field and formatResolve
-// uses String(info.value) instead of the enabled boolean. These tests
-// verify that non-boolean values produce correct resolve output.
+// FeatureInfo already has a `value` field (added in Slice 1). After Slice 2,
+// formatResolve uses String(info.value) instead of the enabled boolean.
+// These tests verify that non-boolean values produce correct resolve output.
 // ===========================================================================
 
 describe("dx resolve — typed output", () => {
@@ -315,9 +356,9 @@ describe("dx resolve — typed output", () => {
   // features the output changes.
 
   test.failing('string feature "10m": outputs "10m" (not "true")', () => {
-    // Build a FeatureInfo with `value: "10m"`.
-    // Since FeatureInfo doesn't have `value` yet, this test will fail
-    // until the type is widened and formatResolve is updated.
+    // FeatureInfo already has `value` (added in Slice 1), but formatResolve
+    // ignores it — it still returns `info.enabled ? "true" : "false"`.
+    // This test fails because formatResolve doesn't USE `value` yet.
     const info = {
       value: "10m",
       enabled: true,
@@ -392,9 +433,11 @@ describe("dx resolve — typed output", () => {
     };
     const output = formatResolveJson("ci-watcher", info as FeatureInfo);
     const parsed = JSON.parse(output);
-    // The JSON output should now include a `value` field
-    expect(parsed).toHaveProperty("value");
+    // Verify the full shape: feature, value, enabled, source
+    expect(parsed.feature).toBe("ci-watcher");
     expect(parsed.value).toBe(true);
+    expect(parsed.enabled).toBe(true);
+    expect(parsed.source).toBe("default");
   });
 });
 
@@ -445,6 +488,10 @@ describe("dx status — typed display", () => {
     };
   }
 
+  // These tests fail because formatStatus's rendering logic currently renders
+  // "on"/"off" based on `enabled`, ignoring the `value` field entirely.
+  // The type system is fine — FeatureInfo already carries `value` from Slice 1.
+
   test.failing("string features show the actual value, not on/off", () => {
     const data = makeTypedStatusData();
     const output = formatStatus(data);
@@ -490,6 +537,29 @@ describe("dx status — typed display", () => {
     expect(line).toBeDefined();
     // Per spec: overridden non-booleans uppercase the value: "10m" -> "10M"
     expect(line).toContain("10M");
+    // The ~ marker is the universal override indicator
+    expect(line).toContain("~");
+  });
+
+  test.failing("overridden number features show ~ marker (uppercasing is a no-op)", () => {
+    // For numbers, uppercasing is a no-op — the ~ marker is the only
+    // visual indicator that the value is overridden.
+    const data: StatusData = {
+      user: "nitsan",
+      features: {
+        "tips.max-count": {
+          enabled: true,
+          source: "local-override" as const,
+          description: "Maximum tips to show",
+          value: 42,
+        } as FeatureInfo & { description: string },
+      },
+    };
+    const output = formatStatus(data);
+    const line = output.split("\n").find((l) => l.includes("tips.max-count"));
+    expect(line).toBeDefined();
+    expect(line).toContain("42");
+    expect(line).toContain("~");
   });
 
   test.failing("formatStatus uses typed value in display for string feature", () => {
@@ -512,7 +582,6 @@ describe("dx status — typed display", () => {
       }),
     });
 
-    const { buildStatusData } = require("./commands/status");
     const data = buildStatusData(ctx);
     const output = formatStatus(data);
     const lines = output.split("\n");
@@ -540,7 +609,6 @@ describe("dx status — typed display", () => {
       }),
     });
 
-    const { buildStatusData } = require("./commands/status");
     const data = buildStatusData(ctx);
     const output = formatStatus(data);
     const lines = output.split("\n");
