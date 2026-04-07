@@ -329,24 +329,17 @@ export function parseDuration(value: string): number | null {
 export function resolveStatusline(context: StatuslineContext): StatuslineResult {
   const { now, state, tips, showDuration, restDuration, enabled } = context;
 
+  const preserveOrInit = (): StatuslineState =>
+    state ?? { state: "resting" as const, tip_handle: "", transitioned_at: now };
+
   // Disabled: return empty, preserve state as-is
   if (!enabled) {
-    const preservedState = state ?? {
-      state: "resting" as const,
-      tip_handle: "",
-      transitioned_at: now,
-    };
-    return { output: "", newState: preservedState };
+    return { output: "", newState: preserveOrInit() };
   }
 
   // No tips available: nothing to show
   if (tips.length === 0) {
-    const preservedState = state ?? {
-      state: "resting" as const,
-      tip_handle: "",
-      transitioned_at: now,
-    };
-    return { output: "", newState: preservedState };
+    return { output: "", newState: preserveOrInit() };
   }
 
   // First call — no prior state: start showing a random tip

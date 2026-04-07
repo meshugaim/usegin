@@ -1,59 +1,17 @@
 import { describe, test, expect } from "bun:test";
-import type { Tip } from "../src/core";
-import { parseTipFrontmatter } from "../src/core";
+import {
+  parseTipFrontmatter,
+  parseDuration,
+  resolveStatusline,
+} from "../src/core";
+import type { Tip, StatuslineState } from "../src/core";
 import { runCli } from "./helpers";
 
 /**
  * Tests for Slice 3: `tip statusline` command + dx timing params.
  *
  * Part of: ENG-4581
- *
- * New functions under test (lazy-imported since they don't exist yet):
- *   - parseDuration(input: string): number | null
- *   - resolveStatusline(context: StatuslineContext): StatuslineResult
  */
-
-// ---------------------------------------------------------------------------
-// Lazy imports for not-yet-implemented functions
-// ---------------------------------------------------------------------------
-
-async function lazyParseDuration(): Promise<
-  (input: string) => number | null
-> {
-  const mod = await import("../src/core");
-  return (mod as any).parseDuration;
-}
-
-async function lazyResolveStatusline(): Promise<
-  (context: StatuslineContext) => StatuslineResult
-> {
-  const mod = await import("../src/core");
-  return (mod as any).resolveStatusline;
-}
-
-// ---------------------------------------------------------------------------
-// Types for the statusline state machine
-// ---------------------------------------------------------------------------
-
-interface StatuslineState {
-  state: "showing" | "resting";
-  tip_handle: string;
-  transitioned_at: number;
-}
-
-interface StatuslineContext {
-  now: number;
-  state: StatuslineState | null;
-  tips: Tip[];
-  showDuration: number;
-  restDuration: number;
-  enabled: boolean;
-}
-
-interface StatuslineResult {
-  output: string;
-  newState: StatuslineState;
-}
 
 // ---------------------------------------------------------------------------
 // Fixture tips for deterministic testing
@@ -96,28 +54,23 @@ const ALL_TIPS: Tip[] = [TIP_SPOTLIGHT, TIP_SESSION, TIP_DAYBOOK];
 // =============================================================================
 
 describe("parseDuration", () => {
-  test("ENG-4581: parses minutes — 10m to 600000ms", async () => {
-    const parseDuration = await lazyParseDuration();
+  test("ENG-4581: parses minutes — 10m to 600000ms", () => {
     expect(parseDuration("10m")).toBe(600_000);
   });
 
-  test("ENG-4581: parses hours — 2h to 7200000ms", async () => {
-    const parseDuration = await lazyParseDuration();
+  test("ENG-4581: parses hours — 2h to 7200000ms", () => {
     expect(parseDuration("2h")).toBe(7_200_000);
   });
 
-  test("ENG-4581: parses minutes — 30m to 1800000ms", async () => {
-    const parseDuration = await lazyParseDuration();
+  test("ENG-4581: parses minutes — 30m to 1800000ms", () => {
     expect(parseDuration("30m")).toBe(1_800_000);
   });
 
-  test("ENG-4581: returns null for invalid input", async () => {
-    const parseDuration = await lazyParseDuration();
+  test("ENG-4581: returns null for invalid input", () => {
     expect(parseDuration("invalid")).toBeNull();
   });
 
-  test("ENG-4581: parses zero minutes — 0m to 0", async () => {
-    const parseDuration = await lazyParseDuration();
+  test("ENG-4581: parses zero minutes — 0m to 0", () => {
     expect(parseDuration("0m")).toBe(0);
   });
 });
@@ -133,8 +86,7 @@ describe("resolveStatusline", () => {
 
   test(
     "ENG-4581: first call (no prior state) returns tip one-liner, state = SHOWING",
-    async () => {
-      const resolveStatusline = await lazyResolveStatusline();
+    () => {
       const result = resolveStatusline({
         now: NOW,
         state: null,
@@ -157,8 +109,7 @@ describe("resolveStatusline", () => {
 
   test(
     "ENG-4581: during show window returns same tip",
-    async () => {
-      const resolveStatusline = await lazyResolveStatusline();
+    () => {
       const currentState: StatuslineState = {
         state: "showing",
         tip_handle: "spotlight-traces",
@@ -186,8 +137,7 @@ describe("resolveStatusline", () => {
 
   test(
     "ENG-4581: show window expired transitions to RESTING, returns empty",
-    async () => {
-      const resolveStatusline = await lazyResolveStatusline();
+    () => {
       const currentState: StatuslineState = {
         state: "showing",
         tip_handle: "spotlight-traces",
@@ -213,8 +163,7 @@ describe("resolveStatusline", () => {
 
   test(
     "ENG-4581: during rest window returns empty string",
-    async () => {
-      const resolveStatusline = await lazyResolveStatusline();
+    () => {
       const restStart = NOW;
       const currentState: StatuslineState = {
         state: "resting",
@@ -240,8 +189,7 @@ describe("resolveStatusline", () => {
 
   test(
     "ENG-4581: rest window expired transitions to SHOWING with new tip",
-    async () => {
-      const resolveStatusline = await lazyResolveStatusline();
+    () => {
       const restStart = NOW;
       const currentState: StatuslineState = {
         state: "resting",
@@ -269,9 +217,7 @@ describe("resolveStatusline", () => {
 
   test(
     "ENG-4581: disabled returns empty string regardless of state",
-    async () => {
-      const resolveStatusline = await lazyResolveStatusline();
-
+    () => {
       // Even with a valid showing state, disabled should return empty
       const result = resolveStatusline({
         now: NOW,
@@ -292,9 +238,7 @@ describe("resolveStatusline", () => {
 
   test(
     "ENG-4581: empty tips array returns empty string",
-    async () => {
-      const resolveStatusline = await lazyResolveStatusline();
-
+    () => {
       const result = resolveStatusline({
         now: NOW,
         state: null,

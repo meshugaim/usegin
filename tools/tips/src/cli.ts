@@ -109,7 +109,7 @@ function readStateFile(): StatuslineState | null {
   }
 }
 
-/** Atomically write the statusline state file. */
+/** Write the statusline state file. */
 function writeStateFile(state: StatuslineState): void {
   writeFileSync(STATE_FILE, JSON.stringify(state) + "\n");
 }
