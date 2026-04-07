@@ -11,7 +11,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "marked": "15",
+    "marked": "^18",
     "marked-terminal": "^7.3.0"
   },
   "devDependencies": {
