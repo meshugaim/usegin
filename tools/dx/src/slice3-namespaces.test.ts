@@ -48,7 +48,7 @@ describe("filterByNamespace", () => {
     return mod.filterByNamespace;
   }
 
-  test.failing("returns only keys starting with 'tips.' when namespace is 'tips'", () => {
+  test("returns only keys starting with 'tips.' when namespace is 'tips'", () => {
     const filterByNamespace = getFilterByNamespace();
 
     const features: Record<string, FeatureInfo> = {
@@ -69,7 +69,7 @@ describe("filterByNamespace", () => {
     ]);
   });
 
-  test.failing("returns all keys when namespace is undefined (no filter)", () => {
+  test("returns all keys when namespace is undefined (no filter)", () => {
     const filterByNamespace = getFilterByNamespace();
 
     const features: Record<string, FeatureInfo> = {
@@ -84,7 +84,7 @@ describe("filterByNamespace", () => {
     );
   });
 
-  test.failing("returns empty when namespace matches nothing", () => {
+  test("returns empty when namespace matches nothing", () => {
     const filterByNamespace = getFilterByNamespace();
 
     const features: Record<string, FeatureInfo> = {
@@ -96,7 +96,7 @@ describe("filterByNamespace", () => {
     expect(Object.keys(filtered)).toEqual([]);
   });
 
-  test.failing("exact match: 'ci-watcher' returns only 'ci-watcher'", () => {
+  test("exact match: 'ci-watcher' returns only 'ci-watcher'", () => {
     const filterByNamespace = getFilterByNamespace();
 
     const features: Record<string, FeatureInfo> = {
@@ -109,7 +109,7 @@ describe("filterByNamespace", () => {
     expect(Object.keys(filtered)).toEqual(["ci-watcher"]);
   });
 
-  test.failing("does not match partial prefixes without dot separator: 'tip' does not match 'tips.enabled'", () => {
+  test("does not match partial prefixes without dot separator: 'tip' does not match 'tips.enabled'", () => {
     const filterByNamespace = getFilterByNamespace();
 
     const features: Record<string, FeatureInfo> = {
@@ -123,7 +123,7 @@ describe("filterByNamespace", () => {
     expect(Object.keys(filtered)).toEqual([]);
   });
 
-  test.failing("when namespace is both an exact feature name and a prefix, returns exact + prefixed", () => {
+  test("when namespace is both an exact feature name and a prefix, returns exact + prefixed", () => {
     const filterByNamespace = getFilterByNamespace();
 
     // "tips" is both a registered feature AND a prefix of tips.* features.
@@ -148,7 +148,7 @@ describe("filterByNamespace", () => {
 // ===========================================================================
 
 describe("buildStatusCommand — namespace argument", () => {
-  test.failing("accepts optional [namespace] argument", () => {
+  test("accepts optional [namespace] argument", () => {
     const cmd = buildStatusCommand();
 
     // Commander stores arguments in _args (no public API as of commander@12)
@@ -196,7 +196,7 @@ describe("buildStatusData — namespace filtering", () => {
     });
   }
 
-  test.failing("with namespace 'tips' returns only tips.* features", () => {
+  test("with namespace 'tips' returns only tips.* features", () => {
     const ctx = makeNamespacedContext();
     const data = buildStatusData(ctx, "tips");
 
@@ -232,7 +232,7 @@ describe("buildStatusData — namespace filtering", () => {
 // ===========================================================================
 
 describe("buildListCommand — namespace argument", () => {
-  test.failing("accepts optional [namespace] argument", () => {
+  test("accepts optional [namespace] argument", () => {
     const cmd = buildListCommand();
 
     const args = (cmd as any)._args;
@@ -268,7 +268,7 @@ describe("buildListData — namespace filtering", () => {
     });
   }
 
-  test.failing("with namespace 'tips' returns only tips.* entries", () => {
+  test("with namespace 'tips' returns only tips.* entries", () => {
     const ctx = makeNamespacedContext();
     const grepResults = {
       "ci-watcher": 2,
@@ -334,7 +334,7 @@ describe("dx reset — namespace behavior", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test.failing("reset 'tips' clears only tips.* local overrides, preserves others", () => {
+  test("reset 'tips' clears only tips.* local overrides, preserves others", () => {
     const localPath = join(tempDir, "config.local.json");
     writeFileSync(
       localPath,
@@ -385,7 +385,7 @@ describe("dx reset — namespace behavior", () => {
     expect(result.overrides).toEqual({});
   });
 
-  test.failing("reset 'tips' clears only tips.* user overrides (--save), preserves others", () => {
+  test("reset 'tips' clears only tips.* user overrides (--save), preserves others", () => {
     const configPath = join(tempDir, "config.json");
     writeFileSync(
       configPath,
@@ -421,7 +421,7 @@ describe("dx reset — namespace behavior", () => {
     expect(result.users.nitsan.overrides["ci-watcher"]).toBe(false);
   });
 
-  test.failing("reset namespace matching nothing is a no-op", () => {
+  test("reset namespace matching nothing is a no-op", () => {
     const localPath = join(tempDir, "config.local.json");
     writeFileSync(
       localPath,

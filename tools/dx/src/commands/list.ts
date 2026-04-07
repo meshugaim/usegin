@@ -4,12 +4,13 @@
  * Exports pure functions for building and formatting the list,
  * plus a Commander command builder.
  *
- * Part of: ENG-3443
+ * Part of: ENG-3443, ENG-4688
  */
 
 import { Command } from "commander";
 import { spawnSync } from "child_process";
 import type { DxContext } from "../core";
+import { filterByNamespace } from "../namespace";
 import { dxShouldOutputJson, dotFill } from "../output";
 import dx from "../../sdk";
 
@@ -32,10 +33,14 @@ export interface ListEntry {
 export function buildListData(
   ctx: DxContext,
   grepResults: Record<string, number>,
+  namespace?: string,
 ): ListEntry[] {
+  // Filter features by namespace before building entries
+  const filteredFeatures = filterByNamespace(ctx.config.features, namespace);
+
   const entries: ListEntry[] = [];
 
-  for (const [name, featureDef] of Object.entries(ctx.config.features)) {
+  for (const [name, featureDef] of Object.entries(filteredFeatures)) {
     const gateCount = grepResults[name] ?? 0;
 
     let warning: string | null = null;
@@ -221,15 +226,16 @@ export function formatListJson(entries: ListEntry[]): string {
 export function buildListCommand(): Command {
   const cmd = new Command("list")
     .description("Show all registered features with gate counts")
+    .argument("[namespace]", "Filter to a namespace prefix (e.g. 'tips')")
     .option("--json", "Output as JSON");
 
-  cmd.action((opts: { json?: boolean }) => {
+  cmd.action((namespace: string | undefined, opts: { json?: boolean }) => {
     const useJson = dxShouldOutputJson(opts);
     const ctx = dx.getContext();
 
     const featureNames = Object.keys(ctx.config.features);
     const grepResults = grepGateCounts(featureNames);
-    const data = buildListData(ctx, grepResults);
+    const data = buildListData(ctx, grepResults, namespace);
 
     if (useJson) {
       process.stdout.write(formatListJson(data) + "\n");

@@ -4,7 +4,7 @@
  * Exports pure functions for clearing overrides and formatting output,
  * plus a Commander command builder.
  *
- * Part of: ENG-3465, ENG-4687
+ * Part of: ENG-3465, ENG-4687, ENG-4688
  */
 
 import { Command } from "commander";
@@ -103,6 +103,70 @@ export function clearAllUserOverrides(
   }
 
   data.users[user].overrides = {};
+
+  writeFileSync(configPath, JSON.stringify(data, null, 2) + "\n");
+}
+
+/**
+ * Clear local overrides matching a namespace prefix from `.dx/config.local.json`.
+ *
+ * Removes all override keys that start with `namespace.` (dot-separated prefix).
+ * Keys that don't match the prefix are preserved. If the file doesn't exist,
+ * this is a no-op.
+ *
+ * Note: unlike single-feature clear, this uses prefix matching — it clears
+ * all keys in the namespace, not just one.
+ */
+export function clearNamespaceLocalOverrides(
+  localPath: string,
+  namespace: string,
+): void {
+  if (!existsSync(localPath)) {
+    return;
+  }
+
+  const raw = readFileSync(localPath, "utf-8");
+  const data = JSON.parse(raw);
+
+  if (typeof data.overrides === "object" && data.overrides !== null) {
+    const prefix = namespace + ".";
+    for (const key of Object.keys(data.overrides)) {
+      if (key === namespace || key.startsWith(prefix)) {
+        delete data.overrides[key];
+      }
+    }
+  }
+
+  writeFileSync(localPath, JSON.stringify(data, null, 2) + "\n");
+}
+
+/**
+ * Clear user overrides matching a namespace prefix from `.dx/config.json`.
+ *
+ * Removes all override keys under `users[user].overrides` that start with
+ * `namespace.` (dot-separated prefix). Keys that don't match the prefix
+ * are preserved. Throws if the user doesn't exist in config.
+ */
+export function clearNamespaceUserOverrides(
+  configPath: string,
+  user: string,
+  namespace: string,
+): void {
+  const raw = readFileSync(configPath, "utf-8");
+  const data = JSON.parse(raw);
+
+  if (!data.users || !data.users[user]) {
+    throw new Error(`dx: user "${user}" not found in config`);
+  }
+
+  if (data.users[user].overrides) {
+    const prefix = namespace + ".";
+    for (const key of Object.keys(data.users[user].overrides)) {
+      if (key === namespace || key.startsWith(prefix)) {
+        delete data.users[user].overrides[key];
+      }
+    }
+  }
 
   writeFileSync(configPath, JSON.stringify(data, null, 2) + "\n");
 }

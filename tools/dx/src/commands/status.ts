@@ -3,7 +3,7 @@
  *
  * Exports pure formatting functions and a Commander command builder.
  *
- * Part of: ENG-3442, ENG-4687
+ * Part of: ENG-3442, ENG-4687, ENG-4688
  */
 
 import { Command } from "commander";
@@ -13,6 +13,7 @@ import {
   type FeatureInfo,
   type DxContext,
 } from "../core";
+import { filterByNamespace } from "../namespace";
 import { dxShouldOutputJson, dotFill } from "../output";
 import dx from "../../sdk";
 
@@ -118,13 +119,16 @@ export function formatStatusJson(data: StatusData): string {
  * Resolves the user, evaluates all features, and enriches each
  * feature with its description from the config.
  */
-export function buildStatusData(ctx: DxContext): StatusData {
+export function buildStatusData(ctx: DxContext, namespace?: string): StatusData {
   const user = resolveUser(ctx);
   const rawFeatures = allFeatures(ctx);
 
+  // Filter by namespace before enriching (avoid unnecessary work)
+  const filtered = filterByNamespace(rawFeatures, namespace);
+
   // Enrich each feature with its description from config
   const features: Record<string, FeatureInfo & { description: string }> = {};
-  for (const [name, info] of Object.entries(rawFeatures)) {
+  for (const [name, info] of Object.entries(filtered)) {
     features[name] = {
       ...info,
       description: ctx.config.features[name]?.description ?? "",
@@ -143,13 +147,14 @@ export function buildStatusData(ctx: DxContext): StatusData {
 export function buildStatusCommand(): Command {
   const cmd = new Command("status")
     .description("Show all features with their resolved values")
+    .argument("[namespace]", "Filter to a namespace prefix (e.g. 'tips')")
     .option("--json", "Output as JSON");
 
-  cmd.action((opts: { json?: boolean }) => {
+  cmd.action((namespace: string | undefined, opts: { json?: boolean }) => {
     const useJson = dxShouldOutputJson(opts);
 
     const ctx = dx.getContext();
-    const data = buildStatusData(ctx);
+    const data = buildStatusData(ctx, namespace);
 
     if (useJson) {
       process.stdout.write(formatStatusJson(data) + "\n");
