@@ -115,9 +115,6 @@ describe("toEnabled — type coercion", () => {
 // 2. getFeature with typed values
 // ===========================================================================
 
-// NOTE for Green phase: existing tests in core.test.ts use `toEqual` on
-// getFeature results without a `value` field. The implementer must update
-// those tests to include `value` when widening FeatureInfo.
 describe("getFeature — typed values", () => {
   test("boolean default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });

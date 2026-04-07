@@ -88,7 +88,7 @@ export function formatStatus(data: StatusData): string {
 /**
  * Format the status output as JSON (headless/--json).
  *
- * Returns `{ user, features: { [name]: { enabled, source, description } } }`
+ * Returns `{ user, features: { [name]: { value, enabled, source, description } } }`
  */
 export function formatStatusJson(data: StatusData): string {
   return JSON.stringify(

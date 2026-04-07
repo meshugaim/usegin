@@ -10,23 +10,15 @@ import {
   type DxContext,
   type FeatureInfo,
 } from "./core";
-import { makeConfig } from "./test-fixtures";
+import { makeConfig, makeContext } from "./test-fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-/** Build a DxContext with sensible defaults. */
+/** Build a DxContext with env: {} (no auto-resolved user). */
 function makeCtx(overrides?: Partial<DxContext>): DxContext {
-  return {
-    config: makeConfig(),
-    local: null,
-    env: {},
-    gitUserName: null,
-    gitUserEmail: null,
-    whoami: null,
-    ...overrides,
-  };
+  return makeContext({ env: {}, ...overrides });
 }
 
 /** Local config that enables autosync. */
