@@ -1,5 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test";
-import { rmSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
 import { parseTipFrontmatter, loadTips, pickRandom, formatTipForTerminal } from "../src/core";
 
@@ -15,6 +16,10 @@ import { parseTipFrontmatter, loadTips, pickRandom, formatTipForTerminal } from 
 
 /** Path to the seed tips directory shipped with this tool. */
 const SEED_TIPS_DIR = join(import.meta.dir, "..", "tips");
+
+/** Strip ANSI escape codes for content assertions. */
+// eslint-disable-next-line no-control-regex
+const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const VALID_TIP_ALL_FIELDS = `---
 title: Query local traces from terminal
@@ -155,10 +160,6 @@ describe("loadTips", () => {
   });
 
   test("ENG-4579: returns only valid tips when directory has mix of valid and invalid files", () => {
-    const { mkdtempSync, writeFileSync } = require("fs");
-    const { tmpdir } = require("os");
-
-    // Create a temp dir with one valid and one invalid tip
     const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
     tempDirs.push(tempDir);
     writeFileSync(
@@ -183,9 +184,6 @@ describe("loadTips", () => {
   });
 
   test("ENG-4579: ignores non-markdown files in tips directory", () => {
-    const { mkdtempSync, writeFileSync } = require("fs");
-    const { tmpdir } = require("os");
-
     const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
     tempDirs.push(tempDir);
     writeFileSync(join(tempDir, "valid.md"), VALID_TIP_ALL_FIELDS);
@@ -233,14 +231,7 @@ describe("pickRandom", () => {
 describe("formatTipForTerminal", () => {
   test("ENG-4579: includes title, body, and tags in output", () => {
     const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
-    const output = formatTipForTerminal(tip);
-
-    // Strip ANSI codes for content assertions
-    const stripped = output.replace(
-      // eslint-disable-next-line no-control-regex
-      /\x1b\[[0-9;]*m/g,
-      "",
-    );
+    const stripped = stripAnsi(formatTipForTerminal(tip));
 
     expect(stripped).toContain("Query local traces from terminal");
     expect(stripped).toContain("spotlight-dev traces --slow");
@@ -249,13 +240,7 @@ describe("formatTipForTerminal", () => {
 
   test("ENG-4579: includes context when present", () => {
     const tip = parseTipFrontmatter(VALID_TIP_ALL_FIELDS)!;
-    const output = formatTipForTerminal(tip);
-
-    const stripped = output.replace(
-      // eslint-disable-next-line no-control-regex
-      /\x1b\[[0-9;]*m/g,
-      "",
-    );
+    const stripped = stripAnsi(formatTipForTerminal(tip));
 
     expect(stripped).toContain(
       "When investigating slow requests or errors locally",
@@ -270,7 +255,7 @@ describe("formatTipForTerminal", () => {
 describe("CLI", () => {
   test(
     "ENG-4579: running cli.ts with no args exits 0 and produces output",
-    async () => {
+    () => {
       const result = Bun.spawnSync({
         cmd: ["bun", join(import.meta.dir, "..", "src", "cli.ts")],
         stdout: "pipe",

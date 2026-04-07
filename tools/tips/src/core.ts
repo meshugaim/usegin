@@ -115,8 +115,14 @@ export function loadTips(tipsDir: string): Tip[] {
         tips.push(tip);
       }
     }
-  } catch {
-    // Directory might not be readable — return what we have
+  } catch (err: unknown) {
+    // Tolerate expected filesystem errors (missing/unreadable directory).
+    // Re-throw anything else so genuine bugs surface.
+    if (err instanceof Error && "code" in err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "EACCES") return tips;
+    }
+    throw err;
   }
 
   return tips;
