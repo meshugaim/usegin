@@ -10,9 +10,10 @@
  * Part of: ENG-4688
  */
 
-import { describe, test, expect } from "bun:test";
-import { Command } from "commander";
-
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { makeConfig, makeContext } from "./test-fixtures";
 import type { FeatureInfo } from "./core";
 
@@ -20,8 +21,6 @@ import type { FeatureInfo } from "./core";
 import {
   buildStatusCommand,
   buildStatusData,
-  formatStatus,
-  type StatusData,
 } from "./commands/status";
 import {
   buildListCommand,
@@ -29,6 +28,7 @@ import {
 } from "./commands/list";
 import {
   buildResetCommand,
+  clearAllLocalOverrides,
 } from "./commands/reset";
 
 // ===========================================================================
@@ -122,6 +122,25 @@ describe("filterByNamespace", () => {
     const filtered = filterByNamespace(features, "tip");
     expect(Object.keys(filtered)).toEqual([]);
   });
+
+  test.failing("when namespace is both an exact feature name and a prefix, returns exact + prefixed", () => {
+    const filterByNamespace = getFilterByNamespace();
+
+    // "tips" is both a registered feature AND a prefix of tips.* features.
+    // filterByNamespace should return all matches — the disambiguation
+    // (exact-match-wins) is the reset command's responsibility, not this function.
+    const features: Record<string, FeatureInfo> = {
+      "ci-watcher": { value: true, enabled: true, source: "default" },
+      tips: { value: true, enabled: true, source: "default" },
+      "tips.enabled": { value: true, enabled: true, source: "default" },
+      "tips.show-duration": { value: "10m", enabled: true, source: "default" },
+    };
+
+    const filtered = filterByNamespace(features, "tips");
+    const keys = Object.keys(filtered).sort();
+
+    expect(keys).toEqual(["tips", "tips.enabled", "tips.show-duration"]);
+  });
 });
 
 // ===========================================================================
@@ -204,41 +223,9 @@ describe("buildStatusData — namespace filtering", () => {
   });
 });
 
-describe("formatStatus — namespace filtering", () => {
-  test("with namespace shows only filtered features", () => {
-    const data: StatusData = {
-      user: "nitsan",
-      features: {
-        "tips.enabled": {
-          value: true,
-          enabled: true,
-          source: "default",
-          description: "Show tips in status line",
-        },
-        "tips.show-duration": {
-          value: "10m",
-          enabled: true,
-          source: "default",
-          description: "How long a tip stays visible",
-        },
-      },
-    };
-
-    const output = formatStatus(data);
-
-    // Should show tips features
-    expect(output).toContain("tips.enabled");
-    expect(output).toContain("tips.show-duration");
-
-    // Should NOT show non-tips features (they weren't in the data)
-    expect(output).not.toContain("ci-watcher");
-    expect(output).not.toContain("autosync");
-
-    // This test verifies that formatStatus correctly renders
-    // pre-filtered data. The filtering itself is tested in
-    // buildStatusData tests above.
-  });
-});
+// Note: formatStatus rendering of pre-filtered data is already covered by
+// the formatStatus tests in cli.test.ts. Namespace filtering is tested
+// at the buildStatusData level above (where the filtering actually happens).
 
 // ===========================================================================
 // dx ls [namespace] — AC 12, 14
@@ -337,120 +324,122 @@ describe("dx reset — namespace behavior", () => {
    * namespace-scoped reset clears the correct overrides.
    */
 
-  const { mkdtempSync, rmSync, readFileSync, writeFileSync } = require("fs");
-  const { tmpdir } = require("os");
-  const { join } = require("path");
-
   let tempDir: string;
 
-  function setup() {
+  beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "dx-reset-ns-"));
-  }
+  });
 
-  function teardown() {
+  afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true });
-  }
+  });
 
   test.failing("reset 'tips' clears only tips.* local overrides, preserves others", () => {
-    setup();
-    try {
-      const localPath = join(tempDir, "config.local.json");
-      writeFileSync(
-        localPath,
-        JSON.stringify({
-          overrides: {
-            "ci-watcher": false,
-            "tips.enabled": false,
-            "tips.show-duration": "5m",
-            "tips.rest-duration": "1h",
-          },
-        }),
-      );
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(
+      localPath,
+      JSON.stringify({
+        overrides: {
+          "ci-watcher": false,
+          "tips.enabled": false,
+          "tips.show-duration": "5m",
+          "tips.rest-duration": "1h",
+        },
+      }),
+    );
 
-      // Lazy import: clearNamespaceLocalOverrides doesn't exist yet
-      const { clearNamespaceLocalOverrides } = require("./commands/reset");
-      clearNamespaceLocalOverrides(localPath, "tips");
+    // Lazy import: clearNamespaceLocalOverrides doesn't exist yet
+    const { clearNamespaceLocalOverrides } = require("./commands/reset");
+    clearNamespaceLocalOverrides(localPath, "tips");
 
-      const result = JSON.parse(readFileSync(localPath, "utf-8"));
+    const result = JSON.parse(readFileSync(localPath, "utf-8"));
 
-      // tips.* overrides should be gone
-      expect(result.overrides["tips.enabled"]).toBeUndefined();
-      expect(result.overrides["tips.show-duration"]).toBeUndefined();
-      expect(result.overrides["tips.rest-duration"]).toBeUndefined();
+    // tips.* overrides should be gone
+    expect(result.overrides["tips.enabled"]).toBeUndefined();
+    expect(result.overrides["tips.show-duration"]).toBeUndefined();
+    expect(result.overrides["tips.rest-duration"]).toBeUndefined();
 
-      // ci-watcher should be preserved
-      expect(result.overrides["ci-watcher"]).toBe(false);
-    } finally {
-      teardown();
-    }
+    // ci-watcher should be preserved
+    expect(result.overrides["ci-watcher"]).toBe(false);
   });
 
   test("reset with no args clears all local overrides (existing behavior preserved)", () => {
-    setup();
-    try {
-      const localPath = join(tempDir, "config.local.json");
-      writeFileSync(
-        localPath,
-        JSON.stringify({
-          overrides: {
-            "ci-watcher": false,
-            "tips.enabled": false,
-            "tips.show-duration": "5m",
-          },
-        }),
-      );
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(
+      localPath,
+      JSON.stringify({
+        overrides: {
+          "ci-watcher": false,
+          "tips.enabled": false,
+          "tips.show-duration": "5m",
+        },
+      }),
+    );
 
-      // Using existing function — this tests backward compat
-      const { clearAllLocalOverrides } = require("./commands/reset");
-      clearAllLocalOverrides(localPath);
+    // Using existing function — this tests backward compat
+    clearAllLocalOverrides(localPath);
 
-      const result = JSON.parse(readFileSync(localPath, "utf-8"));
+    const result = JSON.parse(readFileSync(localPath, "utf-8"));
 
-      // All overrides should be cleared
-      expect(result.overrides).toEqual({});
-    } finally {
-      teardown();
-    }
+    // All overrides should be cleared
+    expect(result.overrides).toEqual({});
   });
 
   test.failing("reset 'tips' clears only tips.* user overrides (--save), preserves others", () => {
-    setup();
-    try {
-      const configPath = join(tempDir, "config.json");
-      writeFileSync(
-        configPath,
-        JSON.stringify({
-          features: {
-            "ci-watcher": { description: "Monitor CI", mechanism: "hook", default: true },
-            "tips.enabled": { description: "Tips", mechanism: "statusline", default: true },
-            "tips.show-duration": { description: "Duration", mechanism: "timing", default: "10m" },
-          },
-          users: {
-            nitsan: {
-              aliases: ["Nitsan Avni"],
-              overrides: {
-                "ci-watcher": false,
-                "tips.enabled": false,
-                "tips.show-duration": "5m",
-              },
+    const configPath = join(tempDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        features: {
+          "ci-watcher": { description: "Monitor CI", mechanism: "hook", default: true },
+          "tips.enabled": { description: "Tips", mechanism: "statusline", default: true },
+          "tips.show-duration": { description: "Duration", mechanism: "timing", default: "10m" },
+        },
+        users: {
+          nitsan: {
+            aliases: ["Nitsan Avni"],
+            overrides: {
+              "ci-watcher": false,
+              "tips.enabled": false,
+              "tips.show-duration": "5m",
             },
           },
-        }),
-      );
+        },
+      }),
+    );
 
-      const { clearNamespaceUserOverrides } = require("./commands/reset");
-      clearNamespaceUserOverrides(configPath, "nitsan", "tips");
+    const { clearNamespaceUserOverrides } = require("./commands/reset");
+    clearNamespaceUserOverrides(configPath, "nitsan", "tips");
 
-      const result = JSON.parse(readFileSync(configPath, "utf-8"));
+    const result = JSON.parse(readFileSync(configPath, "utf-8"));
 
-      // tips.* user overrides should be gone
-      expect(result.users.nitsan.overrides["tips.enabled"]).toBeUndefined();
-      expect(result.users.nitsan.overrides["tips.show-duration"]).toBeUndefined();
+    // tips.* user overrides should be gone
+    expect(result.users.nitsan.overrides["tips.enabled"]).toBeUndefined();
+    expect(result.users.nitsan.overrides["tips.show-duration"]).toBeUndefined();
 
-      // ci-watcher should be preserved
-      expect(result.users.nitsan.overrides["ci-watcher"]).toBe(false);
-    } finally {
-      teardown();
-    }
+    // ci-watcher should be preserved
+    expect(result.users.nitsan.overrides["ci-watcher"]).toBe(false);
+  });
+
+  test.failing("reset namespace matching nothing is a no-op", () => {
+    const localPath = join(tempDir, "config.local.json");
+    writeFileSync(
+      localPath,
+      JSON.stringify({
+        overrides: {
+          "ci-watcher": false,
+          "tips.enabled": false,
+        },
+      }),
+    );
+
+    const { clearNamespaceLocalOverrides } = require("./commands/reset");
+    clearNamespaceLocalOverrides(localPath, "nonexistent");
+
+    const result = JSON.parse(readFileSync(localPath, "utf-8"));
+
+    // All overrides should be untouched
+    expect(result.overrides["ci-watcher"]).toBe(false);
+    expect(result.overrides["tips.enabled"]).toBe(false);
   });
 });
