@@ -158,10 +158,17 @@ program
 
 // ── default action (no subcommand) ─────────────────────────────────────────
 
-// When a positional argument is given that isn't a known subcommand,
-// treat it as a topic (tag filter).
+// Use Commander's `isDefault` pattern so that named subcommands (list, show,
+// search, statusline) are always matched first. Without this, a root-level
+// `.argument("[topic]")` can intercept subcommand names as topic strings —
+// e.g. `tip statusline` would be treated as topic "statusline" instead of
+// running the statusline subcommand.
+//
+// With `isDefault: true`, Commander routes to this command only when no other
+// subcommand matches. Both `tip debugging` and `tip topic debugging` work.
 program
-  .argument("[topic]", "Filter tips by tag")
+  .command("topic [name]", { isDefault: true })
+  .description("Show a random tip, or filter by tag")
   .action((topic?: string) => {
     const tips = loadTipsOrExit();
 

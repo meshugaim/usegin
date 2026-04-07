@@ -322,8 +322,23 @@ describe("CLI: tip statusline", () => {
     // A proper statusline command returns either a one-liner tip or empty string.
     expect(stdout).not.toContain("No tips found for");
     expect(stdout).not.toContain("Available tags:");
+    expect(stdout).not.toContain("Try: tip list");
     // Output should be at most one line (the tip one-liner) or empty
     const lines = stdout.trim().split("\n").filter((l) => l.length > 0);
     expect(lines.length).toBeLessThanOrEqual(1);
+  });
+
+  test("ENG-4581: tip statusline is not routed to the default topic action", () => {
+    // Regression test: ensure Commander routes `statusline` to the statusline
+    // subcommand, not the default topic action. The topic action would output
+    // either a full multi-line formatted tip or a "No tips found" message.
+    const { stdout, stderr, exitCode } = runCli("statusline");
+
+    expect(exitCode).toBe(0);
+    // The default topic action includes "Tags:" in its formatted output.
+    // The statusline command returns only a bare one-liner (title) or empty.
+    expect(stdout).not.toContain("Tags:");
+    // Stderr should be clean
+    expect(stderr).toBe("");
   });
 });
