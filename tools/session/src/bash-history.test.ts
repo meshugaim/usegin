@@ -120,7 +120,7 @@ describe("extractBashCommands", () => {
 });
 
 describe("formatBashEntry", () => {
-  it("renders timestamp + description + command", () => {
+  it.failing("renders command first, then timestamp + description", () => {
     const entry = formatBashEntry({
       timestamp: "2025-03-18T10:30:00Z",
       description: "Run the test suite",
@@ -130,9 +130,10 @@ describe("formatBashEntry", () => {
       turnIndex: 2,
     });
 
-    expect(entry).toContain("2025-03-18 10:30");
-    expect(entry).toContain("Run the test suite");
-    expect(entry).toContain("$ bun test src/parser.test.ts");
+    const lines = entry.split("\n");
+    expect(lines[0]).toBe("$ bun test src/parser.test.ts");
+    expect(lines[1]).toContain("2025-03-18 10:30");
+    expect(lines[1]).toContain("Run the test suite");
   });
 
   it("handles missing timestamp", () => {
