@@ -15,6 +15,7 @@ import {
   resolveStatusline,
 } from "./core";
 import type { StatuslineState } from "./core";
+import dx from "../../dx/sdk";
 
 // Resolve the tips directory: from src/ go up to tools/tips/, then into tips/
 const tipsDir = join(dirname(import.meta.dir), "tips");
@@ -82,23 +83,6 @@ program
 
 const STATE_FILE = "/tmp/tip-statusline-state.json";
 
-/** Shell out to `dx resolve <param>` and return the parsed JSON value, or null on failure. */
-function dxResolve(param: string): unknown {
-  try {
-    const result = Bun.spawnSync({
-      cmd: ["dx", "resolve", param],
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    if (result.exitCode !== 0) return null;
-    const raw = result.stdout.toString().trim();
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
 /** Read the statusline state file, returning null if missing or corrupt. */
 function readStateFile(): StatuslineState | null {
   try {
@@ -119,15 +103,19 @@ program
   .description("Return a one-liner tip for the status line (or empty)")
   .action(() => {
     // 1. Check if tips are enabled via dx
-    const enabledRaw = dxResolve("tips.enabled");
-    const enabled = enabledRaw === null ? true : Boolean(enabledRaw);
+    const enabled = dx.isEnabled("tips.enabled");
 
     // 2. Read persisted state
     const state = readStateFile();
 
-    // 3. Resolve show/rest durations from dx (defaults: 10m, 2h)
-    const showRaw = dxResolve("tips.show-duration");
-    const restRaw = dxResolve("tips.rest-duration");
+    // 3. Resolve show/rest durations from dx config (defaults: 10m, 2h)
+    //    getFeature registers the gate point for dx ls scanning.
+    //    The raw config default carries the duration string (e.g. "10m").
+    dx.getFeature("tips.show-duration");
+    dx.getFeature("tips.rest-duration");
+    const features = dx.getContext().config.features;
+    const showRaw = features["tips.show-duration"]?.default;
+    const restRaw = features["tips.rest-duration"]?.default;
     const showDuration =
       (typeof showRaw === "string" ? parseDuration(showRaw) : null) ?? 600_000;
     const restDuration =
