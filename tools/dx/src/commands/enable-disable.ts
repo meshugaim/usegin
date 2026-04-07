@@ -30,7 +30,7 @@ export function writeLocalOverride(
   feature: string,
   value: FeatureValue,
 ): void {
-  let data: { overrides: Record<string, FeatureValue> };
+  let data: { $schema?: string; overrides: Record<string, FeatureValue> };
 
   if (existsSync(localPath)) {
     // File exists — read and parse (throws on corrupted JSON)
@@ -40,8 +40,9 @@ export function writeLocalOverride(
       data.overrides = {};
     }
   } else {
-    // File doesn't exist — create with empty overrides
-    data = { overrides: {} };
+    // File doesn't exist — create with empty overrides and $schema reference
+    // so editors (VS Code) get inline validation from the JSON Schema.
+    data = { $schema: "./config.local.schema.json", overrides: {} };
     // Ensure parent directory exists (only needed when creating the file)
     mkdirSync(dirname(localPath), { recursive: true });
   }

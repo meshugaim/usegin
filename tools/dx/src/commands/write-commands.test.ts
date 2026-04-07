@@ -92,6 +92,14 @@ describe("writeLocalOverride", () => {
     expect(content.overrides["ci-watcher"]).toBe(false);
   });
 
+  test("includes $schema when creating config.local.json from scratch", () => {
+    const localPath = join(tempDir, "fresh-config.local.json");
+    writeLocalOverride(localPath, "autosync", true);
+
+    const content = JSON.parse(readFileSync(localPath, "utf-8"));
+    expect(content.$schema).toBe("./config.local.schema.json");
+  });
+
   test("reads existing file and preserves other overrides", () => {
     const localPath = join(tempDir, "config.local.json");
     writeFileSync(

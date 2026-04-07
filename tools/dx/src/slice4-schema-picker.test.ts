@@ -35,10 +35,16 @@ import {
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..");
 const SCHEMA_DIR = resolve(REPO_ROOT, ".dx");
 
+// Parse schemas once — reused across describe blocks that validate the same files.
+const configSchema = JSON.parse(
+  readFileSync(resolve(SCHEMA_DIR, "config.schema.json"), "utf-8"),
+);
+const localSchema = JSON.parse(
+  readFileSync(resolve(SCHEMA_DIR, "config.local.schema.json"), "utf-8"),
+);
+
 describe("config.schema.json — structure (AC 15, 18)", () => {
-  const schema = JSON.parse(
-    readFileSync(resolve(SCHEMA_DIR, "config.schema.json"), "utf-8"),
-  );
+  const schema = configSchema;
 
   test("uses JSON Schema 2020-12 dialect", () => {
     expect(schema.$schema).toBe(
@@ -105,9 +111,7 @@ describe("config.schema.json — structure (AC 15, 18)", () => {
 });
 
 describe("config.local.schema.json — structure (AC 16, 18)", () => {
-  const schema = JSON.parse(
-    readFileSync(resolve(SCHEMA_DIR, "config.local.schema.json"), "utf-8"),
-  );
+  const schema = localSchema;
 
   test("uses JSON Schema 2020-12 dialect", () => {
     expect(schema.$schema).toBe(
@@ -165,33 +169,8 @@ describe("schema enforces typed defaults (AC 18)", () => {
    * Structural validation: verify that the schema allows all three value
    * types in the correct places and rejects invalid structures.
    *
-   * We test this by checking the oneOf constraints contain exactly the
-   * three allowed types and no others.
+   * We reuse the configSchema parsed above to avoid redundant file reads.
    */
-  const schema = JSON.parse(
-    readFileSync(resolve(SCHEMA_DIR, "config.schema.json"), "utf-8"),
-  );
-
-  test("feature default allows exactly boolean, string, number", () => {
-    const allowed =
-      schema.properties.features.additionalProperties.properties.default.oneOf;
-
-    expect(allowed).toHaveLength(3);
-
-    const types = allowed.map((s: any) => s.type).sort();
-    expect(types).toEqual(["boolean", "number", "string"]);
-  });
-
-  test("user override values allow exactly boolean, string, number", () => {
-    const allowed =
-      schema.properties.users.additionalProperties.properties.overrides
-        .additionalProperties.oneOf;
-
-    expect(allowed).toHaveLength(3);
-
-    const types = allowed.map((s: any) => s.type).sort();
-    expect(types).toEqual(["boolean", "number", "string"]);
-  });
 
   test("actual config.json validates structurally against schema expectations", () => {
     // Load the real config and verify it matches the shapes the schema expects
@@ -203,7 +182,7 @@ describe("schema enforces typed defaults (AC 18)", () => {
     expect(typeof config.features).toBe("object");
 
     // Each feature must have description (string), mechanism (string), default (bool|str|num)
-    for (const [name, def] of Object.entries(config.features) as [string, any][]) {
+    for (const [_name, def] of Object.entries(config.features) as [string, any][]) {
       expect(typeof def.description).toBe("string");
       expect(typeof def.mechanism).toBe("string");
       expect(["boolean", "string", "number"]).toContain(typeof def.default);
@@ -223,20 +202,38 @@ describe("schema enforces typed defaults (AC 18)", () => {
     }
   });
 
-  test("a config with wrong types would fail structural check", () => {
-    // Simulate a config with an invalid default type (array instead of scalar)
-    const badConfig = {
-      features: {
-        broken: {
-          description: "test",
-          mechanism: "test",
-          default: [1, 2, 3], // arrays are not allowed
-        },
-      },
-    };
+  test("schema rejects feature definitions with invalid default types", () => {
+    // Verify the schema's oneOf constraint only permits scalar types.
+    // An array, object, or null value should NOT be representable in the
+    // allowed types list — confirming the schema would reject them.
+    const allowedTypes = new Set(
+      configSchema.properties.features.additionalProperties.properties.default.oneOf.map(
+        (s: any) => s.type,
+      ),
+    );
 
-    const feature = badConfig.features.broken;
-    expect(["boolean", "string", "number"]).not.toContain(typeof feature.default);
+    // These types must NOT be in the allowed set
+    expect(allowedTypes.has("array")).toBe(false);
+    expect(allowedTypes.has("object")).toBe(false);
+    expect(allowedTypes.has("null")).toBe(false);
+
+    // Only the three scalar types are permitted
+    expect(allowedTypes.size).toBe(3);
+    expect(allowedTypes.has("boolean")).toBe(true);
+    expect(allowedTypes.has("string")).toBe(true);
+    expect(allowedTypes.has("number")).toBe(true);
+  });
+
+  test("schema rejects user overrides with invalid value types", () => {
+    const allowedTypes = new Set(
+      configSchema.properties.users.additionalProperties.properties.overrides
+        .additionalProperties.oneOf.map((s: any) => s.type),
+    );
+
+    expect(allowedTypes.has("array")).toBe(false);
+    expect(allowedTypes.has("object")).toBe(false);
+    expect(allowedTypes.has("null")).toBe(false);
+    expect(allowedTypes.size).toBe(3);
   });
 });
 
