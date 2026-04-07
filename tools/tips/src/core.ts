@@ -140,6 +140,69 @@ export function pickRandom(tips: Tip[]): Tip | null {
 }
 
 // ---------------------------------------------------------------------------
+// Filtering, searching, and lookup
+// ---------------------------------------------------------------------------
+
+/**
+ * Filter tips where any tag matches the given tag (case-insensitive).
+ */
+export function filterByTag(tips: Tip[], tag: string): Tip[] {
+  const needle = tag.toLowerCase();
+  return tips.filter((tip) =>
+    tip.tags.some((t) => t.toLowerCase() === needle),
+  );
+}
+
+/**
+ * Search tips across title, handle, tags, context, and body (case-insensitive).
+ * Returns all tips where the search term appears in any of those fields.
+ */
+export function searchTips(tips: Tip[], term: string): Tip[] {
+  const needle = term.toLowerCase();
+  return tips.filter((tip) => {
+    const haystack = [
+      tip.title,
+      tip.handle,
+      ...tip.tags,
+      tip.context ?? "",
+      tip.body,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(needle);
+  });
+}
+
+/**
+ * Find a tip by reference: either a handle (exact match) or a 1-indexed number.
+ * Returns undefined for unknown handle, out-of-range number, or zero.
+ */
+export function findByRef(tips: Tip[], ref: string): Tip | undefined {
+  // Try numeric lookup first
+  if (/^\d+$/.test(ref)) {
+    const idx = parseInt(ref, 10);
+    if (idx < 1 || idx > tips.length) return undefined;
+    return tips[idx - 1];
+  }
+
+  // Handle lookup (exact match)
+  return tips.find((tip) => tip.handle === ref);
+}
+
+/**
+ * Collect all unique tags from tips, sorted alphabetically.
+ */
+export function allTags(tips: Tip[]): string[] {
+  const tagSet = new Set<string>();
+  for (const tip of tips) {
+    for (const tag of tip.tags) {
+      tagSet.add(tag);
+    }
+  }
+  return [...tagSet].sort();
+}
+
+// ---------------------------------------------------------------------------
 // Terminal formatting
 // ---------------------------------------------------------------------------
 
@@ -167,6 +230,27 @@ export function formatTipForTerminal(tip: Tip): string {
 
   const tagLine = tip.tags.map((t) => yellow(t)).join(dim(", "));
   lines.push(dim("Tags: ") + tagLine);
+
+  return lines.join("\n");
+}
+
+/**
+ * Format tips as a numbered list for `tip list` output.
+ *
+ * Each entry shows: number, title, tags, and context (when present).
+ */
+export function formatTipList(tips: Tip[]): string {
+  const lines: string[] = [];
+
+  for (let i = 0; i < tips.length; i++) {
+    const tip = tips[i]!;
+    const num = String(i + 1).padStart(2);
+    const tags = tip.tags.map((t) => yellow(t)).join(dim(", "));
+    lines.push(`${dim(num)}  ${cyan(tip.title)}  ${dim(tip.handle)}  ${dim("[")}${tags}${dim("]")}`);
+    if (tip.context) {
+      lines.push(`      ${dim(tip.context)}`);
+    }
+  }
 
   return lines.join("\n");
 }

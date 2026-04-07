@@ -8,8 +8,8 @@ import { join } from "path";
  *
  * Part of: ENG-4580
  *
- * All new tests are marked `test.failing` because the CLI subcommands and
- * core functions don't exist yet. Existing Slice 1 tests are NOT modified.
+ * Tests for Slice 2 CLI subcommands and core functions.
+ * Existing Slice 1 tests are NOT modified.
  */
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ describe("core: filterByTag", () => {
     parseTipFrontmatter(TIP_DAYBOOK)!,
   ];
 
-  test.failing("ENG-4580: filters tips by matching tag", () => {
+  test("ENG-4580: filters tips by matching tag", () => {
     const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "debugging");
 
@@ -106,7 +106,7 @@ describe("core: filterByTag", () => {
     expect(matches[0]!.handle).toBe("spotlight-traces");
   });
 
-  test.failing("ENG-4580: tag matching is case-insensitive", () => {
+  test("ENG-4580: tag matching is case-insensitive", () => {
     const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "DEBUGGING");
 
@@ -114,7 +114,7 @@ describe("core: filterByTag", () => {
     expect(matches[0]!.handle).toBe("spotlight-traces");
   });
 
-  test.failing("ENG-4580: returns multiple tips when tag matches several", () => {
+  test("ENG-4580: returns multiple tips when tag matches several", () => {
     const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "sessions");
 
@@ -123,7 +123,7 @@ describe("core: filterByTag", () => {
     expect(handles).toEqual(["daybook", "session-find"]);
   });
 
-  test.failing("ENG-4580: returns empty array when no tag matches", () => {
+  test("ENG-4580: returns empty array when no tag matches", () => {
     const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "nonexistent-tag");
 
@@ -146,7 +146,7 @@ describe("core: searchTips", () => {
     parseTipFrontmatter(TIP_DAYBOOK)!,
   ];
 
-  test.failing("ENG-4580: finds tip by title match", () => {
+  test("ENG-4580: finds tip by title match", () => {
     const searchTips = getSearchTips();
     const matches = searchTips(tips, "traces");
 
@@ -154,7 +154,7 @@ describe("core: searchTips", () => {
     expect(matches.some((t: { handle: string }) => t.handle === "spotlight-traces")).toBe(true);
   });
 
-  test.failing("ENG-4580: finds tip by tag match", () => {
+  test("ENG-4580: finds tip by tag match", () => {
     const searchTips = getSearchTips();
     const matches = searchTips(tips, "fzf");
 
@@ -162,7 +162,7 @@ describe("core: searchTips", () => {
     expect(matches.some((t: { handle: string }) => t.handle === "session-find")).toBe(true);
   });
 
-  test.failing("ENG-4580: finds tip by body content match", () => {
+  test("ENG-4580: finds tip by body content match", () => {
     const searchTips = getSearchTips();
     const matches = searchTips(tips, "daybook --since 3d");
 
@@ -170,7 +170,7 @@ describe("core: searchTips", () => {
     expect(matches.some((t: { handle: string }) => t.handle === "daybook")).toBe(true);
   });
 
-  test.failing("ENG-4580: search is case-insensitive", () => {
+  test("ENG-4580: search is case-insensitive", () => {
     const searchTips = getSearchTips();
     const matches = searchTips(tips, "SPOTLIGHT-DEV");
 
@@ -178,7 +178,7 @@ describe("core: searchTips", () => {
     expect(matches.some((t: { handle: string }) => t.handle === "spotlight-traces")).toBe(true);
   });
 
-  test.failing("ENG-4580: returns empty array when nothing matches", () => {
+  test("ENG-4580: returns empty array when nothing matches", () => {
     const searchTips = getSearchTips();
     const matches = searchTips(tips, "xyzzy-nothing-matches-this");
 
@@ -201,7 +201,7 @@ describe("core: findByRef", () => {
     parseTipFrontmatter(TIP_DAYBOOK)!,
   ];
 
-  test.failing("ENG-4580: finds tip by handle", () => {
+  test("ENG-4580: finds tip by handle", () => {
     const findByRef = getFindByRef();
     const tip = findByRef(tips, "daybook");
 
@@ -209,7 +209,7 @@ describe("core: findByRef", () => {
     expect(tip!.handle).toBe("daybook");
   });
 
-  test.failing("ENG-4580: finds tip by 1-indexed number", () => {
+  test("ENG-4580: finds tip by 1-indexed number", () => {
     const findByRef = getFindByRef();
     const tip = findByRef(tips, "2");
 
@@ -217,21 +217,21 @@ describe("core: findByRef", () => {
     expect(tip!.handle).toBe("session-find");
   });
 
-  test.failing("ENG-4580: returns undefined for unknown handle", () => {
+  test("ENG-4580: returns undefined for unknown handle", () => {
     const findByRef = getFindByRef();
     const tip = findByRef(tips, "nonexistent-handle");
 
     expect(tip).toBeUndefined();
   });
 
-  test.failing("ENG-4580: returns undefined for out-of-range number", () => {
+  test("ENG-4580: returns undefined for out-of-range number", () => {
     const findByRef = getFindByRef();
     const tip = findByRef(tips, "99");
 
     expect(tip).toBeUndefined();
   });
 
-  test.failing("ENG-4580: returns undefined for zero", () => {
+  test("ENG-4580: returns undefined for zero", () => {
     const findByRef = getFindByRef();
     const tip = findByRef(tips, "0");
 
@@ -244,7 +244,7 @@ describe("core: findByRef", () => {
 // =============================================================================
 
 describe("CLI: tip list", () => {
-  test.failing("ENG-4580: shows numbered list of all tips", () => {
+  test("ENG-4580: shows numbered list of all tips", () => {
     const { stdout, exitCode } = runCli("list");
     const output = stripAnsi(stdout);
 
@@ -255,7 +255,7 @@ describe("CLI: tip list", () => {
     expect(output).toContain("Daily cross-reference digest");
   });
 
-  test.failing("ENG-4580: list output includes tags", () => {
+  test("ENG-4580: list output includes tags", () => {
     const { stdout } = runCli("list");
     const output = stripAnsi(stdout);
 
@@ -264,7 +264,7 @@ describe("CLI: tip list", () => {
     expect(output).toContain("sessions");
   });
 
-  test.failing("ENG-4580: list output includes context when present", () => {
+  test("ENG-4580: list output includes context when present", () => {
     const { stdout } = runCli("list");
     const output = stripAnsi(stdout);
 
@@ -272,7 +272,7 @@ describe("CLI: tip list", () => {
     expect(output).toContain("When investigating slow requests");
   });
 
-  test.failing("ENG-4580: list output numbers tips", () => {
+  test("ENG-4580: list output numbers tips", () => {
     const { stdout } = runCli("list");
     const output = stripAnsi(stdout);
 
@@ -290,7 +290,7 @@ describe("CLI: tip list", () => {
 // =============================================================================
 
 describe("CLI: tip show <handle>", () => {
-  test.failing("ENG-4580: shows full tip for known handle", () => {
+  test("ENG-4580: shows full tip for known handle", () => {
     const { stdout, exitCode } = runCli("show", "spotlight-traces");
     const output = stripAnsi(stdout);
 
@@ -300,7 +300,7 @@ describe("CLI: tip show <handle>", () => {
     expect(output).toContain("debugging");
   });
 
-  test.failing("ENG-4580: shows 'not found' message for unknown handle", () => {
+  test("ENG-4580: shows 'not found' message for unknown handle", () => {
     const { stdout, stderr, exitCode } = runCli("show", "nonexistent-tip-handle");
     const combinedOutput = stripAnsi(stdout + stderr);
 
@@ -318,7 +318,7 @@ describe("CLI: tip show <handle>", () => {
 // =============================================================================
 
 describe("CLI: tip show <number>", () => {
-  test.failing("ENG-4580: shows tip by list number", () => {
+  test("ENG-4580: shows tip by list number", () => {
     const { stdout, exitCode } = runCli("show", "1");
     const output = stripAnsi(stdout);
 
@@ -335,7 +335,7 @@ describe("CLI: tip show <number>", () => {
 // =============================================================================
 
 describe("CLI: tip search", () => {
-  test.failing("ENG-4580: search matching title finds the tip", () => {
+  test("ENG-4580: search matching title finds the tip", () => {
     const { stdout, exitCode } = runCli("search", "traces");
     const output = stripAnsi(stdout);
 
@@ -343,7 +343,7 @@ describe("CLI: tip search", () => {
     expect(output).toContain("spotlight-traces");
   });
 
-  test.failing("ENG-4580: search matching tag finds the tip", () => {
+  test("ENG-4580: search matching tag finds the tip", () => {
     const { stdout, exitCode } = runCli("search", "fzf");
     const output = stripAnsi(stdout);
 
@@ -351,7 +351,7 @@ describe("CLI: tip search", () => {
     expect(output).toContain("session-find");
   });
 
-  test.failing("ENG-4580: search matching body content finds the tip", () => {
+  test("ENG-4580: search matching body content finds the tip", () => {
     const { stdout, exitCode } = runCli("search", "daybook");
     const output = stripAnsi(stdout);
 
@@ -359,7 +359,7 @@ describe("CLI: tip search", () => {
     expect(output).toContain("daybook");
   });
 
-  test.failing("ENG-4580: search with no matches shows helpful message", () => {
+  test("ENG-4580: search with no matches shows helpful message", () => {
     const { stdout, exitCode } = runCli("search", "xyzzy-absolutely-nothing");
     const output = stripAnsi(stdout);
 
@@ -374,7 +374,7 @@ describe("CLI: tip search", () => {
 // =============================================================================
 
 describe("CLI: tip <topic>", () => {
-  test.failing("ENG-4580: known tag shows a matching tip with that tag", () => {
+  test("ENG-4580: known tag shows a matching tip with that tag", () => {
     const { stdout, exitCode } = runCli("debugging");
     const output = stripAnsi(stdout);
 
@@ -384,7 +384,7 @@ describe("CLI: tip <topic>", () => {
     expect(output).toContain("spotlight-dev traces");
   });
 
-  test.failing("ENG-4580: unknown tag shows helpful message with available tags", () => {
+  test("ENG-4580: unknown tag shows helpful message with available tags", () => {
     const { stdout, exitCode } = runCli("nonexistent-topic");
     const output = stripAnsi(stdout);
 
@@ -414,7 +414,7 @@ describe("core: formatTipList", () => {
     parseTipFrontmatter(TIP_DAYBOOK)!,
   ];
 
-  test.failing("ENG-4580: formats tips as numbered list", () => {
+  test("ENG-4580: formats tips as numbered list", () => {
     const formatTipList = getFormatTipList();
     const output = stripAnsi(formatTipList(tips));
 
@@ -428,7 +428,7 @@ describe("core: formatTipList", () => {
     expect(output).toContain("Daily cross-reference digest");
   });
 
-  test.failing("ENG-4580: includes tags in list output", () => {
+  test("ENG-4580: includes tags in list output", () => {
     const formatTipList = getFormatTipList();
     const output = stripAnsi(formatTipList(tips));
 
@@ -437,7 +437,7 @@ describe("core: formatTipList", () => {
     expect(output).toContain("daily");
   });
 
-  test.failing("ENG-4580: includes context when present", () => {
+  test("ENG-4580: includes context when present", () => {
     const formatTipList = getFormatTipList();
     const output = stripAnsi(formatTipList(tips));
 
@@ -464,7 +464,7 @@ describe("core: allTags", () => {
     parseTipFrontmatter(TIP_DAYBOOK)!,
   ];
 
-  test.failing("ENG-4580: collects all unique tags sorted", () => {
+  test("ENG-4580: collects all unique tags sorted", () => {
     const collectTags = getAllTags();
     const tags = collectTags(tips);
 
@@ -477,7 +477,7 @@ describe("core: allTags", () => {
     expect(tags).toContain("daily");
   });
 
-  test.failing("ENG-4580: returns empty array for empty tip list", () => {
+  test("ENG-4580: returns empty array for empty tip list", () => {
     const collectTags = getAllTags();
     const tags = collectTags([]);
 
