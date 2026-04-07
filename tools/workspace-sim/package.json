@@ -11,20 +11,20 @@
     "start": "serve dist -l $PORT"
   },
   "dependencies": {
-    "@xyflow/react": "^12.4.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "serve": "^14.2.4",
-    "zustand": "^5.0.2"
+    "@xyflow/react": "^12.10.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "serve": "^14.2.6",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@types/react": "^19.0.1",
-    "@types/react-dom": "^19.0.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@tailwindcss/postcss": "^4.2.2",
     "@vitejs/plugin-react": "^6.0.1",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
-    "vite": "^8.0.5"
+    "vite": "^8.0.6"
   }
 }
