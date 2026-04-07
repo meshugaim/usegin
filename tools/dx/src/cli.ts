@@ -30,6 +30,7 @@ const program = new Command()
     "Developer experience configuration -- per-person automation toggles",
   )
   .version("0.1.0")
+  .enablePositionalOptions()
   .option("--save", "Persist changes to config.json (personal override)");
 
 // Bare `dx` with no args: if headless -> JSON status, if TTY -> interactive picker or help

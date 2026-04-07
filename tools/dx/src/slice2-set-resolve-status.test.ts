@@ -519,3 +519,124 @@ describe("dx status — typed display", () => {
     expect(countLine!.replace("tips.max-count", "")).not.toMatch(/\bon\b/i);
   });
 });
+
+// ===========================================================================
+// --save flag reaches subcommands through Commander (ENG-4687 bug fix)
+//
+// Regression test: Commander was capturing --save at the parent program
+// level, so subcommands (set, enable, disable, reset) never received it.
+// The fix adds `enablePositionalOptions()` to the parent program so
+// options are only parsed at the level they're defined.
+// ===========================================================================
+
+describe("--save flag reaches subcommands through Commander", () => {
+  /**
+   * Build a Commander program that mirrors the real cli.ts structure:
+   * parent program with --save option + real subcommand builders.
+   *
+   * We intercept the subcommand actions to capture opts without triggering
+   * real I/O (the action handlers read dx.getContext() which needs a real
+   * .dx directory). Instead, we add spy subcommands that just capture opts.
+   *
+   * The critical thing: the parent program structure must match cli.ts --
+   * same .option("--save") on the parent, same enablePositionalOptions().
+   */
+  function buildTestCli() {
+    const captured: Record<string, { save?: boolean }> = {};
+
+    // Mirrors cli.ts lines 27-33
+    const program = new Command()
+      .name("dx")
+      .enablePositionalOptions()
+      .option("--save", "Persist changes to config.json (personal override)");
+
+    // Suppress help output and exit
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+
+    // Add spy subcommands that mirror the real command structure
+    // (same arguments and options) but just capture opts
+    const setCmdSpy = new Command("set")
+      .argument("<feature>")
+      .argument("<value>")
+      .option("--save", "Persist to config.json (user override)")
+      .option("--json", "Output as JSON")
+      .action((_feature: string, _value: string, opts: { save?: boolean }) => {
+        captured.set = { save: opts.save };
+      });
+
+    const enableCmdSpy = new Command("enable")
+      .argument("<feature>")
+      .option("--save", "Persist to config.json (user override)")
+      .option("--json", "Output as JSON")
+      .action((_feature: string, opts: { save?: boolean }) => {
+        captured.enable = { save: opts.save };
+      });
+
+    const disableCmdSpy = new Command("disable")
+      .argument("<feature>")
+      .option("--save", "Persist to config.json (user override)")
+      .option("--json", "Output as JSON")
+      .action((_feature: string, opts: { save?: boolean }) => {
+        captured.disable = { save: opts.save };
+      });
+
+    const resetCmdSpy = new Command("reset")
+      .argument("[feature]")
+      .option("--save", "Clear overrides from config.json (user override)")
+      .option("--json", "Output as JSON")
+      .action((_feature: string | undefined, opts: { save?: boolean }) => {
+        captured.reset = { save: opts.save };
+      });
+
+    program.addCommand(setCmdSpy);
+    program.addCommand(enableCmdSpy);
+    program.addCommand(disableCmdSpy);
+    program.addCommand(resetCmdSpy);
+
+    return { program, captured };
+  }
+
+  test("dx set <feature> <value> --save passes save=true to the set action", () => {
+    const { program, captured } = buildTestCli();
+    program.parse(["node", "dx", "set", "tips.show-duration", "5m", "--save"]);
+    expect(captured.set?.save).toBe(true);
+  });
+
+  test("dx enable <feature> --save passes save=true to the enable action", () => {
+    const { program, captured } = buildTestCli();
+    program.parse(["node", "dx", "enable", "ci-watcher", "--save"]);
+    expect(captured.enable?.save).toBe(true);
+  });
+
+  test("dx disable <feature> --save passes save=true to the disable action", () => {
+    const { program, captured } = buildTestCli();
+    program.parse(["node", "dx", "disable", "ci-watcher", "--save"]);
+    expect(captured.disable?.save).toBe(true);
+  });
+
+  test("dx reset --save passes save=true to the reset action", () => {
+    const { program, captured } = buildTestCli();
+    program.parse(["node", "dx", "reset", "--save"]);
+    expect(captured.reset?.save).toBe(true);
+  });
+
+  test("dx reset <feature> --save passes save=true to the reset action", () => {
+    const { program, captured } = buildTestCli();
+    program.parse(["node", "dx", "reset", "ci-watcher", "--save"]);
+    expect(captured.reset?.save).toBe(true);
+  });
+
+  test("dx set <feature> <value> without --save has save undefined", () => {
+    const { program, captured } = buildTestCli();
+    program.parse(["node", "dx", "set", "tips.show-duration", "5m"]);
+    expect(captured.set?.save).toBeUndefined();
+  });
+
+  test("bare dx --save passes save to parent opts (interactive mode)", () => {
+    const { program } = buildTestCli();
+    program.action(() => {}); // bare action
+    program.parse(["node", "dx", "--save"]);
+    expect(program.opts().save).toBe(true);
+  });
+});
