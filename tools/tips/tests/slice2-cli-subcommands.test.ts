@@ -1,7 +1,13 @@
-import { describe, test, expect, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
-import { tmpdir } from "os";
+import { describe, test, expect } from "bun:test";
 import { join } from "path";
+import {
+  filterByTag,
+  searchTips,
+  findByRef,
+  formatTipList,
+  allTags,
+  parseTipFrontmatter,
+} from "../src/core";
 
 /**
  * Tests for Slice 2: CLI subcommands — list, show, search, topic filter, empty states.
@@ -79,19 +85,42 @@ Run \`daybook --since 3d\` to look further back.
 `;
 
 // =============================================================================
+// Core: parseTipFrontmatter — numeric handle rejection
+// =============================================================================
+
+describe("core: parseTipFrontmatter rejects numeric handles", () => {
+  test("ENG-4580: returns null for purely numeric handle", () => {
+    const content = `---
+title: Some tip
+handle: 42
+tags: [testing]
+---
+
+Body content here.
+`;
+    expect(parseTipFrontmatter(content)).toBeNull();
+  });
+
+  test("ENG-4580: accepts handle that contains digits but is not purely numeric", () => {
+    const content = `---
+title: Some tip
+handle: tip-42
+tags: [testing]
+---
+
+Body content here.
+`;
+    const tip = parseTipFrontmatter(content);
+    expect(tip).not.toBeNull();
+    expect(tip!.handle).toBe("tip-42");
+  });
+});
+
+// =============================================================================
 // Core functions — new for Slice 2
 // =============================================================================
 
 describe("core: filterByTag", () => {
-  // Lazy import — function doesn't exist yet
-  const getFilterByTag = () =>
-    require("../src/core").filterByTag as (
-      tips: import("../src/core").Tip[],
-      tag: string,
-    ) => import("../src/core").Tip[];
-
-  const { parseTipFrontmatter } = require("../src/core") as typeof import("../src/core");
-
   const tips = [
     parseTipFrontmatter(TIP_SPOTLIGHT)!,
     parseTipFrontmatter(TIP_SESSION)!,
@@ -99,7 +128,6 @@ describe("core: filterByTag", () => {
   ];
 
   test("ENG-4580: filters tips by matching tag", () => {
-    const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "debugging");
 
     expect(matches).toHaveLength(1);
@@ -107,7 +135,6 @@ describe("core: filterByTag", () => {
   });
 
   test("ENG-4580: tag matching is case-insensitive", () => {
-    const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "DEBUGGING");
 
     expect(matches).toHaveLength(1);
@@ -115,16 +142,14 @@ describe("core: filterByTag", () => {
   });
 
   test("ENG-4580: returns multiple tips when tag matches several", () => {
-    const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "sessions");
 
     expect(matches).toHaveLength(2);
-    const handles = matches.map((t: { handle: string }) => t.handle).sort();
+    const handles = matches.map((t) => t.handle).sort();
     expect(handles).toEqual(["daybook", "session-find"]);
   });
 
   test("ENG-4580: returns empty array when no tag matches", () => {
-    const filterByTag = getFilterByTag();
     const matches = filterByTag(tips, "nonexistent-tag");
 
     expect(matches).toHaveLength(0);
@@ -132,14 +157,6 @@ describe("core: filterByTag", () => {
 });
 
 describe("core: searchTips", () => {
-  const getSearchTips = () =>
-    require("../src/core").searchTips as (
-      tips: import("../src/core").Tip[],
-      term: string,
-    ) => import("../src/core").Tip[];
-
-  const { parseTipFrontmatter } = require("../src/core") as typeof import("../src/core");
-
   const tips = [
     parseTipFrontmatter(TIP_SPOTLIGHT)!,
     parseTipFrontmatter(TIP_SESSION)!,
@@ -147,39 +164,34 @@ describe("core: searchTips", () => {
   ];
 
   test("ENG-4580: finds tip by title match", () => {
-    const searchTips = getSearchTips();
     const matches = searchTips(tips, "traces");
 
     expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(matches.some((t: { handle: string }) => t.handle === "spotlight-traces")).toBe(true);
+    expect(matches.some((t) => t.handle === "spotlight-traces")).toBe(true);
   });
 
   test("ENG-4580: finds tip by tag match", () => {
-    const searchTips = getSearchTips();
     const matches = searchTips(tips, "fzf");
 
     expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(matches.some((t: { handle: string }) => t.handle === "session-find")).toBe(true);
+    expect(matches.some((t) => t.handle === "session-find")).toBe(true);
   });
 
   test("ENG-4580: finds tip by body content match", () => {
-    const searchTips = getSearchTips();
     const matches = searchTips(tips, "daybook --since 3d");
 
     expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(matches.some((t: { handle: string }) => t.handle === "daybook")).toBe(true);
+    expect(matches.some((t) => t.handle === "daybook")).toBe(true);
   });
 
   test("ENG-4580: search is case-insensitive", () => {
-    const searchTips = getSearchTips();
     const matches = searchTips(tips, "SPOTLIGHT-DEV");
 
     expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(matches.some((t: { handle: string }) => t.handle === "spotlight-traces")).toBe(true);
+    expect(matches.some((t) => t.handle === "spotlight-traces")).toBe(true);
   });
 
   test("ENG-4580: returns empty array when nothing matches", () => {
-    const searchTips = getSearchTips();
     const matches = searchTips(tips, "xyzzy-nothing-matches-this");
 
     expect(matches).toHaveLength(0);
@@ -187,14 +199,6 @@ describe("core: searchTips", () => {
 });
 
 describe("core: findByRef", () => {
-  const getFindByRef = () =>
-    require("../src/core").findByRef as (
-      tips: import("../src/core").Tip[],
-      ref: string,
-    ) => import("../src/core").Tip | undefined;
-
-  const { parseTipFrontmatter } = require("../src/core") as typeof import("../src/core");
-
   const tips = [
     parseTipFrontmatter(TIP_SPOTLIGHT)!,
     parseTipFrontmatter(TIP_SESSION)!,
@@ -202,7 +206,6 @@ describe("core: findByRef", () => {
   ];
 
   test("ENG-4580: finds tip by handle", () => {
-    const findByRef = getFindByRef();
     const tip = findByRef(tips, "daybook");
 
     expect(tip).toBeDefined();
@@ -210,7 +213,6 @@ describe("core: findByRef", () => {
   });
 
   test("ENG-4580: finds tip by 1-indexed number", () => {
-    const findByRef = getFindByRef();
     const tip = findByRef(tips, "2");
 
     expect(tip).toBeDefined();
@@ -218,21 +220,18 @@ describe("core: findByRef", () => {
   });
 
   test("ENG-4580: returns undefined for unknown handle", () => {
-    const findByRef = getFindByRef();
     const tip = findByRef(tips, "nonexistent-handle");
 
     expect(tip).toBeUndefined();
   });
 
   test("ENG-4580: returns undefined for out-of-range number", () => {
-    const findByRef = getFindByRef();
     const tip = findByRef(tips, "99");
 
     expect(tip).toBeUndefined();
   });
 
   test("ENG-4580: returns undefined for zero", () => {
-    const findByRef = getFindByRef();
     const tip = findByRef(tips, "0");
 
     expect(tip).toBeUndefined();
@@ -310,6 +309,7 @@ describe("CLI: tip show <handle>", () => {
     expect(combinedOutput.toLowerCase()).toContain("not found");
     // Should mention the handle the user tried
     expect(combinedOutput).toContain("nonexistent-tip-handle");
+    expect(exitCode).not.toBe(0);
   });
 });
 
@@ -401,13 +401,6 @@ describe("CLI: tip <topic>", () => {
 // =============================================================================
 
 describe("core: formatTipList", () => {
-  const getFormatTipList = () =>
-    require("../src/core").formatTipList as (
-      tips: import("../src/core").Tip[],
-    ) => string;
-
-  const { parseTipFrontmatter } = require("../src/core") as typeof import("../src/core");
-
   const tips = [
     parseTipFrontmatter(TIP_SPOTLIGHT)!,
     parseTipFrontmatter(TIP_SESSION)!,
@@ -415,7 +408,6 @@ describe("core: formatTipList", () => {
   ];
 
   test("ENG-4580: formats tips as numbered list", () => {
-    const formatTipList = getFormatTipList();
     const output = stripAnsi(formatTipList(tips));
 
     // Should contain numbering
@@ -429,7 +421,6 @@ describe("core: formatTipList", () => {
   });
 
   test("ENG-4580: includes tags in list output", () => {
-    const formatTipList = getFormatTipList();
     const output = stripAnsi(formatTipList(tips));
 
     expect(output).toContain("debugging");
@@ -438,7 +429,6 @@ describe("core: formatTipList", () => {
   });
 
   test("ENG-4580: includes context when present", () => {
-    const formatTipList = getFormatTipList();
     const output = stripAnsi(formatTipList(tips));
 
     expect(output).toContain("When investigating slow requests");
@@ -451,13 +441,6 @@ describe("core: formatTipList", () => {
 // =============================================================================
 
 describe("core: allTags", () => {
-  const getAllTags = () =>
-    require("../src/core").allTags as (
-      tips: import("../src/core").Tip[],
-    ) => string[];
-
-  const { parseTipFrontmatter } = require("../src/core") as typeof import("../src/core");
-
   const tips = [
     parseTipFrontmatter(TIP_SPOTLIGHT)!,
     parseTipFrontmatter(TIP_SESSION)!,
@@ -465,8 +448,7 @@ describe("core: allTags", () => {
   ];
 
   test("ENG-4580: collects all unique tags sorted", () => {
-    const collectTags = getAllTags();
-    const tags = collectTags(tips);
+    const tags = allTags(tips);
 
     // Should be sorted and unique
     expect(tags).toEqual([...new Set(tags)].sort());
@@ -478,8 +460,7 @@ describe("core: allTags", () => {
   });
 
   test("ENG-4580: returns empty array for empty tip list", () => {
-    const collectTags = getAllTags();
-    const tags = collectTags([]);
+    const tags = allTags([]);
 
     expect(tags).toEqual([]);
   });

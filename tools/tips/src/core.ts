@@ -68,6 +68,8 @@ export function parseTipFrontmatter(content: string): Tip | null {
 
   if (typeof title !== "string" || !title) return null;
   if (typeof handle !== "string" || !handle) return null;
+  // Reject purely-numeric handles — they collide with findByRef's positional lookup
+  if (/^\d+$/.test(handle)) return null;
   if (!Array.isArray(tags) || tags.length === 0) return null;
 
   const body = rawBody!.trim();
@@ -102,7 +104,9 @@ export function loadTips(tipsDir: string): Tip[] {
   const tips: Tip[] = [];
 
   try {
-    const files = readdirSync(tipsDir).filter((f) => f.endsWith(".md"));
+    const files = readdirSync(tipsDir)
+      .filter((f) => f.endsWith(".md"))
+      .sort();
 
     for (const file of files) {
       const filePath = join(tipsDir, file);
@@ -178,7 +182,9 @@ export function searchTips(tips: Tip[], term: string): Tip[] {
  * Returns undefined for unknown handle, out-of-range number, or zero.
  */
 export function findByRef(tips: Tip[], ref: string): Tip | undefined {
-  // Try numeric lookup first
+  // Numeric refs are interpreted as 1-indexed list positions, not handles.
+  // parseTipFrontmatter rejects purely-numeric handles, so this is safe —
+  // a numeric string can never collide with a real handle.
   if (/^\d+$/.test(ref)) {
     const idx = parseInt(ref, 10);
     if (idx < 1 || idx > tips.length) return undefined;

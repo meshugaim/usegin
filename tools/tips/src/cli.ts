@@ -15,6 +15,16 @@ import {
 // Resolve the tips directory: from src/ go up to tools/tips/, then into tips/
 const tipsDir = join(dirname(import.meta.dir), "tips");
 
+/** Load tips or exit cleanly when none exist. Shared across all subcommands. */
+function loadTipsOrExit(): import("./core").Tip[] {
+  const tips = loadTips(tipsDir);
+  if (tips.length === 0) {
+    console.log("No tips found. Add tip files to tools/tips/tips/");
+    process.exit(0);
+  }
+  return tips;
+}
+
 const program = new Command()
   .name("tip")
   .description("DX tip system — surfaces useful 'did you know?' knowledge")
@@ -26,13 +36,7 @@ program
   .command("list")
   .description("Show all tips as a numbered list")
   .action(() => {
-    const tips = loadTips(tipsDir);
-
-    if (tips.length === 0) {
-      console.log("No tips found. Add tip files to tools/tips/tips/");
-      return;
-    }
-
+    const tips = loadTipsOrExit();
     console.log(formatTipList(tips));
   });
 
@@ -42,7 +46,7 @@ program
   .command("show <ref>")
   .description("Show a specific tip by handle or list number")
   .action((ref: string) => {
-    const tips = loadTips(tipsDir);
+    const tips = loadTipsOrExit();
     const tip = findByRef(tips, ref);
 
     if (!tip) {
@@ -59,7 +63,7 @@ program
   .command("search <term>")
   .description("Search tips across title, handle, tags, context, and body")
   .action((term: string) => {
-    const tips = loadTips(tipsDir);
+    const tips = loadTipsOrExit();
     const matches = searchTips(tips, term);
 
     if (matches.length === 0) {
@@ -77,12 +81,7 @@ program
 program
   .argument("[topic]", "Filter tips by tag")
   .action((topic?: string) => {
-    const tips = loadTips(tipsDir);
-
-    if (tips.length === 0) {
-      console.log("No tips found. Add tip files to tools/tips/tips/");
-      return;
-    }
+    const tips = loadTipsOrExit();
 
     if (!topic) {
       // No argument: show a random tip
