@@ -482,7 +482,7 @@ describe("buildSyncEntries", () => {
     expect(entries).toHaveLength(2);
   });
 
-  test("each entry has key and boolean value", () => {
+  test("each entry has key and resolved value", () => {
     const features: Record<string, FeatureInfo> = {
       "ci-watcher": { value: true, enabled: true, source: "default" },
     };
@@ -493,7 +493,7 @@ describe("buildSyncEntries", () => {
     });
   });
 
-  test("maps enabled state correctly", () => {
+  test("maps resolved value correctly", () => {
     const features: Record<string, FeatureInfo> = {
       "ci-watcher": { value: true, enabled: true, source: "default" },
       autosync: { value: false, enabled: false, source: "user-override" },
@@ -531,13 +531,25 @@ describe("buildSyncEntries", () => {
     };
     const entries = buildSyncEntries(features);
 
-    // Every entry must have a string key and boolean value —
+    // Every entry must have a string key and a FeatureValue —
     // the shape needed to display "would write <key> = <value>" in dry-run.
     for (const entry of entries) {
       expect(typeof entry.key).toBe("string");
       expect(entry.key.length).toBeGreaterThan(0);
-      expect(typeof entry.value).toBe("boolean");
+      expect(["boolean", "string", "number"]).toContain(typeof entry.value);
     }
+  });
+
+  test("uses info.value (not info.enabled) for typed features", () => {
+    const features: Record<string, FeatureInfo> = {
+      "tips.show-duration": { value: "10m", enabled: true, source: "default" },
+      "tips.max-count": { value: 42, enabled: true, source: "default" },
+    };
+    const entries = buildSyncEntries(features);
+    const durationEntry = entries.find((e) => e.key === "tips.show-duration");
+    const countEntry = entries.find((e) => e.key === "tips.max-count");
+    expect(durationEntry!.value).toBe("10m");
+    expect(countEntry!.value).toBe(42);
   });
 });
 

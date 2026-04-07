@@ -14,7 +14,11 @@ import dx from "../../sdk";
 /**
  * Format the resolve output for human display.
  *
- * Outputs "true" or "false" to stdout (not stderr). This is intentional:
+ * Outputs the resolved value as a string: `String(info.value)`.
+ * For booleans this is "true"/"false"; for strings and numbers it's the
+ * actual value (e.g., "10m", "42").
+ *
+ * Output goes to stdout (not stderr). This is intentional:
  * `dx resolve` is designed for scripting (`if dx resolve feature; then ...`),
  * so its output goes to stdout to be capturable, unlike other human-facing
  * commands that write to stderr.

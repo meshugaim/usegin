@@ -10,6 +10,7 @@
 import { Command } from "commander";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { dirname, resolve } from "path";
+import type { FeatureValue } from "../core";
 import { dxShouldOutputJson } from "../output";
 import { resolveUser } from "../core";
 import { autoSync } from "./sync";
@@ -18,15 +19,18 @@ import dx from "../../sdk";
 /**
  * Synchronously reads/writes a local override to `.dx/config.local.json`.
  *
- * Reads the file (creates if missing), sets `overrides[feature] = enabled`,
+ * Reads the file (creates if missing), sets `overrides[feature] = value`,
  * and writes back to disk. Uses `readFileSync`/`writeFileSync`/`mkdirSync`.
+ *
+ * Accepts any `FeatureValue` (boolean, string, or number) so that both
+ * `dx enable/disable` (boolean) and `dx set` (typed) share a single path.
  */
 export function writeLocalOverride(
   localPath: string,
   feature: string,
-  enabled: boolean,
+  value: FeatureValue,
 ): void {
-  let data: { overrides: Record<string, boolean> };
+  let data: { overrides: Record<string, FeatureValue> };
 
   if (existsSync(localPath)) {
     // File exists — read and parse (throws on corrupted JSON)
@@ -42,7 +46,7 @@ export function writeLocalOverride(
     mkdirSync(dirname(localPath), { recursive: true });
   }
 
-  data.overrides[feature] = enabled;
+  data.overrides[feature] = value;
 
   writeFileSync(localPath, JSON.stringify(data, null, 2) + "\n");
 }
@@ -50,16 +54,19 @@ export function writeLocalOverride(
 /**
  * Synchronously reads/writes a user override to `.dx/config.json`.
  *
- * Reads the file, sets `users[user].overrides[feature] = enabled`,
+ * Reads the file, sets `users[user].overrides[feature] = value`,
  * creates the user entry if it doesn't exist, and writes back to disk.
  * Uses `readFileSync`/`writeFileSync`. Throws if the file does not exist
  * (config.json should always be committed to the repo).
+ *
+ * Accepts any `FeatureValue` (boolean, string, or number) so that both
+ * `dx enable/disable` (boolean) and `dx set` (typed) share a single path.
  */
 export function writeUserOverride(
   configPath: string,
   user: string,
   feature: string,
-  enabled: boolean,
+  value: FeatureValue,
 ): void {
   // config.json must exist — it's committed to the repo
   const raw = readFileSync(configPath, "utf-8");
@@ -77,7 +84,7 @@ export function writeUserOverride(
     data.users[user].overrides = {};
   }
 
-  data.users[user].overrides[feature] = enabled;
+  data.users[user].overrides[feature] = value;
 
   writeFileSync(configPath, JSON.stringify(data, null, 2) + "\n");
 }

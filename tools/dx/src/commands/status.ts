@@ -1,5 +1,5 @@
 /**
- * dx status -- show all features with resolved on/off state.
+ * dx status -- show all features with their resolved values.
  *
  * Exports pure formatting functions and a Commander command builder.
  *
@@ -142,7 +142,7 @@ export function buildStatusData(ctx: DxContext): StatusData {
  */
 export function buildStatusCommand(): Command {
   const cmd = new Command("status")
-    .description("Show all features with resolved on/off state")
+    .description("Show all features with their resolved values")
     .option("--json", "Output as JSON");
 
   cmd.action((opts: { json?: boolean }) => {

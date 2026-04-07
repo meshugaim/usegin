@@ -8,20 +8,20 @@
 
 import { Command } from "commander";
 import { spawnSync } from "child_process";
-import { allFeatures, type FeatureInfo } from "../core";
+import { allFeatures, type FeatureInfo, type FeatureValue } from "../core";
 import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
 
 /** A single entry to write to git config. */
 export interface SyncEntry {
   key: string;
-  value: boolean;
+  value: FeatureValue;
 }
 
 /**
  * Build the list of git config entries to write.
  *
- * Each entry maps a feature name to its resolved boolean value.
+ * Each entry maps a feature name to its resolved typed value.
  * Also serves as the dry-run output: callers can display these entries
  * instead of writing them to show what *would* be synced.
  */
@@ -30,7 +30,7 @@ export function buildSyncEntries(
 ): SyncEntry[] {
   return Object.entries(features).map(([name, info]) => ({
     key: name,
-    value: info.enabled,
+    value: info.value,
   }));
 }
 

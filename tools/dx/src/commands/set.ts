@@ -1,18 +1,19 @@
 /**
  * dx set <feature> <value> -- set a feature to a typed value.
  *
- * Exports pure functions for parsing CLI values, writing typed overrides,
- * formatting output, and a Commander command builder.
+ * Exports pure functions for parsing CLI values, formatting output,
+ * and a Commander command builder. Persistence uses the shared
+ * `writeLocalOverride`/`writeUserOverride` from `enable-disable.ts`.
  *
  * Part of: ENG-4687
  */
 
 import { Command } from "commander";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { dirname, resolve } from "path";
 import type { FeatureValue } from "../core";
 import { resolveUser } from "../core";
 import { dxShouldOutputJson } from "../output";
+import { writeLocalOverride, writeUserOverride } from "./enable-disable";
 import { autoSync } from "./sync";
 import dx from "../../sdk";
 
@@ -37,74 +38,6 @@ export function parseCliValue(raw: string): FeatureValue {
 
   // Everything else is a string
   return raw;
-}
-
-/**
- * Synchronously reads/writes a typed local override to `.dx/config.local.json`.
- *
- * Reads the file (creates if missing), sets `overrides[feature] = value`,
- * and writes back to disk. Follows the same pattern as `writeLocalOverride`
- * in enable-disable.ts but accepts any FeatureValue, not just boolean.
- */
-export function writeTypedLocalOverride(
-  localPath: string,
-  feature: string,
-  value: FeatureValue,
-): void {
-  let data: { overrides: Record<string, FeatureValue> };
-
-  if (existsSync(localPath)) {
-    // File exists -- read and parse (throws on corrupted JSON)
-    const raw = readFileSync(localPath, "utf-8");
-    data = JSON.parse(raw);
-    if (typeof data.overrides !== "object" || data.overrides === null) {
-      data.overrides = {};
-    }
-  } else {
-    // File doesn't exist -- create with empty overrides
-    data = { overrides: {} };
-    // Ensure parent directory exists (only needed when creating the file)
-    mkdirSync(dirname(localPath), { recursive: true });
-  }
-
-  data.overrides[feature] = value;
-
-  writeFileSync(localPath, JSON.stringify(data, null, 2) + "\n");
-}
-
-/**
- * Synchronously reads/writes a typed user override to `.dx/config.json`.
- *
- * Reads the file, sets `users[user].overrides[feature] = value`,
- * creates the user entry if it doesn't exist, and writes back to disk.
- * Follows the same pattern as `writeUserOverride` in enable-disable.ts
- * but accepts any FeatureValue, not just boolean.
- */
-export function writeTypedUserOverride(
-  configPath: string,
-  user: string,
-  feature: string,
-  value: FeatureValue,
-): void {
-  // config.json must exist -- it's committed to the repo
-  const raw = readFileSync(configPath, "utf-8");
-  const data = JSON.parse(raw);
-
-  if (!data.users) {
-    data.users = {};
-  }
-
-  if (!data.users[user]) {
-    data.users[user] = { aliases: [], overrides: {} };
-  }
-
-  if (!data.users[user].overrides) {
-    data.users[user].overrides = {};
-  }
-
-  data.users[user].overrides[feature] = value;
-
-  writeFileSync(configPath, JSON.stringify(data, null, 2) + "\n");
 }
 
 /**
@@ -140,9 +73,13 @@ export function formatSetResult(
     return `dx: ${feature} = ${displayValue} (saved to config.json)`;
   }
 
+  // Quote string values in the hint so the command is copy-pasteable
+  // (e.g., `dx set feature "" --save` instead of `dx set feature  --save`)
+  const hintValue = typeof value === "string" ? JSON.stringify(value) : String(value);
+
   return (
     `dx: ${feature} = ${displayValue} (local)\n` +
-    `    To persist across environments: dx set ${feature} ${value} --save`
+    `    To persist across environments: dx set ${feature} ${hintValue} --save`
   );
 }
 
@@ -203,7 +140,7 @@ export function buildSetCommand(): Command {
         if (!ctx.configPath) {
           throw new Error("dx: configPath not set in context -- cannot --save");
         }
-        writeTypedUserOverride(ctx.configPath, user, feature, value);
+        writeUserOverride(ctx.configPath, user, feature, value);
         saved = true;
       } else {
         // --save requires a known user; fall back to local with a warning
@@ -221,7 +158,7 @@ export function buildSetCommand(): Command {
           ? resolve(dirname(ctx.configPath), "config.local.json")
           : null);
       if (!localPath) throw new Error("dx: cannot determine local config path");
-      writeTypedLocalOverride(localPath, feature, value);
+      writeLocalOverride(localPath, feature, value);
     }
 
     // Auto-sync to git config so `git config dx.<feature>` stays current
