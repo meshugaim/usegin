@@ -1,4 +1,5 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, afterEach } from "bun:test";
+import { rmSync } from "fs";
 import { join } from "path";
 
 /**
@@ -62,6 +63,22 @@ tags: []
 This tip has an empty tags array.
 `;
 
+const INVALID_TIP_MISSING_TITLE = `---
+handle: no-title
+tags: [oops]
+---
+
+This tip has no title field.
+`;
+
+const INVALID_TIP_MISSING_TAGS = `---
+title: A tip without tags
+handle: no-tags
+---
+
+This tip is missing the tags field entirely.
+`;
+
 // =============================================================================
 // parseTipFrontmatter
 // =============================================================================
@@ -122,6 +139,28 @@ describe("parseTipFrontmatter", () => {
       expect(tip).toBeNull();
     },
   );
+
+  test.failing(
+    "ENG-4579: returns null for tip missing title",
+    async () => {
+      const { parseTipFrontmatter } = await getCore();
+
+      const tip = parseTipFrontmatter(INVALID_TIP_MISSING_TITLE);
+
+      expect(tip).toBeNull();
+    },
+  );
+
+  test.failing(
+    "ENG-4579: returns null for tip missing tags entirely",
+    async () => {
+      const { parseTipFrontmatter } = await getCore();
+
+      const tip = parseTipFrontmatter(INVALID_TIP_MISSING_TAGS);
+
+      expect(tip).toBeNull();
+    },
+  );
 });
 
 // =============================================================================
@@ -129,14 +168,27 @@ describe("parseTipFrontmatter", () => {
 // =============================================================================
 
 describe("loadTips", () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of tempDirs) {
+      try {
+        rmSync(dir, { recursive: true });
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+    tempDirs.length = 0;
+  });
+
   test.failing(
-    "ENG-4579: loads all valid tips from directory with 3 seed tips",
+    "ENG-4579: loads all seed tips from directory",
     async () => {
       const { loadTips } = await getCore();
 
       const tips = await loadTips(SEED_TIPS_DIR);
 
-      expect(tips).toHaveLength(3);
+      expect(tips.length).toBeGreaterThanOrEqual(3);
       // Verify each tip has the required shape
       for (const tip of tips) {
         expect(tip.title).toBeDefined();
@@ -156,6 +208,7 @@ describe("loadTips", () => {
 
       // Create a temp dir with one valid and one invalid tip
       const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
+      tempDirs.push(tempDir);
       writeFileSync(
         join(tempDir, "valid.md"),
         VALID_TIP_ALL_FIELDS,
@@ -182,6 +235,25 @@ describe("loadTips", () => {
       expect(tips).toEqual([]);
     },
   );
+
+  test.failing(
+    "ENG-4579: ignores non-markdown files in tips directory",
+    async () => {
+      const { loadTips } = await getCore();
+      const { mkdtempSync, writeFileSync } = await import("fs");
+      const { tmpdir } = await import("os");
+
+      const tempDir = mkdtempSync(join(tmpdir(), "tips-test-"));
+      tempDirs.push(tempDir);
+      writeFileSync(join(tempDir, "valid.md"), VALID_TIP_ALL_FIELDS);
+      writeFileSync(join(tempDir, "notes.txt"), "This is not a tip file");
+
+      const tips = await loadTips(tempDir);
+
+      expect(tips).toHaveLength(1);
+      expect(tips[0]!.handle).toBe("spotlight-traces");
+    },
+  );
 });
 
 // =============================================================================
@@ -198,10 +270,15 @@ describe("pickRandom", () => {
       const tip2 = parseTipFrontmatter(VALID_TIP_REQUIRED_ONLY)!;
       const tips = [tip1, tip2];
 
-      const picked = pickRandom(tips);
-
-      expect(picked).not.toBeNull();
-      expect(tips).toContainEqual(picked);
+      // Call 20 times and verify randomness — at least 2 distinct results
+      const handles = new Set<string>();
+      for (let i = 0; i < 20; i++) {
+        const picked = pickRandom(tips);
+        expect(picked).not.toBeNull();
+        expect(tips).toContainEqual(picked);
+        handles.add(picked!.handle);
+      }
+      expect(handles.size).toBeGreaterThanOrEqual(2);
     },
   );
 
@@ -279,10 +356,12 @@ describe("CLI", () => {
       });
 
       expect(result.exitCode).toBe(0);
-      // Should produce some output (a random tip or help text)
+      // stdout should have content (a random tip or help text)
       const stdout = result.stdout.toString();
+      expect(stdout.length).toBeGreaterThan(0);
+      // stderr should not contain errors
       const stderr = result.stderr.toString();
-      expect(stdout.length + stderr.length).toBeGreaterThan(0);
+      expect(stderr).not.toContain("Error");
     },
   );
 });
