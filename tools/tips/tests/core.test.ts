@@ -84,7 +84,7 @@ This tip is missing the tags field entirely.
 // =============================================================================
 
 describe("parseTipFrontmatter", () => {
-  test.failing(
+  test(
     "ENG-4579: parses valid tip with all fields",
     async () => {
       const { parseTipFrontmatter } = await getCore();
@@ -102,7 +102,7 @@ describe("parseTipFrontmatter", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: parses valid tip with only required fields (no context)",
     async () => {
       const { parseTipFrontmatter } = await getCore();
@@ -118,7 +118,7 @@ describe("parseTipFrontmatter", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: returns null for tip missing required field (no handle)",
     async () => {
       const { parseTipFrontmatter } = await getCore();
@@ -129,7 +129,7 @@ describe("parseTipFrontmatter", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: returns null for tip with empty tags array",
     async () => {
       const { parseTipFrontmatter } = await getCore();
@@ -140,7 +140,7 @@ describe("parseTipFrontmatter", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: returns null for tip missing title",
     async () => {
       const { parseTipFrontmatter } = await getCore();
@@ -151,7 +151,7 @@ describe("parseTipFrontmatter", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: returns null for tip missing tags entirely",
     async () => {
       const { parseTipFrontmatter } = await getCore();
@@ -181,7 +181,7 @@ describe("loadTips", () => {
     tempDirs.length = 0;
   });
 
-  test.failing(
+  test(
     "ENG-4579: loads all seed tips from directory",
     async () => {
       const { loadTips } = await getCore();
@@ -199,7 +199,7 @@ describe("loadTips", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: returns only valid tips when directory has mix of valid and invalid files",
     async () => {
       const { loadTips } = await getCore();
@@ -225,7 +225,7 @@ describe("loadTips", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: returns empty array for nonexistent directory",
     async () => {
       const { loadTips } = await getCore();
@@ -236,7 +236,7 @@ describe("loadTips", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: ignores non-markdown files in tips directory",
     async () => {
       const { loadTips } = await getCore();
@@ -261,7 +261,7 @@ describe("loadTips", () => {
 // =============================================================================
 
 describe("pickRandom", () => {
-  test.failing(
+  test(
     "ENG-4579: returns one of the tips from a non-empty array",
     async () => {
       const { pickRandom, parseTipFrontmatter } = await getCore();
@@ -282,7 +282,7 @@ describe("pickRandom", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: returns null for empty array",
     async () => {
       const { pickRandom } = await getCore();
@@ -299,7 +299,7 @@ describe("pickRandom", () => {
 // =============================================================================
 
 describe("formatTipForTerminal", () => {
-  test.failing(
+  test(
     "ENG-4579: includes title, body, and tags in output",
     async () => {
       const { formatTipForTerminal, parseTipFrontmatter } = await getCore();
@@ -320,7 +320,7 @@ describe("formatTipForTerminal", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4579: includes context when present",
     async () => {
       const { formatTipForTerminal, parseTipFrontmatter } = await getCore();
@@ -346,7 +346,7 @@ describe("formatTipForTerminal", () => {
 // =============================================================================
 
 describe("CLI", () => {
-  test.failing(
+  test(
     "ENG-4579: running cli.ts with no args exits 0 and produces output",
     async () => {
       const result = Bun.spawnSync({
