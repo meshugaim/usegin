@@ -109,13 +109,10 @@ program
     const state = readStateFile();
 
     // 3. Resolve show/rest durations from dx config (defaults: 10m, 2h)
-    //    getFeature registers the gate point for dx ls scanning.
-    //    The raw config default carries the duration string (e.g. "10m").
-    dx.getFeature("tips.show-duration");
-    dx.getFeature("tips.rest-duration");
-    const features = dx.getContext().config.features;
-    const showRaw = features["tips.show-duration"]?.default;
-    const restRaw = features["tips.rest-duration"]?.default;
+    //    getValue returns the typed resolved value through the three-layer
+    //    merge chain (default -> user-override -> local-override).
+    const showRaw = dx.getValue("tips.show-duration");
+    const restRaw = dx.getValue("tips.rest-duration");
     const showDuration =
       (typeof showRaw === "string" ? parseDuration(showRaw) : null) ?? 600_000;
     const restDuration =
