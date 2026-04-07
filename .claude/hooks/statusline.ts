@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
+import { dirname, join } from "path";
 
 interface StatusLineInput {
   session_id: string;
@@ -112,5 +113,23 @@ if (modelName.includes("opus")) {
 if (git) parts.push(git);
 
 parts.push(`${input.session_id.slice(0, 8)}`);
+
+// Ambient tip from DX tip system
+try {
+  // Resolve repo root from this script's location: .claude/hooks/ → repo root
+  const repoRoot = join(dirname(dirname(import.meta.dir)));
+  const tipResult = Bun.spawnSync({
+    cmd: ["bun", join(repoRoot, "tools/tips/src/cli.ts"), "statusline"],
+    stdout: "pipe",
+    stderr: "pipe",
+    cwd: repoRoot,
+  });
+  const tip = tipResult.stdout.toString().trim();
+  if (tip) {
+    parts.push(`💡 ${DIM}${tip}${RESET}`);
+  }
+} catch {
+  // Non-blocking — tip CLI failure should never break the status line
+}
 
 console.log(parts.join(" | "));
