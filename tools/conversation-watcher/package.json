@@ -15,15 +15,15 @@
     "format": "bunx biome format --write ."
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.7",
+    "@biomejs/biome": "^2.4.10",
     "@types/bun": "latest",
-    "@typescript/native-preview": "^7.0.0-dev.20251125.1"
+    "@typescript/native-preview": "^7.0.0-dev.20260407.1"
   },
   "peerDependencies": {
     "typescript": "^6.0.2"
   },
   "dependencies": {
     "@bunli/core": "^0.9.0",
-    "zod": "^4.1.13"
+    "zod": "^4.3.6"
   }
 }
