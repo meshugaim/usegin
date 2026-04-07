@@ -51,11 +51,13 @@ function makeStatusData(overrides?: Partial<StatusData>): StatusData {
     features: {
       "ci-watcher": {
         enabled: false,
+        value: false,
         source: "user-override",
         description: "Monitor CI after push",
       },
       autosync: {
         enabled: false,
+        value: false,
         source: "default",
         description: "Push to origin after every commit",
       },
@@ -69,6 +71,7 @@ function makeFeatureInfo(
   overrides?: Partial<FeatureInfo>,
 ): FeatureInfo {
   return {
+    value: true,
     enabled: true,
     source: "default",
     ...overrides,
@@ -136,11 +139,13 @@ describe("formatStatus", () => {
     const data = makeStatusData({
       features: {
         "ci-watcher": {
+          value: true,
           enabled: true,
           source: "default",
           description: "Monitor CI after push",
         },
         autosync: {
+          value: false,
           enabled: false,
           source: "default",
           description: "Push to origin after every commit",
@@ -166,11 +171,13 @@ describe("formatStatus", () => {
     const data = makeStatusData({
       features: {
         "ci-watcher": {
+          value: false,
           enabled: false,
           source: "user-override",
           description: "Monitor CI after push",
         },
         autosync: {
+          value: false,
           enabled: false,
           source: "default",
           description: "Push to origin after every commit",
@@ -191,11 +198,13 @@ describe("formatStatus", () => {
     const data = makeStatusData({
       features: {
         "ci-watcher": {
+          value: true,
           enabled: true,
           source: "local-override",
           description: "Monitor CI after push",
         },
         autosync: {
+          value: false,
           enabled: false,
           source: "default",
           description: "Push to origin after every commit",
@@ -222,16 +231,19 @@ describe("formatStatus", () => {
       user: "nitsan",
       features: {
         "ci-watcher": {
+          value: false,
           enabled: false,
           source: "user-override",
           description: "Monitor CI",
         },
         autopull: {
+          value: true,
           enabled: true,
           source: "local-override",
           description: "Poll main",
         },
         autosync: {
+          value: false,
           enabled: false,
           source: "default",
           description: "Push after commit",
@@ -284,11 +296,13 @@ describe("formatStatusJson", () => {
     const data = makeStatusData();
     const parsed = JSON.parse(formatStatusJson(data));
     expect(parsed.features["ci-watcher"]).toEqual({
+      value: false,
       enabled: false,
       source: "user-override",
       description: "Monitor CI after push",
     });
     expect(parsed.features.autosync).toEqual({
+      value: false,
       enabled: false,
       source: "default",
       description: "Push to origin after every commit",
@@ -298,12 +312,13 @@ describe("formatStatusJson", () => {
   test("JSON structure matches spec", () => {
     const data = makeStatusData();
     const parsed = JSON.parse(formatStatusJson(data));
-    // Spec: { user, features: { [name]: { enabled, source, description } } }
+    // Spec: { user, features: { [name]: { value, enabled, source, description } } }
     expect(parsed).toHaveProperty("user");
     expect(parsed).toHaveProperty("features");
     expect(Object.keys(parsed)).toHaveLength(2);
     for (const [, info] of Object.entries(parsed.features)) {
       const fi = info as Record<string, unknown>;
+      expect(fi).toHaveProperty("value");
       expect(fi).toHaveProperty("enabled");
       expect(fi).toHaveProperty("source");
       expect(fi).toHaveProperty("description");
@@ -459,8 +474,8 @@ describe("resolveExitCode", () => {
 describe("buildSyncEntries", () => {
   test("returns one entry per feature", () => {
     const features: Record<string, FeatureInfo> = {
-      "ci-watcher": { enabled: true, source: "default" },
-      autosync: { enabled: false, source: "default" },
+      "ci-watcher": { value: true, enabled: true, source: "default" },
+      autosync: { value: false, enabled: false, source: "default" },
     };
     const entries = buildSyncEntries(features);
     expect(entries).toHaveLength(2);
@@ -468,7 +483,7 @@ describe("buildSyncEntries", () => {
 
   test("each entry has key and boolean value", () => {
     const features: Record<string, FeatureInfo> = {
-      "ci-watcher": { enabled: true, source: "default" },
+      "ci-watcher": { value: true, enabled: true, source: "default" },
     };
     const entries = buildSyncEntries(features);
     expect(entries[0]).toEqual({
@@ -479,8 +494,8 @@ describe("buildSyncEntries", () => {
 
   test("maps enabled state correctly", () => {
     const features: Record<string, FeatureInfo> = {
-      "ci-watcher": { enabled: true, source: "default" },
-      autosync: { enabled: false, source: "user-override" },
+      "ci-watcher": { value: true, enabled: true, source: "default" },
+      autosync: { value: false, enabled: false, source: "user-override" },
     };
     const entries = buildSyncEntries(features);
     const ciEntry = entries.find((e) => e.key === "ci-watcher");
@@ -496,9 +511,9 @@ describe("buildSyncEntries", () => {
 
   test("includes features from all sources", () => {
     const features: Record<string, FeatureInfo> = {
-      a: { enabled: true, source: "default" },
-      b: { enabled: false, source: "user-override" },
-      c: { enabled: true, source: "local-override" },
+      a: { value: true, enabled: true, source: "default" },
+      b: { value: false, enabled: false, source: "user-override" },
+      c: { value: true, enabled: true, source: "local-override" },
     };
     const entries = buildSyncEntries(features);
     expect(entries).toHaveLength(3);
@@ -510,8 +525,8 @@ describe("buildSyncEntries", () => {
 
   test("entries have key and value fields suitable for dry-run display", () => {
     const features: Record<string, FeatureInfo> = {
-      "ci-watcher": { enabled: true, source: "default" },
-      autosync: { enabled: false, source: "user-override" },
+      "ci-watcher": { value: true, enabled: true, source: "default" },
+      autosync: { value: false, enabled: false, source: "user-override" },
     };
     const entries = buildSyncEntries(features);
 

@@ -248,4 +248,3 @@ export function getValue(featureName: string, ctx: DxContext, user?: string | nu
   if (!feature) return undefined;
   return getFeature(featureName, ctx, user).value;
 }
-

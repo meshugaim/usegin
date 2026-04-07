@@ -730,9 +730,7 @@ describe("getFeature", () => {
   test("unknown feature returns enabled true with source 'default'", () => {
     const ctx = makeCtx();
     const result = getFeature("nonexistent", ctx, null);
-    expect(result.enabled).toBe(true);
-    // Source for unknown features — they're effectively defaults
-    expect(result.source).toBe("default");
+    expect(result).toEqual({ value: true, enabled: true, source: "default" });
   });
 
   test("resolves user automatically when user param is not provided", () => {

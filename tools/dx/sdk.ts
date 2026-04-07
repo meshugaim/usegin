@@ -13,6 +13,7 @@ import {
   resolveUser as coreResolveUser,
   isEnabled as coreIsEnabled,
   getFeature as coreGetFeature,
+  getValue as coreGetValue,
   allFeatures as coreAllFeatures,
   type DxConfig,
   type DxLocalConfig,
@@ -85,10 +86,7 @@ const dx = {
   isEnabled: (feature: string) => coreIsEnabled(feature, getContext()),
   resolveUser: () => coreResolveUser(getContext()),
   getFeature: (feature: string) => coreGetFeature(feature, getContext()),
-  getValue: (feature: string) => {
-    const info = coreGetFeature(feature, getContext());
-    return info.value;
-  },
+  getValue: (feature: string) => coreGetValue(feature, getContext()),
   allFeatures: () => coreAllFeatures(getContext()),
   reload,
   /** Escape hatch: get the raw context for advanced usage */

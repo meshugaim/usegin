@@ -10,6 +10,8 @@ import { describe, test, expect } from "bun:test";
 import {
   isEnabled,
   getFeature,
+  toEnabled,
+  getValue,
   type DxContext,
   type DxConfig,
 } from "./core";
@@ -76,40 +78,36 @@ function makeTypedConfig(overrides?: Partial<DxConfig>): DxConfig {
 // ===========================================================================
 
 describe("toEnabled — type coercion", () => {
-  // Lazy import: toEnabled does not exist yet
-  const lazyToEnabled = () =>
-    (require("./core") as { toEnabled: (v: any) => boolean }).toEnabled;
-
   test("true -> true", () => {
-    expect(lazyToEnabled()(true)).toBe(true);
+    expect(toEnabled(true)).toBe(true);
   });
 
   test("false -> false", () => {
-    expect(lazyToEnabled()(false)).toBe(false);
+    expect(toEnabled(false)).toBe(false);
   });
 
   test("non-empty string '10m' -> true", () => {
-    expect(lazyToEnabled()("10m")).toBe(true);
+    expect(toEnabled("10m")).toBe(true);
   });
 
   test("empty string '' -> false", () => {
-    expect(lazyToEnabled()("")).toBe(false);
+    expect(toEnabled("")).toBe(false);
   });
 
   test("non-zero number 42 -> true", () => {
-    expect(lazyToEnabled()(42)).toBe(true);
+    expect(toEnabled(42)).toBe(true);
   });
 
   test("zero 0 -> false", () => {
-    expect(lazyToEnabled()(0)).toBe(false);
+    expect(toEnabled(0)).toBe(false);
   });
 
   test("negative number -1 -> true (non-zero)", () => {
-    expect(lazyToEnabled()(-1)).toBe(true);
+    expect(toEnabled(-1)).toBe(true);
   });
 
   test("negative zero -0 -> false (JS: -0 === 0)", () => {
-    expect(lazyToEnabled()(-0)).toBe(false);
+    expect(toEnabled(-0)).toBe(false);
   });
 });
 
@@ -281,25 +279,19 @@ describe("isEnabled — backward compat with typed values", () => {
 // We test the core `getValue` function here as pure-function unit tests.
 // The SDK's `dx.getValue()` wraps this with context injection — see SDK tests.
 describe("getValue — typed value retrieval", () => {
-  // Lazy import: getValue does not exist yet
-  const lazyGetValue = () =>
-    (require("./core") as {
-      getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    }).getValue;
-
   test("boolean default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
-    expect(lazyGetValue()("ci-watcher", ctx, null)).toBe(true);
+    expect(getValue("ci-watcher", ctx, null)).toBe(true);
   });
 
   test("string default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
-    expect(lazyGetValue()("tips.show-duration", ctx, null)).toBe("10m");
+    expect(getValue("tips.show-duration", ctx, null)).toBe("10m");
   });
 
   test("number default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
-    expect(lazyGetValue()("tips.max-count", ctx, null)).toBe(42);
+    expect(getValue("tips.max-count", ctx, null)).toBe(42);
   });
 
   test("local override", () => {
@@ -311,7 +303,7 @@ describe("getValue — typed value retrieval", () => {
         },
       },
     });
-    expect(lazyGetValue()("tips.show-duration", ctx, null)).toBe("3m");
+    expect(getValue("tips.show-duration", ctx, null)).toBe("3m");
   });
 
   test("user override", () => {
@@ -326,7 +318,7 @@ describe("getValue — typed value retrieval", () => {
       },
     });
     const ctx = makeCtx({ config });
-    expect(lazyGetValue()("tips.max-count", ctx, "nitsan")).toBe(99);
+    expect(getValue("tips.max-count", ctx, "nitsan")).toBe(99);
   });
 
   test("unknown feature returns undefined", () => {
@@ -334,7 +326,7 @@ describe("getValue — typed value retrieval", () => {
     // Unknown features in isEnabled return true (enabled).
     // For getValue, the value should be undefined since there's no
     // typed default to return for an unregistered feature.
-    expect(lazyGetValue()("nonexistent-feature", ctx, null)).toBeUndefined();
+    expect(getValue("nonexistent-feature", ctx, null)).toBeUndefined();
   });
 
   test("three-layer resolution returns local override", () => {
@@ -356,7 +348,7 @@ describe("getValue — typed value retrieval", () => {
         },
       },
     });
-    expect(lazyGetValue()("tips.show-duration", ctx, "nitsan")).toBe("1m");
+    expect(getValue("tips.show-duration", ctx, "nitsan")).toBe("1m");
   });
 
   test("local override of string to empty string", () => {
@@ -368,7 +360,7 @@ describe("getValue — typed value retrieval", () => {
         },
       },
     });
-    expect(lazyGetValue()("tips.show-duration", ctx, null)).toBe("");
+    expect(getValue("tips.show-duration", ctx, null)).toBe("");
   });
 
   test("local override of number to zero", () => {
@@ -380,6 +372,6 @@ describe("getValue — typed value retrieval", () => {
         },
       },
     });
-    expect(lazyGetValue()("tips.max-count", ctx, null)).toBe(0);
+    expect(getValue("tips.max-count", ctx, null)).toBe(0);
   });
 });
