@@ -52,10 +52,21 @@ export function formatStatus(data: StatusData): string {
     const isOverridden =
       feat.source === "user-override" || feat.source === "local-override";
 
-    // State label: uppercase when overridden
-    let stateLabel = feat.enabled ? "on" : "off";
-    if (isOverridden) {
-      stateLabel = stateLabel.toUpperCase();
+    // State label: typed values for non-booleans, on/off for booleans
+    let stateLabel: string;
+    if (typeof feat.value === "boolean") {
+      // Boolean features: on/off, uppercase when overridden
+      stateLabel = feat.enabled ? "on" : "off";
+      if (isOverridden) {
+        stateLabel = stateLabel.toUpperCase();
+      }
+    } else {
+      // Non-boolean features: show the actual value
+      stateLabel = String(feat.value);
+      if (isOverridden) {
+        // Uppercase the string representation (no-op for numbers)
+        stateLabel = stateLabel.toUpperCase();
+      }
     }
 
     // Override marker (for quick visual scanning)

@@ -23,7 +23,7 @@ import dx from "../../sdk";
  * @param info Resolved feature info
  */
 export function formatResolve(_feature: string, info: FeatureInfo): string {
-  return info.enabled ? "true" : "false";
+  return String(info.value);
 }
 
 /**
@@ -35,6 +35,7 @@ export function formatResolveJson(feature: string, info: FeatureInfo): string {
   return JSON.stringify(
     {
       feature,
+      value: info.value,
       enabled: info.enabled,
       source: info.source,
     },

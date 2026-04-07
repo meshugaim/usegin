@@ -56,62 +56,62 @@ describe("parseCliValue", () => {
     }
   }
 
-  test.failing('"true" -> true (boolean)', () => {
+  test('"true" -> true (boolean)', () => {
     ensureImported();
     expect(parseCliValue("true")).toBe(true);
   });
 
-  test.failing('"false" -> false (boolean)', () => {
+  test('"false" -> false (boolean)', () => {
     ensureImported();
     expect(parseCliValue("false")).toBe(false);
   });
 
-  test.failing('"TRUE" -> true (case-insensitive)', () => {
+  test('"TRUE" -> true (case-insensitive)', () => {
     ensureImported();
     expect(parseCliValue("TRUE")).toBe(true);
   });
 
-  test.failing('"42" -> 42 (number)', () => {
+  test('"42" -> 42 (number)', () => {
     ensureImported();
     expect(parseCliValue("42")).toBe(42);
   });
 
-  test.failing('"0" -> 0 (number)', () => {
+  test('"0" -> 0 (number)', () => {
     ensureImported();
     expect(parseCliValue("0")).toBe(0);
   });
 
-  test.failing('"3.14" -> 3.14 (number)', () => {
+  test('"3.14" -> 3.14 (number)', () => {
     ensureImported();
     expect(parseCliValue("3.14")).toBe(3.14);
   });
 
-  test.failing('"-1" -> -1 (number)', () => {
+  test('"-1" -> -1 (number)', () => {
     ensureImported();
     expect(parseCliValue("-1")).toBe(-1);
   });
 
-  test.failing('"10m" -> "10m" (string — not a number)', () => {
+  test('"10m" -> "10m" (string — not a number)', () => {
     ensureImported();
     expect(parseCliValue("10m")).toBe("10m");
   });
 
-  test.failing('"" -> "" (empty string)', () => {
+  test('"" -> "" (empty string)', () => {
     ensureImported();
     expect(parseCliValue("")).toBe("");
   });
 
-  test.failing('"hello" -> "hello" (string)', () => {
+  test('"hello" -> "hello" (string)', () => {
     ensureImported();
     expect(parseCliValue("hello")).toBe("hello");
   });
 
-  test.failing('"Infinity" -> "Infinity" (string, not a number — Number.isFinite check)', () => {
+  test('"Infinity" -> "Infinity" (string, not a number — Number.isFinite check)', () => {
     ensureImported();
     expect(parseCliValue("Infinity")).toBe("Infinity");
   });
 
-  test.failing('"NaN" -> "NaN" (string, not a number)', () => {
+  test('"NaN" -> "NaN" (string, not a number)', () => {
     ensureImported();
     expect(parseCliValue("NaN")).toBe("NaN");
   });
@@ -129,19 +129,19 @@ describe("dx set — command structure", () => {
     return mod.buildSetCommand;
   }
 
-  test.failing("buildSetCommand returns a Command instance", () => {
+  test("buildSetCommand returns a Command instance", () => {
     const buildSetCommand = getBuildSetCommand();
     const cmd = buildSetCommand();
     expect(cmd).toBeInstanceOf(Command);
   });
 
-  test.failing("buildSetCommand has name 'set'", () => {
+  test("buildSetCommand has name 'set'", () => {
     const buildSetCommand = getBuildSetCommand();
     const cmd = buildSetCommand();
     expect(cmd.name()).toBe("set");
   });
 
-  test.failing("buildSetCommand accepts <feature> and <value> arguments", () => {
+  test("buildSetCommand accepts <feature> and <value> arguments", () => {
     const buildSetCommand = getBuildSetCommand();
     const cmd = buildSetCommand();
     const args = (cmd as any)._args;
@@ -150,14 +150,14 @@ describe("dx set — command structure", () => {
     expect(args[1].required).toBe(true);
   });
 
-  test.failing("buildSetCommand has --save option", () => {
+  test("buildSetCommand has --save option", () => {
     const buildSetCommand = getBuildSetCommand();
     const cmd = buildSetCommand();
     const saveOpt = cmd.options.find((o: any) => o.long === "--save");
     expect(saveOpt).toBeDefined();
   });
 
-  test.failing("buildSetCommand has --json option", () => {
+  test("buildSetCommand has --json option", () => {
     const buildSetCommand = getBuildSetCommand();
     const cmd = buildSetCommand();
     const jsonOpt = cmd.options.find((o: any) => o.long === "--json");
@@ -189,7 +189,7 @@ describe("dx set — format output", () => {
     return mod.formatSetResultJson;
   }
 
-  test.failing("reports string value in human output (local)", () => {
+  test("reports string value in human output (local)", () => {
     const formatSetResult = getFormatSetResult();
     const output = formatSetResult("tips.show-duration", "5m", false, null);
     // Per spec: dx: tips.show-duration = "5m" (local)
@@ -198,7 +198,7 @@ describe("dx set — format output", () => {
     expect(output).toContain("local");
   });
 
-  test.failing("reports number value in human output (local)", () => {
+  test("reports number value in human output (local)", () => {
     const formatSetResult = getFormatSetResult();
     const output = formatSetResult("tips.max-count", 42, false, null);
     expect(output).toContain("tips.max-count");
@@ -206,7 +206,7 @@ describe("dx set — format output", () => {
     expect(output).toContain("local");
   });
 
-  test.failing("reports boolean value in human output (local)", () => {
+  test("reports boolean value in human output (local)", () => {
     const formatSetResult = getFormatSetResult();
     const output = formatSetResult("ci-watcher", true, false, null);
     expect(output).toContain("ci-watcher");
@@ -214,7 +214,7 @@ describe("dx set — format output", () => {
     expect(output).toContain("local");
   });
 
-  test.failing("reports saved value with user in human output", () => {
+  test("reports saved value with user in human output", () => {
     const formatSetResult = getFormatSetResult();
     const output = formatSetResult("tips.show-duration", "5m", true, "nitsan");
     expect(output).toContain("tips.show-duration");
@@ -223,7 +223,7 @@ describe("dx set — format output", () => {
     expect(output).toContain("config.json");
   });
 
-  test.failing("JSON output includes feature, value, target", () => {
+  test("JSON output includes feature, value, target", () => {
     const formatSetResultJson = getFormatSetResultJson();
     const output = formatSetResultJson("tips.show-duration", "10m", false, null);
     const parsed = JSON.parse(output);
@@ -232,7 +232,7 @@ describe("dx set — format output", () => {
     expect(parsed.target).toBe("local");
   });
 
-  test.failing("JSON output for saved includes user", () => {
+  test("JSON output for saved includes user", () => {
     const formatSetResultJson = getFormatSetResultJson();
     const output = formatSetResultJson("tips.show-duration", "5m", true, "nitsan");
     const parsed = JSON.parse(output);
@@ -242,13 +242,13 @@ describe("dx set — format output", () => {
     expect(parsed.user).toBe("nitsan");
   });
 
-  test.failing("formatSetResultJson returns valid JSON", () => {
+  test("formatSetResultJson returns valid JSON", () => {
     const formatSetResultJson = getFormatSetResultJson();
     const output = formatSetResultJson("ci-watcher", true, false, null);
     expect(() => JSON.parse(output)).not.toThrow();
   });
 
-  test.failing("local (non-saved) output includes persistence hint", () => {
+  test("local (non-saved) output includes persistence hint", () => {
     const formatSetResult = getFormatSetResult();
     const output = formatSetResult("tips.show-duration", "5m", false, null);
     // Hint tells the user how to persist across environments
@@ -272,7 +272,7 @@ describe("dx set — typed persistence", () => {
   // signatures restrict to boolean — calling with a string/number should
   // be a type error that we bypass via the set module's own write path.
 
-  test.failing("set module writes string value to local config", () => {
+  test("set module writes string value to local config", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { writeTypedLocalOverride } = require("./commands/set");
     const localPath = join(tempDir, "config.local.json");
@@ -284,7 +284,7 @@ describe("dx set — typed persistence", () => {
     expect(content.overrides["tips.show-duration"]).toBe("10m");
   });
 
-  test.failing("set module writes number value to local config", () => {
+  test("set module writes number value to local config", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { writeTypedLocalOverride } = require("./commands/set");
     const localPath = join(tempDir, "config.local.json");
@@ -296,7 +296,7 @@ describe("dx set — typed persistence", () => {
     expect(content.overrides["tips.max-count"]).toBe(42);
   });
 
-  test.failing("set module writes boolean value to local config", () => {
+  test("set module writes boolean value to local config", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { writeTypedLocalOverride } = require("./commands/set");
     const localPath = join(tempDir, "config.local.json");
@@ -308,7 +308,7 @@ describe("dx set — typed persistence", () => {
     expect(content.overrides["ci-watcher"]).toBe(true);
   });
 
-  test.failing("set module writes typed value to user config via --save", () => {
+  test("set module writes typed value to user config via --save", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { writeTypedUserOverride } = require("./commands/set");
     const configPath = join(tempDir, "config.json");
@@ -328,7 +328,7 @@ describe("dx set — typed persistence", () => {
     expect(content.users.nitsan.overrides["tips.show-duration"]).toBe("5m");
   });
 
-  test.failing("creates local config file when it doesn't exist yet", () => {
+  test("creates local config file when it doesn't exist yet", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { writeTypedLocalOverride } = require("./commands/set");
     const localPath = join(tempDir, "config.local.json");
@@ -355,7 +355,7 @@ describe("dx resolve — typed output", () => {
   // For boolean features the output is identical — but for string/number
   // features the output changes.
 
-  test.failing('string feature "10m": outputs "10m" (not "true")', () => {
+  test('string feature "10m": outputs "10m" (not "true")', () => {
     // FeatureInfo already has `value` (added in Slice 1), but formatResolve
     // ignores it — it still returns `info.enabled ? "true" : "false"`.
     // This test fails because formatResolve doesn't USE `value` yet.
@@ -369,7 +369,7 @@ describe("dx resolve — typed output", () => {
     expect(output).toBe("10m");
   });
 
-  test.failing("number feature 42: outputs '42'", () => {
+  test("number feature 42: outputs '42'", () => {
     const info = {
       value: 42,
       enabled: true,
@@ -380,7 +380,7 @@ describe("dx resolve — typed output", () => {
     expect(output).toBe("42");
   });
 
-  test.failing("number feature 0: outputs '0' (not 'false')", () => {
+  test("number feature 0: outputs '0' (not 'false')", () => {
     const info = {
       value: 0,
       enabled: false,
@@ -391,7 +391,7 @@ describe("dx resolve — typed output", () => {
     expect(output).toBe("0");
   });
 
-  test.failing("empty string feature: outputs empty string (not 'false')", () => {
+  test("empty string feature: outputs empty string (not 'false')", () => {
     const info = {
       value: "",
       enabled: false,
@@ -402,7 +402,7 @@ describe("dx resolve — typed output", () => {
     expect(output).toBe("");
   });
 
-  test.failing("JSON mode: includes typed value field for string", () => {
+  test("JSON mode: includes typed value field for string", () => {
     const info = {
       value: "10m",
       enabled: true,
@@ -414,7 +414,7 @@ describe("dx resolve — typed output", () => {
     expect(parsed.value).toBe("10m");
   });
 
-  test.failing("JSON mode: includes typed value field for number", () => {
+  test("JSON mode: includes typed value field for number", () => {
     const info = {
       value: 42,
       enabled: true,
@@ -425,7 +425,7 @@ describe("dx resolve — typed output", () => {
     expect(parsed.value).toBe(42);
   });
 
-  test.failing("JSON mode: includes typed value field for boolean", () => {
+  test("JSON mode: includes typed value field for boolean", () => {
     const info = {
       value: true,
       enabled: true,
@@ -492,7 +492,7 @@ describe("dx status — typed display", () => {
   // "on"/"off" based on `enabled`, ignoring the `value` field entirely.
   // The type system is fine — FeatureInfo already carries `value` from Slice 1.
 
-  test.failing("string features show the actual value, not on/off", () => {
+  test("string features show the actual value, not on/off", () => {
     const data = makeTypedStatusData();
     const output = formatStatus(data);
     const lines = output.split("\n");
@@ -508,7 +508,7 @@ describe("dx status — typed display", () => {
     );
   });
 
-  test.failing("number features show the actual number, not on/off", () => {
+  test("number features show the actual number, not on/off", () => {
     const data = makeTypedStatusData();
     const output = formatStatus(data);
     const lines = output.split("\n");
@@ -520,7 +520,7 @@ describe("dx status — typed display", () => {
     expect(countLine!.replace("tips.max-count", "")).not.toMatch(/\bon\b/i);
   });
 
-  test.failing("overridden string features uppercase the value", () => {
+  test("overridden string features uppercase the value", () => {
     const data: StatusData = {
       user: "nitsan",
       features: {
@@ -541,7 +541,7 @@ describe("dx status — typed display", () => {
     expect(line).toContain("~");
   });
 
-  test.failing("overridden number features show ~ marker (uppercasing is a no-op)", () => {
+  test("overridden number features show ~ marker (uppercasing is a no-op)", () => {
     // For numbers, uppercasing is a no-op — the ~ marker is the only
     // visual indicator that the value is overridden.
     const data: StatusData = {
@@ -562,7 +562,7 @@ describe("dx status — typed display", () => {
     expect(line).toContain("~");
   });
 
-  test.failing("formatStatus uses typed value in display for string feature", () => {
+  test("formatStatus uses typed value in display for string feature", () => {
     // Build a real context with typed features, run through buildStatusData,
     // then format. After Slice 2, formatStatus should show "10m" not "on".
     const ctx = makeContext({
@@ -596,7 +596,7 @@ describe("dx status — typed display", () => {
     );
   });
 
-  test.failing("formatStatus uses typed value in display for number feature", () => {
+  test("formatStatus uses typed value in display for number feature", () => {
     const ctx = makeContext({
       config: makeConfig({
         features: {

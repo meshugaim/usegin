@@ -386,7 +386,7 @@ describe("formatResolve", () => {
   });
 
   test("returns 'false' for disabled feature", () => {
-    const info = makeFeatureInfo({ enabled: false });
+    const info = makeFeatureInfo({ value: false, enabled: false });
     const output = formatResolve("autosync", info);
     expect(output).toBe("false");
   });
@@ -394,7 +394,7 @@ describe("formatResolve", () => {
   test("output is purely the boolean string regardless of feature name", () => {
     // Finding #5: verify output doesn't include the feature name
     const enabledInfo = makeFeatureInfo({ enabled: true });
-    const disabledInfo = makeFeatureInfo({ enabled: false });
+    const disabledInfo = makeFeatureInfo({ value: false, enabled: false });
 
     const out1 = formatResolve("ci-watcher", enabledInfo);
     const out2 = formatResolve("some-other-feature", enabledInfo);
@@ -445,6 +445,7 @@ describe("formatResolveJson", () => {
     const parsed = JSON.parse(formatResolveJson("ci-watcher", info));
     expect(parsed).toEqual({
       feature: "ci-watcher",
+      value: true,
       enabled: true,
       source: "default",
     });
