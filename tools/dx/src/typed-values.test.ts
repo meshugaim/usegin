@@ -17,23 +17,15 @@ import {
   type DxContext,
   type DxConfig,
 } from "./core";
-import { makeConfig } from "./test-fixtures";
+import { makeConfig, makeContext } from "./test-fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a DxContext with sensible defaults (mirrors core.test.ts pattern). */
+/** Shorthand for makeContext with env: {} (no auto-resolved user). */
 function makeCtx(overrides?: Partial<DxContext>): DxContext {
-  return {
-    config: makeConfig(),
-    local: null,
-    env: {},
-    gitUserName: null,
-    gitUserEmail: null,
-    whoami: null,
-    ...overrides,
-  };
+  return makeContext({ env: {}, ...overrides });
 }
 
 /**
@@ -56,29 +48,29 @@ function makeTypedConfig(overrides?: Partial<DxConfig>): DxConfig {
       "tips.show-duration": {
         description: "How long a tip stays visible",
         mechanism: "tip statusline timing parameter",
-        default: "10m" as any, // typed value — not yet supported by types
+        default: "10m",
       },
       "tips.rest-duration": {
         description: "Quiet period between tips",
         mechanism: "tip statusline timing parameter",
-        default: "2h" as any,
+        default: "2h",
       },
       "tips.max-count": {
         description: "Maximum tips per session",
         mechanism: "tip counter limit",
-        default: 42 as any,
+        default: 42,
       },
       "tips.disabled-count": {
         description: "A zero-valued number feature",
         mechanism: "test",
-        default: 0 as any,
+        default: 0,
       },
       "tips.empty-string": {
         description: "An empty string feature",
         mechanism: "test",
-        default: "" as any,
+        default: "",
       },
-    },
+    } as any, // typed values — not yet supported by FeatureDefinition types
     ...overrides,
   });
 }
@@ -88,35 +80,40 @@ function makeTypedConfig(overrides?: Partial<DxConfig>): DxConfig {
 // ===========================================================================
 
 describe("toEnabled — type coercion", () => {
+  // Lazy import: toEnabled does not exist yet
+  const lazyToEnabled = () =>
+    (require("./core") as { toEnabled: (v: any) => boolean }).toEnabled;
+
   test.failing("true -> true", () => {
-    // Lazy import: toEnabled does not exist yet
-    const { toEnabled } = require("./core") as { toEnabled: (v: any) => boolean };
-    expect(toEnabled(true)).toBe(true);
+    expect(lazyToEnabled()(true)).toBe(true);
   });
 
   test.failing("false -> false", () => {
-    const { toEnabled } = require("./core") as { toEnabled: (v: any) => boolean };
-    expect(toEnabled(false)).toBe(false);
+    expect(lazyToEnabled()(false)).toBe(false);
   });
 
   test.failing("non-empty string '10m' -> true", () => {
-    const { toEnabled } = require("./core") as { toEnabled: (v: any) => boolean };
-    expect(toEnabled("10m")).toBe(true);
+    expect(lazyToEnabled()("10m")).toBe(true);
   });
 
   test.failing("empty string '' -> false", () => {
-    const { toEnabled } = require("./core") as { toEnabled: (v: any) => boolean };
-    expect(toEnabled("")).toBe(false);
+    expect(lazyToEnabled()("")).toBe(false);
   });
 
   test.failing("non-zero number 42 -> true", () => {
-    const { toEnabled } = require("./core") as { toEnabled: (v: any) => boolean };
-    expect(toEnabled(42)).toBe(true);
+    expect(lazyToEnabled()(42)).toBe(true);
   });
 
   test.failing("zero 0 -> false", () => {
-    const { toEnabled } = require("./core") as { toEnabled: (v: any) => boolean };
-    expect(toEnabled(0)).toBe(false);
+    expect(lazyToEnabled()(0)).toBe(false);
+  });
+
+  test.failing("negative number -1 -> true (non-zero)", () => {
+    expect(lazyToEnabled()(-1)).toBe(true);
+  });
+
+  test.failing("negative zero -0 -> false (JS: -0 === 0)", () => {
+    expect(lazyToEnabled()(-0)).toBe(false);
   });
 });
 
@@ -124,46 +121,49 @@ describe("toEnabled — type coercion", () => {
 // 2. getFeature with typed values
 // ===========================================================================
 
+// NOTE for Green phase: existing tests in core.test.ts use `toEqual` on
+// getFeature results without a `value` field. The implementer must update
+// those tests to include `value` when widening FeatureInfo.
 describe("getFeature — typed values", () => {
-  test.failing("boolean feature default returns { value: true, enabled: true, source: 'default' }", () => {
+  test.failing("boolean default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     const result = getFeature("ci-watcher", ctx, null);
     expect(result).toEqual({ value: true, enabled: true, source: "default" });
   });
 
-  test.failing("string feature default '10m' returns { value: '10m', enabled: true, source: 'default' }", () => {
+  test.failing("string default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     const result = getFeature("tips.show-duration", ctx, null);
     expect(result).toEqual({ value: "10m", enabled: true, source: "default" });
   });
 
-  test.failing("number feature default 42 returns { value: 42, enabled: true, source: 'default' }", () => {
+  test.failing("number default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     const result = getFeature("tips.max-count", ctx, null);
     expect(result).toEqual({ value: 42, enabled: true, source: "default" });
   });
 
-  test.failing("string feature with local override returns overridden value", () => {
+  test.failing("string local override", () => {
     const ctx = makeCtx({
       config: makeTypedConfig(),
       local: {
         overrides: {
-          "tips.show-duration": "5m" as any,
-        },
+          "tips.show-duration": "5m",
+        } as any,
       },
     });
     const result = getFeature("tips.show-duration", ctx, null);
     expect(result).toEqual({ value: "5m", enabled: true, source: "local-override" });
   });
 
-  test.failing("string feature with user override returns correct value and source", () => {
+  test.failing("string user override", () => {
     const config = makeTypedConfig({
       users: {
         nitsan: {
           aliases: ["Nitsan Avni", "nitsan-ona"],
           overrides: {
-            "tips.show-duration": "7m" as any,
-          },
+            "tips.show-duration": "7m",
+          } as any,
         },
       },
     });
@@ -172,14 +172,14 @@ describe("getFeature — typed values", () => {
     expect(result).toEqual({ value: "7m", enabled: true, source: "user-override" });
   });
 
-  test.failing("three-layer merge: default '10m' + user '5m' + local '1m' -> value is '1m'", () => {
+  test.failing("three-layer merge: local wins", () => {
     const config = makeTypedConfig({
       users: {
         nitsan: {
           aliases: ["Nitsan Avni", "nitsan-ona"],
           overrides: {
-            "tips.show-duration": "5m" as any,
-          },
+            "tips.show-duration": "5m",
+          } as any,
         },
       },
     });
@@ -187,27 +187,27 @@ describe("getFeature — typed values", () => {
       config,
       local: {
         overrides: {
-          "tips.show-duration": "1m" as any,
-        },
+          "tips.show-duration": "1m",
+        } as any,
       },
     });
     const result = getFeature("tips.show-duration", ctx, "nitsan");
     expect(result).toEqual({ value: "1m", enabled: true, source: "local-override" });
   });
 
-  test.failing("boolean false feature default returns { value: false, enabled: false, source: 'default' }", () => {
+  test.failing("boolean false default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     const result = getFeature("autosync", ctx, null);
     expect(result).toEqual({ value: false, enabled: false, source: "default" });
   });
 
-  test.failing("number 0 feature default returns { value: 0, enabled: false, source: 'default' }", () => {
+  test.failing("number zero default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     const result = getFeature("tips.disabled-count", ctx, null);
     expect(result).toEqual({ value: 0, enabled: false, source: "default" });
   });
 
-  test.failing("empty string feature default returns { value: '', enabled: false, source: 'default' }", () => {
+  test.failing("empty string default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     const result = getFeature("tips.empty-string", ctx, null);
     expect(result).toEqual({ value: "", enabled: false, source: "default" });
@@ -221,33 +221,33 @@ describe("getFeature — typed values", () => {
 describe("isEnabled — backward compat with typed values", () => {
   // This test passes today — boolean features already work.
   // It's here to guard against regressions when typed values land.
-  test("boolean feature returns boolean as before", () => {
+  test("boolean features unchanged", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     expect(isEnabled("ci-watcher", ctx, null)).toBe(true);
     expect(isEnabled("autosync", ctx, null)).toBe(false);
   });
 
-  test.failing("string feature '10m' returns true", () => {
+  test.failing("truthy string -> true", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     expect(isEnabled("tips.show-duration", ctx, null)).toBe(true);
   });
 
-  test.failing("number feature 0 returns false", () => {
+  test.failing("zero number -> false", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     expect(isEnabled("tips.disabled-count", ctx, null)).toBe(false);
   });
 
-  test.failing("empty string feature returns false", () => {
+  test.failing("empty string -> false", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     expect(isEnabled("tips.empty-string", ctx, null)).toBe(false);
   });
 
-  test.failing("non-zero number feature returns true", () => {
+  test.failing("non-zero number -> true", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     expect(isEnabled("tips.max-count", ctx, null)).toBe(true);
   });
 
-  test.failing("existing boolean features still resolve identically", () => {
+  test.failing("boolean overrides still resolve identically", () => {
     // The existing boolean features should work exactly the same
     // as they did before typed values were introduced.
     const config = makeTypedConfig({
@@ -282,86 +282,73 @@ describe("isEnabled — backward compat with typed values", () => {
 // 4. getValue — new function
 // ===========================================================================
 
+// We test the core `getValue` function here as pure-function unit tests.
+// The SDK's `dx.getValue()` wraps this with context injection — see SDK tests.
 describe("getValue — typed value retrieval", () => {
-  test.failing("returns boolean value for boolean feature", () => {
-    const { getValue } = require("./core") as {
+  // Lazy import: getValue does not exist yet
+  const lazyGetValue = () =>
+    (require("./core") as {
       getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    };
+    }).getValue;
+
+  test.failing("boolean default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
-    expect(getValue("ci-watcher", ctx, null)).toBe(true);
+    expect(lazyGetValue()("ci-watcher", ctx, null)).toBe(true);
   });
 
-  test.failing("returns string value for string feature", () => {
-    const { getValue } = require("./core") as {
-      getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    };
+  test.failing("string default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
-    expect(getValue("tips.show-duration", ctx, null)).toBe("10m");
+    expect(lazyGetValue()("tips.show-duration", ctx, null)).toBe("10m");
   });
 
-  test.failing("returns number value for number feature", () => {
-    const { getValue } = require("./core") as {
-      getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    };
+  test.failing("number default", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
-    expect(getValue("tips.max-count", ctx, null)).toBe(42);
+    expect(lazyGetValue()("tips.max-count", ctx, null)).toBe(42);
   });
 
-  test.failing("returns resolved value through local override", () => {
-    const { getValue } = require("./core") as {
-      getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    };
+  test.failing("local override", () => {
     const ctx = makeCtx({
       config: makeTypedConfig(),
       local: {
         overrides: {
-          "tips.show-duration": "3m" as any,
-        },
+          "tips.show-duration": "3m",
+        } as any,
       },
     });
-    expect(getValue("tips.show-duration", ctx, null)).toBe("3m");
+    expect(lazyGetValue()("tips.show-duration", ctx, null)).toBe("3m");
   });
 
-  test.failing("returns resolved value through user override", () => {
-    const { getValue } = require("./core") as {
-      getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    };
+  test.failing("user override", () => {
     const config = makeTypedConfig({
       users: {
         nitsan: {
           aliases: ["Nitsan Avni", "nitsan-ona"],
           overrides: {
-            "tips.max-count": 99 as any,
-          },
+            "tips.max-count": 99,
+          } as any,
         },
       },
     });
     const ctx = makeCtx({ config });
-    expect(getValue("tips.max-count", ctx, "nitsan")).toBe(99);
+    expect(lazyGetValue()("tips.max-count", ctx, "nitsan")).toBe(99);
   });
 
-  test.failing("unknown feature returns undefined (matches isEnabled's warn-and-default pattern)", () => {
-    const { getValue } = require("./core") as {
-      getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    };
+  test.failing("unknown feature returns undefined", () => {
     const ctx = makeCtx({ config: makeTypedConfig() });
     // Unknown features in isEnabled return true (enabled).
     // For getValue, the value should be undefined since there's no
     // typed default to return for an unregistered feature.
-    expect(getValue("nonexistent-feature", ctx, null)).toBeUndefined();
+    expect(lazyGetValue()("nonexistent-feature", ctx, null)).toBeUndefined();
   });
 
-  test.failing("three-layer resolution returns local override value", () => {
-    const { getValue } = require("./core") as {
-      getValue: (name: string, ctx: DxContext, user?: string | null) => any;
-    };
+  test.failing("three-layer resolution returns local override", () => {
     const config = makeTypedConfig({
       users: {
         nitsan: {
           aliases: ["Nitsan Avni", "nitsan-ona"],
           overrides: {
-            "tips.show-duration": "5m" as any,
-          },
+            "tips.show-duration": "5m",
+          } as any,
         },
       },
     });
@@ -369,10 +356,34 @@ describe("getValue — typed value retrieval", () => {
       config,
       local: {
         overrides: {
-          "tips.show-duration": "1m" as any,
-        },
+          "tips.show-duration": "1m",
+        } as any,
       },
     });
-    expect(getValue("tips.show-duration", ctx, "nitsan")).toBe("1m");
+    expect(lazyGetValue()("tips.show-duration", ctx, "nitsan")).toBe("1m");
+  });
+
+  test.failing("local override of string to empty string", () => {
+    const ctx = makeCtx({
+      config: makeTypedConfig(),
+      local: {
+        overrides: {
+          "tips.show-duration": "",
+        } as any,
+      },
+    });
+    expect(lazyGetValue()("tips.show-duration", ctx, null)).toBe("");
+  });
+
+  test.failing("local override of number to zero", () => {
+    const ctx = makeCtx({
+      config: makeTypedConfig(),
+      local: {
+        overrides: {
+          "tips.max-count": 0,
+        } as any,
+      },
+    });
+    expect(lazyGetValue()("tips.max-count", ctx, null)).toBe(0);
   });
 });
