@@ -1,8 +1,9 @@
 /**
  * dx namespace filtering — prefix-based feature filtering.
  *
- * Provides `filterByNamespace` for commands that accept an optional
- * [namespace] argument to scope their output to a subset of features.
+ * Provides `matchesNamespace` (predicate) and `filterByNamespace` (record filter)
+ * for commands that accept an optional [namespace] argument to scope their
+ * output to a subset of features.
  *
  * Matching rules:
  * - No namespace → return all features (pass-through)
@@ -12,6 +13,21 @@
  *
  * Part of: ENG-4688
  */
+
+/**
+ * Check whether a feature name belongs to a namespace.
+ *
+ * Matching is strict (dot-separated boundary):
+ * - Exact match: `matchesNamespace("ci-watcher", "ci-watcher")` → true
+ * - Prefix match: `matchesNamespace("tips.enabled", "tips")` → true
+ * - Partial word: `matchesNamespace("tips.enabled", "tip")` → false
+ *
+ * This is the single source of truth for namespace prefix matching.
+ * Used by `filterByNamespace` and the namespace-scoped clear functions in reset.ts.
+ */
+export function matchesNamespace(featureName: string, namespace: string): boolean {
+  return featureName === namespace || featureName.startsWith(namespace + ".");
+}
 
 /**
  * Filter a features record by namespace prefix.
@@ -34,11 +50,10 @@ export function filterByNamespace<T>(
     return features;
   }
 
-  const prefix = namespace + ".";
   const result: Record<string, T> = {};
 
   for (const key of Object.keys(features)) {
-    if (key === namespace || key.startsWith(prefix)) {
+    if (matchesNamespace(key, namespace)) {
       result[key] = features[key];
     }
   }

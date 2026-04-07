@@ -9,6 +9,7 @@
 
 import { Command } from "commander";
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { matchesNamespace } from "../namespace";
 import { dxShouldOutputJson } from "../output";
 import { autoSync } from "./sync";
 import { resolveWriteTarget, warnUnregisteredFeature } from "./write-target";
@@ -129,9 +130,8 @@ export function clearNamespaceLocalOverrides(
   const data = JSON.parse(raw);
 
   if (typeof data.overrides === "object" && data.overrides !== null) {
-    const prefix = namespace + ".";
     for (const key of Object.keys(data.overrides)) {
-      if (key === namespace || key.startsWith(prefix)) {
+      if (matchesNamespace(key, namespace)) {
         delete data.overrides[key];
       }
     }
@@ -160,9 +160,8 @@ export function clearNamespaceUserOverrides(
   }
 
   if (data.users[user].overrides) {
-    const prefix = namespace + ".";
     for (const key of Object.keys(data.users[user].overrides)) {
-      if (key === namespace || key.startsWith(prefix)) {
+      if (matchesNamespace(key, namespace)) {
         delete data.users[user].overrides[key];
       }
     }
@@ -177,15 +176,28 @@ export function clearNamespaceUserOverrides(
  * Examples:
  * - `"dx: reset to defaults (local)"`
  * - `"dx: reset ci-watcher to default (local)"`
+ * - `"dx: reset tips.* to defaults (local)"` (namespace reset)
  * - `"dx: reset to defaults for nitsan (saved)"`
  * - `"dx: reset ci-watcher to default for nitsan (saved)"`
+ *
+ * When `isNamespace` is true, the feature argument is a namespace prefix
+ * and the output uses `namespace.*` syntax with plural "defaults".
  */
 export function formatResetResult(
   feature: string | null,
   saved: boolean,
   user: string | null,
+  isNamespace = false,
 ): string {
-  const what = feature ? `${feature} to default` : "to defaults";
+  let what: string;
+  if (feature && isNamespace) {
+    what = `${feature}.* to defaults`;
+  } else if (feature) {
+    what = `${feature} to default`;
+  } else {
+    what = "to defaults";
+  }
+
   const who = saved && user ? ` for ${user}` : "";
   const where = saved ? "(saved)" : "(local)";
 
@@ -206,7 +218,8 @@ export function formatResetResult(
  * Format the result of a reset operation as JSON.
  *
  * Returns a JSON string with `{feature, target, user?}`.
- * - `feature` is the feature name, or `"*"` when all features are reset.
+ * - `feature` is the feature name, `"namespace.*"` for namespace resets,
+ *   or `"*"` when all features are reset.
  * - `target` is `"local"` or `"config"` based on `saved`.
  * - `user` is included only when saved AND user is non-null.
  */
@@ -214,10 +227,18 @@ export function formatResetResultJson(
   feature: string | null,
   saved: boolean,
   user: string | null,
+  isNamespace = false,
 ): string {
+  let featureField: string;
+  if (feature && isNamespace) {
+    featureField = `${feature}.*`;
+  } else {
+    featureField = feature ?? "*";
+  }
+
   return JSON.stringify(
     {
-      feature: feature ?? "*",
+      feature: featureField,
       target: saved ? "config" : "local",
       ...(saved && user ? { user } : {}),
     },
@@ -252,23 +273,51 @@ export function buildResetCommand(): Command {
     const useJson = dxShouldOutputJson(opts);
     const ctx = dx.getContext();
 
-    if (feature) {
-      warnUnregisteredFeature(feature, ctx);
-    }
-
     const target = resolveWriteTarget(ctx, !!opts.save, {
       fallbackMessage: "dx: resetting local overrides instead.",
     });
 
-    if (target.saved) {
-      if (feature) {
-        clearUserOverride(target.configPath, target.user, feature);
+    // Resolve the argument per the spec's 4-step disambiguation:
+    // 1. Exact feature match -> single feature reset
+    // 2. Exact + prefix of others -> exact match wins (single feature)
+    // 3. Prefix only (no exact match) -> namespace reset
+    // 4. No match -> warn, no-op
+    let isNamespace = false;
+
+    if (feature) {
+      const isExact = feature in ctx.config.features;
+      const hasNamespaceMatches = Object.keys(ctx.config.features).some(
+        (k) => k !== feature && matchesNamespace(k, feature),
+      );
+
+      if (isExact) {
+        // Steps 1 & 2: exact match (wins over namespace)
+        if (target.saved) {
+          clearUserOverride(target.configPath, target.user, feature);
+        } else {
+          clearLocalOverride(target.localPath, feature);
+        }
+      } else if (hasNamespaceMatches) {
+        // Step 3: namespace prefix, no exact match
+        isNamespace = true;
+        if (target.saved) {
+          clearNamespaceUserOverrides(target.configPath, target.user, feature);
+        } else {
+          clearNamespaceLocalOverrides(target.localPath, feature);
+        }
       } else {
-        clearAllUserOverrides(target.configPath, target.user);
+        // Step 4: matches nothing — warn
+        warnUnregisteredFeature(feature, ctx);
+        if (target.saved) {
+          clearUserOverride(target.configPath, target.user, feature);
+        } else {
+          clearLocalOverride(target.localPath, feature);
+        }
       }
     } else {
-      if (feature) {
-        clearLocalOverride(target.localPath, feature);
+      // No argument: reset all overrides (existing behavior)
+      if (target.saved) {
+        clearAllUserOverrides(target.configPath, target.user);
       } else {
         clearAllLocalOverrides(target.localPath);
       }
@@ -278,11 +327,11 @@ export function buildResetCommand(): Command {
 
     if (useJson) {
       process.stdout.write(
-        formatResetResultJson(feature ?? null, target.saved, target.user) + "\n",
+        formatResetResultJson(feature ?? null, target.saved, target.user, isNamespace) + "\n",
       );
     } else {
       process.stderr.write(
-        formatResetResult(feature ?? null, target.saved, target.user) + "\n",
+        formatResetResult(feature ?? null, target.saved, target.user, isNamespace) + "\n",
       );
     }
   });

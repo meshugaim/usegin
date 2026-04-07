@@ -17,7 +17,7 @@ import { join } from "path";
 import { makeConfig, makeContext } from "./test-fixtures";
 import type { FeatureInfo } from "./core";
 
-// --- Existing exports (static imports) ---
+import { filterByNamespace } from "./namespace";
 import {
   buildStatusCommand,
   buildStatusData,
@@ -29,6 +29,8 @@ import {
 import {
   buildResetCommand,
   clearAllLocalOverrides,
+  clearNamespaceLocalOverrides,
+  clearNamespaceUserOverrides,
 } from "./commands/reset";
 
 // ===========================================================================
@@ -36,21 +38,7 @@ import {
 // ===========================================================================
 
 describe("filterByNamespace", () => {
-  // Lazy import: filterByNamespace doesn't exist yet.
-  // We import inside each test to get a clear "module not found" or
-  // "not a function" error — the Red signal.
-  function getFilterByNamespace(): (
-    features: Record<string, unknown>,
-    namespace: string | undefined,
-  ) => Record<string, unknown> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require("./namespace");
-    return mod.filterByNamespace;
-  }
-
   test("returns only keys starting with 'tips.' when namespace is 'tips'", () => {
-    const filterByNamespace = getFilterByNamespace();
-
     const features: Record<string, FeatureInfo> = {
       "ci-watcher": { value: true, enabled: true, source: "default" },
       "tips.enabled": { value: true, enabled: true, source: "default" },
@@ -70,8 +58,6 @@ describe("filterByNamespace", () => {
   });
 
   test("returns all keys when namespace is undefined (no filter)", () => {
-    const filterByNamespace = getFilterByNamespace();
-
     const features: Record<string, FeatureInfo> = {
       "ci-watcher": { value: true, enabled: true, source: "default" },
       "tips.enabled": { value: true, enabled: true, source: "default" },
@@ -85,8 +71,6 @@ describe("filterByNamespace", () => {
   });
 
   test("returns empty when namespace matches nothing", () => {
-    const filterByNamespace = getFilterByNamespace();
-
     const features: Record<string, FeatureInfo> = {
       "ci-watcher": { value: true, enabled: true, source: "default" },
       "tips.enabled": { value: true, enabled: true, source: "default" },
@@ -97,8 +81,6 @@ describe("filterByNamespace", () => {
   });
 
   test("exact match: 'ci-watcher' returns only 'ci-watcher'", () => {
-    const filterByNamespace = getFilterByNamespace();
-
     const features: Record<string, FeatureInfo> = {
       "ci-watcher": { value: true, enabled: true, source: "default" },
       "tips.enabled": { value: true, enabled: true, source: "default" },
@@ -110,8 +92,6 @@ describe("filterByNamespace", () => {
   });
 
   test("does not match partial prefixes without dot separator: 'tip' does not match 'tips.enabled'", () => {
-    const filterByNamespace = getFilterByNamespace();
-
     const features: Record<string, FeatureInfo> = {
       "tips.enabled": { value: true, enabled: true, source: "default" },
       "tipster": { value: false, enabled: false, source: "default" },
@@ -124,8 +104,6 @@ describe("filterByNamespace", () => {
   });
 
   test("when namespace is both an exact feature name and a prefix, returns exact + prefixed", () => {
-    const filterByNamespace = getFilterByNamespace();
-
     // "tips" is both a registered feature AND a prefix of tips.* features.
     // filterByNamespace should return all matches — the disambiguation
     // (exact-match-wins) is the reset command's responsibility, not this function.
@@ -348,8 +326,6 @@ describe("dx reset — namespace behavior", () => {
       }),
     );
 
-    // Lazy import: clearNamespaceLocalOverrides doesn't exist yet
-    const { clearNamespaceLocalOverrides } = require("./commands/reset");
     clearNamespaceLocalOverrides(localPath, "tips");
 
     const result = JSON.parse(readFileSync(localPath, "utf-8"));
@@ -408,7 +384,6 @@ describe("dx reset — namespace behavior", () => {
       }),
     );
 
-    const { clearNamespaceUserOverrides } = require("./commands/reset");
     clearNamespaceUserOverrides(configPath, "nitsan", "tips");
 
     const result = JSON.parse(readFileSync(configPath, "utf-8"));
@@ -433,7 +408,6 @@ describe("dx reset — namespace behavior", () => {
       }),
     );
 
-    const { clearNamespaceLocalOverrides } = require("./commands/reset");
     clearNamespaceLocalOverrides(localPath, "nonexistent");
 
     const result = JSON.parse(readFileSync(localPath, "utf-8"));
