@@ -260,3 +260,143 @@ export function formatTipList(tips: Tip[]): string {
 
   return lines.join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Statusline types
+// ---------------------------------------------------------------------------
+
+export interface StatuslineState {
+  state: "showing" | "resting";
+  tip_handle: string;
+  transitioned_at: number;
+}
+
+export interface StatuslineContext {
+  now: number;
+  state: StatuslineState | null;
+  tips: Tip[];
+  showDuration: number;
+  restDuration: number;
+  enabled: boolean;
+}
+
+export interface StatuslineResult {
+  output: string;
+  newState: StatuslineState;
+}
+
+// ---------------------------------------------------------------------------
+// Duration parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a human-friendly duration string into milliseconds.
+ *
+ * Supports `Nm` (minutes) and `Nh` (hours) where N is a non-negative integer.
+ * Returns null for unrecognised formats.
+ */
+export function parseDuration(value: string): number | null {
+  const match = value.match(/^(\d+)(m|h)$/);
+  if (!match) return null;
+
+  const amount = parseInt(match[1]!, 10);
+  const unit = match[2]!;
+
+  if (unit === "m") return amount * 60 * 1000;
+  if (unit === "h") return amount * 60 * 60 * 1000;
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Statusline state machine
+// ---------------------------------------------------------------------------
+
+/**
+ * Pure function implementing the show/rest state machine for `tip statusline`.
+ *
+ * State transitions:
+ *   - No prior state → pick a random tip, enter SHOWING
+ *   - SHOWING within window → return the same tip
+ *   - SHOWING expired → transition to RESTING (empty output)
+ *   - RESTING within window → return empty
+ *   - RESTING expired → pick a new tip, enter SHOWING
+ *
+ * Edge cases:
+ *   - disabled → always empty output, preserve existing state
+ *   - empty tips → always empty output
+ */
+export function resolveStatusline(context: StatuslineContext): StatuslineResult {
+  const { now, state, tips, showDuration, restDuration, enabled } = context;
+
+  // Disabled: return empty, preserve state as-is
+  if (!enabled) {
+    const preservedState = state ?? {
+      state: "resting" as const,
+      tip_handle: "",
+      transitioned_at: now,
+    };
+    return { output: "", newState: preservedState };
+  }
+
+  // No tips available: nothing to show
+  if (tips.length === 0) {
+    const preservedState = state ?? {
+      state: "resting" as const,
+      tip_handle: "",
+      transitioned_at: now,
+    };
+    return { output: "", newState: preservedState };
+  }
+
+  // First call — no prior state: start showing a random tip
+  if (state === null) {
+    const tip = pickRandom(tips)!;
+    return {
+      output: tip.title,
+      newState: {
+        state: "showing",
+        tip_handle: tip.handle,
+        transitioned_at: now,
+      },
+    };
+  }
+
+  const elapsed = now - state.transitioned_at;
+
+  if (state.state === "showing") {
+    if (elapsed < showDuration) {
+      // Still within show window — return the same tip
+      const tip = tips.find((t) => t.handle === state.tip_handle);
+      const output = tip ? tip.title : "";
+      return { output, newState: state };
+    }
+
+    // Show window expired → transition to resting
+    return {
+      output: "",
+      newState: {
+        state: "resting",
+        tip_handle: state.tip_handle,
+        transitioned_at: now,
+      },
+    };
+  }
+
+  // state.state === "resting"
+  if (elapsed < restDuration) {
+    // Still within rest window — stay quiet
+    return { output: "", newState: state };
+  }
+
+  // Rest window expired → show a new tip
+  const tip = pickRandom(tips)!;
+  return {
+    output: tip.title,
+    newState: {
+      state: "showing",
+      tip_handle: tip.handle,
+      transitioned_at: now,
+    },
+  };
+}

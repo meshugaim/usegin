@@ -96,27 +96,27 @@ const ALL_TIPS: Tip[] = [TIP_SPOTLIGHT, TIP_SESSION, TIP_DAYBOOK];
 // =============================================================================
 
 describe("parseDuration", () => {
-  test.failing("ENG-4581: parses minutes — 10m to 600000ms", async () => {
+  test("ENG-4581: parses minutes — 10m to 600000ms", async () => {
     const parseDuration = await lazyParseDuration();
     expect(parseDuration("10m")).toBe(600_000);
   });
 
-  test.failing("ENG-4581: parses hours — 2h to 7200000ms", async () => {
+  test("ENG-4581: parses hours — 2h to 7200000ms", async () => {
     const parseDuration = await lazyParseDuration();
     expect(parseDuration("2h")).toBe(7_200_000);
   });
 
-  test.failing("ENG-4581: parses minutes — 30m to 1800000ms", async () => {
+  test("ENG-4581: parses minutes — 30m to 1800000ms", async () => {
     const parseDuration = await lazyParseDuration();
     expect(parseDuration("30m")).toBe(1_800_000);
   });
 
-  test.failing("ENG-4581: returns null for invalid input", async () => {
+  test("ENG-4581: returns null for invalid input", async () => {
     const parseDuration = await lazyParseDuration();
     expect(parseDuration("invalid")).toBeNull();
   });
 
-  test.failing("ENG-4581: parses zero minutes — 0m to 0", async () => {
+  test("ENG-4581: parses zero minutes — 0m to 0", async () => {
     const parseDuration = await lazyParseDuration();
     expect(parseDuration("0m")).toBe(0);
   });
@@ -131,7 +131,7 @@ describe("resolveStatusline", () => {
   const SHOW_DURATION = 600_000; // 10m
   const REST_DURATION = 7_200_000; // 2h
 
-  test.failing(
+  test(
     "ENG-4581: first call (no prior state) returns tip one-liner, state = SHOWING",
     async () => {
       const resolveStatusline = await lazyResolveStatusline();
@@ -155,7 +155,7 @@ describe("resolveStatusline", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4581: during show window returns same tip",
     async () => {
       const resolveStatusline = await lazyResolveStatusline();
@@ -184,7 +184,7 @@ describe("resolveStatusline", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4581: show window expired transitions to RESTING, returns empty",
     async () => {
       const resolveStatusline = await lazyResolveStatusline();
@@ -211,7 +211,7 @@ describe("resolveStatusline", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4581: during rest window returns empty string",
     async () => {
       const resolveStatusline = await lazyResolveStatusline();
@@ -238,7 +238,7 @@ describe("resolveStatusline", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4581: rest window expired transitions to SHOWING with new tip",
     async () => {
       const resolveStatusline = await lazyResolveStatusline();
@@ -267,7 +267,7 @@ describe("resolveStatusline", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4581: disabled returns empty string regardless of state",
     async () => {
       const resolveStatusline = await lazyResolveStatusline();
@@ -290,7 +290,7 @@ describe("resolveStatusline", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-4581: empty tips array returns empty string",
     async () => {
       const resolveStatusline = await lazyResolveStatusline();
@@ -314,7 +314,7 @@ describe("resolveStatusline", () => {
 // =============================================================================
 
 describe("CLI: tip statusline", () => {
-  test.failing("ENG-4581: tip statusline exits 0 and returns one-liner or empty", () => {
+  test("ENG-4581: tip statusline exits 0 and returns one-liner or empty", () => {
     const { stdout, stderr, exitCode } = runCli("statusline");
 
     expect(exitCode).toBe(0);

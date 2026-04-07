@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { join, dirname } from "path";
+import { readFileSync, writeFileSync } from "fs";
 import {
   loadTips,
   pickRandom,
@@ -10,7 +11,10 @@ import {
   findByRef,
   formatTipList,
   allTags,
+  parseDuration,
+  resolveStatusline,
 } from "./core";
+import type { StatuslineState } from "./core";
 
 // Resolve the tips directory: from src/ go up to tools/tips/, then into tips/
 const tipsDir = join(dirname(import.meta.dir), "tips");
@@ -72,6 +76,84 @@ program
     }
 
     console.log(formatTipList(matches));
+  });
+
+// ── statusline ─────────────────────────────────────────────────────────────
+
+const STATE_FILE = "/tmp/tip-statusline-state.json";
+
+/** Shell out to `dx resolve <param>` and return the parsed JSON value, or null on failure. */
+function dxResolve(param: string): unknown {
+  try {
+    const result = Bun.spawnSync({
+      cmd: ["dx", "resolve", param],
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (result.exitCode !== 0) return null;
+    const raw = result.stdout.toString().trim();
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Read the statusline state file, returning null if missing or corrupt. */
+function readStateFile(): StatuslineState | null {
+  try {
+    const raw = readFileSync(STATE_FILE, "utf-8");
+    return JSON.parse(raw) as StatuslineState;
+  } catch {
+    return null;
+  }
+}
+
+/** Atomically write the statusline state file. */
+function writeStateFile(state: StatuslineState): void {
+  writeFileSync(STATE_FILE, JSON.stringify(state) + "\n");
+}
+
+program
+  .command("statusline")
+  .description("Return a one-liner tip for the status line (or empty)")
+  .action(() => {
+    // 1. Check if tips are enabled via dx
+    const enabledRaw = dxResolve("tips.enabled");
+    const enabled = enabledRaw === null ? true : Boolean(enabledRaw);
+
+    // 2. Read persisted state
+    const state = readStateFile();
+
+    // 3. Resolve show/rest durations from dx (defaults: 10m, 2h)
+    const showRaw = dxResolve("tips.show-duration");
+    const restRaw = dxResolve("tips.rest-duration");
+    const showDuration =
+      (typeof showRaw === "string" ? parseDuration(showRaw) : null) ?? 600_000;
+    const restDuration =
+      (typeof restRaw === "string" ? parseDuration(restRaw) : null) ??
+      7_200_000;
+
+    // 4. Load tips
+    const tips = loadTips(tipsDir);
+
+    // 5. Resolve the state machine
+    const result = resolveStatusline({
+      now: Date.now(),
+      state,
+      tips,
+      showDuration,
+      restDuration,
+      enabled,
+    });
+
+    // 6. Write new state
+    writeStateFile(result.newState);
+
+    // 7. Print output (may be empty)
+    if (result.output) {
+      console.log(result.output);
+    }
   });
 
 // ── default action (no subcommand) ─────────────────────────────────────────
