@@ -37,6 +37,21 @@ For example, if you're working on frontend code that needs a running dev server,
 
 If you're unsure which environments are relevant, ask — but err on the side of reading more rather than guessing.
 
+#### Dev Server Setup by Environment
+
+The right dev server command depends on **who needs to access the app** and **where you're running**:
+
+| Scenario | Command | Ports | `bun set-env` flags |
+|----------|---------|-------|---------------------|
+| **Human accessing app in Gitpod** | `just dev` | 3000 / 8000 | `--supabase local --urls gitpod` |
+| **Human accessing app in Codespaces** | `just dev` | 3000 / 8000 | `--supabase local --urls codespaces` |
+| **Agent-only browser testing (playwright-cli)** | `just agent-dev` | 63000 / 58000 | `--supabase local --urls localhost --ports agent-dev` |
+| **Human accessing app locally** | `just dev` | 3000 / 8000 | `--supabase local --urls localhost` |
+
+**Why this matters in Gitpod/Codespaces:** Only standard ports (3000, 8000) are exposed through the platform's port proxy. Agent-dev ports (63000, 58000) are **not forwarded** — the human will get "Service Unavailable" if you start `just agent-dev` and give them a Gitpod URL. Use `just agent-dev` only when the agent itself is driving the browser via `playwright-cli` (which connects locally).
+
+**When pairing interactively with a human**, default to `just dev` with the appropriate `--urls` flag for the platform. Ask the human if you're unsure which platform you're on — check `$GITPOD_WORKSPACE_URL` (Gitpod) or `$CODESPACE_NAME` (Codespaces) to detect automatically.
+
 ### 2. Spawn a Companion
 
 Spawn a companion to watch your quality. It runs in the background and keeps you honest.
