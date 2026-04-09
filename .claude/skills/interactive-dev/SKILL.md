@@ -1,6 +1,6 @@
 ---
 name: interactive-dev
-description: Interactive development with a human developer. Senior-dev mindset — thinks holistically about architecture, UX, security, and connections before and during implementation. TDD, companion-watched, alignment-first. Use this skill when the user wants to pair on development work, build something together interactively, or wants a thoughtful development partner rather than an autonomous agent. Triggered by "let's work on this together", "interactive dev", "pair with me", "let's build", or "/interactive-dev".
+description: Interactive pairing with a human developer — the human drives, Claude thinks ahead and writes code. Deep investigation before implementation (trace full code paths, check boundaries, verify assumptions). Self-verification after implementation (browser testing via playwright-cli, API calls, DB queries — not just "tests pass"). TDD, companion-watched, alignment-first. Use this skill when the user wants to pair on building or fixing something together, work through an implementation interactively, or wants a thoughtful development partner in the loop rather than an autonomous agent. The key signal is the human wanting to collaborate and stay involved — "let's work on this together", "pair with me", "let's build X", "work through this with me", "interactive dev", or "/interactive-dev". Do NOT use for: autonomous tasks ("go implement X, I'll check back"), bug reports without pairing intent ("X is broken" → use fix-bug), PR reviews, spec writing, or CI investigation.
 ---
 
 # Interactive Development
@@ -67,7 +67,9 @@ Gold standard for the companion:
 - Alignment: confirming approach with the human before implementing
 - Scope: doing what was agreed, not drifting
 - Holistic thinking: raising UI, UX, security, architecture implications — not just the narrow task
-- Not rushing: thinking before coding, not just producing output
+- Deep investigation: traced the full code path before implementing, not guessing
+- Self-verification: actually tested the feature (browser, API, DB) — not just "tests pass"
+- No half-work: when something didn't work, investigated root cause instead of guessing at patches
 ```
 
 Check in with the companion after meaningful milestones — a completed feature, a refactor, a significant decision. Every 3-5 TDD cycles as a cadence baseline.
@@ -143,6 +145,85 @@ bun test:integration              # If you touched DB/service code
 uv run pytest                     # Unit tests
 uv run pytest tests/integration/  # Integration tests
 ```
+
+### Go Deep — Understand Before You Build
+
+The most common failure mode isn't broken code — it's code with bugs that could have been avoided by understanding the problem more deeply. Tests pass, the code compiles, but the feature doesn't actually work right because you didn't fully understand the data flow, the schema, or the existing behavior before changing things.
+
+Borrow from the fix-bug skill's investigation discipline — it applies to feature work just as much as bug fixes:
+
+#### Investigate before implementing
+
+Before writing implementation code, trace the full path your change will touch:
+
+1. **Read the code path end-to-end.** Not just the function you're changing — follow the data from entry point to final destination. If you're adding a column, trace who reads it, who writes it, what triggers fire, what RLS policies apply. If you're adding a UI component, trace where the data comes from, what transformations happen, what loading/error states exist.
+
+2. **Check the boundaries.** Most bugs live at boundaries: between frontend and API, between API and database, between what you assume and what actually happens. Read the types on both sides. Check for mismatches — nullable fields treated as required, arrays that might be empty, timestamps in different zones.
+
+3. **Question your assumptions.** Before implementing, state what you believe to be true about the system. Then verify. "This column is non-null" — check the schema. "This function is only called from X" — grep for it. "This state can't happen" — are you sure? Unverified assumptions are where bugs hide.
+
+4. **Go as wide as needed.** If your change touches something shared (a utility, a type, an API endpoint), check all the consumers. A change that works for your use case but breaks three others is net-negative. `grep` is cheap — use it.
+
+The depth of investigation should match the complexity of the change. A one-line copy fix needs a glance. A new API endpoint needs you to understand the auth model, the data model, the error handling patterns, and who will consume it. Match the effort to the risk.
+
+#### Root cause thinking — even for features
+
+When something doesn't work the way you expected during implementation, resist the urge to patch it and move on. Apply the same root cause discipline from the fix-bug skill:
+
+```
+What I expected: [X]
+What actually happened: [Y]
+Why: [root cause — not "I don't know", actually trace it]
+```
+
+If you can't explain the "Why", you don't understand the system well enough yet. Keep reading. The time spent understanding now prevents two more iterations later.
+
+### Verify Your Own Work
+
+This is the single most important habit. Code that passes tests but hasn't been verified in context will have bugs — bugs that are obvious the moment someone actually uses the feature. Don't make the human find them. Find them yourself.
+
+#### Self-verification is not optional
+
+After implementing a feature or fix, **actually check that it works** — not by reading the code, not by running tests alone, but by exercising the real behavior:
+
+- **For UI changes**: Open the browser using `playwright-cli` (see `manual-testing-by-agent` skill). Navigate to the page. Click through the flow. Check every state — loading, empty, error, full. Take a snapshot and verify the accessibility tree makes sense.
+
+  ```bash
+  bunx playwright-cli snapshot          # See what's actually rendered
+  bunx playwright-cli click <ref>       # Interact with it
+  bunx playwright-cli snapshot          # Verify the result
+  ```
+
+- **For API changes**: Call the endpoint. Check the response shape, status codes, error cases. Don't just test the happy path — send bad input, missing auth, edge-case values.
+
+  ```bash
+  curl -s http://localhost:58000/api/your-endpoint | jq .
+  ```
+
+- **For database changes**: Query the actual data. Check that migrations apply, constraints hold, triggers fire correctly.
+
+  ```bash
+  docker exec -i supabase_db_test-mvp psql -U postgres -c "SELECT ..."
+  ```
+
+- **For cross-cutting changes**: Verify at every layer. A new column means checking: migration applies, API returns it, frontend renders it, RLS allows access.
+
+#### The verification loop
+
+```
+implement → run tests → self-verify in browser/API → find issues → fix → re-verify → done
+```
+
+Not:
+```
+implement → run tests → "looks good" → done → human finds bugs
+```
+
+The difference between these two loops is one round of `playwright-cli snapshot` or one `curl` command. That's the cost. The benefit is catching the bugs yourself instead of making the human find them for you, iteration after iteration.
+
+#### When verification reveals problems
+
+When you find something wrong during self-verification, don't just patch the symptom. Go back to "Investigate before implementing" — trace why it's wrong, understand the root cause, fix it properly. This is where the "half-work loop" happens: you see a bug, slap a quick fix, create a new bug, slap another fix. Each iteration feels productive but you're not converging. Stop. Read the code. Understand what's actually happening. Then fix it once, correctly.
 
 ### Code Quality is Non-Negotiable
 
