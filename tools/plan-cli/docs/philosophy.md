@@ -16,6 +16,8 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 **The plan is for us too**: Let's keep it legible, well connected, up to date.
 
+**Shared API key**: You, other agents, and the human share one Linear API key, so every author/assignee field shows the same user. Treat issues as team-owned (people focus on distinct things), and check git history when real attribution matters. See `plan docs show attribution`.
+
 **The graph**: Work lives in a web of connected issues. When creating, connect it to existing items - `--parent` for sub-issues, `--related-to` for loose connections. This means, first start by familiarizing with the existing `plan list`. Standalone issues are rare.
 
 **Ordering**: The order of issues is a rough understanding of how we think execution should be sequenced. Focus on what's at the top. The rest will shift as things become clearer.
