@@ -325,6 +325,19 @@ describe("formatTipStatusline", () => {
     const line = formatTipStatusline(TIP_SPOTLIGHT);
     expect(line).not.toContain("\n");
   });
+
+  test("ENG-4894: 'tip show <handle>' is rendered as inline code (bg color)", () => {
+    // The command should pop visually as a copy-paste-able snippet, not blend
+    // in with the surrounding dim text. We enforce that by requiring a
+    // 256-color background escape (`\x1b[48;5;<n>m`) in the raw output, which
+    // distinguishes the command segment from the dim-wrapped context segment.
+    const raw = formatTipStatusline(TIP_SPOTLIGHT);
+    expect(raw).toMatch(/\x1b\[48;5;\d+/);
+
+    // And the command text itself must still be present after ANSI stripping.
+    const stripped = stripAnsi(raw);
+    expect(stripped).toContain("tip show spotlight-traces");
+  });
 });
 
 // =============================================================================

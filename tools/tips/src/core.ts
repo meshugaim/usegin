@@ -20,6 +20,12 @@ export interface Tip {
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
 const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
+/**
+ * Render text as an inline code block (dark-grey background, bright-white
+ * bold foreground, with single-space padding). Used to make shell commands
+ * pop visually — like `` `code` `` in markdown.
+ */
+const inlineCode = (s: string) => `\x1b[48;5;238;97;1m ${s} \x1b[0m`;
 
 // ---------------------------------------------------------------------------
 // Frontmatter parsing
@@ -398,18 +404,18 @@ export function resolveStatusline(context: StatuslineContext): StatuslineResult 
 /**
  * Format a tip for the Claude Code status line's dedicated tip row.
  *
- * Layout: `💡 <title> · <context> · tip show <handle>`
+ * Layout: `💡 <title> · <context> · <inline-code: tip show <handle>>`
  * (the context segment is omitted when the tip has none.)
  *
  * This is the *entire* second row — Claude Code renders each line of the
  * statusLine command's stdout as its own status bar row. Title renders at
- * normal brightness; context and the "learn more" command are dim so the
- * title stands out while the hint to expand remains visible.
+ * normal brightness, context is dim, and the "learn more" shell command is
+ * rendered as an inline code block so the reader immediately recognises it
+ * as something they can copy-paste.
  */
 export function formatTipStatusline(tip: Tip): string {
-  const suffixParts: string[] = [];
-  if (tip.context) suffixParts.push(tip.context);
-  suffixParts.push(`tip show ${tip.handle}`);
-  const suffix = dim(" · " + suffixParts.join(" · "));
-  return `💡 ${tip.title}${suffix}`;
+  const contextPart = tip.context ? dim(" · " + tip.context) : "";
+  const separator = dim(" · ");
+  const cmd = inlineCode(`tip show ${tip.handle}`);
+  return `💡 ${tip.title}${contextPart}${separator}${cmd}`;
 }
