@@ -114,7 +114,11 @@ if (git) parts.push(git);
 
 parts.push(`${input.session_id.slice(0, 8)}`);
 
-// Ambient tip from DX tip system
+// Ambient tip from DX tip system — rendered on its own row below the main
+// info line. Claude Code's status line renders each line of stdout as a
+// separate row, so the tip CLI owns the full second row (emoji, title,
+// context, and the `tip show <handle>` "learn more" hint).
+let tipLine = "";
 try {
   // Resolve repo root from this script's location: .claude/hooks/ → repo root
   const repoRoot = join(dirname(dirname(import.meta.dir)));
@@ -124,12 +128,10 @@ try {
     stderr: "pipe",
     cwd: repoRoot,
   });
-  const tip = tipResult.stdout.toString().trim();
-  if (tip) {
-    parts.push(`💡 ${DIM}${tip}${RESET}`);
-  }
+  tipLine = tipResult.stdout.toString().trim();
 } catch {
   // Non-blocking — tip CLI failure should never break the status line
 }
 
 console.log(parts.join(" | "));
+if (tipLine) console.log(tipLine);

@@ -6,6 +6,7 @@ import {
   loadTips,
   pickRandom,
   formatTipForTerminal,
+  formatTipStatusline,
   filterByTag,
   searchTips,
   findByRef,
@@ -135,9 +136,11 @@ program
     // 6. Write new state
     writeStateFile(result.newState);
 
-    // 7. Print output (may be empty)
-    if (result.output) {
-      console.log(result.output);
+    // 7. Print the formatted status-line row (or nothing when resting/empty).
+    //    The formatter owns the 💡 emoji, separators, and the `tip show …`
+    //    "learn more" hint — statusline.ts just relays whatever we print.
+    if (result.tip) {
+      console.log(formatTipStatusline(result.tip));
     }
   });
 

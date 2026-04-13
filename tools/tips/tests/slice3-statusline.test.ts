@@ -3,9 +3,13 @@ import {
   parseTipFrontmatter,
   parseDuration,
   resolveStatusline,
+  formatTipStatusline,
 } from "../src/core";
 import type { Tip, StatuslineState } from "../src/core";
 import { runCli } from "./helpers";
+
+// Strip ANSI escape codes for assertions on formatted output.
+const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 /**
  * Tests for Slice 3: `tip statusline` command + dx timing params.
@@ -85,7 +89,7 @@ describe("resolveStatusline", () => {
   const REST_DURATION = 7_200_000; // 2h
 
   test(
-    "ENG-4581: first call (no prior state) returns tip one-liner, state = SHOWING",
+    "ENG-4581: first call (no prior state) returns a tip, state = SHOWING",
     () => {
       const result = resolveStatusline({
         now: NOW,
@@ -96,12 +100,13 @@ describe("resolveStatusline", () => {
         enabled: true,
       });
 
-      // Should output a non-empty one-liner (the tip title)
-      expect(result.output.length).toBeGreaterThan(0);
+      // Should return a non-null tip from the pool
+      expect(result.tip).not.toBeNull();
+      expect(ALL_TIPS.map((t) => t.handle)).toContain(result.tip!.handle);
       // New state should be SHOWING
       expect(result.newState.state).toBe("showing");
-      // The tip handle should be one of the available tips
-      expect(ALL_TIPS.map((t) => t.handle)).toContain(result.newState.tip_handle);
+      // The tip handle in state should match the returned tip
+      expect(result.newState.tip_handle).toBe(result.tip!.handle);
       // transitioned_at should be now
       expect(result.newState.transitioned_at).toBe(NOW);
     },
@@ -126,8 +131,9 @@ describe("resolveStatusline", () => {
         enabled: true,
       });
 
-      // Should return the same tip's content
-      expect(result.output.length).toBeGreaterThan(0);
+      // Should return the same tip
+      expect(result.tip).not.toBeNull();
+      expect(result.tip!.handle).toBe("spotlight-traces");
       expect(result.newState.state).toBe("showing");
       expect(result.newState.tip_handle).toBe("spotlight-traces");
       // transitioned_at should not change (still in the same show window)
@@ -136,7 +142,7 @@ describe("resolveStatusline", () => {
   );
 
   test(
-    "ENG-4581: show window expired transitions to RESTING, returns empty",
+    "ENG-4581: show window expired transitions to RESTING, returns null tip",
     () => {
       const currentState: StatuslineState = {
         state: "showing",
@@ -154,15 +160,15 @@ describe("resolveStatusline", () => {
         enabled: true,
       });
 
-      // Should return empty (resting now)
-      expect(result.output).toBe("");
+      // Should return null tip (resting now)
+      expect(result.tip).toBeNull();
       expect(result.newState.state).toBe("resting");
       expect(result.newState.transitioned_at).toBe(NOW + SHOW_DURATION);
     },
   );
 
   test(
-    "ENG-4581: during rest window returns empty string",
+    "ENG-4581: during rest window returns null tip",
     () => {
       const restStart = NOW;
       const currentState: StatuslineState = {
@@ -181,7 +187,7 @@ describe("resolveStatusline", () => {
         enabled: true,
       });
 
-      expect(result.output).toBe("");
+      expect(result.tip).toBeNull();
       expect(result.newState.state).toBe("resting");
       expect(result.newState.transitioned_at).toBe(restStart);
     },
@@ -208,17 +214,18 @@ describe("resolveStatusline", () => {
       });
 
       // Should be showing a tip again
-      expect(result.output.length).toBeGreaterThan(0);
+      expect(result.tip).not.toBeNull();
+      expect(ALL_TIPS.map((t) => t.handle)).toContain(result.tip!.handle);
       expect(result.newState.state).toBe("showing");
-      expect(ALL_TIPS.map((t) => t.handle)).toContain(result.newState.tip_handle);
+      expect(result.newState.tip_handle).toBe(result.tip!.handle);
       expect(result.newState.transitioned_at).toBe(restStart + REST_DURATION);
     },
   );
 
   test(
-    "ENG-4581: disabled returns empty string regardless of state",
+    "ENG-4581: disabled returns null tip regardless of state",
     () => {
-      // Even with a valid showing state, disabled should return empty
+      // Even with a valid showing state, disabled should return null
       const result = resolveStatusline({
         now: NOW,
         state: {
@@ -232,12 +239,12 @@ describe("resolveStatusline", () => {
         enabled: false,
       });
 
-      expect(result.output).toBe("");
+      expect(result.tip).toBeNull();
     },
   );
 
   test(
-    "ENG-4581: empty tips array returns empty string",
+    "ENG-4581: empty tips array returns null tip",
     () => {
       const result = resolveStatusline({
         now: NOW,
@@ -248,9 +255,76 @@ describe("resolveStatusline", () => {
         enabled: true,
       });
 
-      expect(result.output).toBe("");
+      expect(result.tip).toBeNull();
     },
   );
+
+  test(
+    "ENG-4894: showing state with a deleted tip handle returns null tip",
+    () => {
+      // If the tip referenced by state was deleted from disk since last run,
+      // the resolver should gracefully return null rather than crashing.
+      const currentState: StatuslineState = {
+        state: "showing",
+        tip_handle: "tip-that-no-longer-exists",
+        transitioned_at: NOW,
+      };
+
+      const result = resolveStatusline({
+        now: NOW + 60_000,
+        state: currentState,
+        tips: ALL_TIPS,
+        showDuration: SHOW_DURATION,
+        restDuration: REST_DURATION,
+        enabled: true,
+      });
+
+      expect(result.tip).toBeNull();
+      // State unchanged — we're still within the show window
+      expect(result.newState).toEqual(currentState);
+    },
+  );
+});
+
+// =============================================================================
+// formatTipStatusline — the dedicated second-row renderer
+// =============================================================================
+
+describe("formatTipStatusline", () => {
+  test("ENG-4894: includes 💡 emoji, title, context, and 'tip show <handle>'", () => {
+    const line = stripAnsi(formatTipStatusline(TIP_SPOTLIGHT));
+
+    expect(line.startsWith("💡 ")).toBe(true);
+    expect(line).toContain("Query local traces from terminal");
+    expect(line).toContain("When investigating slow requests or errors locally");
+    expect(line).toContain("tip show spotlight-traces");
+  });
+
+  test("ENG-4894: separates segments with ' · '", () => {
+    const line = stripAnsi(formatTipStatusline(TIP_SPOTLIGHT));
+    // title · context · command → at least two separators
+    const separators = line.split(" · ").length - 1;
+    expect(separators).toBeGreaterThanOrEqual(2);
+  });
+
+  test("ENG-4894: omits context segment when tip has no context", () => {
+    // TIP_DAYBOOK has no context field
+    expect(TIP_DAYBOOK.context).toBeUndefined();
+    const line = stripAnsi(formatTipStatusline(TIP_DAYBOOK));
+
+    expect(line).toContain("Daily cross-reference digest");
+    expect(line).toContain("tip show daybook");
+    // Only one separator: title · command
+    const separators = line.split(" · ").length - 1;
+    expect(separators).toBe(1);
+  });
+
+  test("ENG-4894: renders as a single line (no embedded newlines)", () => {
+    // The Claude Code status line treats each \n as a new row, so the
+    // formatter must produce exactly one line per tip.
+    const line = formatTipStatusline(TIP_SPOTLIGHT);
+    expect(line).not.toContain("\n");
+  });
 });
 
 // =============================================================================

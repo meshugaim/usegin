@@ -281,7 +281,8 @@ export interface StatuslineContext {
 }
 
 export interface StatuslineResult {
-  output: string;
+  /** The tip to display, or null when resting, disabled, or empty. */
+  tip: Tip | null;
   newState: StatuslineState;
 }
 
@@ -334,19 +335,19 @@ export function resolveStatusline(context: StatuslineContext): StatuslineResult 
 
   // Disabled: return empty, preserve state as-is
   if (!enabled) {
-    return { output: "", newState: preserveOrInit() };
+    return { tip: null, newState: preserveOrInit() };
   }
 
   // No tips available: nothing to show
   if (tips.length === 0) {
-    return { output: "", newState: preserveOrInit() };
+    return { tip: null, newState: preserveOrInit() };
   }
 
   // First call — no prior state: start showing a random tip
   if (state === null) {
     const tip = pickRandom(tips)!;
     return {
-      output: tip.title,
+      tip,
       newState: {
         state: "showing",
         tip_handle: tip.handle,
@@ -360,14 +361,14 @@ export function resolveStatusline(context: StatuslineContext): StatuslineResult 
   if (state.state === "showing") {
     if (elapsed < showDuration) {
       // Still within show window — return the same tip
-      const tip = tips.find((t) => t.handle === state.tip_handle);
-      const output = tip ? tip.title : "";
-      return { output, newState: state };
+      // (may be null if the tip was deleted from disk since last run)
+      const tip = tips.find((t) => t.handle === state.tip_handle) ?? null;
+      return { tip, newState: state };
     }
 
     // Show window expired → transition to resting
     return {
-      output: "",
+      tip: null,
       newState: {
         state: "resting",
         tip_handle: state.tip_handle,
@@ -379,17 +380,36 @@ export function resolveStatusline(context: StatuslineContext): StatuslineResult 
   // state.state === "resting"
   if (elapsed < restDuration) {
     // Still within rest window — stay quiet
-    return { output: "", newState: state };
+    return { tip: null, newState: state };
   }
 
   // Rest window expired → show a new tip
   const tip = pickRandom(tips)!;
   return {
-    output: tip.title,
+    tip,
     newState: {
       state: "showing",
       tip_handle: tip.handle,
       transitioned_at: now,
     },
   };
+}
+
+/**
+ * Format a tip for the Claude Code status line's dedicated tip row.
+ *
+ * Layout: `💡 <title> · <context> · tip show <handle>`
+ * (the context segment is omitted when the tip has none.)
+ *
+ * This is the *entire* second row — Claude Code renders each line of the
+ * statusLine command's stdout as its own status bar row. Title renders at
+ * normal brightness; context and the "learn more" command are dim so the
+ * title stands out while the hint to expand remains visible.
+ */
+export function formatTipStatusline(tip: Tip): string {
+  const suffixParts: string[] = [];
+  if (tip.context) suffixParts.push(tip.context);
+  suffixParts.push(`tip show ${tip.handle}`);
+  const suffix = dim(" · " + suffixParts.join(" · "));
+  return `💡 ${tip.title}${suffix}`;
 }
