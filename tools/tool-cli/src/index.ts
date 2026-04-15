@@ -167,7 +167,7 @@ function getScriptDescription(filePath: string, name: string): string {
     "hebrew-to-english": "Convert Hebrew keyboard input to English",
     "mailgun-send": "Send real emails via Mailgun API (supports threading headers)",
     "mailgun-test-webhook": "Send a signed fake Mailgun webhook to localhost",
-    "mailgun-tunnel": "Start/stop Cloudflare Tunnel for local Mailgun webhooks",
+    "dev-tunnel": "Start/stop Cloudflare Tunnel for local webhook testing (Mailgun, Unified.to, future providers)",
     "nextjs-dev": "Run Next.js dev server",
     "pick-and-push-session.ts": "Pick a session and push for retro",
     "pick-issue": "Interactive issue picker with fzf",
