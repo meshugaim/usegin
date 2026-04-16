@@ -5,11 +5,9 @@
  * Management API endpoint. Uses SUPABASE_ACCESS_TOKEN for auth.
  *
  * Intentionally self-contained — `recover` stays runnable in isolation,
- * without pulling in unrelated tool code. Other callers of the Management
- * API (`scripts/set-env-lib/set-env.ts`, `scripts/list-storage-files.ts`)
- * each keep their own minimal client for the same reason. If these ever
- * start overlapping meaningfully, extract a shared lib instead of
- * cross-importing.
+ * without pulling in unrelated tool code. Each Management API caller keeps
+ * its own minimal client for the same reason; if callers start overlapping
+ * meaningfully, extract into a shared lib.
  */
 
 const MANAGEMENT_API = "https://api.supabase.com";
