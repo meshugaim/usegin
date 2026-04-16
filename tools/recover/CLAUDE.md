@@ -106,7 +106,7 @@ result for each.
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | yes | Personal access token from https://supabase.com/dashboard/account/tokens. Used only for the Management API call. |
 
-Project refs are hardcoded in `src/lib/envs.ts` (same as `tools/project-clone`).
+Project refs are hardcoded in `src/lib/envs.ts`.
 
 ## How it Works
 

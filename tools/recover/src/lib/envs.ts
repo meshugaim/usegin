@@ -1,10 +1,10 @@
 /**
  * Environment → Supabase project-ref mapping and safety guards.
  *
- * Both refs are hardcoded and match tools/project-clone/src/api.ts. Recovery
- * is an engineer-gated mutation path, so an explicit `--env` is *required*
- * (no default). This is stricter than railway-dev, which defaults reads to
- * production, because writes have a much higher blast radius than reads.
+ * Both refs are hardcoded. Recovery is an engineer-gated mutation path, so
+ * an explicit `--env` is *required* (no default). This is stricter than
+ * railway-dev, which defaults reads to production, because writes have a
+ * much higher blast radius than reads.
  */
 
 export const PROD_REF = "becbrfnfxrgezhtkrsrm";

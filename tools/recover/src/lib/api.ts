@@ -5,9 +5,9 @@
  * Management API endpoint. Uses SUPABASE_ACCESS_TOKEN for auth.
  *
  * We deliberately keep this self-contained (no imports from other tools)
- * so `recover` can be run in isolation. The pattern here mirrors the one
- * in tools/project-clone/src/api.ts; extract to a shared lib if a third
- * tool ever needs it.
+ * so `recover` can be run in isolation. If a second tool ever needs to
+ * talk to the Management API, extract this into a shared lib rather than
+ * copy-pasting.
  */
 
 const MANAGEMENT_API = "https://api.supabase.com";
