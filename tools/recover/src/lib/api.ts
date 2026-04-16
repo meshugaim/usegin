@@ -4,10 +4,12 @@
  * Executes SQL and RPC calls against a remote project via the official
  * Management API endpoint. Uses SUPABASE_ACCESS_TOKEN for auth.
  *
- * We deliberately keep this self-contained (no imports from other tools)
- * so `recover` can be run in isolation. If a second tool ever needs to
- * talk to the Management API, extract this into a shared lib rather than
- * copy-pasting.
+ * Intentionally self-contained — `recover` stays runnable in isolation,
+ * without pulling in unrelated tool code. Other callers of the Management
+ * API (`scripts/set-env-lib/set-env.ts`, `scripts/list-storage-files.ts`)
+ * each keep their own minimal client for the same reason. If these ever
+ * start overlapping meaningfully, extract a shared lib instead of
+ * cross-importing.
  */
 
 const MANAGEMENT_API = "https://api.supabase.com";
