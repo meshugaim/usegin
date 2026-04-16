@@ -101,11 +101,11 @@ OTP codes expire quickly — extract and enter within a few seconds of sending.
 | `internal@test.local` | Internal | `22222222-2222-2222-2222-222222222222` |
 | `external@test.local` | External | `33333333-3333-3333-3333-333333333333` |
 
-### Test Organization & Project
+### Test Workspace & Project
 
 | Entity | Name | ID |
 |--------|------|-----|
-| Organization | Test Organization | `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` |
+| Workspace | Test Workspace | `cccccccc-cccc-cccc-cccc-cccccccccccc` |
 | Project | Demo Project | `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` |
 
 ### Admin Access
