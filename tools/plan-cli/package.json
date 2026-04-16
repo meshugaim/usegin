@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@linear/sdk": "^80.1.0",
+    "@linear/sdk": "^81.0.0",
     "commander": "^14.0.3",
     "marked": "^18",
     "marked-terminal": "^7.3.0"
