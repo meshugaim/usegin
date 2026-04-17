@@ -25,8 +25,9 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 
 - **Small steps.** One logical change at a time. Commit and push after each. Don't batch unrelated updates.
 - **In-range first, then majors.** Patches are safe to batch per area. Major bumps get their own commit — research breaking changes before upgrading.
-- **Verify after every change.** Typecheck, lint, automated tests — whatever the area supports. If you find pre-existing test failures or typecheck errors along the way, fix them — leave the codebase cleaner than you found it.
-- **Major changes need test runs, not just "it installs."** A package can install fine and still break behavior silently (e.g., chardet 7 regresses Latin-1 encoding detection). Always run the full test suite after major bumps.
+- **Verify after every change — for real.** Every bump, including patches. Run the area's typecheck, lint, and test suite. "It installs" is not verification; neither is "it's just a patch." Package authors ship regressions in patch versions too. If you find pre-existing test failures or typecheck errors along the way, fix them — leave the codebase cleaner than you found it.
+- **For Python, run integration tests too, not just unit.** The bumps most likely to regress (SDKs, database drivers, HTTP clients) only show their behavior at the integration boundary. Unit tests don't exercise them. If integration tests are slow, that's the cost — budget for it.
+- **Call out what you couldn't verify.** Things like GitHub Actions bumps or changes to throwaway experiments can't be locally tested. Say so explicitly in the commit body or PR description — "verified on next CI run" is honest; silence reads as "I tested this" and isn't true.
 - **Use worktrees** to avoid interfering with other agents' work.
 - **Track in Linear** via `plan` — parent issue for the overall effort, sub-issues per stage.
 
