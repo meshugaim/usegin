@@ -13,7 +13,14 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 
 2. **Check dependabot PRs early.** Run `gh pr list --label dependencies` during discovery. Dependabot PRs reveal pinned versions and version range constraints that `bun update`/`uv lock --upgrade` can't fix. Incorporate them into the plan rather than discovering them halfway through.
 
-3. **Flag pinned versions during discovery.** `bun update` only bumps within version ranges. Exact pins without `^` or `~` (e.g., `"react": "19.2.4"`, `claude-agent-sdk==0.1.56`) need manual `package.json`/`pyproject.toml` edits. Identify these upfront so they don't get silently skipped.
+3. **Flag pinned versions during discovery — and understand *why* they're pinned.** `bun update` only bumps within version ranges. Exact pins without `^` or `~` (e.g., `"react": "19.2.4"`, `claude-agent-sdk==0.1.56`) need manual `package.json`/`pyproject.toml` edits. Identify these upfront so they don't get silently skipped.
+
+   Before bumping a pinned package, check `git log -L '/"name":/,+1:path/to/package.json'` to learn the pin's history. Pins fall into two categories, and the reason dictates how to bump:
+
+   - **Intentional lockstep pins** — `react`/`react-dom` must match exactly (ecosystem rule). Storybook's ecosystem (`storybook`, `eslint-plugin-storybook`, `@storybook/*`) releases in lockstep and must match. When you bump one, bump the siblings **in the same commit** to the same version.
+   - **Dependabot default** — Dependabot writes exact versions without caret when it bumps, so any package it has touched stays pinned even if the original author used `^`. These can be treated like ranged bumps; no sibling coordination needed.
+
+   Call out each pin in the plan with its category and sibling set, so the user sees the coordination cost upfront.
 
 4. **Build a plan.** Group what you found into logical stages (e.g., by app, by package manager, by risk level). Patches and in-range bumps first, majors later.
 
