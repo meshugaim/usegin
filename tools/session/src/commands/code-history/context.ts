@@ -55,14 +55,23 @@ const TRUNCATE_ELLIPSIS = "…";
  *
  * Pure function: no mutation of the input, no side effects.
  */
-export function truncate(value: string | null): string | null {
-  if (value === null) return null;
+/**
+ * Internal string-only variant of `truncate`: applies the collapse-then-cap
+ * rule without the null passthrough. Callers that already know their input
+ * is non-null (e.g. `extractIntent` after an empty-text guard) can skip the
+ * null-overload routing. Not exported — the public API is `truncate`.
+ */
+function truncateString(value: string): string {
   // Run-collapse: every run of \n/\t (any mix, any length) → single space.
   const collapsed = value.replace(/[\n\t]+/g, " ");
   if (collapsed.length <= TRUNCATE_MAX_LEN) return collapsed;
   // Total length budget INCLUDES the ellipsis (1 char), so keep
   // MAX_LEN - 1 chars of content + ellipsis = MAX_LEN chars total.
   return collapsed.slice(0, TRUNCATE_MAX_LEN - 1) + TRUNCATE_ELLIPSIS;
+}
+
+export function truncate(value: string | null): string | null {
+  return value === null ? null : truncateString(value);
 }
 
 // ============================================================================
@@ -137,8 +146,10 @@ export function extractIntent(turns: Turn[]): string | null {
     if (turn.text.trim() === "") continue;
     if (isCommandOrCaveat(turn.text)) continue;
     // AC 15: apply truncate at the extractor's return boundary so
-    // downstream consumers receive a ready-to-render string.
-    return truncate(turn.text);
+    // downstream consumers receive a ready-to-render string. We call
+    // the non-null internal variant because the empty-text guard above
+    // already excluded the only value that would route to `null`.
+    return truncateString(turn.text);
   }
   return null;
 }
