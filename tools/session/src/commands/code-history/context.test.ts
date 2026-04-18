@@ -400,7 +400,7 @@ describe("extractTrigger", () => {
     );
 
     test.failing(
-      "P7: tool-result has leading noise before SHA line → still detected via substring",
+      "P7: tool-result body carries leading noise before the [branch sha] line — detector extracts SHA tokens from the [branch sha] pattern, then matches via bidirectional startsWith (same rule as P8)",
       () => {
         const noisyOutput =
           "warning: CRLF will be replaced by LF\nhint: foo\n[main 4444444] fix: noisy";
@@ -414,7 +414,7 @@ describe("extractTrigger", () => {
     );
 
     test.failing(
-      "P8: SHA format variance — query with full 40-char SHA matches short SHA in result",
+      "P8: SHA format variance — query with full 40-char SHA matches short SHA in result via bidirectional startsWith",
       () => {
         // Tool result carries the short 7-char SHA (as git prints it).
         // Caller passes the full 40-char SHA. Rule: match succeeds when
