@@ -1,7 +1,13 @@
 /**
- * Tests for `context.ts` — session-context extractors (ENG-5050).
- * Covers the Tier-1 acceptance criteria plus whitespace-collapse /
- * boundary pins added during Refactor.
+ * Tests for `context.ts` — session-context extractors.
+ *
+ * Covers the full Tier-1 bar for the extractor family:
+ *   - `truncate`  — whitespace collapse + 200-char cap (ENG-5050 AC 15)
+ *   - `extractIntent`    — first real user ask        (ENG-5042 AC 10)
+ *   - `extractTrigger`   — user ask before a commit    (ENG-5042 AC 11)
+ *   - `extractOutcome`   — assistant text after commit (ENG-5042 AC 12)
+ * plus the pure-module invariant (AC 16), whitespace/boundary pins,
+ * idempotence meta-tests, and the empty-SHA defensive guard.
  */
 
 import { readFileSync } from "node:fs";
@@ -165,8 +171,8 @@ describe("extractIntent", () => {
 //
 // Exhaustive behavior is covered through `extractIntent`'s Tier-1 tests
 // above, where `isCommandOrCaveat` is the underlying skip rule. One
-// direct test here documents that the predicate is exported and
-// reusable by Part B (ENG-5051's trigger walk).
+// direct test here documents that the predicate is exported and reused
+// across the extractor family (intent + trigger both skip through it).
 
 describe("isCommandOrCaveat", () => {
   test("returns true for <command-name> wrapper text", () => {
