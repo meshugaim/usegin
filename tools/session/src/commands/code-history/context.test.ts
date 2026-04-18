@@ -156,12 +156,12 @@ describe("isCommandOrCaveat", () => {
 // ============================================================================
 
 describe("truncate", () => {
-  test.failing("value ≤ 200 chars (post-collapse) → unchanged", () => {
+  test("value ≤ 200 chars (post-collapse) → unchanged", () => {
     const short = "a".repeat(50);
     expect(truncate(short)).toBe(short);
   });
 
-  test.failing("value > 200 chars (post-collapse) → truncated with ellipsis, total length 200", () => {
+  test("value > 200 chars (post-collapse) → truncated with ellipsis, total length 200", () => {
     const long = "a".repeat(300);
     const result = truncate(long);
     expect(result).not.toBeNull();
@@ -170,23 +170,23 @@ describe("truncate", () => {
     expect(result!.slice(0, 199)).toBe("a".repeat(199));
   });
 
-  test.failing("null → null", () => {
+  test("null → null", () => {
     expect(truncate(null)).toBeNull();
   });
 
-  test.failing("collapses single \\n to space", () => {
+  test("collapses single \\n to space", () => {
     expect(truncate("a\nb")).toBe("a b");
   });
 
-  test.failing("collapses single \\t to space", () => {
+  test("collapses single \\t to space", () => {
     expect(truncate("a\tb")).toBe("a b");
   });
 
-  test.failing("run-collapses consecutive \\n/\\t mix to single space", () => {
+  test("run-collapses consecutive \\n/\\t mix to single space", () => {
     expect(truncate("a\n\n\tb")).toBe("a b");
   });
 
-  test.failing("truncation is applied AFTER whitespace collapse", () => {
+  test("truncation is applied AFTER whitespace collapse", () => {
     // Raw length 255, but consecutive `\n`s collapse into a single run
     // → collapsed value is far under the 200-char cap and must NOT be
     // truncated. A naive "truncate-then-collapse" impl would chop the
@@ -199,7 +199,7 @@ describe("truncate", () => {
     expect(result).toBe(" hello");
   });
 
-  test.failing("collapse-then-truncate when BOTH raw and collapsed exceed cap", () => {
+  test("collapse-then-truncate when BOTH raw and collapsed exceed cap", () => {
     // Mirror of the above: raw length 252 AND collapsed length 251 — both
     // exceed the 200-char cap, so truncation must still fire. Pins the
     // rule in the opposite direction: collapse happens first, then the

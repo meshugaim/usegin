@@ -56,10 +56,13 @@ const TRUNCATE_ELLIPSIS = "…";
  * @returns unimplemented sentinel until the Green phase lands
  */
 export function truncate(value: string | null): string | null {
-  void value;
-  void TRUNCATE_MAX_LEN;
-  void TRUNCATE_ELLIPSIS;
-  return "<unimplemented>";
+  if (value === null) return null;
+  // Run-collapse: every run of \n/\t (any mix, any length) → single space.
+  const collapsed = value.replace(/[\n\t]+/g, " ");
+  if (collapsed.length <= TRUNCATE_MAX_LEN) return collapsed;
+  // Total length budget INCLUDES the ellipsis (1 char), so keep
+  // MAX_LEN - 1 chars of content + ellipsis = MAX_LEN chars total.
+  return collapsed.slice(0, TRUNCATE_MAX_LEN - 1) + TRUNCATE_ELLIPSIS;
 }
 
 // ============================================================================
