@@ -14,12 +14,12 @@
  *
  * Layout:
  *   1. `parseCodeHistoryArgs` — pure arg parsing
- *   2. Reserved flags at the parser layer
+ *   2. Reserved flags — parser layer
  *   3. `session code-history --help` — help output
  *   4. End-to-end CLI behavior against a fixture git repo
  *   5. Body preview + missing-layer ("no `body:` line") cases
  *   6. Rename-following regression guard
- *   7. Reserved flags at the E2E layer
+ *   7. Reserved flags — E2E layer
  *
  * Shared fixture helpers (`makeFixtureRepo`, `runCli`, `withFixtureRepo`,
  * `withTempDir`) live in `./code-history/__fixtures__/helpers.ts` so
@@ -320,6 +320,9 @@ describe("session code-history --help (AC 3)", () => {
 describe("session code-history end-to-end", () => {
   let fixture: FixtureRepo;
 
+  // Fixture convention: use `beforeAll` when multiple tests share the same
+  // fixture shape (amortizes git-init cost across the describe); use
+  // `withFixtureRepo` when each test wants its own tailored commit shape.
   beforeAll(() => {
     fixture = makeFixtureRepo();
   });

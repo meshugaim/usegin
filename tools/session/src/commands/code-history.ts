@@ -18,6 +18,11 @@
  *   - `session:` line (slice 4)
  *   - `linear:` line (slice 5)
  *   - `--json` mode (slice 6)
+ *
+ * TODO: Slice numbering mirrors ENG-5040's plan. If slices re-number
+ * (e.g., JSON lands before linear), sweep references across this module:
+ * grep `slice 4|slice 5|slice 6` in
+ * tools/session/src/commands/code-history{,.ts,.test.ts,/format.ts,/trailers.ts}.
  */
 
 import { readFileSync, statSync } from "node:fs";

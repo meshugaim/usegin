@@ -96,10 +96,11 @@ export function formatBody(body: string): string {
   // `"foo "`. Taking the first 2 non-blank lines matches the spec's
   // "first 2 lines" rule without being tripped up by incidental gaps.
   //
-  // Loop + break (rather than filter + slice) so we stop scanning as
-  // soon as we have enough. Matters when slices 4/5 start walking
-  // multiple commits per invocation — no need to pay O(n) over a long
-  // body to discover the first two lines.
+  // Loop + break (rather than filter + slice) so slices 4/5 (which walk
+  // multiple commits per invocation) don't scan past the first two
+  // non-blank lines of each body. No measurable effect on slice 3 —
+  // `stripTrailers` already walks the full body once, so `formatBody`
+  // pays O(n) regardless on a single-commit invocation.
   const nonBlank: string[] = [];
   for (const l of stripped.split("\n")) {
     if (l.length > 0) nonBlank.push(l);
