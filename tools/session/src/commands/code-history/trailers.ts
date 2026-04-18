@@ -115,3 +115,61 @@ function trimTrailingBlank(lines: string[]): string[] {
 export function isTrailerLine(line: string): boolean {
   return TRAILER_LINE_RE.test(line);
 }
+
+// =============================================================================
+// Claude-Session trailer extraction (slice 4 — ENG-5043)
+// =============================================================================
+
+/**
+ * Regex for the `Claude-Session:` trailer line, pinned by the ENG-5039
+ * spec:
+ *
+ *   `/^Claude-Session:\s*(\S+)\s*$/m`
+ *
+ * - Multiline (`m`) so `^` / `$` anchor on line boundaries within the
+ *   raw body, not just the string start/end.
+ * - `\s*` on both sides of the UUID tolerates incidental whitespace
+ *   around the value.
+ * - `\S+` captures the UUID verbatim — UUIDs have no whitespace, so
+ *   this is the widest safe net (don't hard-code UUID v4 shape here;
+ *   validation belongs at the `resolveSessionPath` boundary).
+ *
+ * Global flag is set so `matchAll` can enumerate multiple trailers in
+ * amend-case commits. The caller takes the LAST match per spec.
+ */
+const CLAUDE_SESSION_TRAILER_RE = /^Claude-Session:\s*(\S+)\s*$/gm;
+
+/**
+ * Extract the `Claude-Session: <uuid>` UUID from a raw commit body.
+ *
+ * Returns:
+ *   - `null` when the body contains no `Claude-Session:` trailer.
+ *   - The UUID string (verbatim — no validation) when exactly one
+ *     trailer is present.
+ *   - The UUID from the LAST trailer when multiple are present
+ *     (amend case: an amended commit accumulates trailers from each
+ *     amendment; the last one reflects the final session that touched
+ *     the commit).
+ *
+ * This function does NOT require the trailer to be in a canonical
+ * trailer block (separated by a blank line). The spec's regex is
+ * line-anchored, so a `Claude-Session:` that happens to appear mid-body
+ * on its own line also matches. In practice `git log --format=%b`
+ * always produces trailers at the end, so this flexibility is
+ * theoretical — but it matches the spec-pinned regex exactly and
+ * avoids reinventing the trailer-block vs mid-body distinction here
+ * (that distinction belongs to `stripTrailers` for body-preview, not
+ * to trailer extraction).
+ *
+ * Slice 4 (ENG-5043) uses this to decide whether to populate
+ * `DecoratedCommit.session`. Slice 5 will add a matching
+ * `extractLinearTrailer` once the Linear-line work lands.
+ */
+export function extractClaudeSessionTrailer(_body: string): string | null {
+  // Red-phase stub — returns the pinned `<unimplemented>` sentinel so
+  // test.failing assertions that compare against real UUIDs fail at
+  // the assertion level, and the null-case assertion fails against a
+  // non-null return. Green phase replaces this with the real
+  // `matchAll` + last-match implementation.
+  return "<unimplemented>";
+}

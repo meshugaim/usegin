@@ -9,7 +9,11 @@
 
 import { describe, test, expect } from "bun:test";
 
-import { stripTrailers, isTrailerLine } from "./trailers";
+import {
+  stripTrailers,
+  isTrailerLine,
+  extractClaudeSessionTrailer,
+} from "./trailers";
 
 describe("stripTrailers (ENG-5041)", () => {
   test("ENG-5041: strips a trailing trailer block separated by a blank line", () => {
@@ -142,4 +146,81 @@ describe("isTrailerLine (ENG-5041)", () => {
     // Leading whitespace — not anchored-start trailer.
     expect(isTrailerLine(" Foo: bar")).toBe(false);
   });
+});
+
+// =============================================================================
+// extractClaudeSessionTrailer (ENG-5043)
+// =============================================================================
+//
+// Pin the UUID-extraction contract used by `runCodeHistory` to decide
+// whether to populate `DecoratedCommit.session`. The regex itself is
+// spec-pinned (`/^Claude-Session:\s*(\S+)\s*$/m`) so these tests focus
+// on the SEMANTICS layered on top of that regex: null when absent, last
+// match when multiple.
+
+const FIXTURE_UUID_A = "533a2546-684a-4724-b592-34aa88aac626";
+const FIXTURE_UUID_B = "6e1b04b8-3f88-47a0-9a6c-88a4e5b9f001";
+
+describe("extractClaudeSessionTrailer (ENG-5043)", () => {
+  test.failing(
+    "ENG-5043: returns the UUID when a single Claude-Session trailer is present",
+    () => {
+      const body = [
+        "feat: add the thing",
+        "",
+        "Part of: ENG-5043",
+        `Claude-Session: ${FIXTURE_UUID_A}`,
+      ].join("\n");
+      expect(extractClaudeSessionTrailer(body)).toBe(FIXTURE_UUID_A);
+    },
+  );
+
+  test.failing("ENG-5043: returns null when NO trailer is present", () => {
+    const body = [
+      "feat: add the thing",
+      "",
+      "Part of: ENG-5043",
+    ].join("\n");
+    expect(extractClaudeSessionTrailer(body)).toBeNull();
+  });
+
+  test.failing("ENG-5043: returns null on an empty body", () => {
+    expect(extractClaudeSessionTrailer("")).toBeNull();
+  });
+
+  test.failing(
+    "ENG-5043: takes the LAST match when multiple trailers are present (amend case)",
+    () => {
+      // An amended commit accumulates trailers from each amendment; the
+      // last one reflects the final session that touched the commit.
+      const body = [
+        "feat: amended thing",
+        "",
+        `Claude-Session: ${FIXTURE_UUID_A}`,
+        `Claude-Session: ${FIXTURE_UUID_B}`,
+      ].join("\n");
+      expect(extractClaudeSessionTrailer(body)).toBe(FIXTURE_UUID_B);
+    },
+  );
+
+  test.failing(
+    "ENG-5043: regex is line-anchored — `Claude-Session:` embedded mid-line does NOT match",
+    () => {
+      // Guards against a non-anchored match that would pick up prose
+      // like "see Claude-Session: abc in the log". The spec regex uses
+      // `^...$` under `m`, so only whole-line matches count.
+      const body = "See Claude-Session: foo in the log, not a real trailer.";
+      expect(extractClaudeSessionTrailer(body)).toBeNull();
+    },
+  );
+
+  test.failing(
+    "ENG-5043: tolerates incidental whitespace around the UUID value",
+    () => {
+      // The spec regex uses `\s*` on both sides of the capture. A stray
+      // leading space or trailing whitespace must still yield the UUID.
+      const body = `Claude-Session:   ${FIXTURE_UUID_A}   `;
+      expect(extractClaudeSessionTrailer(body)).toBe(FIXTURE_UUID_A);
+    },
+  );
 });
