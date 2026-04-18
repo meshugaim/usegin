@@ -278,12 +278,16 @@ export interface CodeHistoryArgs {
 /**
  * Parse arguments for `session code-history <file>:<line>`.
  *
- * Pattern reference: `parseFetchArgs` above (same positional-only shape,
- * same throw-on-bad-input discipline). code-history is UNIQUE in this
- * codebase in taking a `file:line` positional — the only parser with a
- * colon-embedded positional — so see the arg-parser tests in
- * `commands/code-history.test.ts` for edge cases (absolute paths,
- * embedded colons in paths: the separator is the LAST colon).
+ * Pattern reference: `parseFetchArgs` above shares the positional-only
+ * shape, but `parseCodeHistoryArgs` THROWS on malformed input whereas
+ * `parseFetchArgs` silently returns an empty `sessionId` — code-history
+ * has a stricter grammar (`<file>:<line>`) so we fail loudly at parse
+ * time rather than let an empty/half-parsed arg reach the git layer.
+ * code-history is also UNIQUE in this codebase in taking a `file:line`
+ * positional — the only parser with a colon-embedded positional — so see
+ * the arg-parser tests in `commands/code-history.test.ts` for edge cases
+ * (absolute paths, embedded colons in paths: the separator is the LAST
+ * colon).
  *
  * Red-phase stub: returns a deliberately-wrong default so the Red tests
  * fail at ASSERTION level (not import level). The Green agent replaces

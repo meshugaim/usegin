@@ -22,12 +22,29 @@
  *   `parseCodeHistoryArgs` suite in `../code-history.test.ts`).
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-/** Path to the CLI entrypoint so `Bun.spawn` can invoke it. */
+/**
+ * Path to the CLI entrypoint so `Bun.spawn` can invoke it. The `"..", "..",
+ * ".."` chain assumes this file lives at
+ * `src/commands/code-history/__fixtures__/helpers.ts`; if `__fixtures__`
+ * ever moves, the `statSync` guard below fails loudly at module load
+ * rather than silently feeding a nonexistent path to `bun` (which would
+ * surface as every E2E test failing with a confusing "Cannot find module"
+ * in stderr).
+ */
 const CLI_ENTRY = join(import.meta.dir, "..", "..", "..", "cli.ts");
+try {
+  statSync(CLI_ENTRY);
+} catch (err) {
+  throw new Error(
+    `code-history test helpers: CLI_ENTRY not found at ${CLI_ENTRY}. ` +
+      `If __fixtures__ was moved, update the "..", "..", ".." path in helpers.ts. ` +
+      `Original error: ${(err as Error).message}`,
+  );
+}
 
 /**
  * One commit in a fixture repo.
@@ -129,7 +146,17 @@ export function makeFixtureRepo(spec: FixtureRepoSpec = {}): FixtureRepo {
   return { dir, file, expectedSubject, expectedSha };
 }
 
-function composeCommitMessage(commit: FixtureCommitSpec): string {
+/**
+ * Compose a commit message from a subject, optional body, and optional
+ * trailers. Upholds git's trailer convention: trailers are separated from
+ * the body (or from the subject, when body is absent) by exactly one
+ * blank line, so `git interpret-trailers --parse` will read them.
+ *
+ * Exported so unit tests can pin the exact output shape — slices 2+
+ * depend on that shape when asserting `Claude-Session:` / `ENG-XXXX`
+ * trailers round-trip through git into the formatter.
+ */
+export function composeCommitMessage(commit: FixtureCommitSpec): string {
   const parts: string[] = [commit.subject];
   if (commit.body && commit.body.length > 0) {
     parts.push("", commit.body);

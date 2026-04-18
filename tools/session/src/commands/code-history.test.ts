@@ -117,25 +117,25 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
 // =============================================================================
 
 describe("session code-history --help (AC 3)", () => {
-  let fixture: FixtureRepo;
-
-  beforeAll(() => {
-    fixture = makeFixtureRepo();
-  });
-
-  afterAll(() => {
-    rmSync(fixture.dir, { recursive: true, force: true });
-  });
+  // NOTE: no git fixture here — `--help` is pure output and doesn't touch
+  // the git layer. Each test creates its own no-git tmp dir so we don't
+  // pay ~200ms for `git init` + seed commits on tests that never need them.
+  // The E2E describe below keeps its git fixture.
 
   test.failing(
     "ENG-5040: prints command-specific help containing the usage line and exits 0",
     () => {
-      const result = runCli(["code-history", "--help"], fixture.dir);
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("session code-history");
-      expect(result.stdout).toMatch(/<file>:<line>/);
-      // Must NOT print the top-level help (which starts with "Session - Parse").
-      expect(result.stdout).not.toContain("Session - Parse Claude session");
+      const tmpDir = mkdtempSync(join(tmpdir(), "code-history-help-"));
+      try {
+        const result = runCli(["code-history", "--help"], tmpDir);
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toContain("session code-history");
+        expect(result.stdout).toMatch(/<file>:<line>/);
+        // Must NOT print the top-level help (which starts with "Session - Parse").
+        expect(result.stdout).not.toContain("Session - Parse Claude session");
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
     },
   );
 
@@ -183,12 +183,12 @@ describe("session code-history end-to-end", () => {
       expect(result.exitCode).toBe(0);
 
       // AC 5 exact header shape: `<short-sha>  <YYYY-MM-DD>  <subject>`.
-      // We pinned expectedSha in the fixture via `git rev-parse HEAD`, so
-      // the whole line is asserted exactly — no regex wiggle room.
+      // SHA and subject are asserted exactly (SHA pinned via
+      // `git rev-parse HEAD` in the fixture; subject pinned in the spec).
+      // The date is soft-pinned on shape only (YYYY-MM-DD) to tolerate
+      // CI clock skew — asserting today's date verbatim would make this
+      // test flaky near midnight UTC / across slow CI queues.
       const firstLine = result.stdout.split("\n").find((l) => l.length > 0) ?? "";
-      // Date comes from the fixture commit's author date — it's today in
-      // practice but we don't pin it, because Green might clock-skew. So
-      // we assert the SHA + subject exactly and the date shape separately.
       const match = firstLine.match(
         /^([0-9a-f]{8}) {2}(\d{4}-\d{2}-\d{2}) {2}(.+)$/,
       );
