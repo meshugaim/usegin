@@ -68,9 +68,8 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
     "ENG-5040: last colon is the file/line separator (paths with embedded colons)",
     () => {
       // A path like `weird:name.ts:42` splits at the LAST colon: file is
-      // `weird:name.ts`, line is `42`. Documenting the rule here so Green
-      // doesn't split at the first colon and later slices don't have to
-      // re-decide.
+      // `weird:name.ts`, line is `42`. Pinning the rule here so later
+      // slices don't have to re-decide.
       expect(parseCodeHistoryArgs(["weird:name.ts:42"])).toEqual({
         file: "weird:name.ts",
         line: 42,
@@ -88,9 +87,9 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
   });
 
   test("ENG-5040: throws when the arg has no colon separator", () => {
-    // Pin EXACT wording so Green commits to one phrasing — downstream
-    // slices and the E2E stderr assertion below re-use it. This is the
-    // canonical "what you typed doesn't match the grammar" message.
+    // Pin EXACT wording — downstream slices and the E2E stderr assertion
+    // below re-use this phrasing. This is the canonical "what you typed
+    // doesn't match the grammar" message.
     expect(() => parseCodeHistoryArgs(["src/foo.ts"])).toThrow(
       'Expected <file>:<line>, got "src/foo.ts"',
     );
@@ -111,10 +110,10 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
   });
 
   test("ENG-5040: throws when extra positionals are present (grammar is exactly one)", () => {
-    // Regression for the Green-phase bug where the parser silently kept
-    // the first positional and dropped the rest — `session code-history
-    // foo:1 bar:2` used to take `foo:1` and ignore `bar:2` with no
-    // warning. Close the grammar: extras are a hard error.
+    // Regression guard: an earlier implementation silently kept the first
+    // positional and dropped the rest — `session code-history foo:1 bar:2`
+    // used to take `foo:1` and ignore `bar:2` with no warning. The grammar
+    // is closed: extras are a hard error.
     expect(() =>
       parseCodeHistoryArgs(["src/foo.ts:1", "src/bar.ts:2"]),
     ).toThrow(/extra|unexpected|one <file>:<line>/i);
@@ -153,9 +152,9 @@ describe("session code-history --help (AC 3)", () => {
   test(
     "ENG-5040: --help works outside a git repo (guards against calling `getMostRecentCommit` before branching on help)",
     async () => {
-      // A tmp dir with no `.git` — Green must branch on `parsed === 'help'`
-      // BEFORE reaching the git layer, otherwise help breaks when invoked
-      // anywhere outside a repo.
+      // A tmp dir with no `.git` — the command must branch on
+      // `parsed === 'help'` BEFORE reaching the git layer, otherwise help
+      // breaks when invoked anywhere outside a repo.
       await withTempDir("code-history-nohelp-", (noRepoDir) => {
         const result = runCli(["code-history", "--help"], noRepoDir);
         expect(result.exitCode).toBe(0);
@@ -299,10 +298,11 @@ describe("session code-history end-to-end", () => {
   test(
     "ENG-5040: running outside a git repo → non-zero exit with a clear git error, NOT a misleading 'No committed history' message",
     async () => {
-      // Regression for the Green-phase bug where any `git log` nonzero exit
-      // was silently routed to AC 19's "No committed history" path. Outside
-      // a git repo, git errors with `fatal: not a git repository` — that
-      // must surface to the user, not get squashed into the no-history path.
+      // Regression guard: an earlier implementation silently routed any
+      // `git log` nonzero exit to AC 19's "No committed history" path.
+      // Outside a git repo, git errors with `fatal: not a git repository`
+      // — that must surface to the user, not get squashed into the
+      // no-history path.
       await withTempDir("code-history-norepo-", (noRepoDir) => {
         // Create a real file so upfront file-existence validation passes —
         // we want to exercise the git-layer failure path, not the AC 2

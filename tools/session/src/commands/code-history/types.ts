@@ -27,8 +27,7 @@ export interface DecoratedCommit {
    * Empty body is represented as `""` (empty string) — NOT `null`, NOT
    * `undefined`, NOT omitted. The JSON mode (slice 6) MUST emit `body`
    * as `""` in the empty case so consumers can rely on the key being
-   * present and string-typed. Resolves an ambiguity surfaced in the
-   * ENG-5040 Red review.
+   * present and string-typed.
    */
   body: string;
 }

@@ -119,10 +119,13 @@ export function makeFixtureRepo(spec: FixtureRepoSpec = {}): FixtureRepo {
       cwd: dir,
       env: {
         ...process.env,
-        GIT_AUTHOR_NAME: "Red Test",
-        GIT_AUTHOR_EMAIL: "red@example.com",
-        GIT_COMMITTER_NAME: "Red Test",
-        GIT_COMMITTER_EMAIL: "red@example.com",
+        // Pinned author/committer so `git log --format=%an/%ae` stays
+        // deterministic across CI environments that may not have a global
+        // git identity configured.
+        GIT_AUTHOR_NAME: "Code History Test",
+        GIT_AUTHOR_EMAIL: "code-history-test@example.com",
+        GIT_COMMITTER_NAME: "Code History Test",
+        GIT_COMMITTER_EMAIL: "code-history-test@example.com",
       },
       stdin: opts.stdin ? new TextEncoder().encode(opts.stdin) : undefined,
     });

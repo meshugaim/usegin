@@ -85,9 +85,9 @@ describe("getMostRecentCommit (unit)", () => {
   test(
     "ENG-5040: running outside a git repo → throws with a clear message",
     async () => {
-      // This is the Issue-1 regression: previously, any nonzero git exit
-      // was silently classified as "no history" → null. That misled the
-      // user when git actually failed (e.g. not a repo). Now: throws.
+      // Regression guard: an earlier implementation silently classified
+      // any nonzero git exit as "no history" → null. That misled the user
+      // when git actually failed (e.g. not a repo). Now: throws.
       await withTempDir("code-history-git-unit-", async (noRepoDir) => {
         // Create a real file so we exercise the git-layer failure path
         // (not "file doesn't exist", which isn't this layer's concern).

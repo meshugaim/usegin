@@ -1,9 +1,8 @@
 /**
  * Unit tests for the pure helpers in `./helpers.ts`.
  *
- * These are NOT `test.failing` Red scaffolds — they pin the behavior of
- * helpers that already work, so slices 2+ notice immediately if the
- * commit-message shape drifts away from git's trailer convention.
+ * These pin the behavior of helpers so slices 2+ notice immediately if
+ * the commit-message shape drifts away from git's trailer convention.
  */
 
 import { describe, test, expect } from "bun:test";
