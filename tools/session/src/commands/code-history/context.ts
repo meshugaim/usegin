@@ -287,6 +287,12 @@ function findCommitAuthoringTurnIndex(
   turns: Turn[],
   sha: string,
 ): number | null {
+  // Empty-SHA guard: `shaPrefixMatch(anyHash, "")` would be true because
+  // `.startsWith("")` is always true — which would resolve to the first
+  // `git commit` Bash in `turns`. Not user-visible today (all call sites
+  // pass a real SHA) but brittle; bail explicitly so the predicate can't
+  // silently degenerate into "first commit found" if a caller ever slips.
+  if (sha === "") return null;
   for (let i = 0; i < turns.length; i += 1) {
     const turn = turns[i];
     if (!turn || turn.role !== "assistant") continue;

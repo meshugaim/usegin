@@ -806,3 +806,31 @@ describe("idempotence meta-tests", () => {
     expect(turns).toEqual(snapshot);
   });
 });
+
+// ============================================================================
+// empty-SHA defensive guard — extractTrigger + extractOutcome
+// ============================================================================
+//
+// `shaPrefixMatch` uses `.startsWith`, which returns `true` for the empty
+// string against any input — so without an explicit guard, `extractTrigger`
+// / `extractOutcome` called with `sha: ""` would resolve to the first
+// `git commit` Bash in the turn list. Today every call site passes a real
+// SHA, but pin the behavior so a future caller that slips gets a clean
+// `null` rather than a silently-wrong first-commit match.
+
+describe("empty-SHA defensive guard", () => {
+  test("extractTrigger + extractOutcome return null for empty SHA", () => {
+    const [bashA, bashUser] = makeBashTurn(
+      'git commit -m "real commit"',
+      "[main abc1234] real commit",
+    );
+    const turns = [
+      makeUserTurn("real user ask"),
+      bashA,
+      bashUser,
+      makeAssistantTurn({ text: "real outcome" }),
+    ];
+    expect(extractTrigger(turns, "")).toBeNull();
+    expect(extractOutcome(turns, "")).toBeNull();
+  });
+});
