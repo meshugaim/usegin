@@ -95,10 +95,19 @@ export function formatBody(body: string): string {
   // Drop blank lines so `"foo\n\nbar"` renders as `"foo bar"`, not
   // `"foo "`. Taking the first 2 non-blank lines matches the spec's
   // "first 2 lines" rule without being tripped up by incidental gaps.
-  const nonBlank = stripped.split("\n").filter((l) => l.length > 0);
+  //
+  // Loop + break (rather than filter + slice) so we stop scanning as
+  // soon as we have enough. Matters when slices 4/5 start walking
+  // multiple commits per invocation — no need to pay O(n) over a long
+  // body to discover the first two lines.
+  const nonBlank: string[] = [];
+  for (const l of stripped.split("\n")) {
+    if (l.length > 0) nonBlank.push(l);
+    if (nonBlank.length === 2) break;
+  }
   if (nonBlank.length === 0) return "";
 
-  const joined = nonBlank.slice(0, 2).join(" ");
+  const joined = nonBlank.join(" ");
 
   // Only truncate when STRICTLY over the limit. A body that is exactly
   // BODY_PREVIEW_MAX_LEN chars long stays whole; MAX+1 gets cut to
