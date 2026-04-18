@@ -209,6 +209,20 @@ describe("truncate", () => {
     expect(result!.slice(0, CONTEXT_MAX_LEN - 1)).toBe("a".repeat(CONTEXT_MAX_LEN - 1));
   });
 
+  // Boundary pins — exactly-at-cap stays untouched, one-over truncates.
+  test("value exactly at cap (post-collapse) → unchanged, no ellipsis", () => {
+    const exact = "a".repeat(CONTEXT_MAX_LEN);
+    expect(truncate(exact)).toBe(exact);
+  });
+
+  test("value exactly cap+1 (post-collapse) → truncates to cap with ellipsis", () => {
+    const oneOver = "a".repeat(CONTEXT_MAX_LEN + 1);
+    const result = truncate(oneOver);
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(CONTEXT_MAX_LEN);
+    expect(result!.endsWith(CONTEXT_ELLIPSIS)).toBe(true);
+  });
+
   test("null → null", () => {
     expect(truncate(null)).toBeNull();
   });
