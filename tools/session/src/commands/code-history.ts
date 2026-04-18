@@ -13,15 +13,15 @@
  *   - Body preview line   — AC 8, AC 9 (ENG-5041 slice 2)
  *   - Rename following    — AC 20       (ENG-5041 slice 2)
  *   - Reserved-flag rejection — AC 24   (ENG-5041 slice 2)
+ *   - `session:` line     — AC 6, AC 13 (ENG-5043 slice 4)
  *
  * Future slices extend `runCodeHistory` with:
- *   - `session:` line (slice 4)
  *   - `linear:` line (slice 5)
  *   - `--json` mode (slice 6)
  *
  * TODO: Slice numbering mirrors ENG-5040's plan. If slices re-number
  * (e.g., JSON lands before linear), sweep references across this module:
- * grep `slice 4|slice 5|slice 6` in
+ * grep `slice 5|slice 6` in
  * tools/session/src/commands/code-history{,.ts,.test.ts,/format.ts,/trailers.ts}.
  */
 
