@@ -3,7 +3,7 @@
  *
  * Git's trailer convention (per `git-interpret-trailers(1)`): a trailer is a
  * group of `Key: value` lines at the END of a commit message, separated from
- * the body proper by exactly one blank line. Mid-body lines that happen to
+ * the body proper by at least one blank line. Mid-body lines that happen to
  * match `Key: value` (e.g. "Note: this is a special case") are NOT trailers.
  *
  * WHY PURE TYPESCRIPT (not `git interpret-trailers --parse`):
