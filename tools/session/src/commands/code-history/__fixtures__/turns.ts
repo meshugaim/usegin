@@ -131,7 +131,7 @@ export function makeAssistantTurn(opts: MakeAssistantTurnOptions = {}): Turn {
  * result so extractors that pair calls↔results by `toolUseId` see a
  * consistent graph.
  */
-export function makeBashTurn(command: string, resultText: string): Turn[] {
+export function makeBashTurn(command: string, resultText: string): [Turn, Turn] {
   const toolUseId: ToolUseId = asToolUseId(nextUuid("tool"));
   const assistantUuid = nextUuid("a");
   const userUuid = nextUuid("u");
