@@ -334,21 +334,29 @@ export const CODE_HISTORY_RESERVED_FLAG_MESSAGE =
 export function parseCodeHistoryArgs(
   args: string[],
 ): CodeHistoryArgs | "help" {
-  // Help takes precedence over everything else — `session code-history --help`
-  // should print help even if a malformed positional is also present.
+  // These two passes stay separate (rather than merged into a single loop)
+  // on purpose:
+  //   1. --help wins over everything, including reserved-flag detection —
+  //      `session code-history --help -n 3` should print help, not the
+  //      reserved-flag error.
+  //   2. The reserved-flag reject runs BEFORE the positional-count check
+  //      further down so `-n 3 file:1` surfaces the pinned ENG-5048
+  //      message instead of the generic "extra positionals" path.
+  // Keeping the ordering in three explicit passes makes the precedence
+  // obvious at a glance and is cheap for a 4-element reserved list.
+
+  // Pass 1: --help wins over everything.
   for (const arg of args) {
     if (arg === "--help" || arg === "-h") {
       return "help";
     }
   }
 
-  // Reserved-flag rejection (AC 24) — checked BEFORE the positional-count
-  // check so `-n 3 file:1` routes to the pinned "not yet / ENG-5048"
-  // message instead of the generic "unexpected extra arguments" path
-  // (which would fire because the parser currently treats `-n` as an
-  // unknown flag and `3` as an extra positional). Ignore values — we
-  // match on the flag NAME only, since each reserved flag has its own
-  // value shape (`-n N`, `--all` bare, `-L a,b`, `--func name`).
+  // Pass 2: reserved-flag rejection (AC 24). Match on flag NAME only —
+  // each reserved flag has its own value shape (`-n N`, `--all` bare,
+  // `-L a,b`, `--func name`) and we don't need to consume the value to
+  // know we won't honor the flag. `.includes` on a 4-element readonly
+  // array is fine; a Set wouldn't read any clearer.
   for (const arg of args) {
     if (CODE_HISTORY_RESERVED_FLAGS.includes(arg)) {
       throw new Error(CODE_HISTORY_RESERVED_FLAG_MESSAGE);
