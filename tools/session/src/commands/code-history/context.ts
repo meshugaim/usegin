@@ -10,14 +10,19 @@
  * test in `context.test.ts` — see the test for the exact forbidden
  * tokens.
  *
- * Part A (ENG-5050) — currently in this file:
+ * Public API:
  *   - `truncate` — whitespace run-collapse + 200-char cap with "…"
- *   - `extractIntent` — first "real" user turn text, skipping caveats
- *     and command wrappers
- *   - `isCommandOrCaveat` — predicate reused by Part B's trigger walk
+ *     (+ `CONTEXT_MAX_LEN` / `CONTEXT_ELLIPSIS` constants)
+ *   - `isCommandOrCaveat` — text predicate for system-injected wrappers
+ *   - `extractIntent(turns)` — first real user ask in the session
+ *   - `extractTrigger(turns, sha)` — user ask immediately preceding the
+ *     commit-authoring Bash turn for `sha`
+ *   - `extractOutcome(turns, sha)` — first text-bearing assistant turn
+ *     immediately following the commit-authoring Bash turn for `sha`
  *
- * Part B (ENG-5051) will add `extractTrigger` / `extractOutcome`
- * alongside these, reusing `truncate` + `isCommandOrCaveat`.
+ * Slice 4 (ENG-5043) wires these extractors into the `session code-history`
+ * command pipeline. Until then the module is self-contained and tested in
+ * isolation via `context.test.ts`.
  */
 
 // Type-only imports — zero runtime dependency, preserves pure-module invariant.
@@ -90,8 +95,10 @@ function truncateString(value: string): string {
  *   - Truncation is applied AFTER whitespace collapse, so a 300-char
  *     input that's mostly `\n` can end up short of the cap.
  *   - When the collapsed value exceeds the cap, output is exactly
- *     `CONTEXT_MAX_LEN` chars: 199 of content + the ellipsis — same
- *     rule as the body preview line from ENG-5041.
+ *     `CONTEXT_MAX_LEN` chars: 199 of content + the ellipsis. (The
+ *     cap-includes-ellipsis convention matches ENG-5041's body-preview
+ *     truncation, but the numeric budgets differ — see the constant
+ *     docstring above.)
  *
  * Pure function: no mutation of the input, no side effects.
  */
@@ -116,9 +123,9 @@ export function truncate(value: string | null): string | null {
  *     for a real user turn.
  *   - `Caveat: …` style free-text preambles emitted before real input.
  *
- * Used by `extractIntent` to skip over these when hunting for the first
- * real user turn, and will be reused by Part B's `extractTrigger`
- * backward-walk to find the last real user ask before an assistant turn.
+ * Used by `isRealUserTurn` (see below), which in turn is shared by
+ * `extractIntent` (forward first-match) and `extractTrigger` (backward
+ * nearest-match) to skip system-injected turns in either direction.
  *
  * Known false-positive: a user message starting with literal `<` in prose
  * would be skipped. In practice this hasn't been observed — Claude Code's
@@ -225,9 +232,9 @@ function isTextBearingAssistantTurn(turn: Turn): boolean {
  *
  * Pure: the input array is not mutated; `Array.find` reads each turn
  * at most once and exits on the first match. Chosen over a `for…of`
- * walk because ENG-5051 will land `extractTrigger` / `extractOutcome`
- * alongside this — a backward walk there is naturally `findLast`, so
- * the family reads as a set.
+ * walk so the family of three extractors reads as a set — `extractIntent`
+ * uses `.find`, `extractTrigger` uses `.findLast`, `extractOutcome` uses
+ * `.find` against a `slice`.
  */
 export function extractIntent(turns: Turn[]): string | null {
   const intent = turns.find(isRealUserTurn);
