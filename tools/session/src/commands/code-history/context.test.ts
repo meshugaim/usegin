@@ -199,6 +199,23 @@ describe("truncate", () => {
     expect(result).toBe(" hello");
   });
 
+  test.failing("collapse-then-truncate when BOTH raw and collapsed exceed cap", () => {
+    // Mirror of the above: raw length 252 AND collapsed length 251 — both
+    // exceed the 200-char cap, so truncation must still fire. Pins the
+    // rule in the opposite direction: collapse happens first, then the
+    // length check, and the 200-char cap still applies when the
+    // collapsed value is long.
+    const raw = "\n\n" + "a".repeat(250);
+    expect(raw.length).toBe(252);
+    const result = truncate(raw);
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(200);
+    expect(result!.endsWith("…")).toBe(true);
+    // After collapse: " " + 250 a's (251 chars). Truncate to 200:
+    // first 199 chars of collapsed value + ellipsis = " " + 198 a's + "…".
+    expect(result!).toBe(" " + "a".repeat(198) + "…");
+  });
+
   // Meta-test — plain test, mutation guard
   test("idempotence: same string twice → same result", () => {
     const input = "hello\nworld";
