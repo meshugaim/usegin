@@ -138,6 +138,15 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
       // null. Regression-guard for the AC 9 missing-layer invariant
       // at BOTH phases: "no ENG ref" is the normal case, not a
       // failure — no subprocess, no stderr noise.
+      //
+      // Red-phase trivial pass: the Red stub returns the commit
+      // unchanged regardless of trailer presence, so this assertion
+      // green-passes today without exercising any extractor. Lands as
+      // a real regression guard once Green wires
+      // extractLinearRef → null → skip-fetch path (the "fetch not
+      // called, warn not called" shape then becomes a genuine
+      // assertion about the skip branch, not an artifact of the
+      // stub).
       const commit = makeCommit({
         body: "Just a plain body with no issue ref.",
       });
