@@ -161,7 +161,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
   // test — clearer failure output than one test with a forEach inside.
   // (Bun test supports dynamic test registration inside describe.)
   for (const flag of CODE_HISTORY_RESERVED_FLAGS) {
-    test.failing(
+    test(
       `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` with the pinned "not yet / ENG-5048" message (basic presence)`,
       () => {
         // Flag BEFORE the positional: `-n 3 file.ts:1`. The parser must
@@ -172,7 +172,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
       },
     );
 
-    test.failing(
+    test(
       `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` even when it appears AFTER the positional (basic presence)`,
       () => {
         // Regression guard: an implementation that only scans `args[0]`
@@ -186,7 +186,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
 
   // Realistic-shape tests — one per reserved flag, matching the shape a
   // user would actually type. All reject with the same pinned message.
-  test.failing(
+  test(
     "ENG-5041 (AC 24): rejects `-n 3 <file>:<line>` (user form — count flag + numeric arg)",
     () => {
       expect(() =>
@@ -195,7 +195,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 24): rejects `--all <file>:<line>` (user form — bare flag, no argument)",
     () => {
       // Guards the "parser expects a value after every reserved flag"
@@ -206,7 +206,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 24): rejects `-L 2,5 <file>:<line>` (user form — range arg like git log -L)",
     () => {
       // `-L` in git takes a `start,end` range. We must reject the flag
@@ -217,7 +217,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 24): rejects `--func myFn <file>:<line>` (user form — value arg that isn't a number)",
     () => {
       // `--func` takes a function name. Guards against a parser that
@@ -246,7 +246,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 24): the parser actually USES the pinned constant (guards against drift to a hardcoded string)",
     () => {
       // Parser-contract check — Green flips this to passing. If the
@@ -664,7 +664,7 @@ describe("session code-history reserved flags (AC 24)", () => {
   // we don't pay for `git init` on tests that never need it.
 
   for (const flag of CODE_HISTORY_RESERVED_FLAGS) {
-    test.failing(
+    test(
       `ENG-5041 (AC 24): \`${flag}\` → exit 1, stderr contains "not yet" AND "ENG-5048"`,
       async () => {
         await withTempDir("code-history-reserved-", (tmpDir) => {

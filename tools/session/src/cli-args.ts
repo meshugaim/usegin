@@ -342,6 +342,19 @@ export function parseCodeHistoryArgs(
     }
   }
 
+  // Reserved-flag rejection (AC 24) — checked BEFORE the positional-count
+  // check so `-n 3 file:1` routes to the pinned "not yet / ENG-5048"
+  // message instead of the generic "unexpected extra arguments" path
+  // (which would fire because the parser currently treats `-n` as an
+  // unknown flag and `3` as an extra positional). Ignore values — we
+  // match on the flag NAME only, since each reserved flag has its own
+  // value shape (`-n N`, `--all` bare, `-L a,b`, `--func name`).
+  for (const arg of args) {
+    if (CODE_HISTORY_RESERVED_FLAGS.includes(arg)) {
+      throw new Error(CODE_HISTORY_RESERVED_FLAG_MESSAGE);
+    }
+  }
+
   // Find positionals. The spec accepts EXACTLY one — no more, no less.
   // Previously any extra positionals were silently ignored, which meant
   // `session code-history foo:1 bar:2` took `foo:1` and dropped `bar:2`
