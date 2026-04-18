@@ -443,9 +443,31 @@ export interface CliResult {
  * Spawn the session CLI with `args` and `cwd`. See the module header for
  * why we go through a subprocess instead of calling `runCodeHistory`
  * directly.
+ *
+ * `opts.env` merges into (and overrides) the inherited `process.env`.
+ * Slice 4 (ENG-5043) uses this to point `HOME` at a per-test temp dir
+ * so `fetchSession`'s `getClaudeProjectsDir()` looks up fixture JSONLs
+ * under the sandboxed home without polluting the developer's real
+ * `~/.claude/projects/`. The env-merge (rather than an env-replace)
+ * keeps essential tools like `bun` on PATH while letting tests swap
+ * out targeted variables.
  */
-export function runCli(args: string[], cwd: string): CliResult {
-  const proc = Bun.spawnSync(["bun", CLI_ENTRY, ...args], { cwd });
+export interface RunCliOptions {
+  env?: Record<string, string>;
+}
+export function runCli(
+  args: string[],
+  cwd: string,
+  opts: RunCliOptions = {},
+): CliResult {
+  const env =
+    opts.env === undefined
+      ? undefined
+      : { ...process.env, ...opts.env };
+  const spawnArgs: Parameters<typeof Bun.spawnSync>[1] = env
+    ? { cwd, env }
+    : { cwd };
+  const proc = Bun.spawnSync(["bun", CLI_ENTRY, ...args], spawnArgs);
   return {
     exitCode: proc.exitCode ?? -1,
     stdout: new TextDecoder().decode(proc.stdout),
@@ -477,6 +499,40 @@ export async function withTempDir<T>(
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Seed a session JSONL at the path `fetchSession` would look for it, so
+ * subprocess CLI tests can exercise the full slice-4 pipeline (trailer
+ * parse → local resolve → parse → extractors → render) without hitting
+ * real `~/.claude/projects/` or `~/agent-records/`.
+ *
+ * The layout mirrors what Claude Code creates:
+ *   `<homeDir>/.claude/projects/<dashed-cwd>/<sessionId>.jsonl`
+ *
+ * Where `<dashed-cwd>` matches `finder/discovery.ts#getCurrentProjectHash`
+ * (the cwd with `/` → `-`). Tests MUST pass `HOME=<homeDir>` to `runCli`
+ * so `homedir()` resolves to `homeDir` inside the subprocess.
+ *
+ * `jsonl` is the already-JSONL-encoded file contents (one entry per line
+ * via `JSON.stringify(entry)`). Centralizing the path math here keeps
+ * each test focused on what the session *contains* rather than *where*
+ * it lives.
+ *
+ * Returns the full path to the seeded file for assertions / cleanup.
+ */
+export function seedSessionJsonl(
+  homeDir: string,
+  cwd: string,
+  sessionId: string,
+  jsonl: string,
+): string {
+  const dashedCwd = cwd.replace(/\//g, "-");
+  const sessionDir = join(homeDir, ".claude", "projects", dashedCwd);
+  mkdirSync(sessionDir, { recursive: true });
+  const sessionPath = join(sessionDir, `${sessionId}.jsonl`);
+  writeFileSync(sessionPath, jsonl);
+  return sessionPath;
 }
 
 /**

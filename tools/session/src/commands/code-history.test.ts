@@ -43,11 +43,13 @@ import {
   makeFixtureRepo,
   makeFixtureRepoWithRename,
   runCli,
+  seedSessionJsonl,
   withFixtureRepo,
   withTempDir,
   type FixtureRepo,
   type FixtureRepoWithRename,
 } from "./code-history/__fixtures__/helpers";
+import { userEntry, assistantEntry } from "../testing";
 
 // =============================================================================
 // ARG PARSER (AC 1, AC 2)
@@ -686,4 +688,290 @@ describe("session code-history reserved flags (AC 24)", () => {
       },
     );
   }
+});
+
+// =============================================================================
+// END-TO-END CLI — session block (AC 6, AC 13) — ENG-5043
+// =============================================================================
+//
+// These tests exercise the full slice-4 pipeline through the CLI: trailer
+// parse → `fetchSession` (local-hit) → `parseSession` → extractors →
+// `formatSessionBlock`. `HOME` is redirected to a per-test temp dir so
+// `getClaudeProjectsDir()` looks up a fixture JSONL we seed by hand,
+// never the developer's real `~/.claude/projects/`.
+//
+// The in-process tests in `code-history/session-decorate.test.ts` cover
+// the SessionNotFoundError vs generic-error classification without the
+// subprocess cost. These tests here pin the stdout SHAPE produced by
+// the real CLI for the happy / no-trailer / multi-trailer / fetch-miss
+// paths.
+
+/** Fixture UUID used across the E2E session-block tests. */
+const SESSION_FIXTURE_ID = "533a2546-684a-4724-b592-34aa88aac626";
+/** Shorter form that appears in the `(→ session <shortId> --since-timestamp …)` hint. */
+const SESSION_FIXTURE_SHORT_ID = "533a2546";
+
+/**
+ * Build a minimal JSONL payload for a Claude-authored commit. The
+ * extractors (`extractIntent`/`extractTrigger`/`extractOutcome`) drive
+ * what values show up in the session block, so the turn sequence here
+ * is shaped to exercise all three:
+ *
+ *   1. User intent message.
+ *   2. Assistant runs `git commit`, tool_result reports the SHA.
+ *   3. Assistant outcome message.
+ *
+ * `commitShortSha` MUST match the actual short SHA of the fixture
+ * commit — otherwise `findCommitAuthoringTurnIndex` can't pair the
+ * tool_use to a commit and trigger/outcome degrade to `null`.
+ */
+function makeSessionJsonl(commitShortSha: string): string {
+  const entries = [
+    userEntry("u1", "Wire session extractors into code-history.", {
+      parentUuid: null,
+    }),
+    assistantEntry("a1", "", {
+      parentUuid: "u1",
+      toolCalls: [
+        {
+          id: "bash-1",
+          name: "Bash",
+          input: { command: `git commit -m "feat: add session block"` },
+        },
+      ],
+    }),
+    userEntry("u2", "", {
+      parentUuid: "a1",
+      toolResults: [
+        {
+          toolUseId: "bash-1",
+          content: `[main ${commitShortSha}] feat: add session block`,
+        },
+      ],
+    }),
+    assistantEntry("a2", "Committed the session block. Running tests next.", {
+      parentUuid: "u2",
+    }),
+  ];
+  return entries.map((e) => JSON.stringify(e)).join("\n") + "\n";
+}
+
+describe("session code-history session block (AC 6, AC 13) — ENG-5043", () => {
+  test.failing(
+    "ENG-5043 (AC 6): Claude-Session trailer + resolvable session JSONL → full block renders after header, before body",
+    async () => {
+      await withTempDir("code-history-session-home-", async (homeDir) => {
+        await withFixtureRepo(
+          {
+            commits: [
+              { subject: "initial: seed target file" },
+              {
+                subject: "feat: add the session block",
+                body: "Make the plain-mode render cover the session layer.",
+                trailers: {
+                  "Claude-Session": SESSION_FIXTURE_ID,
+                  "Part of": "ENG-5043",
+                },
+              },
+            ],
+          },
+          async (fx) => {
+            // Seed the session JSONL at the path `fetchSession` /
+            // `findSessionById` will look when HOME is pointed at `homeDir`
+            // and cwd is `fx.dir`. Extractors need the commit's short SHA
+            // to find the authoring Bash turn → pair trigger / outcome to
+            // it. The fixture returns the short form already.
+            seedSessionJsonl(
+              homeDir,
+              fx.dir,
+              SESSION_FIXTURE_ID,
+              makeSessionJsonl(fx.expectedSha),
+            );
+
+            const result = runCli(
+              ["code-history", `${fx.file}:2`],
+              fx.dir,
+              { env: { HOME: homeDir } },
+            );
+
+            expect(result.exitCode).toBe(0);
+
+            const lines = result.stdout.split("\n");
+            // Block ordering: header → session → body. Pin the FIRST four
+            // non-empty lines so ordering is unambiguous.
+            const nonEmpty = lines.filter((l) => l.length > 0);
+            expect(nonEmpty.length).toBeGreaterThanOrEqual(5);
+            // Line 0: header (sha + date + subject)
+            expect(nonEmpty[0]).toMatch(
+              /^[0-9a-f]{8} {2}\d{4}-\d{2}-\d{2} {2}feat: add the session block$/,
+            );
+            // Line 1: session line at 4-space indent
+            expect(nonEmpty[1]).toMatch(
+              new RegExp(
+                `^ {4}session: {2}${SESSION_FIXTURE_ID} {2}\\(→ session ${SESSION_FIXTURE_SHORT_ID} --since-timestamp \\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}Z\\)$`,
+              ),
+            );
+            // Lines 2-4: nested context lines at 6-space indent
+            const nestedLines = nonEmpty.slice(2, 5);
+            expect(nestedLines[0]).toBe(
+              "      intent:   Wire session extractors into code-history.",
+            );
+            expect(nestedLines[1]).toBe(
+              "      trigger:  Wire session extractors into code-history.",
+            );
+            expect(nestedLines[2]).toBe(
+              "      outcome:  Committed the session block. Running tests next.",
+            );
+            // Body line comes AFTER the session block — pin ordering
+            // explicitly so a future tweak that re-orders doesn't slip.
+            const bodyIdx = nonEmpty.findIndex((l) => l.startsWith("body:"));
+            expect(bodyIdx).toBeGreaterThan(4);
+            expect(nonEmpty[bodyIdx]).toBe(
+              "body: Make the plain-mode render cover the session layer.",
+            );
+          },
+        );
+      });
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 6): commit without Claude-Session trailer → no session line in stdout",
+    async () => {
+      // Default-shape fixture: commits have subject only, no trailers.
+      // Session block must be completely absent — not a placeholder, not
+      // a blank line.
+      await withFixtureRepo(undefined, (fx) => {
+        const result = runCli(
+          ["code-history", `${fx.file}:2`],
+          fx.dir,
+        );
+        expect(result.exitCode).toBe(0);
+        const hasSessionLine = result.stdout
+          .split("\n")
+          .some((l) => l.trimStart().startsWith("session:"));
+        expect(hasSessionLine).toBe(false);
+      });
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 6): multiple Claude-Session trailers (amend case) → LAST trailer's UUID used in session line",
+    async () => {
+      const UUID_EARLIER = "11111111-1111-4111-8111-111111111111";
+      const UUID_LATER = "22222222-2222-4222-8222-222222222222";
+
+      await withTempDir("code-history-session-multi-", async (homeDir) => {
+        await withFixtureRepo(
+          {
+            commits: [
+              { subject: "initial: seed" },
+              {
+                subject: "feat: amended with two session trailers",
+                trailers: {
+                  // Record insertion order — the LATER one overwrites
+                  // any prior value of the same key. Git's trailer
+                  // convention keeps both on separate lines though, so
+                  // compose a body manually to emit both.
+                },
+                body: [
+                  "Amended body preamble.",
+                  "",
+                  `Claude-Session: ${UUID_EARLIER}`,
+                  `Claude-Session: ${UUID_LATER}`,
+                ].join("\n"),
+              },
+            ],
+          },
+          async (fx) => {
+            // Seed the LATER UUID's session so fetchSession succeeds for
+            // the one we expect to win — the earlier UUID has no JSONL.
+            seedSessionJsonl(
+              homeDir,
+              fx.dir,
+              UUID_LATER,
+              makeSessionJsonl(fx.expectedSha),
+            );
+
+            const result = runCli(
+              ["code-history", `${fx.file}:2`],
+              fx.dir,
+              { env: { HOME: homeDir } },
+            );
+            expect(result.exitCode).toBe(0);
+
+            const sessionLine = result.stdout
+              .split("\n")
+              .find((l) => l.trimStart().startsWith("session:"));
+            expect(sessionLine).toBeDefined();
+            expect(sessionLine).toContain(UUID_LATER);
+            expect(sessionLine).not.toContain(UUID_EARLIER);
+          },
+        );
+      });
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 13): Claude-Session trailer but JSONL missing on disk → session line only, no extractors, exit 0, no stderr noise",
+    async () => {
+      // SessionNotFoundError path. The trailer points at a UUID for which
+      // no JSONL exists under HOME or the (non-existent) agent-records
+      // archive. The command MUST degrade to the session line + hint,
+      // omit the nested context lines, and exit 0.
+      await withTempDir("code-history-session-missing-", async (homeDir) => {
+        await withFixtureRepo(
+          {
+            commits: [
+              { subject: "initial: seed" },
+              {
+                subject: "feat: commit whose session is gone",
+                trailers: {
+                  "Claude-Session": SESSION_FIXTURE_ID,
+                },
+              },
+            ],
+          },
+          (fx) => {
+            // HOME points at a fresh empty dir — .claude/projects/ doesn't
+            // even exist, so findSessionById returns null → SessionNotFoundError.
+            const result = runCli(
+              ["code-history", `${fx.file}:2`],
+              fx.dir,
+              { env: { HOME: homeDir } },
+            );
+
+            expect(result.exitCode).toBe(0);
+
+            // Session line renders with the hint.
+            const sessionLine = result.stdout
+              .split("\n")
+              .find((l) => l.trimStart().startsWith("session:"));
+            expect(sessionLine).toBeDefined();
+            expect(sessionLine).toContain(SESSION_FIXTURE_ID);
+            expect(sessionLine).toContain(SESSION_FIXTURE_SHORT_ID);
+            expect(sessionLine).toContain("--since-timestamp");
+
+            // No extractor lines when fetch failed.
+            const hasIntent = result.stdout
+              .split("\n")
+              .some((l) => l.trimStart().startsWith("intent:"));
+            const hasTrigger = result.stdout
+              .split("\n")
+              .some((l) => l.trimStart().startsWith("trigger:"));
+            const hasOutcome = result.stdout
+              .split("\n")
+              .some((l) => l.trimStart().startsWith("outcome:"));
+            expect(hasIntent).toBe(false);
+            expect(hasTrigger).toBe(false);
+            expect(hasOutcome).toBe(false);
+
+            // AC 13: no stderr noise on this path. Missing context lines
+            // are sufficient signal.
+            expect(result.stderr).toBe("");
+          },
+        );
+      });
+    },
+  );
 });
