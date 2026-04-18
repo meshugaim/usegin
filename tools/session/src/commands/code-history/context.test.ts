@@ -15,7 +15,13 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { extractIntent, isCommandOrCaveat, truncate } from "./context";
+import {
+  CONTEXT_ELLIPSIS,
+  CONTEXT_MAX_LEN,
+  extractIntent,
+  isCommandOrCaveat,
+  truncate,
+} from "./context";
 import { makeAssistantTurn, makeUserTurn } from "./__fixtures__/turns";
 
 // ============================================================================
@@ -113,12 +119,12 @@ describe("extractIntent", () => {
   // downstream consumers receive a ready-to-render string. These two
   // tests pin that boundary — they would fail against a raw-return impl.
   test("long intent is truncated per AC 15 at extractor boundary", () => {
-    const turns = [makeUserTurn("a".repeat(300))];
+    const turns = [makeUserTurn("a".repeat(CONTEXT_MAX_LEN + 100))];
     const result = extractIntent(turns);
     expect(result).not.toBeNull();
-    expect(result!.length).toBe(200);
-    expect(result!.endsWith("…")).toBe(true);
-    expect(result!.slice(0, 199)).toBe("a".repeat(199));
+    expect(result!.length).toBe(CONTEXT_MAX_LEN);
+    expect(result!.endsWith(CONTEXT_ELLIPSIS)).toBe(true);
+    expect(result!.slice(0, CONTEXT_MAX_LEN - 1)).toBe("a".repeat(CONTEXT_MAX_LEN - 1));
   });
 
   test("intent with embedded \\n\\t is collapsed per AC 15", () => {
@@ -189,18 +195,18 @@ describe("isCommandOrCaveat", () => {
 // ============================================================================
 
 describe("truncate", () => {
-  test("value ≤ 200 chars (post-collapse) → unchanged", () => {
+  test("value ≤ cap (post-collapse) → unchanged", () => {
     const short = "a".repeat(50);
     expect(truncate(short)).toBe(short);
   });
 
-  test("value > 200 chars (post-collapse) → truncated with ellipsis, total length 200", () => {
-    const long = "a".repeat(300);
+  test("value > cap (post-collapse) → truncated with ellipsis, total length = cap", () => {
+    const long = "a".repeat(CONTEXT_MAX_LEN + 100);
     const result = truncate(long);
     expect(result).not.toBeNull();
-    expect(result!.length).toBe(200);
-    expect(result!.endsWith("…")).toBe(true);
-    expect(result!.slice(0, 199)).toBe("a".repeat(199));
+    expect(result!.length).toBe(CONTEXT_MAX_LEN);
+    expect(result!.endsWith(CONTEXT_ELLIPSIS)).toBe(true);
+    expect(result!.slice(0, CONTEXT_MAX_LEN - 1)).toBe("a".repeat(CONTEXT_MAX_LEN - 1));
   });
 
   test("null → null", () => {
@@ -234,19 +240,18 @@ describe("truncate", () => {
 
   test("collapse-then-truncate when BOTH raw and collapsed exceed cap", () => {
     // Mirror of the above: raw length 252 AND collapsed length 251 — both
-    // exceed the 200-char cap, so truncation must still fire. Pins the
-    // rule in the opposite direction: collapse happens first, then the
-    // length check, and the 200-char cap still applies when the
-    // collapsed value is long.
+    // exceed the cap, so truncation must still fire. Pins the rule in the
+    // opposite direction: collapse happens first, then the length check,
+    // and the cap still applies when the collapsed value is long.
     const raw = "\n\n" + "a".repeat(250);
     expect(raw.length).toBe(252);
     const result = truncate(raw);
     expect(result).not.toBeNull();
-    expect(result!.length).toBe(200);
-    expect(result!.endsWith("…")).toBe(true);
-    // After collapse: " " + 250 a's (251 chars). Truncate to 200:
-    // first 199 chars of collapsed value + ellipsis = " " + 198 a's + "…".
-    expect(result!).toBe(" " + "a".repeat(198) + "…");
+    expect(result!.length).toBe(CONTEXT_MAX_LEN);
+    expect(result!.endsWith(CONTEXT_ELLIPSIS)).toBe(true);
+    // After collapse: " " + 250 a's (251 chars). Truncate to cap:
+    // first (cap - 1) chars of collapsed value + ellipsis.
+    expect(result!).toBe(" " + "a".repeat(CONTEXT_MAX_LEN - 2) + CONTEXT_ELLIPSIS);
   });
 
   // Meta-test — plain test, mutation guard

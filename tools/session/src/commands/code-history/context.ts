@@ -33,9 +33,13 @@ import type { Turn } from "../../types";
  * budget from ENG-5041 (see `BODY_PREVIEW_MAX_LEN` in `format.ts`): the
  * two budgets are intentionally the same so that a commit-row's body
  * preview and a session-context snippet wrap to the same width.
+ *
+ * Exported because ENG-5051's `extractTrigger` / `extractOutcome` will
+ * reuse the same budget, and downstream test code pins to these constants
+ * rather than hardcoding `200` / `"…"`.
  */
-const TRUNCATE_MAX_LEN = 200;
-const TRUNCATE_ELLIPSIS = "…";
+export const CONTEXT_MAX_LEN = 200;
+export const CONTEXT_ELLIPSIS = "…";
 
 /**
  * Collapse runs of internal whitespace and cap length at 200 chars
@@ -50,7 +54,7 @@ const TRUNCATE_ELLIPSIS = "…";
  *   - Truncation is applied AFTER whitespace collapse, so a 300-char
  *     input that's mostly `\n` can end up short of the cap.
  *   - When the collapsed value exceeds the cap, output is exactly
- *     `TRUNCATE_MAX_LEN` chars: 199 of content + the ellipsis — same
+ *     `CONTEXT_MAX_LEN` chars: 199 of content + the ellipsis — same
  *     rule as the body preview line from ENG-5041.
  *
  * Pure function: no mutation of the input, no side effects.
@@ -64,10 +68,10 @@ const TRUNCATE_ELLIPSIS = "…";
 function truncateString(value: string): string {
   // Run-collapse: every run of \n/\t (any mix, any length) → single space.
   const collapsed = value.replace(/[\n\t]+/g, " ");
-  if (collapsed.length <= TRUNCATE_MAX_LEN) return collapsed;
+  if (collapsed.length <= CONTEXT_MAX_LEN) return collapsed;
   // Total length budget INCLUDES the ellipsis (1 char), so keep
   // MAX_LEN - 1 chars of content + ellipsis = MAX_LEN chars total.
-  return collapsed.slice(0, TRUNCATE_MAX_LEN - 1) + TRUNCATE_ELLIPSIS;
+  return collapsed.slice(0, CONTEXT_MAX_LEN - 1) + CONTEXT_ELLIPSIS;
 }
 
 export function truncate(value: string | null): string | null {
