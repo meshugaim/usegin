@@ -12,7 +12,9 @@
  * Slice 1 (ENG-5040) only populates the four raw git fields. Later slices
  * extend this with:
  *   - session?: { id, intent?, trigger?, outcome?, sinceTimestampCmd }
+ *     (ENG-5043 — landed)
  *   - linear?:  { id, title, status }
+ *     (ENG-5044 — landed)
  */
 export interface DecoratedCommit {
   /** Full commit SHA (40 hex chars). Short SHA is derived at format time. */
@@ -62,5 +64,32 @@ export interface DecoratedCommit {
     trigger?: string;
     outcome?: string;
     sinceTimestampCmd: string;
+  };
+  /**
+   * Linear issue context decoration (slice 5 / ENG-5044).
+   *
+   * Populated by `runCodeHistory` when the commit body mentions an
+   * `ENG-\d+` reference AND `plan show <id> --json` succeeds. Absent
+   * otherwise (no ENG ref, subprocess failure, malformed JSON, timeout).
+   *
+   * All three fields are REQUIRED when `linear` is present — partial
+   * responses from `plan show` are treated as malformed and result in
+   * `linear` being omitted (plus an AC-18 stderr warning from the
+   * decorator naming the issue id).
+   *
+   * Shape matches what `tools/plan-cli/src/lib/output/detail.ts`
+   * `formatShowJson` emits at the top level:
+   *   - `id`     — the Linear identifier (e.g. `ENG-5039`). Populated
+   *     from `identifier` in the JSON (renamed here to `id` for
+   *     consistency with `session.id`).
+   *   - `title`  — issue title, already `truncate`d (ENG-5042 convention
+   *     — consistency with every other user-visible string in the
+   *     plain block).
+   *   - `status` — issue state display name (e.g. "In Progress").
+   */
+  linear?: {
+    id: string;
+    title: string;
+    status: string;
   };
 }
