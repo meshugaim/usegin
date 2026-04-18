@@ -37,14 +37,19 @@ export interface GetMostRecentCommitOptions {
 const GIT_LOG_FIELD_SEP = "\x00";
 
 /**
- * Minimum number of fields per the `%H%x00%cs%x00%s%x00%b` format.
+ * Minimum number of fields per the `%H%x00%cs%x00%cI%x00%s%x00%b` format.
  *
- * The format emits 4 NUL-separated fields; a body containing NULs (git
+ * The format emits 5 NUL-separated fields; a body containing NULs (git
  * doesn't emit them in `%b`, but defensively) would yield more fields,
  * which we rejoin. So this is a LOWER BOUND, not an exact count — hence
  * `MIN_FIELDS`.
+ *
+ * `%cI` (committer ISO-strict date) was added in slice 4 (ENG-5043) so
+ * `formatSinceTimestamp` can derive `<t-30m>` at minute precision. `%cs`
+ * is kept alongside because the header line wants the `YYYY-MM-DD`
+ * form verbatim without re-formatting.
  */
-const MIN_FIELDS = 4;
+const MIN_FIELDS = 5;
 
 /**
  * Git `-L` stderr phrases that indicate the requested line has no
@@ -107,7 +112,7 @@ export async function getMostRecentCommit(
       "-n",
       "1",
       "--no-patch",
-      `--format=%H%x00%cs%x00%s%x00%b`,
+      `--format=%H%x00%cs%x00%cI%x00%s%x00%b`,
     ],
     {
       cwd,
@@ -156,7 +161,7 @@ export async function getMostRecentCommit(
     );
   }
 
-  const [sha, date, subject, ...bodyParts] = parts;
+  const [sha, date, committedAt, subject, ...bodyParts] = parts;
   // The body may itself contain NULs? Git doesn't emit them in %b, but
   // if upstream behavior ever changes, rejoining preserves the full
   // body rather than silently dropping the tail.
@@ -165,6 +170,7 @@ export async function getMostRecentCommit(
   return {
     sha: sha!,
     date: date!,
+    committedAt: committedAt!,
     subject: subject!,
     body,
   };

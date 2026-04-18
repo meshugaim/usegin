@@ -23,6 +23,11 @@ function makeCommit(overrides: Partial<DecoratedCommit> = {}): DecoratedCommit {
   return {
     sha: "4fff467fb48a632519c742358505e9a0a739d525",
     date: "2026-04-18",
+    // Slice 4 (ENG-5043) added `committedAt`. Header tests don't care
+    // about its exact value — they assert on `<sha>  <date>  <subject>`
+    // — but every fresh commit needs a plausible ISO timestamp so slice-4
+    // helpers (`formatSinceTimestamp`) don't blow up on re-used fixtures.
+    committedAt: "2026-04-18T08:43:00+00:00",
     subject: "chore(pre-push): instrument per-stage timings + logger",
     body: "",
     ...overrides,

@@ -46,6 +46,14 @@ describe("getMostRecentCommit (unit)", () => {
       expect(commit!.sha).toHaveLength(40); // full SHA
       expect(commit!.subject).toBe(fixture.expectedSubject);
       expect(commit!.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // ENG-5043: %cI ISO timestamp must be populated (slice 4 needs
+      // minute precision for `formatSinceTimestamp`). Format is
+      // `YYYY-MM-DDTHH:MM:SS[+-]HH:MM` (or `Z` on some gits) — pin the
+      // date-time prefix shape and leave the tz tail permissive so we
+      // don't couple to a specific git version's tz rendering.
+      expect(commit!.committedAt).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+      );
       expect(typeof commit!.body).toBe("string"); // may be "" but always string
     },
   );
