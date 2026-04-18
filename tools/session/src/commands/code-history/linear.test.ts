@@ -157,7 +157,7 @@ describe("formatLinearLine (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (P1): canonical fixture → exact pinned bytes (indent + field spacing + bracketed status)",
     () => {
       const line = formatLinearLine({
@@ -169,7 +169,7 @@ describe("formatLinearLine (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: indent is exactly 4 spaces (value column matches session: / body:)",
     () => {
       const line = formatLinearLine({
@@ -186,7 +186,7 @@ describe("formatLinearLine (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: the value column starts at character index 14 (aligned with `session:`'s column)",
     () => {
       // Slice 4 pins `session:` values at column 14 (see
@@ -203,7 +203,7 @@ describe("formatLinearLine (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: fields separated by exactly 2 spaces (mirrors header and session separators)",
     () => {
       // id ␣␣ title ␣␣ [status]. Guarding the "2 spaces" rule
@@ -220,7 +220,7 @@ describe("formatLinearLine (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (P4): archived / canceled status renders verbatim inside square brackets",
     () => {
       // The AC 7 test bar pinned "archived/canceled issue still
@@ -236,7 +236,7 @@ describe("formatLinearLine (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: status with spaces (`In Progress`) renders without quoting",
     () => {
       // Multi-word statuses ("In Progress", "In Review") are common

@@ -149,12 +149,9 @@ export async function fetchLinearIssue(
 export function formatLinearLine(
   linear: DecoratedCommit["linear"],
 ): string | null {
-  // Red stub — returns a non-null sentinel when `linear` is provided
-  // so the format tests fail on exact-string mismatch, NOT on
-  // null-vs-string. When `linear` is absent, null matches the
-  // missing-layer invariant (so that assertion is effectively a
-  // regression-guard today and stays true in Green).
   if (linear === undefined) return null;
-  void linear;
-  return "<unimplemented>";
+  // 4-space indent + `linear:` (7 chars) + 3 spaces → value column 14,
+  // matching `session:` / `body:`. Fields separated by 2 spaces, status
+  // wrapped in brackets. Layout pinned by `linear.test.ts`.
+  return `    linear:   ${linear.id}  ${linear.title}  [${linear.status}]`;
 }
