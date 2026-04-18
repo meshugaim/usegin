@@ -247,7 +247,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
 describe("formatLinearWarning (ENG-5044)", () => {
   test("ENG-5044 (AC 18): canonical shape for a known id", () => {
     expect(formatLinearWarning("ENG-5044")).toBe(
-      "warning: plan show ENG-5044 failed; linear context skipped",
+      "Warning: plan show ENG-5044 failed; linear context skipped",
     );
   });
 

@@ -70,13 +70,19 @@ export interface DecorateLinearDeps {
  * The spec AC 18 says "single one-line warning naming the issue id".
  * This helper produces:
  *
- *   `warning: plan show <id> failed; linear context skipped`
+ *   `Warning: plan show <id> failed; linear context skipped`
+ *
+ * `Warning:` (capital W) matches the dominant shape across the
+ * `session` CLI (`list.ts`, `find.ts` — `console.error(\`Warning:
+ * …\`)`). Keeping the prefix consistent across commands means
+ * greps like `rg '^Warning:'` stay stable as slices 5/6/… add more
+ * stderr writes.
  *
  * Exported so tests can assert on the exact bytes without hardcoding
  * the template separately.
  */
 export function formatLinearWarning(id: string): string {
-  return `warning: plan show ${id} failed; linear context skipped`;
+  return `Warning: plan show ${id} failed; linear context skipped`;
 }
 
 /**
