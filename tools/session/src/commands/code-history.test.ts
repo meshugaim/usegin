@@ -498,7 +498,7 @@ describe("session code-history body preview (AC 8, AC 9)", () => {
   //     adding body rendering must not start emitting a spurious empty
   //     `body:` line for subject-only or trailers-only commits.
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): commit with body + trailers → stdout includes `body:` line after the header",
     () => {
       const fx = makeFixtureRepo({

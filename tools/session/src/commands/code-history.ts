@@ -16,7 +16,7 @@ import { readFileSync, statSync } from "node:fs";
 
 import { parseCodeHistoryArgs } from "../cli-args";
 import { getMostRecentCommit } from "./code-history/git";
-import { formatHeader } from "./code-history/format";
+import { formatHeader, formatBody } from "./code-history/format";
 
 /**
  * Print the command-specific help for `session code-history`.
@@ -104,6 +104,15 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   }
 
   console.log(formatHeader(commit));
+
+  // Body preview (AC 8). `formatBody` strips trailers, joins the first
+  // two non-blank lines, and truncates. Empty string means "no non-trailer
+  // body content" — per AC 9 ("missing layer → no line") we omit the
+  // `body:` line entirely in that case rather than emitting a placeholder.
+  const bodyPreview = formatBody(commit.body);
+  if (bodyPreview.length > 0) {
+    console.log(`body: ${bodyPreview}`);
+  }
 }
 
 /**
