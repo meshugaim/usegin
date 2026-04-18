@@ -580,6 +580,24 @@ export interface FakePlanSpec {
    * per-test wall budget.
    */
   sleepSeconds?: number;
+  /**
+   * When set, the fake asserts that its runtime `$@` equals exactly
+   * this list of arguments. On mismatch, it prints a diagnostic to
+   * stderr (naming expected vs. actual) and exits NONZERO — so the
+   * caller's assertion fails loudly rather than silently green-passing
+   * against the wrong wiring.
+   *
+   * Use this to pin the exact argv the production code must pass to
+   * `plan` (e.g. `["show", "ENG-5039", "--json"]`). Without this, a
+   * caller that wires `plan list` or `plan show ENG-XXXX` (without
+   * `--json`) would still see the fake's canned stdout and pass tests
+   * that don't otherwise inspect argv.
+   *
+   * Comparison is strict equality over both the length and each
+   * positional slot — any drift (extra flag, reordering, missing
+   * `--json`) flips the exit code.
+   */
+  expectArgs?: string[];
 }
 
 export interface FakePlanBin {
@@ -600,6 +618,31 @@ export function makeFakePlanBin(spec: FakePlanSpec = {}): FakePlanBin {
   // round-trip exact bytes including newlines in the stdout payload
   // without worrying about echo's `-e` inconsistencies across shells.
   const lines: string[] = ["#!/usr/bin/env bash", "set -u"];
+
+  // Argv assertion (when `expectArgs` is set). The fake compares its
+  // runtime `$@` to the expected list and bails with a diagnostic on
+  // mismatch. Using `$#` for length and positional indices for each
+  // slot keeps the comparison POSIX-portable and side-steps quoting
+  // games with `IFS`-joined strings.
+  if (spec.expectArgs !== undefined) {
+    const expected = spec.expectArgs;
+    lines.push(`if [ "$#" -ne ${expected.length} ]; then`);
+    lines.push(
+      `  printf 'fake plan: expected ${expected.length} arg(s), got %d (%s)\\n' "$#" "$*" 1>&2`,
+    );
+    lines.push(`  exit 99`);
+    lines.push(`fi`);
+    for (let i = 0; i < expected.length; i++) {
+      const want = expected[i].replace(/'/g, "'\\''");
+      lines.push(`if [ "\${${i + 1}}" != '${want}' ]; then`);
+      lines.push(
+        `  printf 'fake plan: arg %d: expected %s, got %s\\n' '${i + 1}' '${want}' "\${${i + 1}}" 1>&2`,
+      );
+      lines.push(`  exit 99`);
+      lines.push(`fi`);
+    }
+  }
+
   if (spec.sleepSeconds !== undefined) {
     lines.push(`sleep ${spec.sleepSeconds}`);
   }

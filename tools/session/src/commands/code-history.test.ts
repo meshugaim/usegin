@@ -1171,6 +1171,67 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
+  test.failing(
+    "ENG-5044 (AC 7): Green MUST invoke `plan show <id> --json` with exactly those argv (argv-pin via fake plan)",
+    async () => {
+      // Argv-pin: the fake `plan` binary asserts its `$@` matches the
+      // expected list and exits non-zero on any drift. Without this
+      // pin, a Green implementation that calls `plan list` or omits
+      // `--json` (or reorders / adds flags) would still collect the
+      // fake's canned stdout and satisfy the happy-path test.
+      //
+      // Pins the exact wire contract at the subprocess boundary —
+      // once Green wires `plan show <id> --json`, any future
+      // refactor that changes argv (e.g. adds `--team`, swaps to
+      // `plan issue show`) flips this test red before it lands.
+      await withFakePlanBin(
+        {
+          stdout: makePlanShowJson(),
+          exitCode: 0,
+          expectArgs: ["show", LINEAR_FIXTURE_ID, "--json"],
+        },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed target file" },
+                {
+                  subject: "feat: argv-pinned wire",
+                  body: `Implements ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              // No argv-mismatch diagnostic leaked to stderr — if the
+              // fake's argv assertion had fired, "fake plan:" would
+              // appear. Absent → Green invoked the expected argv.
+              expect(result.stderr).not.toContain("fake plan:");
+
+              // Happy-path stdout still renders the line — confirms
+              // the fake took the normal exit path (not the argv-
+              // mismatch bail-out).
+              const linearLine = result.stdout
+                .split("\n")
+                .find((l) => l.trimStart().startsWith("linear:"));
+              expect(linearLine).toBe(EXPECTED_LINEAR_LINE);
+            },
+          );
+        },
+      );
+    },
+  );
+
   test(
     "ENG-5044 (N1 / AC 9): no ENG ref in body → no `linear:` line, no stderr warning, exit 0",
     async () => {
