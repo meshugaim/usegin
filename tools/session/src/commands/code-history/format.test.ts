@@ -14,6 +14,7 @@ import { describe, test, expect } from "bun:test";
 import {
   formatHeader,
   formatBody,
+  formatSinceTimestamp,
   BODY_PREVIEW_MAX_LEN,
   BODY_PREVIEW_ELLIPSIS,
 } from "./format";
@@ -232,6 +233,87 @@ describe("formatBody (AC 8, AC 9)", () => {
     "ENG-5041 (AC 8): single-line body under max length is returned as-is (no ellipsis, no trimming)",
     () => {
       expect(formatBody("Short body.")).toBe("Short body.");
+    },
+  );
+});
+
+// =============================================================================
+// formatSinceTimestamp (AC 6) — ENG-5043
+// =============================================================================
+//
+// Pure arithmetic: subtract 30 minutes from an ISO timestamp, format as
+// `YYYY-MM-DDTHH:MMZ` in UTC with minute precision. Edge-case pins cover
+// the obvious boundaries (minute=00, day / month / year rollover) so slice-5
+// (Linear line) and slice-6 (JSON) can reuse the same helper without
+// relitigating the rounding rule.
+
+describe("formatSinceTimestamp (AC 6)", () => {
+  test.failing("ENG-5043: basic — 08:43 commit → 08:13 since-timestamp", () => {
+    expect(formatSinceTimestamp("2026-04-18T08:43:00Z")).toBe(
+      "2026-04-18T08:13Z",
+    );
+  });
+
+  test.failing(
+    "ENG-5043: minute=00 — 09:00 commit → 08:30 (pins exact arithmetic)",
+    () => {
+      expect(formatSinceTimestamp("2026-04-18T09:00:00Z")).toBe(
+        "2026-04-18T08:30Z",
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5043: day boundary — 00:15 commit → previous day 23:45",
+    () => {
+      expect(formatSinceTimestamp("2026-04-18T00:15:00Z")).toBe(
+        "2026-04-17T23:45Z",
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5043: month+year boundary — Jan 1 00:15 UTC → Dec 31 23:45 (prev year)",
+    () => {
+      expect(formatSinceTimestamp("2026-01-01T00:15:00Z")).toBe(
+        "2025-12-31T23:45Z",
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5043: non-UTC input — `+02:00` offset normalizes to UTC before subtraction",
+    () => {
+      // 10:43+02:00 == 08:43 UTC — minus 30m == 08:13Z. Guards against a
+      // naive implementation that slices the string rather than parsing it.
+      expect(formatSinceTimestamp("2026-04-18T10:43:00+02:00")).toBe(
+        "2026-04-18T08:13Z",
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5043: output always ends with `Z` (UTC), never a numeric offset",
+    () => {
+      // Format pin — guard against a future change that accidentally emits
+      // the source tz offset (e.g. `+00:00` instead of `Z`). Slices 5/6 rely
+      // on the `Z` suffix when composing the `--since-timestamp` CLI arg.
+      const out = formatSinceTimestamp("2026-04-18T08:43:00+05:30");
+      expect(out.endsWith("Z")).toBe(true);
+      expect(out).not.toMatch(/[+-]\d{2}:\d{2}$/);
+    },
+  );
+
+  test.failing(
+    "ENG-5043: minute precision — seconds are dropped (pinned format is `HH:MMZ`)",
+    () => {
+      // Even when the source has seconds, the output truncates to the
+      // minute. Guards against a copy-paste that kept `.toISOString()`'s
+      // full shape without slicing off seconds.
+      const out = formatSinceTimestamp("2026-04-18T08:43:37Z");
+      expect(out).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/);
+      // Subtract 30 from 43 → 13. Seconds :37 get dropped.
+      expect(out).toBe("2026-04-18T08:13Z");
     },
   );
 });

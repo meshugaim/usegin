@@ -117,3 +117,34 @@ export function formatBody(body: string): string {
   if (joined.length <= BODY_PREVIEW_MAX_LEN) return joined;
   return joined.slice(0, BODY_PREVIEW_MAX_LEN - 1) + BODY_PREVIEW_ELLIPSIS;
 }
+
+// =============================================================================
+// formatSinceTimestamp (AC 6 — ENG-5043)
+// =============================================================================
+
+/**
+ * Compute the `--since-timestamp <t-30m>` string for the session-line hint.
+ *
+ * Input: an ISO-8601 commit timestamp (the `committedAt` field on
+ * `DecoratedCommit`, derived from `git log --format=%cI`).
+ *
+ * Output: the commit time minus 30 minutes, formatted as
+ * `YYYY-MM-DDTHH:MMZ` (UTC, minute precision). Seconds are dropped —
+ * minute precision is sufficient for the "start from 30m before commit"
+ * heuristic and produces shorter, human-readable CLI output.
+ *
+ * Edge cases pinned by unit tests (see format.test.ts):
+ *   - minute=00:      `2026-04-18T09:00:00Z` → `2026-04-18T08:30Z`
+ *   - day boundary:   `2026-04-18T00:15:00Z` → `2026-04-17T23:45Z`
+ *   - month boundary: `2026-01-01T00:15:00Z` → `2025-12-31T23:45Z`
+ *
+ * Implementation: `new Date(iso) - 30*60*1000`, re-serialize with
+ * `.toISOString()` (always UTC `Z`), slice off seconds.
+ */
+export function formatSinceTimestamp(_commitISO: string): string {
+  // Red-phase stub — `<unimplemented>` is a pinned sentinel so the
+  // test.failing assertions (which compare against the real expected
+  // timestamps) fail at the assertion level rather than the import
+  // level. Removed in the Green phase.
+  return "<unimplemented>";
+}
