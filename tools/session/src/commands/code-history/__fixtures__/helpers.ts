@@ -47,6 +47,47 @@ try {
 }
 
 /**
+ * Pinned author/committer identity for every `git` invocation in a
+ * fixture repo. Centralized so the tests see a stable author across CI
+ * environments that may not have a global git identity configured.
+ */
+const FIXTURE_GIT_ENV = {
+  GIT_AUTHOR_NAME: "Code History Test",
+  GIT_AUTHOR_EMAIL: "code-history-test@example.com",
+  GIT_COMMITTER_NAME: "Code History Test",
+  GIT_COMMITTER_EMAIL: "code-history-test@example.com",
+} as const;
+
+/**
+ * Run a `git` (or other) command in the given directory and return its
+ * stdout. Throws on non-zero exit with the stderr inlined, so a broken
+ * fixture setup points at the first failing git step rather than a
+ * mystery later in the test.
+ *
+ * Extracted because `makeFixtureRepo` and `makeFixtureRepoWithRename`
+ * previously defined identical inner `run(cmd)` closures with the same
+ * env-vars dance. Centralizing the spawn keeps the identity config
+ * (see {@link FIXTURE_GIT_ENV}) in one place and makes it trivial to
+ * add features like `stdin` uniformly across both fixture shapes.
+ */
+function runGit(
+  cwd: string,
+  cmd: string[],
+  opts: { stdin?: string } = {},
+): string {
+  const proc = Bun.spawnSync(cmd, {
+    cwd,
+    env: { ...process.env, ...FIXTURE_GIT_ENV },
+    stdin: opts.stdin ? new TextEncoder().encode(opts.stdin) : undefined,
+  });
+  if (proc.exitCode !== 0) {
+    const stderr = new TextDecoder().decode(proc.stderr);
+    throw new Error(`git command failed: ${cmd.join(" ")}\n${stderr}`);
+  }
+  return new TextDecoder().decode(proc.stdout);
+}
+
+/**
  * One commit in a fixture repo.
  *
  * Slices 2+ will use `body` to add `Claude-Session: <id>` / `ENG-XXXX`
@@ -114,39 +155,17 @@ export function makeFixtureRepo(spec: FixtureRepoSpec = {}): FixtureRepo {
 
   mkdirSync(join(dir, "src"), { recursive: true });
 
-  const run = (cmd: string[], opts: { stdin?: string } = {}) => {
-    const proc = Bun.spawnSync(cmd, {
-      cwd: dir,
-      env: {
-        ...process.env,
-        // Pinned author/committer so `git log --format=%an/%ae` stays
-        // deterministic across CI environments that may not have a global
-        // git identity configured.
-        GIT_AUTHOR_NAME: "Code History Test",
-        GIT_AUTHOR_EMAIL: "code-history-test@example.com",
-        GIT_COMMITTER_NAME: "Code History Test",
-        GIT_COMMITTER_EMAIL: "code-history-test@example.com",
-      },
-      stdin: opts.stdin ? new TextEncoder().encode(opts.stdin) : undefined,
-    });
-    if (proc.exitCode !== 0) {
-      const stderr = new TextDecoder().decode(proc.stderr);
-      throw new Error(`git command failed: ${cmd.join(" ")}\n${stderr}`);
-    }
-    return new TextDecoder().decode(proc.stdout);
-  };
-
-  run(["git", "init", "-q", "-b", "main"]);
+  runGit(dir, ["git", "init", "-q", "-b", "main"]);
 
   commits.forEach((commit, index) => {
     // Every commit rewrites the file so line 2 changes — `git log -L 2,2`
     // should then surface every commit in order.
     const contents = `line 1\nline 2 v${index + 1}\nline 3\n`;
     writeFileSync(join(dir, file), contents);
-    run(["git", "add", file]);
+    runGit(dir, ["git", "add", file]);
 
     const message = composeCommitMessage(commit);
-    run(["git", "commit", "-q", "-m", message]);
+    runGit(dir, ["git", "commit", "-q", "-m", message]);
   });
 
   // After committing, append an UNCOMMITTED 4th line. This gives us a
@@ -165,7 +184,7 @@ export function makeFixtureRepo(spec: FixtureRepoSpec = {}): FixtureRepo {
   );
 
   const expectedSubject = commits[commits.length - 1]!.subject;
-  const fullSha = run(["git", "rev-parse", "HEAD"]).trim();
+  const fullSha = runGit(dir, ["git", "rev-parse", "HEAD"]).trim();
   const expectedSha = fullSha.slice(0, 8);
 
   return { dir, file, expectedSubject, expectedSha, uncommittedLine };
@@ -246,30 +265,12 @@ export function makeFixtureRepoWithRename(): FixtureRepoWithRename {
 
   mkdirSync(join(dir, "src"), { recursive: true });
 
-  const run = (cmd: string[]) => {
-    const proc = Bun.spawnSync(cmd, {
-      cwd: dir,
-      env: {
-        ...process.env,
-        GIT_AUTHOR_NAME: "Code History Test",
-        GIT_AUTHOR_EMAIL: "code-history-test@example.com",
-        GIT_COMMITTER_NAME: "Code History Test",
-        GIT_COMMITTER_EMAIL: "code-history-test@example.com",
-      },
-    });
-    if (proc.exitCode !== 0) {
-      const stderr = new TextDecoder().decode(proc.stderr);
-      throw new Error(`git command failed: ${cmd.join(" ")}\n${stderr}`);
-    }
-    return new TextDecoder().decode(proc.stdout);
-  };
-
-  run(["git", "init", "-q", "-b", "main"]);
+  runGit(dir, ["git", "init", "-q", "-b", "main"]);
 
   // Commit 1 — create original file with a known watched line at line 2.
   writeFileSync(join(dir, originalFile), `line 1\nline 2 original\nline 3\n`);
-  run(["git", "add", originalFile]);
-  run(["git", "commit", "-q", "-m", preRenameSubject]);
+  runGit(dir, ["git", "add", originalFile]);
+  runGit(dir, ["git", "commit", "-q", "-m", preRenameSubject]);
 
   // Commit 2 — pure rename, no content change. Using `git mv` (vs fs
   // rename + `git add -A`) is intentional: `git mv` stages the rename
@@ -277,8 +278,8 @@ export function makeFixtureRepoWithRename(): FixtureRepoWithRename {
   // without relying on rename-detection heuristics. Critically, we do NOT
   // follow up with a content edit: the query line's only touch-point is
   // commit 1 (pre-rename), so the test only passes when follow works.
-  run(["git", "mv", originalFile, renamedFile]);
-  run(["git", "commit", "-q", "-m", "chore: rename original.ts to renamed.ts"]);
+  runGit(dir, ["git", "mv", originalFile, renamedFile]);
+  runGit(dir, ["git", "commit", "-q", "-m", "chore: rename original.ts to renamed.ts"]);
 
   return { dir, originalFile, renamedFile, preRenameSubject };
 }
