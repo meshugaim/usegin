@@ -229,15 +229,31 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
     },
   );
 
-  test.failing(
-    "ENG-5041 (AC 24): the pinned message references ENG-5048 so users know where the follow-up lives",
+  // Split into two separate tests: the constant-shape check is a pure
+  // data assertion that passes today (no `test.failing`), and the
+  // parser-contract check is the Red-phase invariant that Green will
+  // flip. Clearer signal: the failure output tells you which part is
+  // under Green's control vs which part is already a stable fact.
+
+  test(
+    "ENG-5041 (AC 24): the pinned message references ENG-5048 and says 'not yet' so users know where the follow-up lives",
     () => {
-      // Double-check the constant itself — if someone re-words the
-      // message without updating ENG-5048 tracking, this catches it.
+      // Pure constant-shape check — already passes today, guards
+      // against wording drift that would decouple the message from
+      // ENG-5048 tracking.
       expect(CODE_HISTORY_RESERVED_FLAG_MESSAGE).toContain("ENG-5048");
       expect(CODE_HISTORY_RESERVED_FLAG_MESSAGE.toLowerCase()).toContain("not yet");
-      // Also confirm the parser actually USES the constant (guards
-      // against drift where parser hardcodes its own string).
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 24): the parser actually USES the pinned constant (guards against drift to a hardcoded string)",
+    () => {
+      // Parser-contract check — Green flips this to passing. If the
+      // parser ever builds its own string instead of throwing the
+      // pinned constant, this fails even if the basic-presence tests
+      // above still pass (since they only check `.toThrow(substring)`
+      // against the same constant's text).
       expect(() => parseCodeHistoryArgs(["-n", "3", "src/foo.ts:1"])).toThrow(
         CODE_HISTORY_RESERVED_FLAG_MESSAGE,
       );
