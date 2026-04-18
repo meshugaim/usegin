@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { extractIntent, isCommandOrCaveat, truncate } from "./context";
-import { makeUserTurn } from "./__fixtures__/turns";
+import { makeAssistantTurn, makeUserTurn } from "./__fixtures__/turns";
 
 // ============================================================================
 // Pure-module invariant (AC 16) — plain test, passes today
@@ -84,8 +84,13 @@ describe("extractIntent", () => {
   });
 
   test.failing("P2: returns first real msg when it is the first turn", () => {
+    // Insert an assistant turn between the two user turns so the fixture
+    // mirrors real-session alternation (user → assistant → user).
+    // `extractIntent` behavior is unchanged — it still finds "hello claude"
+    // as the first real user turn.
     const turns = [
       makeUserTurn("hello claude"),
+      makeAssistantTurn({}),
       makeUserTurn("follow-up message"),
     ];
     expect(extractIntent(turns)).toBe("hello claude");
