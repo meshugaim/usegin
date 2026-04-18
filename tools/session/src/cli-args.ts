@@ -265,6 +265,40 @@ export function parseResumeArgs(args: string[]): ResumeArgs {
 }
 
 // =============================================================================
+// CODE-HISTORY ARGS
+// =============================================================================
+
+export interface CodeHistoryArgs {
+  /** Absolute or relative path to the file whose line history we want. */
+  file: string;
+  /** 1-based line number (positive integer). */
+  line: number;
+}
+
+/**
+ * Parse arguments for `session code-history <file>:<line>`.
+ *
+ * Red-phase stub: returns a deliberately-wrong default so the Red tests
+ * fail at ASSERTION level (not import level). The Green agent replaces
+ * this body with the real parser. Contract (per spec AC 1, AC 2):
+ *
+ *   - Returns `"help"` if `--help` / `-h` is present.
+ *   - Returns `{ file, line }` on a valid `file.ts:42` positional.
+ *   - Throws a clear `Error` for: missing positional, no `:` separator,
+ *     empty file or line portion, non-integer or non-positive line.
+ *
+ * The caller (`runCodeHistory`) turns thrown errors into stderr + non-zero
+ * exit. Existence / line-in-range checks live in the command layer
+ * because they need `fs` access — this parser stays pure.
+ */
+export function parseCodeHistoryArgs(
+  _args: string[],
+): CodeHistoryArgs | "help" {
+  // Red stub: return a non-matching shape so assertion-level checks fail.
+  return { file: "<unimplemented>", line: 0 };
+}
+
+// =============================================================================
 // FORK ARGS
 // =============================================================================
 

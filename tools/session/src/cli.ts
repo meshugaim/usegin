@@ -29,6 +29,7 @@ import {
   runSearchIn,
   runDocs,
   runParse,
+  runCodeHistory,
 } from "./commands";
 
 function printHelp() {
@@ -235,6 +236,12 @@ async function main() {
   // Check for 'search-in' subcommand
   if (rawArgs[0] === "search-in") {
     await runSearchIn(rawArgs.slice(1));
+    return;
+  }
+
+  // Check for 'code-history' subcommand (ENG-5039 / ENG-5040 slice 1)
+  if (rawArgs[0] === "code-history") {
+    await runCodeHistory(rawArgs.slice(1));
     return;
   }
 

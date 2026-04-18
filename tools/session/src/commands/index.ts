@@ -9,3 +9,4 @@ export { runBash } from "./bash";
 export { runSearchIn } from "./search-in";
 export { runDocs } from "./docs";
 export { runParse } from "./parse";
+export { runCodeHistory } from "./code-history";
