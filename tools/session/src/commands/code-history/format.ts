@@ -194,13 +194,31 @@ export function formatSinceTimestamp(commitISO: string): string {
  *     with just `id` + `sinceTimestampCmd` (no extractors), and the
  *     block renders as just the session line + hint.
  */
-export function formatSessionBlock(_commit: DecoratedCommit): string | null {
-  // Red-phase stub: non-null sentinel so the `test.failing` assertions
-  // fail at assertion level rather than module-init. Throwing here —
-  // the cleaner-looking option — propagates via `bailWithError` in
-  // `runCodeHistory` and breaks earlier-slice tests (ENG-5040 / 5041)
-  // because `decorateCommitWithSession`'s Red stub ALSO always
-  // populates `commit.session`, so the pipeline calls this formatter
-  // for every commit. Green phase replaces both stubs atomically.
-  return "session: <unimplemented>";
+export function formatSessionBlock(commit: DecoratedCommit): string | null {
+  const session = commit.session;
+  if (session === undefined) return null;
+
+  // Line 1 — the session line itself, at 4-space indent. Values start at
+  // column 14 (`    ` + `session:` + two spaces). The hint composes the
+  // full UUID, separated from the `(→ …)` hint by two spaces.
+  const lines: string[] = [
+    `    session:  ${session.id}  (→ ${session.sinceTimestampCmd})`,
+  ];
+
+  // Nested context lines at 6-space indent. Labels pad to width 8
+  // (incl colon) + 2 spaces before the value, so values left-align at
+  // column 16. `intent:` (7 chars) → 3 trailing spaces; `trigger:` /
+  // `outcome:` (8 chars) → 2. Missing extractors (undefined) omit the
+  // line entirely — AC 9 missing-layer invariant applied per-line.
+  if (session.intent !== undefined) {
+    lines.push(`      intent:   ${session.intent}`);
+  }
+  if (session.trigger !== undefined) {
+    lines.push(`      trigger:  ${session.trigger}`);
+  }
+  if (session.outcome !== undefined) {
+    lines.push(`      outcome:  ${session.outcome}`);
+  }
+
+  return lines.join("\n");
 }

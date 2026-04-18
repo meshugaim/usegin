@@ -357,7 +357,7 @@ function commitWithSession(
 }
 
 describe("formatSessionBlock (AC 6)", () => {
-  test.failing(
+  test(
     "ENG-5043 (AC 6): all fields present — 4-line block with exact indents + alignment",
     () => {
       const commit = commitWithSession({
@@ -379,7 +379,7 @@ describe("formatSessionBlock (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 6): `session` absent on commit → returns null (missing layer → no line)",
     () => {
       const commit = commitWithSession(undefined);
@@ -387,7 +387,7 @@ describe("formatSessionBlock (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 6): intent only (trigger + outcome undefined) → session + intent lines only",
     () => {
       // AC 9 invariant: missing extractors → lines omitted entirely,
@@ -402,7 +402,7 @@ describe("formatSessionBlock (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 6): trigger only → session + trigger lines only",
     () => {
       const commit = commitWithSession({ trigger: "Only trigger." });
@@ -415,7 +415,7 @@ describe("formatSessionBlock (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 6): outcome only → session + outcome lines only",
     () => {
       const commit = commitWithSession({ outcome: "Only outcome." });
@@ -428,7 +428,7 @@ describe("formatSessionBlock (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 13): none of intent/trigger/outcome → just the session line (fetch-failure degradation)",
     () => {
       // AC 13: on SessionNotFoundError, pipeline populates `commit.session`
@@ -442,7 +442,7 @@ describe("formatSessionBlock (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 6): label alignment — values in the nested group start at the same column regardless of which lines are present",
     () => {
       // Column-alignment regression guard. The value column for the
