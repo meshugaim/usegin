@@ -39,21 +39,21 @@ import {
 // contract so slices 5/6 can't drift to a subtly different rule.
 
 describe("extractLinearRef (ENG-5044)", () => {
-  test.failing(
+  test(
     "ENG-5044: no ENG ref in body → null",
     () => {
       expect(extractLinearRef("Just a plain body with no issue ref.")).toBeNull();
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: empty body → null",
     () => {
       expect(extractLinearRef("")).toBeNull();
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: single `ENG-5039` in prose → returns `ENG-5039`",
     () => {
       expect(
@@ -62,7 +62,7 @@ describe("extractLinearRef (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: ENG ref in a `Part of:` trailer → returns the ref (raw-body scan, no trailer stripping)",
     () => {
       // Forward-pointer context from prior slices: `stripTrailers` is
@@ -78,7 +78,7 @@ describe("extractLinearRef (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: ENG ref in a `Closes:` trailer → returns the ref",
     () => {
       const body = [
@@ -90,7 +90,7 @@ describe("extractLinearRef (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (G2): multiple ENG refs → FIRST match only (spec-explicit)",
     () => {
       // Spec Algorithm step 5b: "scan body for first ENG-\d+ match".
@@ -105,7 +105,7 @@ describe("extractLinearRef (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: ENG ref with arbitrary-length digits → captures all digits verbatim",
     () => {
       expect(extractLinearRef("ref: ENG-99999")).toBe("ENG-99999");
@@ -113,7 +113,7 @@ describe("extractLinearRef (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: non-ENG project prefixes (ACME-123, FOO-9) are IGNORED",
     () => {
       // The spec fixes the regex at `ENG-\d+` — only ENG-prefixed
@@ -123,7 +123,7 @@ describe("extractLinearRef (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: `ENG-5039` embedded in a URL still matches (extractor is word-agnostic)",
     () => {
       // Linear URLs embed the identifier — `linear.app/.../ENG-5039/…`.

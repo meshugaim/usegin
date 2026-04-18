@@ -45,7 +45,7 @@ import type { DecoratedCommit } from "./types";
  * behave as a single-match result. If a future slice needs all matches,
  * switch callers to `matchAll` and an `/ENG-\d+/g` form.
  */
-const LINEAR_REF_RE = /ENG-\d+/;
+export const LINEAR_REF_RE = /ENG-\d+/;
 
 /**
  * Subprocess timeout for `plan show` (G1). 5 seconds tolerates
@@ -73,16 +73,7 @@ export const LINEAR_FETCH_TIMEOUT_MS = 5000;
  * multi-issue rendering in v1.
  */
 export function extractLinearRef(body: string): string | null {
-  // Red stub — returns a visible sentinel for EVERY input so unit
-  // tests fail at the assertion level regardless of whether they
-  // expect a match or `null`. Returning `null` from the stub would
-  // silently pass the "no-match" tests against wrong behavior; this
-  // distinct string keeps them honest until Green lands the real
-  // regex.
-  void body;
-  // GREEN: replace with LINEAR_REF_RE.exec(body)?.[0] ?? null
-  void LINEAR_REF_RE;
-  return "<unimplemented-extractLinearRef>";
+  return LINEAR_REF_RE.exec(body)?.[0] ?? null;
 }
 
 /**
