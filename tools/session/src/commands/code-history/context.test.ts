@@ -758,6 +758,9 @@ describe("G3 pathological — same-SHA duplicate", () => {
     // a follow-up test can pin "first match wins" or similar).
     expect(() => extractTrigger(turns, sha)).not.toThrow();
     expect(() => extractOutcome(turns, sha)).not.toThrow();
+    // TODO(ENG-5051 Green): once first-match-wins is deterministic, add:
+    //   expect(extractTrigger(turns, sha)).toBe("first ask")
+    // to promote this from a non-crash guarantee to a behavior pin.
   });
 });
 
