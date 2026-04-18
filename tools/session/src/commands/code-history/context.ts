@@ -44,7 +44,9 @@ const TRUNCATE_ELLIPSIS = "…";
  * Semantics (matches ENG-5050 AC 15):
  *   - `null` → `null`
  *   - Consecutive `\n`/`\t` runs collapse to a single space
- *     (so `"a\n\n\tb"` → `"a b"`).
+ *     (so `"a\n\n\tb"` → `"a b"`). Collapses only `\n` and `\t`
+ *     (and runs thereof); other whitespace (`\r`, `\v`, NBSP, and
+ *     runs of regular spaces) passes through unchanged.
  *   - Truncation is applied AFTER whitespace collapse, so a 300-char
  *     input that's mostly `\n` can end up short of the cap.
  *   - When the collapsed value exceeds the cap, output is exactly
@@ -52,8 +54,6 @@ const TRUNCATE_ELLIPSIS = "…";
  *     rule as the body preview line from ENG-5041.
  *
  * Pure function: no mutation of the input, no side effects.
- *
- * @returns unimplemented sentinel until the Green phase lands
  */
 export function truncate(value: string | null): string | null {
   if (value === null) return null;
