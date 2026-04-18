@@ -1,7 +1,7 @@
 /**
  * In-process tests for `decorateCommitWithSession` (slice 4 — ENG-5043).
  *
- * These tests stub the `SessionDeps` so they can pin:
+ * These tests stub the `DecorateSessionDeps` so they can pin:
  *   - Happy path: `fetchSession` resolves, `parseSession` returns turns,
  *     extractors run, `commit.session` fully populated.
  *   - No trailer: commit body without `Claude-Session:` → `commit.session`
@@ -23,7 +23,7 @@ import { describe, test, expect } from "bun:test";
 import {
   decorateCommitWithSession,
   SessionNotFoundError,
-  type SessionDeps,
+  type DecorateSessionDeps,
 } from "./session-decorate";
 import type { DecoratedCommit } from "./types";
 import type { ParsedSession } from "../../types";
@@ -80,11 +80,11 @@ function makeCommit(overrides: Partial<DecoratedCommit> = {}): DecoratedCommit {
 }
 
 /**
- * Build a stub `SessionDeps` composing the three callbacks. Each
+ * Build a stub `DecorateSessionDeps` composing the three callbacks. Each
  * callback defaults to a safe no-op / success path; tests override
  * individual hooks to exercise failure cases.
  */
-function makeDeps(overrides: Partial<SessionDeps> = {}): SessionDeps {
+function makeDeps(overrides: Partial<DecorateSessionDeps> = {}): DecorateSessionDeps {
   const defaultTurns = (() => {
     const [assistantBash, userResult] = makeBashTurn(
       `git commit -m "feat: thing"`,

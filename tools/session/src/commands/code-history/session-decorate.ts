@@ -15,7 +15,7 @@
  * no extractors (AC 13). Other errors propagate so real failures (a
  * corrupted JSONL, permission denied, etc.) remain visible.
  *
- * Dependency injection shape (the `SessionDeps` arg) exists for testing:
+ * Dependency injection shape (the `DecorateSessionDeps` arg) exists for testing:
  * integration tests stub `fetchSession` to throw `SessionNotFoundError`
  * (or an arbitrary generic `Error`) and assert the classification,
  * without the subprocess cost of seeding the archive machinery. Prod
@@ -37,7 +37,7 @@ import type { DecoratedCommit } from "./types";
  * `../../finder/resolve.ts` / `../../parser.ts` — see `code-history.ts`
  * for the default composition.
  */
-export interface SessionDeps {
+export interface DecorateSessionDeps {
   /** Resolve a session ID (or prefix) to a local JSONL path, fetching from remote if needed. */
   fetchSession: (input: string) => Promise<FetchResult>;
   /** Parse a local JSONL file into a structured session. */
@@ -56,7 +56,7 @@ export interface SessionDeps {
  */
 export async function decorateCommitWithSession(
   _commit: DecoratedCommit,
-  _deps: SessionDeps,
+  _deps: DecorateSessionDeps,
 ): Promise<DecoratedCommit> {
   // Red-phase stub — populates a pinned `<unimplemented>` sentinel
   // session so EVERY test.failing assertion (including the
