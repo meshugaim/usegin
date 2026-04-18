@@ -49,7 +49,7 @@ import {
   type FixtureRepo,
   type FixtureRepoWithRename,
 } from "./code-history/__fixtures__/helpers";
-import { userEntry, assistantEntry } from "../testing";
+import { userEntry, assistantEntry, systemEntry } from "../testing";
 
 // =============================================================================
 // ARG PARSER (AC 1, AC 2)
@@ -726,12 +726,19 @@ const SESSION_FIXTURE_SHORT_ID = "533a2546";
  * tool_use to a commit and trigger/outcome degrade to `null`.
  */
 function makeSessionJsonl(commitShortSha: string): string {
+  // Realistic shape: a `system`/`init` entry precedes the conversation
+  // entries, and every entry carries a `timestamp`. Mirrors what
+  // Claude Code actually writes to JSONL so later slices (ENG-5044/5045)
+  // don't trip when the extractors tighten their expectations.
   const entries = [
+    systemEntry("sys-init"),
     userEntry("u1", "Wire session extractors into code-history.", {
       parentUuid: null,
+      timestamp: "2026-04-18T08:13:00.000Z",
     }),
     assistantEntry("a1", "", {
       parentUuid: "u1",
+      timestamp: "2026-04-18T08:14:00.000Z",
       toolCalls: [
         {
           id: "bash-1",
@@ -742,6 +749,7 @@ function makeSessionJsonl(commitShortSha: string): string {
     }),
     userEntry("u2", "", {
       parentUuid: "a1",
+      timestamp: "2026-04-18T08:14:30.000Z",
       toolResults: [
         {
           toolUseId: "bash-1",
@@ -751,6 +759,7 @@ function makeSessionJsonl(commitShortSha: string): string {
     }),
     assistantEntry("a2", "Committed the session block. Running tests next.", {
       parentUuid: "u2",
+      timestamp: "2026-04-18T08:15:00.000Z",
     }),
   ];
   return entries.map((e) => JSON.stringify(e)).join("\n") + "\n";

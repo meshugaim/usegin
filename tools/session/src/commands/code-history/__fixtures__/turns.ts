@@ -122,6 +122,13 @@ export function makeAssistantTurn(opts: MakeAssistantTurnOptions = {}): Turn {
   };
 }
 
+export interface MakeBashTurnOptions {
+  /** Timestamp on the assistant (Bash call) turn. */
+  assistantTimestamp?: string;
+  /** Timestamp on the user (tool result) turn. */
+  userTimestamp?: string;
+}
+
 /**
  * Composite helper for the common "assistant ran Bash, user turn carries
  * the matching tool_result" shape. Returns a 2-element `Turn[]` in
@@ -129,9 +136,16 @@ export function makeAssistantTurn(opts: MakeAssistantTurnOptions = {}): Turn {
  *
  * The returned tuple shares the same `ToolUseId` between the call and
  * result so extractors that pair calls↔results by `toolUseId` see a
- * consistent graph.
+ * consistent graph. `opts.assistantTimestamp` / `opts.userTimestamp`
+ * attach realistic timestamps — real Claude Code JSONL always carries
+ * them, so slices 4+ that tighten on timestamp presence don't trip on
+ * test fixtures.
  */
-export function makeBashTurn(command: string, resultText: string): [Turn, Turn] {
+export function makeBashTurn(
+  command: string,
+  resultText: string,
+  opts: MakeBashTurnOptions = {},
+): [Turn, Turn] {
   const toolUseId: ToolUseId = asToolUseId(nextUuid("tool"));
   const assistantUuid = nextUuid("a");
   const userUuid = nextUuid("u");
@@ -148,6 +162,9 @@ export function makeBashTurn(command: string, resultText: string): [Turn, Turn] 
     ],
     toolResults: [],
     isOnCurrentBranch: true,
+    ...(opts.assistantTimestamp !== undefined
+      ? { timestamp: opts.assistantTimestamp }
+      : {}),
   };
   const user: Turn = {
     role: "user",
@@ -163,6 +180,9 @@ export function makeBashTurn(command: string, resultText: string): [Turn, Turn] 
       },
     ],
     isOnCurrentBranch: true,
+    ...(opts.userTimestamp !== undefined
+      ? { timestamp: opts.userTimestamp }
+      : {}),
   };
   return [assistant, user];
 }

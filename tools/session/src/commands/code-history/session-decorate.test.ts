@@ -94,16 +94,28 @@ function makeCommit(overrides: Partial<DecoratedCommit> = {}): DecoratedCommit {
  * individual hooks to exercise failure cases.
  */
 function makeDeps(overrides: Partial<DecorateSessionDeps> = {}): DecorateSessionDeps {
+  // Realistic turn shape: every turn carries a timestamp (what real
+  // Claude Code JSONL emits). Lets later slices tighten expectations
+  // on timestamp presence without retrofitting every fixture here.
   const defaultTurns = (() => {
     const [assistantBash, userResult] = makeBashTurn(
       `git commit -m "feat: thing"`,
       `[main ${FIXTURE_COMMIT_SHA.slice(0, 7)}] feat: thing`,
+      {
+        assistantTimestamp: "2026-04-18T08:14:00.000Z",
+        userTimestamp: "2026-04-18T08:14:30.000Z",
+      },
     );
     return [
-      makeUserTurn("Wire the session extractors."),
+      makeUserTurn("Wire the session extractors.", {
+        timestamp: "2026-04-18T08:13:00.000Z",
+      }),
       assistantBash,
       userResult,
-      makeAssistantTurn({ text: "Committed. Running the tests now." }),
+      makeAssistantTurn({
+        text: "Committed. Running the tests now.",
+        timestamp: "2026-04-18T08:15:00.000Z",
+      }),
     ];
   })();
   return {
