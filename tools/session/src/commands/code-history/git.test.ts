@@ -11,12 +11,15 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { getMostRecentCommit } from "./git";
-import { makeFixtureRepo, type FixtureRepo } from "./__fixtures__/helpers";
+import {
+  makeFixtureRepo,
+  withTempDir,
+  type FixtureRepo,
+} from "./__fixtures__/helpers";
 
 describe("getMostRecentCommit (unit)", () => {
   let fixture: FixtureRepo;
@@ -85,8 +88,7 @@ describe("getMostRecentCommit (unit)", () => {
       // This is the Issue-1 regression: previously, any nonzero git exit
       // was silently classified as "no history" → null. That misled the
       // user when git actually failed (e.g. not a repo). Now: throws.
-      const noRepoDir = mkdtempSync(join(tmpdir(), "code-history-git-unit-"));
-      try {
+      await withTempDir("code-history-git-unit-", async (noRepoDir) => {
         // Create a real file so we exercise the git-layer failure path
         // (not "file doesn't exist", which isn't this layer's concern).
         writeFileSync(join(noRepoDir, "target.ts"), "a\nb\n");
@@ -94,9 +96,7 @@ describe("getMostRecentCommit (unit)", () => {
         await expect(
           getMostRecentCommit("target.ts", 1, { cwd: noRepoDir }),
         ).rejects.toThrow(/git log failed|not a git repository/i);
-      } finally {
-        rmSync(noRepoDir, { recursive: true, force: true });
-      }
+      });
     },
   );
 
@@ -110,15 +110,12 @@ describe("getMostRecentCommit (unit)", () => {
       // falsely succeed). This is the only test that pins the `cwd` option
       // as load-bearing; every other test passes `cwd: fixture.dir`
       // implicitly exercising the happy path.
-      const foreignCwd = mkdtempSync(join(tmpdir(), "code-history-foreign-"));
-      try {
+      await withTempDir("code-history-foreign-", async (foreignCwd) => {
         writeFileSync(join(foreignCwd, "target.ts"), "a\nb\n");
         await expect(
           getMostRecentCommit("target.ts", 1, { cwd: foreignCwd }),
         ).rejects.toThrow(/git log failed|not a git repository/i);
-      } finally {
-        rmSync(foreignCwd, { recursive: true, force: true });
-      }
+      });
     },
   );
 });

@@ -19,14 +19,14 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { parseCodeHistoryArgs } from "../cli-args";
 import {
   makeFixtureRepo,
   runCli,
+  withTempDir,
   type FixtureRepo,
 } from "./code-history/__fixtures__/helpers";
 
@@ -138,35 +138,29 @@ describe("session code-history --help (AC 3)", () => {
 
   test(
     "ENG-5040: prints command-specific help containing the usage line and exits 0",
-    () => {
-      const tmpDir = mkdtempSync(join(tmpdir(), "code-history-help-"));
-      try {
+    async () => {
+      await withTempDir("code-history-help-", (tmpDir) => {
         const result = runCli(["code-history", "--help"], tmpDir);
         expect(result.exitCode).toBe(0);
         expect(result.stdout).toContain("session code-history");
         expect(result.stdout).toMatch(/<file>:<line>/);
         // Must NOT print the top-level help (which starts with "Session - Parse").
         expect(result.stdout).not.toContain("Session - Parse Claude session");
-      } finally {
-        rmSync(tmpDir, { recursive: true, force: true });
-      }
+      });
     },
   );
 
   test(
     "ENG-5040: --help works outside a git repo (guards against calling `getMostRecentCommit` before branching on help)",
-    () => {
+    async () => {
       // A tmp dir with no `.git` — Green must branch on `parsed === 'help'`
       // BEFORE reaching the git layer, otherwise help breaks when invoked
       // anywhere outside a repo.
-      const noRepoDir = mkdtempSync(join(tmpdir(), "code-history-nohelp-"));
-      try {
+      await withTempDir("code-history-nohelp-", (noRepoDir) => {
         const result = runCli(["code-history", "--help"], noRepoDir);
         expect(result.exitCode).toBe(0);
         expect(result.stdout).toContain("session code-history");
-      } finally {
-        rmSync(noRepoDir, { recursive: true, force: true });
-      }
+      });
     },
   );
 });
@@ -304,13 +298,12 @@ describe("session code-history end-to-end", () => {
 
   test(
     "ENG-5040: running outside a git repo → non-zero exit with a clear git error, NOT a misleading 'No committed history' message",
-    () => {
+    async () => {
       // Regression for the Green-phase bug where any `git log` nonzero exit
       // was silently routed to AC 19's "No committed history" path. Outside
       // a git repo, git errors with `fatal: not a git repository` — that
       // must surface to the user, not get squashed into the no-history path.
-      const noRepoDir = mkdtempSync(join(tmpdir(), "code-history-norepo-"));
-      try {
+      await withTempDir("code-history-norepo-", (noRepoDir) => {
         // Create a real file so upfront file-existence validation passes —
         // we want to exercise the git-layer failure path, not the AC 2
         // "file not found" path.
@@ -325,9 +318,7 @@ describe("session code-history end-to-end", () => {
         // Must NOT take AC 19's no-history path — that would hide the real
         // failure from the user.
         expect(result.stderr).not.toContain(`No committed history for ${file}:1`);
-      } finally {
-        rmSync(noRepoDir, { recursive: true, force: true });
-      }
+      });
     },
   );
 

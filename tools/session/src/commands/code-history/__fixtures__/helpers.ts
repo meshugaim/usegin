@@ -22,7 +22,7 @@
  *   `parseCodeHistoryArgs` suite in `../code-history.test.ts`).
  */
 
-import { mkdtempSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -210,4 +210,30 @@ export function runCli(args: string[], cwd: string): CliResult {
     stdout: new TextDecoder().decode(proc.stdout),
     stderr: new TextDecoder().decode(proc.stderr),
   };
+}
+
+/**
+ * Run `fn` in a fresh throwaway tmp directory, then remove it no matter
+ * what `fn` does. Works for both sync and async callbacks — `await` on a
+ * non-promise is a no-op.
+ *
+ * Extracted because the tmp-dir dance (`mkdtempSync` → `try { fn } finally
+ * { rmSync }`) appeared 5 times across `code-history.test.ts` and
+ * `git.test.ts`. Naming the helper "tmp-dir-scoped work" makes the intent
+ * obvious at each call site and keeps the cleanup guarantee uniform.
+ *
+ * `prefix` is the `mkdtempSync` prefix — pass something that identifies
+ * the test (e.g. `"code-history-help-"`) so leftover dirs from a crashed
+ * run are easy to attribute.
+ */
+export async function withTempDir<T>(
+  prefix: string,
+  fn: (dir: string) => T | Promise<T>,
+): Promise<T> {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  try {
+    return await fn(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
