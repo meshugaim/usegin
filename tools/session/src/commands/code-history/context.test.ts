@@ -664,3 +664,35 @@ describe("extractOutcome", () => {
     );
   });
 });
+
+// ============================================================================
+// extractTrigger + extractOutcome — AC 14 combined
+// ============================================================================
+//
+// When the query SHA appears in no tool_result, BOTH trigger and outcome
+// return null (the commit-authoring anchor is missing). extractIntent is
+// unaffected because it doesn't take a SHA — it returns the first real
+// user turn regardless.
+
+describe("extractTrigger + extractOutcome (AC 14 combined)", () => {
+  test.failing(
+    "SHA not in any tool result → trigger + outcome both null; extractIntent unaffected",
+    () => {
+      const [bashA, bashUser] = makeBashTurn(
+        'git commit -m "real commit"',
+        "[main aaaaaab] real commit",
+      );
+      const turns = [
+        makeUserTurn("do the thing"),
+        bashA,
+        bashUser,
+        makeAssistantTurn({ text: "Committed." }),
+      ];
+      const missingSha = "deadbee";
+      expect(extractTrigger(turns, missingSha)).toBeNull();
+      expect(extractOutcome(turns, missingSha)).toBeNull();
+      // Intent is SHA-independent and must still find the first real user.
+      expect(extractIntent(turns)).toBe("do the thing");
+    },
+  );
+});
