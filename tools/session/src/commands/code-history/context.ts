@@ -102,19 +102,22 @@ export function isCommandOrCaveat(text: string): boolean {
 /**
  * Extract the first human-authored user message from a conversation.
  *
- * Skips over system-injected wrappers (see `isCommandOrCaveat`) so that
- * a session starting with `[<caveat>, <command-name>, "fix the build"]`
+ * Skips over:
+ *   - system-injected wrappers (see `isCommandOrCaveat`), and
+ *   - empty-text user turns (e.g. a pure tool-result user turn that
+ *     happens to carry no prose).
+ *
+ * So a session starting with `[<caveat>, <command-name>, "fix the build"]`
  * returns `"fix the build"`.
  *
  * Returns `null` when:
  *   - `turns` has no user turns, OR
- *   - every user turn's text is a command/caveat wrapper.
+ *   - every user turn is empty or a command/caveat wrapper.
  *
- * Returns the raw text — no whitespace collapse, no truncation.
- * Callers (slices 4/5/6 renderers) apply `truncate` at the render
- * boundary when they need a single-line bounded string. Keeping the
- * extractor raw lets callers decide whether they want the full intent
- * (e.g. a JSON export) or a preview (e.g. a trailer row).
+ * Return boundary (ENG-5042 AC 15): the returned string is already
+ * `truncate`d — whitespace runs are collapsed and the result is ≤200
+ * chars. Downstream consumers (slices 4/5/6 renderers) can render
+ * the value verbatim without re-applying the bounded-string rule.
  *
  * Pure: the input array is not mutated; a `for…of` walk reads each
  * turn exactly once and exits on the first match.
@@ -122,8 +125,14 @@ export function isCommandOrCaveat(text: string): boolean {
 export function extractIntent(turns: Turn[]): string | null {
   for (const turn of turns) {
     if (turn.role !== "user") continue;
+    // Skip pure tool-result-only user turns that carry no prose. This
+    // check is separate from `isCommandOrCaveat` — that predicate answers
+    // "is this a wrapper message," not "is this empty."
+    if (turn.text.trim() === "") continue;
     if (isCommandOrCaveat(turn.text)) continue;
-    return turn.text;
+    // AC 15: apply truncate at the extractor's return boundary so
+    // downstream consumers receive a ready-to-render string.
+    return truncate(turn.text);
   }
   return null;
 }
