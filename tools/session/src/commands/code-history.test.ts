@@ -11,95 +11,35 @@
  *   2. `session code-history --help` — help output (AC 3)
  *   3. End-to-end CLI behavior (AC 4, AC 5, AC 19) against a fixture git repo
  *
- * The fixture repo lives under a tmp dir (see `makeFixtureRepo`). Tests
- * MUST NOT read from the real monorepo's git history — that couples to
- * real commits and will break on every rewrite.
+ * Shared fixture helpers (`makeFixtureRepo`, `runCli`) live in
+ * `./code-history/__fixtures__/helpers.ts` so slices 2+ can extend them
+ * with trailers/bodies without forking a new helper.
+ *
+ * Tests MUST NOT read from the real monorepo's git history — that couples
+ * to real commits and will break on every rewrite.
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { parseCodeHistoryArgs } from "../cli-args";
-
-// =============================================================================
-// FIXTURE REPO
-// =============================================================================
-
-/**
- * Create a throwaway git repo with N commits touching a known file & line.
- *
- * Returns `{ dir, file }`:
- *   - `dir`: repo root (cwd to use when spawning the CLI)
- *   - `file`: path to the file inside the repo, relative to `dir`
- *
- * The file ends up with 3 commits, the most recent of which has a known
- * subject line the tests can assert on.
- */
-function makeFixtureRepo(): { dir: string; file: string; expectedSubject: string } {
-  const dir = mkdtempSync(join(tmpdir(), "code-history-fixture-"));
-  const file = "src/target.ts";
-  const expectedSubject = "feat(target): change the watched line";
-
-  mkdirSync(join(dir, "src"), { recursive: true });
-
-  const run = (cmd: string[], opts: { stdin?: string } = {}) => {
-    const proc = Bun.spawnSync(cmd, {
-      cwd: dir,
-      env: {
-        ...process.env,
-        GIT_AUTHOR_NAME: "Red Test",
-        GIT_AUTHOR_EMAIL: "red@example.com",
-        GIT_COMMITTER_NAME: "Red Test",
-        GIT_COMMITTER_EMAIL: "red@example.com",
-      },
-      stdin: opts.stdin ? new TextEncoder().encode(opts.stdin) : undefined,
-    });
-    if (proc.exitCode !== 0) {
-      const stderr = new TextDecoder().decode(proc.stderr);
-      throw new Error(`git command failed: ${cmd.join(" ")}\n${stderr}`);
-    }
-  };
-
-  run(["git", "init", "-q", "-b", "main"]);
-
-  // Commit 1: initial content.
-  writeFileSync(join(dir, file), "line 1\nline 2\nline 3\n");
-  run(["git", "add", file]);
-  run(["git", "commit", "-q", "-m", "initial: add target file"]);
-
-  // Commit 2: touch line 2 with an unrelated subject.
-  writeFileSync(join(dir, file), "line 1\nline 2 v2\nline 3\n");
-  run(["git", "add", file]);
-  run(["git", "commit", "-q", "-m", "chore: tweak another line"]);
-
-  // Commit 3: touch line 2 again — this is the commit we expect to see.
-  writeFileSync(join(dir, file), "line 1\nline 2 v3 final\nline 3\n");
-  run(["git", "add", file]);
-  run(["git", "commit", "-q", "-m", expectedSubject]);
-
-  return { dir, file, expectedSubject };
-}
-
-/** Path to the CLI entrypoint so `Bun.spawn` can invoke it. */
-const CLI_ENTRY = join(import.meta.dir, "..", "cli.ts");
-
-function runCli(
-  args: string[],
-  cwd: string,
-): { exitCode: number; stdout: string; stderr: string } {
-  const proc = Bun.spawnSync(["bun", CLI_ENTRY, ...args], { cwd });
-  return {
-    exitCode: proc.exitCode ?? -1,
-    stdout: new TextDecoder().decode(proc.stdout),
-    stderr: new TextDecoder().decode(proc.stderr),
-  };
-}
+import {
+  makeFixtureRepo,
+  runCli,
+  type FixtureRepo,
+} from "./code-history/__fixtures__/helpers";
 
 // =============================================================================
 // ARG PARSER (AC 1, AC 2)
 // =============================================================================
+//
+// See `parseCodeHistoryArgs` in `../cli-args.ts` for the contract. The
+// pattern reference is `parseFetchArgs` in the same file — but code-history
+// is unique in accepting a `file:line` positional (the only parser in this
+// codebase with a colon-embedded positional), so last-colon-is-separator
+// edge cases get their own tests below.
 
 describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
   test.failing("ENG-5040: parses `file.ts:42` into { file, line }", () => {
@@ -116,6 +56,29 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
     });
   });
 
+  test.failing("ENG-5040: accepts absolute paths", () => {
+    expect(
+      parseCodeHistoryArgs(["/workspaces/test-mvp/src/foo.ts:42"]),
+    ).toEqual({
+      file: "/workspaces/test-mvp/src/foo.ts",
+      line: 42,
+    });
+  });
+
+  test.failing(
+    "ENG-5040: last colon is the file/line separator (paths with embedded colons)",
+    () => {
+      // A path like `weird:name.ts:42` splits at the LAST colon: file is
+      // `weird:name.ts`, line is `42`. Documenting the rule here so Green
+      // doesn't split at the first colon and later slices don't have to
+      // re-decide.
+      expect(parseCodeHistoryArgs(["weird:name.ts:42"])).toEqual({
+        file: "weird:name.ts",
+        line: 42,
+      });
+    },
+  );
+
   test.failing("ENG-5040: recognizes --help", () => {
     expect(parseCodeHistoryArgs(["--help"])).toBe("help");
     expect(parseCodeHistoryArgs(["-h"])).toBe("help");
@@ -126,7 +89,12 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
   });
 
   test.failing("ENG-5040: throws when the arg has no colon separator", () => {
-    expect(() => parseCodeHistoryArgs(["src/foo.ts"])).toThrow(/file.*line/i);
+    // Pin EXACT wording so Green commits to one phrasing — downstream
+    // slices and the E2E stderr assertion below re-use it. This is the
+    // canonical "what you typed doesn't match the grammar" message.
+    expect(() => parseCodeHistoryArgs(["src/foo.ts"])).toThrow(
+      'Expected <file>:<line>, got "src/foo.ts"',
+    );
   });
 
   test.failing("ENG-5040: throws when the line is non-integer", () => {
@@ -149,21 +117,41 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
 // =============================================================================
 
 describe("session code-history --help (AC 3)", () => {
+  let fixture: FixtureRepo;
+
+  beforeAll(() => {
+    fixture = makeFixtureRepo();
+  });
+
+  afterAll(() => {
+    rmSync(fixture.dir, { recursive: true, force: true });
+  });
+
   test.failing(
     "ENG-5040: prints command-specific help containing the usage line and exits 0",
     () => {
-      // Use a freshly created repo as cwd so we don't execute git against
-      // the monorepo — help should not care, but we don't want surprises.
-      const { dir } = makeFixtureRepo();
+      const result = runCli(["code-history", "--help"], fixture.dir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("session code-history");
+      expect(result.stdout).toMatch(/<file>:<line>/);
+      // Must NOT print the top-level help (which starts with "Session - Parse").
+      expect(result.stdout).not.toContain("Session - Parse Claude session");
+    },
+  );
+
+  test.failing(
+    "ENG-5040: --help works outside a git repo (guards against calling `getMostRecentCommit` before branching on help)",
+    () => {
+      // A tmp dir with no `.git` — Green must branch on `parsed === 'help'`
+      // BEFORE reaching the git layer, otherwise help breaks when invoked
+      // anywhere outside a repo.
+      const noRepoDir = mkdtempSync(join(tmpdir(), "code-history-nohelp-"));
       try {
-        const result = runCli(["code-history", "--help"], dir);
+        const result = runCli(["code-history", "--help"], noRepoDir);
         expect(result.exitCode).toBe(0);
         expect(result.stdout).toContain("session code-history");
-        expect(result.stdout).toMatch(/<file>:<line>/);
-        // Must NOT print the top-level help (which starts with "Session - Parse").
-        expect(result.stdout).not.toContain("Session - Parse Claude session");
       } finally {
-        rmSync(dir, { recursive: true, force: true });
+        rmSync(noRepoDir, { recursive: true, force: true });
       }
     },
   );
@@ -174,7 +162,7 @@ describe("session code-history --help (AC 3)", () => {
 // =============================================================================
 
 describe("session code-history end-to-end", () => {
-  let fixture: { dir: string; file: string; expectedSubject: string };
+  let fixture: FixtureRepo;
 
   beforeAll(() => {
     fixture = makeFixtureRepo();
@@ -194,17 +182,20 @@ describe("session code-history end-to-end", () => {
 
       expect(result.exitCode).toBe(0);
 
-      // AC 5 header shape: `<short-sha>  <YYYY-MM-DD>  <subject>`
-      //   - 8 lowercase hex chars
-      //   - two spaces
-      //   - YYYY-MM-DD
-      //   - two spaces
-      //   - subject
+      // AC 5 exact header shape: `<short-sha>  <YYYY-MM-DD>  <subject>`.
+      // We pinned expectedSha in the fixture via `git rev-parse HEAD`, so
+      // the whole line is asserted exactly — no regex wiggle room.
       const firstLine = result.stdout.split("\n").find((l) => l.length > 0) ?? "";
-      expect(firstLine).toMatch(
-        /^[0-9a-f]{8} {2}\d{4}-\d{2}-\d{2} {2}.+/,
+      // Date comes from the fixture commit's author date — it's today in
+      // practice but we don't pin it, because Green might clock-skew. So
+      // we assert the SHA + subject exactly and the date shape separately.
+      const match = firstLine.match(
+        /^([0-9a-f]{8}) {2}(\d{4}-\d{2}-\d{2}) {2}(.+)$/,
       );
-      expect(firstLine).toContain(fixture.expectedSubject);
+      expect(match).not.toBeNull();
+      const [, sha, , subject] = match!;
+      expect(sha).toBe(fixture.expectedSha);
+      expect(subject).toBe(fixture.expectedSubject);
 
       // AC 4: only ONE commit block for this slice (no `-n` multi-commit yet).
       // A single header line is enough to assert the "one block" contract.
@@ -266,27 +257,33 @@ describe("session code-history end-to-end", () => {
         fixture.dir,
       );
       expect(result.exitCode).not.toBe(0);
-      // Stderr must explain the expected shape — not just be "some error".
-      expect(result.stderr.toLowerCase()).toMatch(/file.*line|<file>:<line>|colon/);
+      // Stderr echoes the exact parser wording (pinned in the parser
+      // test above) so wording drift in either place breaks the other.
+      expect(result.stderr).toContain(
+        'Expected <file>:<line>, got "src/foo.ts"',
+      );
     },
   );
 
   test.failing(
-    "ENG-5040 (AC 2): nonexistent file → non-zero exit, stderr names the file",
+    "ENG-5040 (AC 2): nonexistent file → non-zero exit, stderr names the file AND explains it wasn't found",
     () => {
       const result = runCli(
         ["code-history", "src/does-not-exist.ts:1"],
         fixture.dir,
       );
       expect(result.exitCode).not.toBe(0);
-      // Stderr must actually tell the user WHICH file is missing, so they
-      // can act on the error.
-      expect(result.stderr).toContain("src/does-not-exist.ts");
+      // Must emit a clear "file not found" message upfront, not let
+      // `git log -L` error bubble out with a cryptic complaint. Accept
+      // any common wording: "not found", "no such file", "does not exist".
+      expect(result.stderr).toMatch(
+        /src\/does-not-exist\.ts.*(not.*found|no such|does not exist)|((not.*found|no such|does not exist).*src\/does-not-exist\.ts)/i,
+      );
     },
   );
 
   test.failing(
-    "ENG-5040 (AC 2): line > file length → non-zero exit, stderr mentions the line",
+    "ENG-5040 (AC 2): line > file length → non-zero exit, stderr mentions the line being out of range",
     () => {
       // The fixture file has exactly 3 lines; ask for line 50.
       // AC 2 says this is an ERROR (not "no committed history"), because
@@ -296,8 +293,12 @@ describe("session code-history end-to-end", () => {
         fixture.dir,
       );
       expect(result.exitCode).not.toBe(0);
-      // Stderr must name the out-of-range line number.
-      expect(result.stderr).toContain("50");
+      // Stderr must clearly signal that line 50 is out of range — not
+      // just contain the digits "50" anywhere (a stack frame would
+      // satisfy that weaker check).
+      expect(result.stderr.toLowerCase()).toMatch(
+        /line.*50|50.*line|exceed|out of range/,
+      );
     },
   );
 });
