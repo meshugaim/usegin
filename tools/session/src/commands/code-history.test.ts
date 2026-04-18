@@ -146,12 +146,23 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
 // canonical string.
 
 describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
+  // Two-tier coverage:
+  //   1. BASIC PRESENCE — uniform `[flag, "3", "src/foo.ts:1"]` shape,
+  //      iterates every reserved flag. Confirms each one trips the
+  //      reject, independent of how it's normally invoked.
+  //   2. REALISTIC SHAPES — per-flag tests using the SAME shape users
+  //      would actually type (`-n 3`, `--all` bare, `-L 2,5`, `--func
+  //      myFn`). Guards against a parser that rejects the uniform shape
+  //      but accidentally accepts the real shape — e.g. a parser that
+  //      expects a numeric arg after `--all` would pass tier 1 but let
+  //      the bare `--all` slip through.
+  //
   // Use a test.each-style loop so each reserved flag gets its own named
   // test — clearer failure output than one test with a forEach inside.
   // (Bun test supports dynamic test registration inside describe.)
   for (const flag of CODE_HISTORY_RESERVED_FLAGS) {
     test.failing(
-      `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` with the pinned "not yet / ENG-5048" message`,
+      `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` with the pinned "not yet / ENG-5048" message (basic presence)`,
       () => {
         // Flag BEFORE the positional: `-n 3 file.ts:1`. The parser must
         // reject before even looking at the positional.
@@ -162,7 +173,7 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
     );
 
     test.failing(
-      `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` even when it appears AFTER the positional`,
+      `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` even when it appears AFTER the positional (basic presence)`,
       () => {
         // Regression guard: an implementation that only scans `args[0]`
         // for the reserved check would miss this ordering.
@@ -172,6 +183,51 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
       },
     );
   }
+
+  // Realistic-shape tests — one per reserved flag, matching the shape a
+  // user would actually type. All reject with the same pinned message.
+  test.failing(
+    "ENG-5041 (AC 24): rejects `-n 3 <file>:<line>` (user form — count flag + numeric arg)",
+    () => {
+      expect(() =>
+        parseCodeHistoryArgs(["-n", "3", "src/foo.ts:1"]),
+      ).toThrow(CODE_HISTORY_RESERVED_FLAG_MESSAGE);
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 24): rejects `--all <file>:<line>` (user form — bare flag, no argument)",
+    () => {
+      // Guards the "parser expects a value after every reserved flag"
+      // bug — `--all` is a boolean flag and takes no argument.
+      expect(() =>
+        parseCodeHistoryArgs(["--all", "src/foo.ts:1"]),
+      ).toThrow(CODE_HISTORY_RESERVED_FLAG_MESSAGE);
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 24): rejects `-L 2,5 <file>:<line>` (user form — range arg like git log -L)",
+    () => {
+      // `-L` in git takes a `start,end` range. We must reject the flag
+      // itself before the parser tries to interpret `2,5` as anything.
+      expect(() =>
+        parseCodeHistoryArgs(["-L", "2,5", "src/foo.ts:1"]),
+      ).toThrow(CODE_HISTORY_RESERVED_FLAG_MESSAGE);
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 24): rejects `--func myFn <file>:<line>` (user form — value arg that isn't a number)",
+    () => {
+      // `--func` takes a function name. Guards against a parser that
+      // only rejects when the value after the flag is numeric (since
+      // `-n 3` and `-L 2,5` both have numeric-shaped values).
+      expect(() =>
+        parseCodeHistoryArgs(["--func", "myFn", "src/foo.ts:1"]),
+      ).toThrow(CODE_HISTORY_RESERVED_FLAG_MESSAGE);
+    },
+  );
 
   test.failing(
     "ENG-5041 (AC 24): the pinned message references ENG-5048 so users know where the follow-up lives",
