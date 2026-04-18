@@ -430,4 +430,113 @@ describe("extractTrigger", () => {
       },
     );
   });
+
+  describe("negative cases", () => {
+    test.failing("N1: `git commits` (no word boundary) → NOT detected", () => {
+      // Bash command starts with "git commits" (plural) — the extractor
+      // must require a word boundary so this does NOT qualify. Even though
+      // the tool result contains the SHA, the command string is not a
+      // `git commit` invocation.
+      const [bashA, bashUser] = makeBashTurn(
+        "git commits --list",
+        "[main 6666666] fake: should not match",
+      );
+      const turns = [makeUserTurn("list my commits"), bashA, bashUser];
+      expect(extractTrigger(turns, "6666666")).toBeNull();
+    });
+
+    test.failing(
+      "N2: `git  commit` (double space) → NOT detected (literal-prefix semantics)",
+      () => {
+        // Judgment call per companion: spec says "starts with `git commit`",
+        // literal prefix. Double-space between tokens breaks that prefix.
+        // Kept as a negative; revisit if a real-user case surfaces.
+        const [bashA, bashUser] = makeBashTurn(
+          'git  commit -m "double space"',
+          "[main 7777777] double space",
+        );
+        const turns = [makeUserTurn("commit with double space"), bashA, bashUser];
+        expect(extractTrigger(turns, "7777777")).toBeNull();
+      },
+    );
+
+    test.failing(
+      "N3: `git checkout` / `git cherry-pick` → NOT detected",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          "git checkout -b new-branch",
+          "[main 8888888] wrong command",
+        );
+        const turns = [makeUserTurn("checkout a branch"), bashA, bashUser];
+        expect(extractTrigger(turns, "8888888")).toBeNull();
+      },
+    );
+
+    test.failing(
+      "N4: plain text mentioning `git commit` (not a Bash tool_use) → NOT detected",
+      () => {
+        // An assistant text turn that *says* "git commit" in prose but
+        // never runs a Bash tool. No Bash tool_use → no commit-authoring
+        // turn → null.
+        const turns = [
+          makeUserTurn("how do I commit?"),
+          makeAssistantTurn({
+            text: "You can run `git commit -m \"...\"` to commit changes.",
+          }),
+        ];
+        expect(extractTrigger(turns, "9999999")).toBeNull();
+      },
+    );
+
+    test.failing(
+      "N5: Bash tool_use exists but SHA not in any tool result → null",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "something"',
+          "[main aaaaaaa] something",
+        );
+        const turns = [makeUserTurn("commit please"), bashA, bashUser];
+        // Query a SHA that doesn't appear anywhere in tool results.
+        expect(extractTrigger(turns, "deadbee")).toBeNull();
+      },
+    );
+
+    test.failing("N6: no Bash tool_use at all → null", () => {
+      const turns = [
+        makeUserTurn("hi"),
+        makeAssistantTurn({ text: "hello back" }),
+      ];
+      expect(extractTrigger(turns, "abcdef0")).toBeNull();
+    });
+
+    test.failing(
+      "N7: aliased `gc -m` → NOT detected (literal check, no alias resolution)",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'gc -m "fix via alias"',
+          "[main bbbbbbc] fix via alias",
+        );
+        const turns = [makeUserTurn("commit via alias"), bashA, bashUser];
+        expect(extractTrigger(turns, "bbbbbbc")).toBeNull();
+      },
+    );
+
+    test.failing(
+      "N8: commit-authoring Bash turn with no preceding real user turn → null",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "no user"',
+          "[main ccccccd] no user",
+        );
+        // All preceding user turns are wrappers — no real user ask.
+        const turns = [
+          makeUserTurn("<command-name>/auto-commit</command-name>"),
+          makeUserTurn("Caveat: system preamble"),
+          bashA,
+          bashUser,
+        ];
+        expect(extractTrigger(turns, "ccccccd")).toBeNull();
+      },
+    );
+  });
 });
