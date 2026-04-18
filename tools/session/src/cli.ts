@@ -49,6 +49,7 @@ USAGE:
   session delete <id>       Alias for 'rm'
   session bash [id] [--grep <p>]  Browse Bash commands from sessions
   session search-in <id> <query>  Search within a session's turns
+  session code-history <file>:<line>  Show commit context for a line
   session docs [list|show]  Browse embedded documentation
 
 SESSION IDENTIFIERS:
