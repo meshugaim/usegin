@@ -18,8 +18,10 @@
  *     the tests don't need a git fixture just to exercise body-preview logic.
  *
  * Slice 2 (ENG-5041) uses `stripTrailers` for the body-preview line.
- * Slice 4 will add `extractTrailers` to surface `Claude-Session: <uuid>`.
- * Slice 5 will reuse that to look for `Part of: ENG-XXXX` / `Closes: ENG-XXXX`.
+ * Slice 4 (ENG-5043) added `extractClaudeSessionTrailer` below to surface
+ * `Claude-Session: <uuid>` for the session block.
+ * Slice 5 will reuse that pattern to look for `Part of: ENG-XXXX` /
+ * `Closes: ENG-XXXX`.
  */
 
 /**
