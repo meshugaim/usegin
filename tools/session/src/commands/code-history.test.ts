@@ -31,6 +31,7 @@ import {
   makeFixtureRepo,
   makeFixtureRepoWithRename,
   runCli,
+  withFixtureRepo,
   withTempDir,
   type FixtureRepo,
   type FixtureRepoWithRename,
@@ -498,103 +499,88 @@ describe("session code-history body preview (AC 8, AC 9)", () => {
 
   test(
     "ENG-5041 (AC 8): commit with body + trailers → stdout includes `body:` line after the header",
-    () => {
-      const fx = makeFixtureRepo({
-        commits: [
-          { subject: "initial: seed target file" },
-          {
-            subject: "feat: add a thoughtful feature",
-            body: "This commit does the thing. It also does the other thing.",
-            trailers: {
-              "Co-Authored-By": "Claude <noreply@anthropic.com>",
-              "Part of": "ENG-5041",
+    async () => {
+      await withFixtureRepo(
+        {
+          commits: [
+            { subject: "initial: seed target file" },
+            {
+              subject: "feat: add a thoughtful feature",
+              body: "This commit does the thing. It also does the other thing.",
+              trailers: {
+                "Co-Authored-By": "Claude <noreply@anthropic.com>",
+                "Part of": "ENG-5041",
+              },
             },
-          },
-        ],
-      });
+          ],
+        },
+        (fx) => {
+          const result = runCli(["code-history", `${fx.file}:2`], fx.dir);
+          expect(result.exitCode).toBe(0);
 
-      try {
-        const result = runCli(
-          ["code-history", `${fx.file}:2`],
-          fx.dir,
-        );
-        expect(result.exitCode).toBe(0);
-
-        // The body line must follow the `<sha>  <date>  <subject>` header.
-        // Pin the exact preview content — trailers stripped, two lines
-        // space-joined.
-        const lines = result.stdout.split("\n").filter((l) => l.length > 0);
-        const bodyLine = lines.find((l) => l.startsWith("body:"));
-        expect(bodyLine).toBeDefined();
-        expect(bodyLine).toBe(
-          "body: This commit does the thing. It also does the other thing.",
-        );
-      } finally {
-        rmSync(fx.dir, { recursive: true, force: true });
-      }
+          // The body line must follow the `<sha>  <date>  <subject>` header.
+          // Pin the exact preview content — trailers stripped, two lines
+          // space-joined.
+          const lines = result.stdout.split("\n").filter((l) => l.length > 0);
+          const bodyLine = lines.find((l) => l.startsWith("body:"));
+          expect(bodyLine).toBeDefined();
+          expect(bodyLine).toBe(
+            "body: This commit does the thing. It also does the other thing.",
+          );
+        },
+      );
     },
   );
 
   test(
     "ENG-5041 (AC 9): commit with ONLY trailers (no real body) → stdout has NO `body:` line",
-    () => {
+    async () => {
       // The "missing layer → no line" invariant: when the body collapses
       // to pure trailers, omit the `body:` line entirely. No placeholder,
       // no blank line. Slices 4 and 5 follow this same pattern for the
       // session / linear lines.
-      const fx = makeFixtureRepo({
-        commits: [
-          { subject: "initial: seed" },
-          {
-            subject: "feat: thing with trailers only",
-            trailers: {
-              "Co-Authored-By": "Claude <noreply@anthropic.com>",
-              "Claude-Session": "abc-123",
+      await withFixtureRepo(
+        {
+          commits: [
+            { subject: "initial: seed" },
+            {
+              subject: "feat: thing with trailers only",
+              trailers: {
+                "Co-Authored-By": "Claude <noreply@anthropic.com>",
+                "Claude-Session": "abc-123",
+              },
             },
-          },
-        ],
-      });
-
-      try {
-        const result = runCli(
-          ["code-history", `${fx.file}:2`],
-          fx.dir,
-        );
-        expect(result.exitCode).toBe(0);
-        // No line in stdout may START with "body:" — searching the raw
-        // output catches even a line with trailing whitespace.
-        const hasBodyLine = result.stdout
-          .split("\n")
-          .some((l) => l.startsWith("body:"));
-        expect(hasBodyLine).toBe(false);
-      } finally {
-        rmSync(fx.dir, { recursive: true, force: true });
-      }
+          ],
+        },
+        (fx) => {
+          const result = runCli(["code-history", `${fx.file}:2`], fx.dir);
+          expect(result.exitCode).toBe(0);
+          // No line in stdout may START with "body:" — searching the raw
+          // output catches even a line with trailing whitespace.
+          const hasBodyLine = result.stdout
+            .split("\n")
+            .some((l) => l.startsWith("body:"));
+          expect(hasBodyLine).toBe(false);
+        },
+      );
     },
   );
 
   test(
     "ENG-5041 (AC 9): commit with subject ONLY (no body, no trailers) → stdout has NO `body:` line",
-    () => {
+    async () => {
       // Companion case to the trailers-only test — guards the other
       // branch of "empty body after stripping". The default fixture
       // commits are subject-only, so the default shape is a natural
       // fixture for this scenario.
-      const fx = makeFixtureRepo();
-
-      try {
-        const result = runCli(
-          ["code-history", `${fx.file}:2`],
-          fx.dir,
-        );
+      await withFixtureRepo(undefined, (fx) => {
+        const result = runCli(["code-history", `${fx.file}:2`], fx.dir);
         expect(result.exitCode).toBe(0);
         const hasBodyLine = result.stdout
           .split("\n")
           .some((l) => l.startsWith("body:"));
         expect(hasBodyLine).toBe(false);
-      } finally {
-        rmSync(fx.dir, { recursive: true, force: true });
-      }
+      });
     },
   );
 });

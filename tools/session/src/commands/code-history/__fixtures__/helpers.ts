@@ -476,3 +476,35 @@ export async function withTempDir<T>(
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+/**
+ * Build a fixture repo with the given `spec`, hand it to `fn`, then remove
+ * the repo no matter what `fn` does. The scoped-cleanup counterpart to
+ * {@link makeFixtureRepo} for tests that want a per-test repo shape
+ * (rather than a shared `beforeAll` fixture).
+ *
+ * Extracted because the pattern:
+ *
+ *     const fx = makeFixtureRepo({ commits: [...] });
+ *     try {
+ *       // …assertions…
+ *     } finally {
+ *       rmSync(fx.dir, { recursive: true, force: true });
+ *     }
+ *
+ * appeared 3 times across the body-preview tests in
+ * `code-history.test.ts` and slices 4/5/6 will add more per-test fixture
+ * shapes for session/linear/JSON. Keeping cleanup inside the helper means
+ * an assertion that throws still leaves `/tmp` clean.
+ */
+export async function withFixtureRepo<T>(
+  spec: FixtureRepoSpec | undefined,
+  fn: (fx: FixtureRepo) => T | Promise<T>,
+): Promise<T> {
+  const fx = makeFixtureRepo(spec);
+  try {
+    return await fn(fx);
+  } finally {
+    rmSync(fx.dir, { recursive: true, force: true });
+  }
+}
