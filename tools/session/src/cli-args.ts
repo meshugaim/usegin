@@ -334,7 +334,7 @@ export const CODE_HISTORY_RESERVED_FLAG_MESSAGE =
 export function parseCodeHistoryArgs(
   args: string[],
 ): CodeHistoryArgs | "help" {
-  // These two passes stay separate (rather than merged into a single loop)
+  // These three passes stay separate (rather than merged into a single loop)
   // on purpose:
   //   1. --help wins over everything, including reserved-flag detection —
   //      `session code-history --help -n 3` should print help, not the
@@ -342,6 +342,8 @@ export function parseCodeHistoryArgs(
   //   2. The reserved-flag reject runs BEFORE the positional-count check
   //      further down so `-n 3 file:1` surfaces the pinned ENG-5048
   //      message instead of the generic "extra positionals" path.
+  //   3. The positional-count check runs last so a valid `file:line`
+  //      can be parsed once the earlier two passes have approved the argv.
   // Keeping the ordering in three explicit passes makes the precedence
   // obvious at a glance and is cheap for a 4-element reserved list.
 

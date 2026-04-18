@@ -46,7 +46,8 @@ export const BODY_PREVIEW_ELLIPSIS = "…";
  * Named `HEADER_FIELD_SEP` to disambiguate from the NUL separator used
  * in `./git.ts` (`GIT_LOG_FIELD_SEP`). Both files previously used a
  * constant called `FIELD_SEP`, which made grepping ambiguous once more
- * formatted lines get added in slices 2+ (session / linear / body).
+ * formatted lines get added in slices 4+ (session / linear) and JSON
+ * mode (slice 6).
  */
 const HEADER_FIELD_SEP = "  ";
 
@@ -98,7 +99,7 @@ export function formatBody(body: string): string {
   //
   // Loop + break (rather than filter + slice) so slices 4/5 (which walk
   // multiple commits per invocation) don't scan past the first two
-  // non-blank lines of each body. No measurable effect on slice 3 —
+  // non-blank lines of each body. No measurable effect on slice 2 —
   // `stripTrailers` already walks the full body once, so `formatBody`
   // pays O(n) regardless on a single-commit invocation.
   const nonBlank: string[] = [];

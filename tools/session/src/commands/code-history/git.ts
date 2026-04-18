@@ -32,7 +32,7 @@ export interface GetMostRecentCommitOptions {
  * Named `GIT_LOG_FIELD_SEP` to disambiguate from the visible two-space
  * separator used in `formatHeader` (see `./format.ts`). Both layers
  * previously used a constant called `FIELD_SEP`, which made grepping for
- * "the separator" ambiguous when slices 2+ add more formatted lines.
+ * "the separator" ambiguous when slices 4+ add session/linear lines.
  */
 const GIT_LOG_FIELD_SEP = "\x00";
 

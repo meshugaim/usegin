@@ -1,7 +1,7 @@
 /**
  * Shared fixtures for `session code-history` tests.
  *
- * Parameterized helpers live here so slices 2+ (session trailers, Linear
+ * Parameterized helpers live here so slices 4+ (session trailers, Linear
  * trailers, context extractors, JSON mode) can build richer commits by
  * passing structured commit specs — without forking a new fixture helper
  * per slice.
@@ -198,7 +198,7 @@ export function makeFixtureRepo(spec: FixtureRepoSpec = {}): FixtureRepo {
  * the body (or from the subject, when body is absent) by exactly one
  * blank line, so `git interpret-trailers --parse` will read them.
  *
- * Exported so unit tests can pin the exact output shape — slices 2+
+ * Exported so unit tests can pin the exact output shape — slices 4/5
  * depend on that shape when asserting `Claude-Session:` / `ENG-XXXX`
  * trailers round-trip through git into the formatter.
  */

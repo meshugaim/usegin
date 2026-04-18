@@ -2,7 +2,7 @@
  * Unit tests for the git layer of `session code-history`.
  *
  * These exercise `getMostRecentCommit` directly — not through the CLI —
- * so slices 2+ can keep adding git-layer tests alongside feature tests
+ * so slices 4+ can keep adding git-layer tests alongside feature tests
  * without paying E2E subprocess cost every time.
  *
  * Each test uses `makeFixtureRepo` (shared with the E2E suite) so the

@@ -1,7 +1,7 @@
 /**
  * Unit tests for the pure helpers in `./helpers.ts`.
  *
- * These pin the behavior of helpers so slices 2+ notice immediately if
+ * These pin the behavior of helpers so slices 4+ notice immediately if
  * the commit-message shape drifts away from git's trailer convention.
  */
 
