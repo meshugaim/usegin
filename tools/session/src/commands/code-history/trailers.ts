@@ -54,6 +54,10 @@ const TRAILER_LINE_RE = /^[A-Za-z][A-Za-z0-9-]*(?: [A-Za-z][A-Za-z0-9-]*)*:\s/;
  *   - If the entire body is trailers (or empty), returns `""`.
  *   - Otherwise, returns the body with the trailing blank line(s) and
  *     trailer block removed, and no trailing `\n`.
+ *   - Any trailing blank lines are stripped regardless of whether a
+ *     trailer block was found — callers never see a phantom blank tail.
+ *     Slices 4/5 rely on this when reusing `stripTrailers` upstream of
+ *     `session:` / `linear:` line extraction.
  *
  * @param body Raw commit body as produced by `git log --format=%b` (or empty).
  */
