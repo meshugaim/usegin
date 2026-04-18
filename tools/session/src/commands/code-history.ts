@@ -14,7 +14,7 @@
 
 import { readFileSync, statSync } from "node:fs";
 
-import { parseCodeHistoryArgs } from "../cli-args";
+import { parseCodeHistoryArgs, CODE_HISTORY_RESERVED_FLAGS } from "../cli-args";
 import { getMostRecentCommit } from "./code-history/git";
 import { formatHeader, formatBody } from "./code-history/format";
 
@@ -26,10 +26,11 @@ import { formatHeader, formatBody } from "./code-history/format";
  * they land.
  */
 export function printCodeHistoryHelp(): void {
-  // TODO(ENG-5041 Green): add a RESERVED section listing
-  // `CODE_HISTORY_RESERVED_FLAGS` from ../cli-args so the help text
-  // tells users "-n/--all/-L/--func are reserved for ENG-5048" before
-  // they try them.
+  // RESERVED section lists flags that the parser rejects with the
+  // pinned CODE_HISTORY_RESERVED_FLAG_MESSAGE — iterate the exported
+  // constant so this list and the parser check can't drift. Follow-up
+  // work (`-n`, `--all`, `-L`, `--func`) is tracked in ENG-5048.
+  const reservedList = CODE_HISTORY_RESERVED_FLAGS.map((f) => `  ${f}`).join("\n");
   console.log(`
 session code-history - Show the commit + transcript context for a line of code
 
@@ -46,6 +47,11 @@ ARGUMENTS:
 
 OPTIONS:
   --help, -h      Show this help
+
+RESERVED:
+  The following flags are reserved for a follow-up (tracked in ENG-5048)
+  and currently rejected with a "not yet" error:
+${reservedList}
 
 EXAMPLES:
   session code-history tools/session/src/cli.ts:42
