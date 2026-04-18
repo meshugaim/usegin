@@ -1,10 +1,9 @@
 /**
  * Tests for `session code-history` command.
  *
- * ALL tests are RED-phase (`test.failing`) stubs for ENG-5040. The Green
- * agent flips them to passing by implementing the real behavior in
- * `./code-history/git.ts`, the real arg-parser validation, and any
- * additional stderr polish.
+ * Covers ENG-5040 slice 1 — the skeleton that implements AC 1, 2, 3, 4, 5,
+ * and 19. Later slices extend this suite with session / linear / body
+ * lines and `--json` mode.
  *
  * Layout:
  *   1. `parseCodeHistoryArgs` — pure arg parsing (AC 1, AC 2)
@@ -42,21 +41,21 @@ import {
 // edge cases get their own tests below.
 
 describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
-  test.failing("ENG-5040: parses `file.ts:42` into { file, line }", () => {
+  test("ENG-5040: parses `file.ts:42` into { file, line }", () => {
     expect(parseCodeHistoryArgs(["src/foo.ts:42"])).toEqual({
       file: "src/foo.ts",
       line: 42,
     });
   });
 
-  test.failing("ENG-5040: accepts relative paths with `./`", () => {
+  test("ENG-5040: accepts relative paths with `./`", () => {
     expect(parseCodeHistoryArgs(["./src/foo.ts:1"])).toEqual({
       file: "./src/foo.ts",
       line: 1,
     });
   });
 
-  test.failing("ENG-5040: accepts absolute paths", () => {
+  test("ENG-5040: accepts absolute paths", () => {
     expect(
       parseCodeHistoryArgs(["/workspaces/test-mvp/src/foo.ts:42"]),
     ).toEqual({
@@ -65,7 +64,7 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
     });
   });
 
-  test.failing(
+  test(
     "ENG-5040: last colon is the file/line separator (paths with embedded colons)",
     () => {
       // A path like `weird:name.ts:42` splits at the LAST colon: file is
@@ -79,16 +78,16 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
     },
   );
 
-  test.failing("ENG-5040: recognizes --help", () => {
+  test("ENG-5040: recognizes --help", () => {
     expect(parseCodeHistoryArgs(["--help"])).toBe("help");
     expect(parseCodeHistoryArgs(["-h"])).toBe("help");
   });
 
-  test.failing("ENG-5040: throws when the positional arg is missing", () => {
+  test("ENG-5040: throws when the positional arg is missing", () => {
     expect(() => parseCodeHistoryArgs([])).toThrow(/file.*line/i);
   });
 
-  test.failing("ENG-5040: throws when the arg has no colon separator", () => {
+  test("ENG-5040: throws when the arg has no colon separator", () => {
     // Pin EXACT wording so Green commits to one phrasing — downstream
     // slices and the E2E stderr assertion below re-use it. This is the
     // canonical "what you typed doesn't match the grammar" message.
@@ -97,17 +96,17 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
     );
   });
 
-  test.failing("ENG-5040: throws when the line is non-integer", () => {
+  test("ENG-5040: throws when the line is non-integer", () => {
     expect(() => parseCodeHistoryArgs(["src/foo.ts:abc"])).toThrow(/line/i);
     expect(() => parseCodeHistoryArgs(["src/foo.ts:1.5"])).toThrow(/line/i);
   });
 
-  test.failing("ENG-5040: throws when the line is zero or negative", () => {
+  test("ENG-5040: throws when the line is zero or negative", () => {
     expect(() => parseCodeHistoryArgs(["src/foo.ts:0"])).toThrow(/line/i);
     expect(() => parseCodeHistoryArgs(["src/foo.ts:-3"])).toThrow(/line/i);
   });
 
-  test.failing("ENG-5040: throws when the file portion is empty", () => {
+  test("ENG-5040: throws when the file portion is empty", () => {
     expect(() => parseCodeHistoryArgs([":42"])).toThrow(/file/i);
   });
 });
@@ -122,7 +121,7 @@ describe("session code-history --help (AC 3)", () => {
   // pay ~200ms for `git init` + seed commits on tests that never need them.
   // The E2E describe below keeps its git fixture.
 
-  test.failing(
+  test(
     "ENG-5040: prints command-specific help containing the usage line and exits 0",
     () => {
       const tmpDir = mkdtempSync(join(tmpdir(), "code-history-help-"));
@@ -139,7 +138,7 @@ describe("session code-history --help (AC 3)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5040: --help works outside a git repo (guards against calling `getMostRecentCommit` before branching on help)",
     () => {
       // A tmp dir with no `.git` — Green must branch on `parsed === 'help'`
@@ -172,7 +171,7 @@ describe("session code-history end-to-end", () => {
     rmSync(fixture.dir, { recursive: true, force: true });
   });
 
-  test.failing(
+  test(
     "ENG-5040 (AC 4, AC 5): prints one header block for the most recent commit touching the line",
     () => {
       const result = runCli(
@@ -206,7 +205,7 @@ describe("session code-history end-to-end", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5040 (AC 19): line with no committed history → stderr message, exit 0",
     () => {
       // Line 999 in a 3-line file has no committed history.
@@ -224,7 +223,7 @@ describe("session code-history end-to-end", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5040 (AC 2): missing file argument → non-zero exit, stderr message",
     () => {
       const result = runCli(["code-history"], fixture.dir);
@@ -233,7 +232,7 @@ describe("session code-history end-to-end", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5040 (AC 2): non-integer line → non-zero exit, stderr explains the line is invalid",
     () => {
       const result = runCli(
@@ -249,7 +248,7 @@ describe("session code-history end-to-end", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5040 (AC 2): unparseable file:line (no colon) → non-zero exit, stderr explains the format",
     () => {
       const result = runCli(
@@ -265,7 +264,7 @@ describe("session code-history end-to-end", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5040 (AC 2): nonexistent file → non-zero exit, stderr names the file AND explains it wasn't found",
     () => {
       const result = runCli(
@@ -282,7 +281,7 @@ describe("session code-history end-to-end", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5040 (AC 2): line > file length → non-zero exit, stderr mentions the line being out of range",
     () => {
       // The fixture file has exactly 3 lines; ask for line 50.

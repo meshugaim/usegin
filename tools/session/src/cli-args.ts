@@ -289,9 +289,7 @@ export interface CodeHistoryArgs {
  * (absolute paths, embedded colons in paths: the separator is the LAST
  * colon).
  *
- * Red-phase stub: returns a deliberately-wrong default so the Red tests
- * fail at ASSERTION level (not import level). The Green agent replaces
- * this body with the real parser. Contract (per spec AC 1, AC 2):
+ * Contract (per spec AC 1, AC 2):
  *
  *   - Returns `"help"` if `--help` / `-h` is present.
  *   - Returns `{ file, line }` on a valid `file.ts:42` positional.
@@ -303,21 +301,54 @@ export interface CodeHistoryArgs {
  * The caller (`runCodeHistory`) turns thrown errors into stderr + non-zero
  * exit. Existence / line-in-range checks live in the command layer
  * because they need `fs` access — this parser stays pure.
- *
- * IMPORTANT for the Green agent: The end-to-end error tests in
- * `code-history.test.ts` are currently guarded by `getMostRecentCommit`'s
- * Red-phase throw, which masks order-of-operations bugs. Do NOT implement
- * the git layer before the parser (and upfront file-existence /
- * line-in-range validation) is in place — otherwise half the AC-2 error
- * tests will false-green against a bubbled `git log -L` error rather than
- * the clear user-facing message the spec requires.
  */
 export function parseCodeHistoryArgs(
-  _args: string[],
+  args: string[],
 ): CodeHistoryArgs | "help" {
-  // TODO(ENG-5040 Green): return a non-matching shape so assertion-level
-  // checks fail. Replace with the real parser per the contract above.
-  return { file: "<unimplemented>", line: 0 };
+  // Help takes precedence over everything else — `session code-history --help`
+  // should print help even if a malformed positional is also present.
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      return "help";
+    }
+  }
+
+  // Find the first non-flag positional. The spec only accepts one.
+  const positional = args.find((a) => !a.startsWith("-"));
+  if (positional === undefined) {
+    throw new Error("Missing argument: expected <file>:<line>");
+  }
+
+  // Split on the LAST colon so absolute paths (`/foo/bar.ts:42`) and
+  // paths with embedded colons (`weird:name.ts:42`) parse correctly.
+  const lastColon = positional.lastIndexOf(":");
+  if (lastColon === -1) {
+    throw new Error(`Expected <file>:<line>, got "${positional}"`);
+  }
+
+  const file = positional.slice(0, lastColon);
+  const lineStr = positional.slice(lastColon + 1);
+
+  if (file.length === 0) {
+    throw new Error(`Expected <file>:<line>, got "${positional}" (file portion is empty)`);
+  }
+
+  // Reject non-integer, decimal, and non-numeric values. Use a regex check
+  // so that "1.5", "abc", "1e2", " 1", etc. all fail — `Number()` is too
+  // permissive.
+  if (!/^-?\d+$/.test(lineStr)) {
+    throw new Error(
+      `Invalid line "${lineStr}" in "${positional}": expected a positive integer`,
+    );
+  }
+  const line = Number(lineStr);
+  if (!Number.isInteger(line) || line <= 0) {
+    throw new Error(
+      `Invalid line "${lineStr}" in "${positional}": line must be a positive integer (1-based)`,
+    );
+  }
+
+  return { file, line };
 }
 
 // =============================================================================
