@@ -138,22 +138,25 @@ export function isCommandOrCaveat(text: string): boolean {
  * chars. Downstream consumers (slices 4/5/6 renderers) can render
  * the value verbatim without re-applying the bounded-string rule.
  *
- * Pure: the input array is not mutated; a `for…of` walk reads each
- * turn exactly once and exits on the first match.
+ * Pure: the input array is not mutated; `Array.find` reads each turn
+ * at most once and exits on the first match. Chosen over a `for…of`
+ * walk because ENG-5051 will land `extractTrigger` / `extractOutcome`
+ * alongside this — a backward walk there is naturally `findLast`, so
+ * the family reads as a set.
  */
 export function extractIntent(turns: Turn[]): string | null {
-  for (const turn of turns) {
-    if (turn.role !== "user") continue;
-    // Skip pure tool-result-only user turns that carry no prose. This
-    // check is separate from `isCommandOrCaveat` — that predicate answers
-    // "is this a wrapper message," not "is this empty."
-    if (turn.text.trim() === "") continue;
-    if (isCommandOrCaveat(turn.text)) continue;
-    // AC 15: apply truncate at the extractor's return boundary so
-    // downstream consumers receive a ready-to-render string. We call
-    // the non-null internal variant because the empty-text guard above
-    // already excluded the only value that would route to `null`.
-    return truncateString(turn.text);
-  }
-  return null;
+  const intent = turns.find(
+    (t) =>
+      t.role === "user" &&
+      t.text.trim() !== "" &&
+      // Empty-text and command/caveat skips are distinct questions —
+      // empty guards against pure tool-result user turns, isCommandOrCaveat
+      // guards against system-injected wrappers.
+      !isCommandOrCaveat(t.text),
+  );
+  // AC 15: apply truncate at the extractor's return boundary so
+  // downstream consumers receive a ready-to-render string. The
+  // non-null internal variant is safe here because the predicate
+  // above already filtered empty text.
+  return intent ? truncateString(intent.text) : null;
 }
