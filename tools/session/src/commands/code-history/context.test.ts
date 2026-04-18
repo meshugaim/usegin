@@ -540,3 +540,127 @@ describe("extractTrigger", () => {
     );
   });
 });
+
+// ============================================================================
+// extractOutcome (AC 12) — ENG-5051
+// ============================================================================
+
+describe("extractOutcome", () => {
+  describe("positive cases", () => {
+    test.failing(
+      "P1: assistant text turn immediately after commit-authoring → returns its text",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "done"',
+          "[main e111111] done",
+        );
+        const turns = [
+          makeUserTurn("commit it"),
+          bashA,
+          bashUser,
+          makeAssistantTurn({ text: "Committed as e111111." }),
+        ];
+        expect(extractOutcome(turns, "e111111")).toBe("Committed as e111111.");
+      },
+    );
+
+    test.failing(
+      "P2: tool-only assistant turn between commit and text → skip tool-only, return later text",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "done"',
+          "[main e222222] done",
+        );
+        const turns = [
+          makeUserTurn("commit it"),
+          bashA,
+          bashUser,
+          // Tool-only assistant turn (empty text, a Bash tool_use).
+          makeAssistantTurn({ bash: "git log -1" }),
+          // Matching result turn.
+          makeUserTurn(""),
+          // Finally, the text-bearing assistant turn that reports outcome.
+          makeAssistantTurn({ text: "Commit landed." }),
+        ];
+        expect(extractOutcome(turns, "e222222")).toBe("Commit landed.");
+      },
+    );
+
+    test.failing(
+      "P3: distant outcome — text-bearing assistant many turns after commit → returned (no window)",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "done"',
+          "[main e333333] done",
+        );
+        // Fill with tool-only assistant turns and matching empty-text user
+        // turns between the commit and the eventual outcome. The spec says
+        // no hidden window — the first text-bearing assistant turn wins.
+        const filler: ReturnType<typeof makeAssistantTurn>[] = [];
+        for (let i = 0; i < 10; i += 1) {
+          filler.push(makeAssistantTurn({ bash: `echo ${i}` }));
+        }
+        const turns = [
+          makeUserTurn("commit it"),
+          bashA,
+          bashUser,
+          ...filler,
+          makeAssistantTurn({ text: "Commit landed, eventually." }),
+        ];
+        expect(extractOutcome(turns, "e333333")).toBe(
+          "Commit landed, eventually.",
+        );
+      },
+    );
+  });
+
+  describe("negative cases", () => {
+    test.failing("N1: whitespace-only text after commit → skipped, null if no other text", () => {
+      const [bashA, bashUser] = makeBashTurn(
+        'git commit -m "done"',
+        "[main f111111] done",
+      );
+      const turns = [
+        makeUserTurn("commit it"),
+        bashA,
+        bashUser,
+        // Only whitespace — must be skipped.
+        makeAssistantTurn({ text: "   \n\t  " }),
+      ];
+      expect(extractOutcome(turns, "f111111")).toBeNull();
+    });
+
+    test.failing("N2: no following text-bearing assistant turn → null", () => {
+      const [bashA, bashUser] = makeBashTurn(
+        'git commit -m "done"',
+        "[main f222222] done",
+      );
+      const turns = [
+        makeUserTurn("commit it"),
+        bashA,
+        bashUser,
+        // Only tool-only assistant turns after — no text to report.
+        makeAssistantTurn({ bash: "echo after" }),
+      ];
+      expect(extractOutcome(turns, "f222222")).toBeNull();
+    });
+
+    test.failing(
+      "N3: commit-authoring turn not found (SHA mismatch) → null",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "done"',
+          "[main f333333] done",
+        );
+        const turns = [
+          makeUserTurn("commit it"),
+          bashA,
+          bashUser,
+          makeAssistantTurn({ text: "Commit landed." }),
+        ];
+        // Query an unrelated SHA — no authoring turn to anchor from.
+        expect(extractOutcome(turns, "deadbee")).toBeNull();
+      },
+    );
+  });
+});
