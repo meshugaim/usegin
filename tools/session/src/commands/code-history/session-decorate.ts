@@ -26,26 +26,7 @@
 import type { ParsedSession } from "../../types";
 import type { FetchResult } from "../../fetch";
 import { SessionNotFoundError } from "../../errors";
-import { extractClaudeSessionTrailer } from "./trailers";
-import { formatSinceTimestamp } from "./format";
-import {
-  extractIntent,
-  extractTrigger,
-  extractOutcome,
-} from "./context";
 import type { DecoratedCommit } from "./types";
-
-/**
- * Short-SHA length used in the `(→ session <shortId> --since-timestamp …)`
- * hint. Matches the 8-char short SHA from the header line (spec "Concrete
- * example": `session 533a2546 --since-timestamp …`).
- *
- * Deliberately a constant rather than reusing the header's short-SHA
- * magic number because the two values could in theory diverge (a future
- * tweak might want the hint at 7 or 12 chars while keeping the header
- * at 8). Pinning here keeps the intention explicit.
- */
-const SESSION_SHORT_ID_LEN = 8;
 
 /**
  * Dependency hooks for `decorateCommitWithSession`.
@@ -61,20 +42,6 @@ export interface SessionDeps {
   fetchSession: (input: string) => Promise<FetchResult>;
   /** Parse a local JSONL file into a structured session. */
   parseSession: (jsonlPath: string) => Promise<ParsedSession>;
-}
-
-/**
- * Compose the `(→ session <shortId> --since-timestamp <t-30m>)` hint
- * string the session line renders in its tail.
- *
- * Centralized because the Red-phase `formatSessionBlock` unit tests
- * compose this literal too — keeping the string shape in one place
- * prevents drift between the pipeline and the formatter's fixtures.
- */
-function composeSinceTimestampCmd(uuid: string, commitISO: string): string {
-  const shortId = uuid.slice(0, SESSION_SHORT_ID_LEN);
-  const since = formatSinceTimestamp(commitISO);
-  return `session ${shortId} --since-timestamp ${since}`;
 }
 
 /**
@@ -110,17 +77,3 @@ export async function decorateCommitWithSession(
 // importing from this module see the full contract (function +
 // exceptions) without reaching into `../../errors`.
 export { SessionNotFoundError };
-
-// Declare these imports as `used` in the public API surface so the
-// decorator's implementation (Green phase) has them wired. The
-// extractors are not yet referenced in the Red stub — they're imported
-// here so the module graph is complete from the Red phase onward.
-//
-// This is a deliberate choice, not an oversight: wiring the imports in
-// Red makes the Green edit a pure logic change, not a logic+imports
-// change, which keeps the Green diff narrowly-scoped to behavior.
-void extractClaudeSessionTrailer;
-void composeSinceTimestampCmd;
-void extractIntent;
-void extractTrigger;
-void extractOutcome;
