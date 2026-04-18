@@ -49,6 +49,10 @@ import {
   type FixtureRepo,
   type FixtureRepoWithRename,
 } from "./code-history/__fixtures__/helpers";
+import {
+  SESSION_FIXTURE_ID,
+  SESSION_FIXTURE_SHORT_ID,
+} from "./code-history/__fixtures__/session";
 import { userEntry, assistantEntry, systemEntry } from "../testing";
 
 // =============================================================================
@@ -705,11 +709,6 @@ describe("session code-history reserved flags (AC 24)", () => {
 // subprocess cost. These tests here pin the stdout SHAPE produced by
 // the real CLI for the happy / no-trailer / multi-trailer / fetch-miss
 // paths.
-
-/** Fixture UUID used across the E2E session-block tests. */
-const SESSION_FIXTURE_ID = "533a2546-684a-4724-b592-34aa88aac626";
-/** Shorter form that appears in the `(→ session <shortId> --since-timestamp …)` hint. */
-const SESSION_FIXTURE_SHORT_ID = "533a2546";
 
 /**
  * Build a minimal JSONL payload for a Claude-authored commit. The
