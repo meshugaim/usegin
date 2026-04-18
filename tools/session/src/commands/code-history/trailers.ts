@@ -110,9 +110,13 @@ function trimTrailingBlank(lines: string[]): string[] {
 }
 
 /**
- * True iff the given line matches the git-trailer shape. Exported so the
- * body formatter (slice 2) and the session/linear extractors (slices 4-5)
- * agree on exactly one definition of "what counts as a trailer line".
+ * True iff the given line matches the git-trailer shape. Exported for
+ * reuse by the body formatter (slice 2) via `stripTrailers`. The
+ * session-trailer extractor (slice 4, ENG-5043) pins its OWN regex from
+ * the ENG-5039 spec (`^Claude-Session:\s*(\S+)\s*$/m`) rather than
+ * reusing this one, because the spec wording is tighter than the
+ * generic trailer shape. Slice 5's Linear-trailer extractor may reuse
+ * this if its spec permits.
  */
 export function isTrailerLine(line: string): boolean {
   return TRAILER_LINE_RE.test(line);

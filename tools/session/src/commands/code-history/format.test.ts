@@ -1,12 +1,14 @@
 /**
  * Pure-formatter tests for `session code-history`.
  *
- * Golden-test style: pin the exact bytes we emit so slices 4/5/6 (session
- * line, linear line, JSON) can layer on top of a stable rule set.
+ * Golden-test style: pin the exact bytes we emit so slices 5/6 (linear
+ * line, JSON) can layer on top of a stable rule set.
  *
  * Coverage so far:
- *   - `formatHeader` — AC 5         (ENG-5040 slice 1)
- *   - `formatBody`   — AC 8, AC 9   (ENG-5041 slice 2)
+ *   - `formatHeader`         — AC 5             (ENG-5040 slice 1)
+ *   - `formatBody`           — AC 8, AC 9       (ENG-5041 slice 2)
+ *   - `formatSinceTimestamp` — AC 6             (ENG-5043 slice 4)
+ *   - `formatSessionBlock`   — AC 6, AC 9, AC 13 (ENG-5043 slice 4)
  */
 
 import { describe, test, expect } from "bun:test";

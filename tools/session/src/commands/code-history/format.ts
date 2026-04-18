@@ -45,9 +45,9 @@ export const BODY_PREVIEW_ELLIPSIS = "…";
  *
  * Named `HEADER_FIELD_SEP` to disambiguate from the NUL separator used
  * in `./git.ts` (`GIT_LOG_FIELD_SEP`). Both files previously used a
- * constant called `FIELD_SEP`, which made grepping ambiguous once more
- * formatted lines get added in slices 4+ (session / linear) and JSON
- * mode (slice 6).
+ * constant called `FIELD_SEP`, which made grepping ambiguous once slice
+ * 4's session block (and slice 5's linear line, slice 6's JSON mode)
+ * introduced more formatted output.
  */
 const HEADER_FIELD_SEP = "  ";
 
@@ -86,8 +86,9 @@ export function formatHeader(commit: DecoratedCommit): string {
  *
  * Returning `""` (rather than `null` / `undefined`) keeps the return type
  * total — callers check `.length === 0` to decide whether to emit the
- * `body:` line. Slices 4/5 will follow the same "empty string → omit
- * line" pattern for session / linear rendering.
+ * `body:` line. Slice 4's `formatSessionBlock` follows the same
+ * "missing layer → omit line" shape (returns `null` for a whole block;
+ * per-nested-line omits happen inside). Slice 5's linear line will too.
  */
 export function formatBody(body: string): string {
   const stripped = stripTrailers(body);
@@ -97,11 +98,11 @@ export function formatBody(body: string): string {
   // `"foo "`. Taking the first 2 non-blank lines matches the spec's
   // "first 2 lines" rule without being tripped up by incidental gaps.
   //
-  // Loop + break (rather than filter + slice) so slices 4/5 (which walk
-  // multiple commits per invocation) don't scan past the first two
-  // non-blank lines of each body. No measurable effect on slice 2 —
-  // `stripTrailers` already walks the full body once, so `formatBody`
-  // pays O(n) regardless on a single-commit invocation.
+  // Loop + break (rather than filter + slice) so we stop at the first
+  // two non-blank lines regardless of body size. No measurable win on
+  // today's single-commit invocations — `stripTrailers` already walks
+  // the full body once, so `formatBody` is O(n) either way — but it
+  // keeps the early-exit obvious if a future multi-commit caller lands.
   const nonBlank: string[] = [];
   for (const l of stripped.split("\n")) {
     if (l.length > 0) nonBlank.push(l);
