@@ -103,17 +103,19 @@ describe("getMostRecentCommit (unit)", () => {
   test(
     "ENG-5040: respects the `cwd` option (doesn't rely on process.cwd)",
     async () => {
-      // The happy-path test above already passes `cwd`; this test pins
-      // the contract by running from a DIFFERENT cwd and confirming we
-      // still hit the fixture repo. Future slices must keep the `cwd`
-      // contract — in-process parallel tests would break without it.
+      // Actually verify cwd-switching: point `cwd` at a directory that is
+      // NOT a git repo, and confirm the git layer throws (rather than
+      // silently running in `process.cwd()`, which — since the test runner
+      // itself lives inside this monorepo — is a real repo and would
+      // falsely succeed). This is the only test that pins the `cwd` option
+      // as load-bearing; every other test passes `cwd: fixture.dir`
+      // implicitly exercising the happy path.
       const foreignCwd = mkdtempSync(join(tmpdir(), "code-history-foreign-"));
       try {
-        const commit = await getMostRecentCommit(fixture.file, 2, {
-          cwd: fixture.dir,
-        });
-        expect(commit).not.toBeNull();
-        expect(commit!.subject).toBe(fixture.expectedSubject);
+        writeFileSync(join(foreignCwd, "target.ts"), "a\nb\n");
+        await expect(
+          getMostRecentCommit("target.ts", 1, { cwd: foreignCwd }),
+        ).rejects.toThrow(/git log failed|not a git repository/i);
       } finally {
         rmSync(foreignCwd, { recursive: true, force: true });
       }
