@@ -224,6 +224,9 @@ function findCommitAuthoringTurnIndex(
   turns: Turn[],
   sha: string,
 ): number | null {
+  // TODO(ENG-5051 Green): extractTrigger + extractOutcome both delegate here;
+  // implement SHA→turn-index lookup using the `[branch sha]`-extraction +
+  // bidirectional-startsWith rule pinned by P7+P8.
   void turns;
   void sha;
   return null;
