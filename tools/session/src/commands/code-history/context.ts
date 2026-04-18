@@ -36,14 +36,25 @@ import { extractCommitsFromToolResult } from "../../parse-turn";
 
 /**
  * Truncation constants. Kept at the top of the module so a reader can see
- * the budget at a glance. The 200-char target matches the body-preview
- * budget from ENG-5041 (see `BODY_PREVIEW_MAX_LEN` in `format.ts`): the
- * two budgets are intentionally the same so that a commit-row's body
- * preview and a session-context snippet wrap to the same width.
+ * the budget at a glance.
  *
- * Exported because ENG-5051's `extractTrigger` / `extractOutcome` will
- * reuse the same budget, and downstream test code pins to these constants
- * rather than hardcoding `200` / `"…"`.
+ * The 200-char budget here is intentionally DIFFERENT from the body-preview
+ * budget in `format.ts` (`BODY_PREVIEW_MAX_LEN = 160`). The two serve
+ * different jobs:
+ *   - `BODY_PREVIEW_MAX_LEN` (160) caps the commit-row body preview, a
+ *     single compact line meant to fit alongside the header in a dense
+ *     `git log`–style table. Shorter = more rows visible at a glance.
+ *   - `CONTEXT_MAX_LEN` (200) caps session-context snippets (trigger /
+ *     outcome / intent — ENG-5042 AC 15). These carry more text per snippet
+ *     because they're human prose, not a commit-subject-style one-liner,
+ *     and the renderer lays them out on their own lines.
+ *
+ * If these budgets ever need to converge (e.g. a unified renderer), change
+ * both consciously — don't assume they're "the same constant in two places".
+ *
+ * Exported because `extractTrigger` / `extractOutcome` reuse the same budget,
+ * and downstream test code pins to these constants rather than hardcoding
+ * `200` / `"…"`.
  */
 export const CONTEXT_MAX_LEN = 200;
 export const CONTEXT_ELLIPSIS = "…";
