@@ -80,6 +80,7 @@ export function extractLinearRef(body: string): string | null {
   // distinct string keeps them honest until Green lands the real
   // regex.
   void body;
+  // GREEN: replace with LINEAR_REF_RE.exec(body)?.[0] ?? null
   void LINEAR_REF_RE;
   return "<unimplemented-extractLinearRef>";
 }
