@@ -10,7 +10,7 @@
  * test in `context.test.ts` — see the test for the exact forbidden
  * tokens.
  *
- * Part A (ENG-5050 — this file's Red state) lands:
+ * Part A (ENG-5050) — currently in this file:
  *   - `truncate` — whitespace run-collapse + 200-char cap with "…"
  *   - `extractIntent` — first "real" user turn text, skipping caveats
  *     and command wrappers
@@ -42,7 +42,25 @@ export const CONTEXT_MAX_LEN = 200;
 export const CONTEXT_ELLIPSIS = "…";
 
 /**
- * Collapse runs of internal whitespace and cap length at 200 chars
+ * Internal string-only variant of `truncate`: applies the collapse-then-cap
+ * rule without the null passthrough. Callers that already know their input
+ * is non-null (e.g. `extractIntent` after an empty-text guard) can skip the
+ * null-overload routing. Not exported — the public API is `truncate`.
+ *
+ * See `truncate` below for the full semantics (whitespace collapse scope,
+ * cap-inclusive ellipsis, collapse-before-cap ordering).
+ */
+function truncateString(value: string): string {
+  // Run-collapse: every run of \n/\t (any mix, any length) → single space.
+  const collapsed = value.replace(/[\n\t]+/g, " ");
+  if (collapsed.length <= CONTEXT_MAX_LEN) return collapsed;
+  // Total length budget INCLUDES the ellipsis (1 char), so keep
+  // CONTEXT_MAX_LEN - 1 chars of content + ellipsis = CONTEXT_MAX_LEN total.
+  return collapsed.slice(0, CONTEXT_MAX_LEN - 1) + CONTEXT_ELLIPSIS;
+}
+
+/**
+ * Collapse runs of internal whitespace and cap length at `CONTEXT_MAX_LEN`
  * (including the trailing "…" when truncation is required).
  *
  * Semantics (matches ENG-5050 AC 15):
@@ -59,21 +77,6 @@ export const CONTEXT_ELLIPSIS = "…";
  *
  * Pure function: no mutation of the input, no side effects.
  */
-/**
- * Internal string-only variant of `truncate`: applies the collapse-then-cap
- * rule without the null passthrough. Callers that already know their input
- * is non-null (e.g. `extractIntent` after an empty-text guard) can skip the
- * null-overload routing. Not exported — the public API is `truncate`.
- */
-function truncateString(value: string): string {
-  // Run-collapse: every run of \n/\t (any mix, any length) → single space.
-  const collapsed = value.replace(/[\n\t]+/g, " ");
-  if (collapsed.length <= CONTEXT_MAX_LEN) return collapsed;
-  // Total length budget INCLUDES the ellipsis (1 char), so keep
-  // MAX_LEN - 1 chars of content + ellipsis = MAX_LEN chars total.
-  return collapsed.slice(0, CONTEXT_MAX_LEN - 1) + CONTEXT_ELLIPSIS;
-}
-
 export function truncate(value: string | null): string | null {
   return value === null ? null : truncateString(value);
 }
