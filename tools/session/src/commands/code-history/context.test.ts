@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { extractIntent, isCommandOrCaveat } from "./context";
+import { extractIntent, isCommandOrCaveat, truncate } from "./context";
 import { makeUserTurn } from "./__fixtures__/turns";
 
 // ============================================================================
@@ -118,5 +118,65 @@ describe("extractIntent", () => {
 describe("isCommandOrCaveat", () => {
   test.failing("returns true for <command-name> wrapper text", () => {
     expect(isCommandOrCaveat("<command-name>/retro</command-name>")).toBe(true);
+  });
+});
+
+// ============================================================================
+// truncate (AC 15)
+// ============================================================================
+
+describe("truncate", () => {
+  test.failing("value ≤ 200 chars (post-collapse) → unchanged", () => {
+    const short = "a".repeat(50);
+    expect(truncate(short)).toBe(short);
+  });
+
+  test.failing("value > 200 chars (post-collapse) → truncated with ellipsis, total length 200", () => {
+    const long = "a".repeat(300);
+    const result = truncate(long);
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(200);
+    expect(result!.endsWith("…")).toBe(true);
+    expect(result!.slice(0, 199)).toBe("a".repeat(199));
+  });
+
+  test.failing("null → null", () => {
+    expect(truncate(null)).toBeNull();
+  });
+
+  test.failing("collapses single \\n to space", () => {
+    expect(truncate("a\nb")).toBe("a b");
+  });
+
+  test.failing("collapses single \\t to space", () => {
+    expect(truncate("a\tb")).toBe("a b");
+  });
+
+  test.failing("run-collapses consecutive \\n/\\t mix to single space", () => {
+    expect(truncate("a\n\n\tb")).toBe("a b");
+  });
+
+  test.failing("truncation is applied AFTER whitespace collapse", () => {
+    // Raw length 255, but consecutive `\n`s collapse into a single run
+    // → collapsed value is far under the 200-char cap and must NOT be
+    // truncated. A naive "truncate-then-collapse" impl would chop the
+    // raw string first and fail this test.
+    const raw = "\n".repeat(250) + "hello";
+    expect(raw.length).toBe(255);
+    const result = truncate(raw);
+    // Exact expected shape: the leading \n-run collapses to one space,
+    // then "hello". Total length 6, no ellipsis.
+    expect(result).toBe(" hello");
+  });
+
+  // Meta-test — plain test, mutation guard
+  test("idempotence: same string twice → same result", () => {
+    const input = "hello\nworld";
+    const first = truncate(input);
+    const second = truncate(input);
+    expect(second).toBe(first);
+    // Input string is primitive so can't be mutated, but assert reference
+    // equality as a sanity check.
+    expect(input).toBe("hello\nworld");
   });
 });
