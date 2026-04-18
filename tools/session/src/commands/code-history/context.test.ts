@@ -1,13 +1,7 @@
 /**
- * Tests for `context.ts` — session-context extractors.
- *
- * Landed in the Red phase of ENG-5050. All `test.failing` entries are
- * the pre-committed Tier-1 bar from the Linear issue; they flip to
- * plain `test` when Green lands the real implementations.
- *
- * The pure-module-invariant test (grep-style) is a plain `test` — it
- * passes today (stubs don't import `fs`/`node:*`/`Bun`, no `async`)
- * and acts as a regression guard once real code lands.
+ * Tests for `context.ts` — session-context extractors (ENG-5050).
+ * Covers the Tier-1 acceptance criteria plus whitespace-collapse /
+ * boundary pins added during Refactor.
  */
 
 import { readFileSync } from "node:fs";
@@ -181,10 +175,8 @@ describe("isCommandOrCaveat", () => {
     expect(isCommandOrCaveat("Caveat: system noise goes here")).toBe(true);
   });
 
-  // Negative case: plain user prose → false. The stub returns `false` for
-  // everything, so this passes today. Kept as plain `test` (not `.failing`)
-  // because it's a true regression guard once Green lands — the real impl
-  // must not flag ordinary text as command-or-caveat.
+  // Plain prose input — the real impl must not flag ordinary text as
+  // command-or-caveat. True regression guard.
   test("returns false for plain user prose", () => {
     expect(isCommandOrCaveat("fix the build")).toBe(false);
   });
