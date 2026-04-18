@@ -35,6 +35,7 @@
  */
 
 import { truncate } from "./context";
+import type { DecoratedCommit } from "./types";
 
 /**
  * Spec-pinned regex for extracting an ENG reference from a commit body.
@@ -153,11 +154,9 @@ export async function fetchLinearIssue(
  *     visual cue that this is metadata, not prose (matches the
  *     spec's "Concrete example").
  */
-export function formatLinearLine(linear: {
-  id: string;
-  title: string;
-  status: string;
-} | undefined): string | null {
+export function formatLinearLine(
+  linear: DecoratedCommit["linear"],
+): string | null {
   // Red stub — returns a non-null sentinel when `linear` is provided
   // so the format tests fail on exact-string mismatch, NOT on
   // null-vs-string. When `linear` is absent, null matches the
