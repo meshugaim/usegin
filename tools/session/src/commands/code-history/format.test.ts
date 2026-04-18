@@ -145,6 +145,27 @@ describe("formatBody (AC 8, AC 9)", () => {
   );
 
   test.failing(
+    "ENG-5041 (AC 8): truncation boundary — body at MAX+1 chars truncates to MAX with ellipsis",
+    () => {
+      // The tight edge case between "exactly at max → keep" and "truncate".
+      // BODY_PREVIEW_MAX (160) stays; BODY_PREVIEW_MAX + 1 (161) truncates.
+      // This catches the `>= MAX_LEN` vs `> MAX_LEN` off-by-one that the
+      // exact-at-max test alone doesn't expose: a buggy `>= MAX_LEN` would
+      // truncate the exact-at-max body (caught above), but a buggy
+      // `> MAX_LEN + 1` would only show up here.
+      const oneOver = "z".repeat(BODY_PREVIEW_MAX_LEN + 1);
+      const preview = formatBody(oneOver);
+      expect(preview.length).toBe(BODY_PREVIEW_MAX_LEN);
+      expect(preview.endsWith(BODY_PREVIEW_ELLIPSIS)).toBe(true);
+      // The chars before the ellipsis are the first (MAX - 1) of the
+      // original — the 160th and 161st original chars got replaced by `…`.
+      expect(preview.slice(0, BODY_PREVIEW_MAX_LEN - 1)).toBe(
+        "z".repeat(BODY_PREVIEW_MAX_LEN - 1),
+      );
+    },
+  );
+
+  test.failing(
     "ENG-5041 (AC 8): blank lines between content are skipped — first 2 NON-BLANK lines are taken",
     () => {
       // Gap-happy body: blank line between real content should not be
