@@ -73,18 +73,22 @@ export function truncate(value: string | null): string | null {
  *     commands like `/retro`).
  *   - `<command-message>…</command-message>` (the slash-command payload
  *     that appears alongside a matching tool_use turn).
- *   - `Caveat: …` style system caveats emitted before real input.
+ *   - Any other `<…>`-prefixed wrapper (e.g. `<caveat>`,
+ *     `<local-command-stdout>`, `<command-stderr>`) — the spec rule
+ *     from ENG-5039 / ENG-5042 is "trimmed text does not start with `<`"
+ *     for a real user turn.
+ *   - `Caveat: …` style free-text preambles emitted before real input.
  *
  * Used by `extractIntent` to skip over these when hunting for the first
  * real user turn, and will be reused by Part B's `extractTrigger`
  * backward-walk to find the last real user ask before an assistant turn.
  *
  * Pure: no side effects, no I/O.
- *
- * @returns unimplemented sentinel (false) until the Green phase lands
  */
 export function isCommandOrCaveat(text: string): boolean {
-  void text;
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("<")) return true;
+  if (trimmed.startsWith("Caveat:")) return true;
   return false;
 }
 

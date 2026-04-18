@@ -130,15 +130,15 @@ describe("extractIntent", () => {
 // reusable by Part B (ENG-5051's trigger walk).
 
 describe("isCommandOrCaveat", () => {
-  test.failing("returns true for <command-name> wrapper text", () => {
+  test("returns true for <command-name> wrapper text", () => {
     expect(isCommandOrCaveat("<command-name>/retro</command-name>")).toBe(true);
   });
 
-  test.failing("returns true for <command-message> wrapper text", () => {
+  test("returns true for <command-message> wrapper text", () => {
     expect(isCommandOrCaveat("<command-message>retro</command-message>")).toBe(true);
   });
 
-  test.failing("returns true for Caveat:-prefixed text", () => {
+  test("returns true for Caveat:-prefixed text", () => {
     expect(isCommandOrCaveat("Caveat: system noise goes here")).toBe(true);
   });
 
