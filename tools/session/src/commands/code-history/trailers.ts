@@ -7,8 +7,9 @@
  * match `Key: value` (e.g. "Note: this is a special case") are NOT trailers.
  *
  * WHY PURE TYPESCRIPT (not `git interpret-trailers --parse`):
- *   - This module is called per commit by the formatter. Slices 4 and 5 will
- *     reuse it to extract `Claude-Session:` IDs and `ENG-XXXX` references.
+ *   - This module is called per commit by the formatter. Slice 4 extended
+ *     it with `extractClaudeSessionTrailer` (spec-pinned regex); slice 5
+ *     will add an analogous extractor for `Part of:` / `Closes:` ENG refs.
  *     A subprocess per commit is unnecessary cost when the rule is "block of
  *     `Key: value` lines at end, separated by a blank line" — ~20 lines of TS.
  *   - `git interpret-trailers` would still leave us to strip the trailer
