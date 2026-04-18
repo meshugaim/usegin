@@ -190,16 +190,12 @@ export function formatSinceTimestamp(_commitISO: string): string {
  *     block renders as just the session line + hint.
  */
 export function formatSessionBlock(_commit: DecoratedCommit): string | null {
-  // Red-phase stub — returns a sentinel that STARTS with `session:` so
-  // every test.failing assertion fails at the assertion level:
-  //   - Unit tests comparing against the exact block bytes fail on
-  //     content mismatch.
-  //   - The "session absent on commit → null" unit test fails because
-  //     the stub returns a non-null string.
-  //   - The integration "commit without Claude-Session trailer → no
-  //     session line in stdout" test fails because the stub's string
-  //     shows up in the CLI output and starts with `session:`.
-  // Green phase replaces this with the real renderer (which returns
-  // `null` legitimately when `commit.session` is absent).
+  // Red-phase stub: non-null sentinel so the `test.failing` assertions
+  // fail at assertion level rather than module-init. Throwing here —
+  // the cleaner-looking option — propagates via `bailWithError` in
+  // `runCodeHistory` and breaks earlier-slice tests (ENG-5040 / 5041)
+  // because `decorateCommitWithSession`'s Red stub ALSO always
+  // populates `commit.session`, so the pipeline calls this formatter
+  // for every commit. Green phase replaces both stubs atomically.
   return "session: <unimplemented>";
 }
