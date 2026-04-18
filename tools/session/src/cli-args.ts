@@ -276,6 +276,35 @@ export interface CodeHistoryArgs {
 }
 
 /**
+ * Reserved flags that the code-history spec (ENG-5039) explicitly carves
+ * out for a follow-up (tracked as ENG-5048). Each listed flag must FAIL
+ * with a dedicated "not yet" error rather than silently being ignored —
+ * otherwise a user who types `code-history foo.ts:1 -n 3` expecting
+ * multi-commit walking gets a single commit back and doesn't know why.
+ *
+ * Slice 2 (ENG-5041) introduces the reject. Slices 3-6 leave this set
+ * intact; the follow-up that actually implements `-n` / `--all` / `-L` /
+ * `--func` will remove entries here as each one is delivered.
+ *
+ * Exported so tests can iterate rather than hand-writing every case.
+ */
+export const CODE_HISTORY_RESERVED_FLAGS: readonly string[] = [
+  "-n",
+  "--all",
+  "-L",
+  "--func",
+] as const;
+
+/**
+ * The exact stderr message emitted when a reserved flag appears. Pinned
+ * as a constant so the parser, the E2E tests, and any future help text
+ * can all reference the same string — no drift on whether it's "not yet"
+ * vs "not implemented" vs "coming soon".
+ */
+export const CODE_HISTORY_RESERVED_FLAG_MESSAGE =
+  "not yet — see git log -L for multi-commit walking; follow-up tracked in ENG-5048";
+
+/**
  * Parse arguments for `session code-history <file>:<line>`.
  *
  * Pattern reference: `parseFetchArgs` above shares the positional-only
