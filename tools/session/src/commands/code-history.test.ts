@@ -61,6 +61,7 @@ import {
   EXPECTED_LINEAR_LINE,
 } from "./code-history/__fixtures__/linear";
 import { userEntry, assistantEntry, systemEntry } from "../testing";
+import { LINEAR_FETCH_TIMEOUT_MS } from "./code-history/linear";
 
 // =============================================================================
 // ARG PARSER (AC 1, AC 2)
@@ -1598,12 +1599,17 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
               const elapsed = Date.now() - start;
 
               expect(result.exitCode).toBe(0);
-              // The subprocess timeout is 5s — the whole command
-              // should finish comfortably under 10s (the fake's
-              // sleep). Asserting < 9s gives headroom for CI jitter
-              // + bun startup while still catching "timeout didn't
-              // fire and we waited the full sleep".
-              expect(elapsed).toBeLessThan(9000);
+              // The subprocess timeout is `LINEAR_FETCH_TIMEOUT_MS`
+              // (5s today) — the whole command should finish
+              // comfortably before the fake's 10s sleep completes.
+              // Upper bound: `LINEAR_FETCH_TIMEOUT_MS + 4000` gives
+              // ~4s of CI-jitter + bun-startup headroom on top of
+              // the real timeout, while still catching "timeout
+              // didn't fire and we waited the full sleep"
+              // (10_000ms > 5_000 + 4_000 = 9_000ms). Referencing
+              // the exported constant keeps this assertion honest
+              // against any future tweak of the timeout literal.
+              expect(elapsed).toBeLessThan(LINEAR_FETCH_TIMEOUT_MS + 4000);
 
               const hasLinearLine = result.stdout
                 .split("\n")
