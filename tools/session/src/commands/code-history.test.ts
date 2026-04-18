@@ -22,12 +22,18 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { parseCodeHistoryArgs } from "../cli-args";
+import {
+  parseCodeHistoryArgs,
+  CODE_HISTORY_RESERVED_FLAGS,
+  CODE_HISTORY_RESERVED_FLAG_MESSAGE,
+} from "../cli-args";
 import {
   makeFixtureRepo,
+  makeFixtureRepoWithRename,
   runCli,
   withTempDir,
   type FixtureRepo,
+  type FixtureRepoWithRename,
 } from "./code-history/__fixtures__/helpers";
 
 // =============================================================================
@@ -123,6 +129,64 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
       parseCodeHistoryArgs(["src/foo.ts:1", "src/bar.ts:2"]),
     ).toThrow(/src\/bar\.ts:2/);
   });
+});
+
+// =============================================================================
+// RESERVED FLAGS (AC 24) — ENG-5041
+// =============================================================================
+//
+// Spec AC 24 carves out `-n <N>`, `--all`, `-L N,M`, `--func <name>` as
+// reserved for a follow-up tracked in ENG-5048. The parser MUST reject
+// these with a dedicated "not yet" message — not fall through to the
+// generic "unexpected positional" path (which would happen today because
+// `-n 3` sheds the `-n` and feeds `3` as a positional).
+//
+// Wording is pinned by CODE_HISTORY_RESERVED_FLAG_MESSAGE so the parser,
+// the E2E stderr check, and any future CLAUDE.md / docs reference one
+// canonical string.
+
+describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
+  // Use a test.each-style loop so each reserved flag gets its own named
+  // test — clearer failure output than one test with a forEach inside.
+  // (Bun test supports dynamic test registration inside describe.)
+  for (const flag of CODE_HISTORY_RESERVED_FLAGS) {
+    test.failing(
+      `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` with the pinned "not yet / ENG-5048" message`,
+      () => {
+        // Flag BEFORE the positional: `-n 3 file.ts:1`. The parser must
+        // reject before even looking at the positional.
+        expect(() => parseCodeHistoryArgs([flag, "3", "src/foo.ts:1"])).toThrow(
+          CODE_HISTORY_RESERVED_FLAG_MESSAGE,
+        );
+      },
+    );
+
+    test.failing(
+      `ENG-5041 (AC 24): rejects reserved flag \`${flag}\` even when it appears AFTER the positional`,
+      () => {
+        // Regression guard: an implementation that only scans `args[0]`
+        // for the reserved check would miss this ordering.
+        expect(() =>
+          parseCodeHistoryArgs(["src/foo.ts:1", flag, "3"]),
+        ).toThrow(CODE_HISTORY_RESERVED_FLAG_MESSAGE);
+      },
+    );
+  }
+
+  test.failing(
+    "ENG-5041 (AC 24): the pinned message references ENG-5048 so users know where the follow-up lives",
+    () => {
+      // Double-check the constant itself — if someone re-words the
+      // message without updating ENG-5048 tracking, this catches it.
+      expect(CODE_HISTORY_RESERVED_FLAG_MESSAGE).toContain("ENG-5048");
+      expect(CODE_HISTORY_RESERVED_FLAG_MESSAGE.toLowerCase()).toContain("not yet");
+      // Also confirm the parser actually USES the constant (guards
+      // against drift where parser hardcodes its own string).
+      expect(() => parseCodeHistoryArgs(["-n", "3", "src/foo.ts:1"])).toThrow(
+        CODE_HISTORY_RESERVED_FLAG_MESSAGE,
+      );
+    },
+  );
 });
 
 // =============================================================================
@@ -341,4 +405,207 @@ describe("session code-history end-to-end", () => {
       );
     },
   );
+});
+
+// =============================================================================
+// END-TO-END CLI — body preview & "missing layer → no line" (AC 8, AC 9)
+// =============================================================================
+//
+// Each test builds its own fixture with a tailored commit body/trailer
+// shape. We deliberately don't reuse the top-level `fixture` repo so the
+// body cases stay self-contained — reviewers can read one test and know
+// exactly what's committed.
+
+describe("session code-history body preview (AC 8, AC 9)", () => {
+  // Mix of `test.failing` and plain `test`:
+  //   - AC 8 (body line IS rendered) is test.failing until Green wires
+  //     `formatBody` into the output pipeline.
+  //   - AC 9 (NO body line when empty) is a plain `test` because the
+  //     slice-1 output has no body line at all, so the invariant already
+  //     holds. These tests then act as REGRESSION GUARDS for Green:
+  //     adding body rendering must not start emitting a spurious empty
+  //     `body:` line for subject-only or trailers-only commits.
+
+  test.failing(
+    "ENG-5041 (AC 8): commit with body + trailers → stdout includes `body:` line after the header",
+    () => {
+      const fx = makeFixtureRepo({
+        commits: [
+          { subject: "initial: seed target file" },
+          {
+            subject: "feat: add a thoughtful feature",
+            body: "This commit does the thing. It also does the other thing.",
+            trailers: {
+              "Co-Authored-By": "Claude <noreply@anthropic.com>",
+              "Part of": "ENG-5041",
+            },
+          },
+        ],
+      });
+
+      try {
+        const result = runCli(
+          ["code-history", `${fx.file}:2`],
+          fx.dir,
+        );
+        expect(result.exitCode).toBe(0);
+
+        // The body line must follow the `<sha>  <date>  <subject>` header.
+        // Pin the exact preview content — trailers stripped, two lines
+        // space-joined.
+        const lines = result.stdout.split("\n").filter((l) => l.length > 0);
+        const bodyLine = lines.find((l) => l.startsWith("body:"));
+        expect(bodyLine).toBeDefined();
+        expect(bodyLine).toBe(
+          "body: This commit does the thing. It also does the other thing.",
+        );
+      } finally {
+        rmSync(fx.dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test(
+    "ENG-5041 (AC 9): commit with ONLY trailers (no real body) → stdout has NO `body:` line",
+    () => {
+      // The "missing layer → no line" invariant: when the body collapses
+      // to pure trailers, omit the `body:` line entirely. No placeholder,
+      // no blank line. Slices 4 and 5 follow this same pattern for the
+      // session / linear lines.
+      const fx = makeFixtureRepo({
+        commits: [
+          { subject: "initial: seed" },
+          {
+            subject: "feat: thing with trailers only",
+            trailers: {
+              "Co-Authored-By": "Claude <noreply@anthropic.com>",
+              "Claude-Session": "abc-123",
+            },
+          },
+        ],
+      });
+
+      try {
+        const result = runCli(
+          ["code-history", `${fx.file}:2`],
+          fx.dir,
+        );
+        expect(result.exitCode).toBe(0);
+        // No line in stdout may START with "body:" — searching the raw
+        // output catches even a line with trailing whitespace.
+        const hasBodyLine = result.stdout
+          .split("\n")
+          .some((l) => l.startsWith("body:"));
+        expect(hasBodyLine).toBe(false);
+      } finally {
+        rmSync(fx.dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test(
+    "ENG-5041 (AC 9): commit with subject ONLY (no body, no trailers) → stdout has NO `body:` line",
+    () => {
+      // Companion case to the trailers-only test — guards the other
+      // branch of "empty body after stripping". The default fixture
+      // commits are subject-only, so the default shape is a natural
+      // fixture for this scenario.
+      const fx = makeFixtureRepo();
+
+      try {
+        const result = runCli(
+          ["code-history", `${fx.file}:2`],
+          fx.dir,
+        );
+        expect(result.exitCode).toBe(0);
+        const hasBodyLine = result.stdout
+          .split("\n")
+          .some((l) => l.startsWith("body:"));
+        expect(hasBodyLine).toBe(false);
+      } finally {
+        rmSync(fx.dir, { recursive: true, force: true });
+      }
+    },
+  );
+});
+
+// =============================================================================
+// END-TO-END CLI — rename following (AC 20)
+// =============================================================================
+
+describe("session code-history follows renames (AC 20)", () => {
+  // NOT `test.failing` — slice 1 already passes this invariant because
+  // `getMostRecentCommit` deliberately omits `--no-follow`, so `git log
+  // -L` follows renames inherently. This test exists as a REGRESSION
+  // GUARD: if anyone ever adds `--no-follow` (or switches to `--no-renames`),
+  // this fails loudly. The spec calls out AC 20 as a "test only, no
+  // production change" acceptance criterion for this slice.
+  //
+  // Separate fixture because the rename case seeds a different set of
+  // commits and files than the default fixture. `beforeAll`/`afterAll`
+  // amortize the `git init` + 3 commits across the tests in this describe.
+  let fx: FixtureRepoWithRename;
+
+  beforeAll(() => {
+    fx = makeFixtureRepoWithRename();
+  });
+
+  afterAll(() => {
+    rmSync(fx.dir, { recursive: true, force: true });
+  });
+
+  test(
+    "ENG-5041 (AC 20): querying the post-rename path surfaces the most recent commit that touched the line, exit 0",
+    () => {
+      // Simplest assertion: the header prints the expected post-rename
+      // subject. If rename-following ever broke (e.g. someone added
+      // `--no-follow` back), this fails.
+      const result = runCli(
+        ["code-history", `${fx.renamedFile}:2`],
+        fx.dir,
+      );
+      expect(result.exitCode).toBe(0);
+      // The header's subject field is the final field on the first
+      // non-empty stdout line — pin it exactly.
+      const firstLine =
+        result.stdout.split("\n").find((l) => l.length > 0) ?? "";
+      expect(firstLine.endsWith(fx.expectedSubject)).toBe(true);
+    },
+  );
+});
+
+// =============================================================================
+// END-TO-END CLI — reserved flags (AC 24)
+// =============================================================================
+
+describe("session code-history reserved flags (AC 24)", () => {
+  // No git fixture needed — reserved-flag rejection happens at the parser
+  // layer, before any filesystem or git access. Use a no-git tmp dir so
+  // we don't pay for `git init` on tests that never need it.
+
+  for (const flag of CODE_HISTORY_RESERVED_FLAGS) {
+    test.failing(
+      `ENG-5041 (AC 24): \`${flag}\` → exit 1, stderr contains "not yet" AND "ENG-5048"`,
+      async () => {
+        await withTempDir("code-history-reserved-", (tmpDir) => {
+          // Also seed a real file so the error can't be attributed to the
+          // AC 2 "file not found" path even if the parser check ever
+          // regresses — we want an unambiguous signal that the reserved
+          // flag is what rejected it.
+          writeFileSync(join(tmpDir, "target.ts"), "line 1\nline 2\nline 3\n");
+
+          const result = runCli(
+            ["code-history", flag, "3", "target.ts:1"],
+            tmpDir,
+          );
+          expect(result.exitCode).toBe(1);
+          // Stderr must pass through the `"Error: "`-prefixed path,
+          // consistent with AC 2's error shape.
+          expect(result.stderr).toContain("Error:");
+          expect(result.stderr.toLowerCase()).toContain("not yet");
+          expect(result.stderr).toContain("ENG-5048");
+        });
+      },
+    );
+  }
 });
