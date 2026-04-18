@@ -28,8 +28,12 @@
 import { readFileSync, statSync } from "node:fs";
 
 import { parseCodeHistoryArgs, CODE_HISTORY_RESERVED_FLAGS } from "../cli-args";
+
+// external session tooling (async I/O)
 import { fetchSession } from "../fetch";
 import { parseSession } from "../parser";
+
+// code-history internals
 import { getMostRecentCommit } from "./code-history/git";
 import {
   formatHeader,
