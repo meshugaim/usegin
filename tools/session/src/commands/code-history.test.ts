@@ -1232,6 +1232,74 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
+  test.failing(
+    "ENG-5044 (G3 / ENG-5042): over-long plan-show title → rendered title is truncated with `…` at CONTEXT_MAX_LEN",
+    async () => {
+      // Title-truncation pin. The agent's design #7 note on the
+      // decorator calls out that `fetchLinearIssue` applies `truncate`
+      // to the title for consistency with the session extractors
+      // (ENG-5042 — 200-char cap with `…`). Without this test, a
+      // Green implementation could forget the truncate call and the
+      // happy-path assertions would still pass (they use a short
+      // fixture title).
+      //
+      // Build a title that exceeds CONTEXT_MAX_LEN (200 chars) so the
+      // output MUST contain `…`. Asserting `<= CONTEXT_MAX_LEN` keeps
+      // the pin on the RULE (cap + ellipsis counts as one char)
+      // rather than the literal — matches the truncate contract in
+      // context.ts.
+      const CONTEXT_MAX_LEN = 200;
+      const longTitle = "x".repeat(250);
+      await withFakePlanBin(
+        {
+          stdout: makePlanShowJson({ title: longTitle }),
+          exitCode: 0,
+        },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed target file" },
+                {
+                  subject: "feat: over-long linear title",
+                  body: `Implements ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              const linearLine = result.stdout
+                .split("\n")
+                .find((l) => l.trimStart().startsWith("linear:"));
+              expect(linearLine).toBeDefined();
+              // Raw 250-char title must NOT appear verbatim.
+              expect(linearLine).not.toContain(longTitle);
+              // Ellipsis present — truncate was applied.
+              expect(linearLine).toContain("…");
+              // Sanity: the truncated title portion (the chunk
+              // between id+2sp and the trailing `  [status]`) is at
+              // most CONTEXT_MAX_LEN chars.
+              const titleChunk = linearLine!
+                .slice(linearLine!.indexOf(LINEAR_FIXTURE_ID) + LINEAR_FIXTURE_ID.length + 2)
+                .replace(/  \[[^\]]*\]$/, "");
+              expect(titleChunk.length).toBeLessThanOrEqual(CONTEXT_MAX_LEN);
+            },
+          );
+        },
+      );
+    },
+  );
+
   test(
     "ENG-5044 (N1 / AC 9): no ENG ref in body → no `linear:` line, no stderr warning, exit 0",
     async () => {
