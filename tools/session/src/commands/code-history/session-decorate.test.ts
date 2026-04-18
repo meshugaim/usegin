@@ -33,9 +33,16 @@ import {
   makeBashTurn,
   makeAssistantTurn,
 } from "./__fixtures__/turns";
+import {
+  SESSION_FIXTURE_ID,
+  SESSION_FIXTURE_SHORT_ID,
+  EXPECTED_HINT_CMD,
+} from "./__fixtures__/session";
 
-const FIXTURE_UUID = "533a2546-684a-4724-b592-34aa88aac626";
-const FIXTURE_SHORT = "533a2546";
+// Local aliases keep the assertion text terse and make the intent of
+// each fixture obvious at the call site.
+const FIXTURE_UUID = SESSION_FIXTURE_ID;
+const FIXTURE_SHORT = SESSION_FIXTURE_SHORT_ID;
 const FIXTURE_COMMIT_SHA = "4fff467fb48a632519c742358505e9a0a739d525";
 
 /**
@@ -136,7 +143,7 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
       expect(decorated.session!.id).toBe(FIXTURE_UUID);
       // `sinceTimestampCmd` composes the 8-char short UUID + t-30m hint.
       expect(decorated.session!.sinceTimestampCmd).toBe(
-        `session ${FIXTURE_SHORT} --since-timestamp 2026-04-18T08:13Z`,
+        EXPECTED_HINT_CMD,
       );
       // Extractors populated from the stubbed turns.
       expect(decorated.session!.intent).toBe("Wire the session extractors.");
@@ -201,7 +208,7 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
       expect(decorated.session).toBeDefined();
       expect(decorated.session!.id).toBe(FIXTURE_UUID);
       expect(decorated.session!.sinceTimestampCmd).toBe(
-        `session ${FIXTURE_SHORT} --since-timestamp 2026-04-18T08:13Z`,
+        EXPECTED_HINT_CMD,
       );
       // Missing-layer invariant: no extractor values when fetch failed.
       expect(decorated.session!.intent).toBeUndefined();

@@ -20,6 +20,11 @@ import {
   BODY_PREVIEW_ELLIPSIS,
 } from "./format";
 import type { DecoratedCommit } from "./types";
+import {
+  SESSION_FIXTURE_ID,
+  SESSION_FIXTURE_SHORT_ID,
+  EXPECTED_HINT_CMD,
+} from "./__fixtures__/session";
 
 function makeCommit(overrides: Partial<DecoratedCommit> = {}): DecoratedCommit {
   return {
@@ -327,26 +332,9 @@ describe("formatSinceTimestamp (AC 6)", () => {
 // (JSON) can layer on a stable shape. Each nested line is OPTIONAL —
 // missing extractors produce OMITTED lines, NOT placeholders.
 
-/**
- * Canonical UUID used in session-block tests. Full 36-char form; the
- * first 8 chars (`533a2546`) appear in the `--since-timestamp` hint.
- *
- * Pinned from the ENG-5039 "Concrete example" for shape parity with the
- * spec's rendering. Reused across multiple tests so the short form can
- * be asserted exactly.
- */
-const SESSION_FIXTURE_ID = "533a2546-684a-4724-b592-34aa88aac626";
-const SESSION_FIXTURE_SHORT_ID = "533a2546";
-
-/**
- * Canonical `sinceTimestampCmd` string used in tests. Mirrors what
- * the pipeline produces at runtime (`session <shortId> --since-timestamp
- * <t-30m>`). Kept as a literal here because the tests pin the block
- * bytes exactly — deriving it from `formatSinceTimestamp` would couple
- * these tests to that helper's Green-phase correctness.
- */
-const SESSION_FIXTURE_HINT_CMD =
-  `session ${SESSION_FIXTURE_SHORT_ID} --since-timestamp 2026-04-18T08:13Z`;
+// Session-block fixtures (ID, short-id, hint) are imported from
+// `./__fixtures__/session` so this module and `session-decorate.test.ts`
+// share the same pinned literal — no drift between layers.
 
 function commitWithSession(
   session?: Partial<NonNullable<DecoratedCommit["session"]>>,
@@ -361,7 +349,7 @@ function commitWithSession(
   if (session !== undefined) {
     commit.session = {
       id: SESSION_FIXTURE_ID,
-      sinceTimestampCmd: SESSION_FIXTURE_HINT_CMD,
+      sinceTimestampCmd: EXPECTED_HINT_CMD,
       ...session,
     };
   }
@@ -382,7 +370,7 @@ describe("formatSessionBlock (AC 6)", () => {
       // block (rather than line-by-line) catches label-column drift in
       // one place and documents the full output shape in-source.
       const expected = [
-        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${EXPECTED_HINT_CMD})`,
         `      intent:   Wire session extractors into code-history.`,
         `      trigger:  Add the session block to the plain-mode output.`,
         `      outcome:  Session line and three nested context lines rendered.`,
@@ -407,7 +395,7 @@ describe("formatSessionBlock (AC 6)", () => {
       const commit = commitWithSession({ intent: "Just the intent." });
       const block = formatSessionBlock(commit);
       const expected = [
-        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${EXPECTED_HINT_CMD})`,
         `      intent:   Just the intent.`,
       ].join("\n");
       expect(block).toBe(expected);
@@ -420,7 +408,7 @@ describe("formatSessionBlock (AC 6)", () => {
       const commit = commitWithSession({ trigger: "Only trigger." });
       const block = formatSessionBlock(commit);
       const expected = [
-        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${EXPECTED_HINT_CMD})`,
         `      trigger:  Only trigger.`,
       ].join("\n");
       expect(block).toBe(expected);
@@ -433,7 +421,7 @@ describe("formatSessionBlock (AC 6)", () => {
       const commit = commitWithSession({ outcome: "Only outcome." });
       const block = formatSessionBlock(commit);
       const expected = [
-        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${EXPECTED_HINT_CMD})`,
         `      outcome:  Only outcome.`,
       ].join("\n");
       expect(block).toBe(expected);
@@ -449,7 +437,7 @@ describe("formatSessionBlock (AC 6)", () => {
       const commit = commitWithSession({});
       const block = formatSessionBlock(commit);
       const expected =
-        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`;
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${EXPECTED_HINT_CMD})`;
       expect(block).toBe(expected);
     },
   );
