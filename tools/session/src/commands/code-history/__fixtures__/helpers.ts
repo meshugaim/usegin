@@ -609,8 +609,14 @@ export interface FakePlanBin {
  * Create a temp directory with an executable `plan` script matching
  * the given spec. The returned `dir` must be prepended to the
  * subprocess's PATH via `runCli({ env: { PATH: `${bin.dir}:${process.env.PATH}` } })`.
+ *
+ * NOT exported. Callers use {@link withFakePlanBin} so the temp
+ * directory is cleaned up even if the body throws — matches the
+ * `withFixtureRepo` / `withTempDir` scoped-helper convention elsewhere
+ * in this file. Exposing the bare maker would invite leaked tmp
+ * directories on assertion failure.
  */
-export function makeFakePlanBin(spec: FakePlanSpec = {}): FakePlanBin {
+function makeFakePlanBin(spec: FakePlanSpec = {}): FakePlanBin {
   const dir = mkdtempSync(join(tmpdir(), "code-history-fake-plan-"));
   const scriptPath = join(dir, "plan");
 
