@@ -770,46 +770,50 @@ describe("G3 pathological — same-SHA duplicate", () => {
 //
 // Mirror of the `extractIntent` idempotence meta-test: same input twice
 // → same result, input unchanged. Guards against input mutation and
-// stateful impls. Once Green lands with a real result, these will pin
-// stability across repeated calls.
+// stateful impls.
+//
+// Plain `test` (not `test.failing`): idempotence is a pure invariant that
+// any sane implementation — including today's stub that returns the same
+// "<unimplemented>" sentinel without touching `turns` — must satisfy, so
+// this passes today and keeps passing through Green. Same pattern as G3
+// (non-crash guarantee): pin the invariant in place BEFORE the real impl
+// lands so Green can't regress it.
+//
+// These tests intentionally do NOT pin a specific return value — value
+// pins belong in P-cases (P1 pins "fix the bug please", P-cases for
+// extractOutcome pin "Committed as …"). Keeping these tests single-purpose
+// means a future change to a return-value pin touches the P-case it
+// belongs to, not a meta-test pretending to be two tests in one.
 
 describe("idempotence meta-tests", () => {
-  test.failing(
-    "extractTrigger: same input twice → same result, input unchanged",
-    () => {
-      const [bashA, bashUser] = makeBashTurn(
-        'git commit -m "x"',
-        "[main 1234abc] x",
-      );
-      const turns = [makeUserTurn("trigger user"), bashA, bashUser];
-      const snapshot = JSON.parse(JSON.stringify(turns));
-      const first = extractTrigger(turns, "1234abc");
-      const second = extractTrigger(turns, "1234abc");
-      expect(second).toBe(first);
-      expect(first).toBe("trigger user"); // Pins the non-stub result
-      expect(turns).toEqual(snapshot);
-    },
-  );
+  test("extractTrigger: deterministic + input-unchanged on repeat", () => {
+    const [bashA, bashUser] = makeBashTurn(
+      'git commit -m "x"',
+      "[main 1234abc] x",
+    );
+    const turns = [makeUserTurn("trigger user"), bashA, bashUser];
+    const snapshot = JSON.parse(JSON.stringify(turns));
+    const first = extractTrigger(turns, "1234abc");
+    const second = extractTrigger(turns, "1234abc");
+    expect(second).toBe(first);
+    expect(turns).toEqual(snapshot);
+  });
 
-  test.failing(
-    "extractOutcome: same input twice → same result, input unchanged",
-    () => {
-      const [bashA, bashUser] = makeBashTurn(
-        'git commit -m "x"',
-        "[main 5678def] x",
-      );
-      const turns = [
-        makeUserTurn("trigger user"),
-        bashA,
-        bashUser,
-        makeAssistantTurn({ text: "outcome here" }),
-      ];
-      const snapshot = JSON.parse(JSON.stringify(turns));
-      const first = extractOutcome(turns, "5678def");
-      const second = extractOutcome(turns, "5678def");
-      expect(second).toBe(first);
-      expect(first).toBe("outcome here"); // Pins the non-stub result
-      expect(turns).toEqual(snapshot);
-    },
-  );
+  test("extractOutcome: deterministic + input-unchanged on repeat", () => {
+    const [bashA, bashUser] = makeBashTurn(
+      'git commit -m "x"',
+      "[main 5678def] x",
+    );
+    const turns = [
+      makeUserTurn("trigger user"),
+      bashA,
+      bashUser,
+      makeAssistantTurn({ text: "outcome here" }),
+    ];
+    const snapshot = JSON.parse(JSON.stringify(turns));
+    const first = extractOutcome(turns, "5678def");
+    const second = extractOutcome(turns, "5678def");
+    expect(second).toBe(first);
+    expect(turns).toEqual(snapshot);
+  });
 });
