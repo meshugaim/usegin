@@ -22,6 +22,13 @@
 
 // Type-only imports — zero runtime dependency, preserves pure-module invariant.
 import type { Turn } from "../../types";
+// Value import of a pure helper (no I/O, no runtime-namespace calls) —
+// canonical SHA-extraction regex lives at its usage site in
+// `parse-turn.ts` and is reused here to avoid regex drift between the
+// parser and the extractors. `extractCommitsFromToolResult` is a
+// same-package utility with no side effects; importing it preserves
+// the pure-module invariant enforced by `context.test.ts`.
+import { extractCommitsFromToolResult } from "../../parse-turn";
 
 // ============================================================================
 // truncate
@@ -205,30 +212,103 @@ export function extractIntent(turns: Turn[]): string | null {
 // ============================================================================
 
 /**
+ * True when a Bash `input.command` string is a `git commit` invocation.
+ *
+ * Literal-prefix semantics (pinned by N1/N2):
+ *   - Leading whitespace / parens are trimmed off first — so
+ *     `"  git commit -m …"` and `"(git commit -m …)"` count. This
+ *     matches how a shell would interpret the leading noise.
+ *   - After trimming, the string must begin with the exact prefix
+ *     `"git commit"` followed by either end-of-string or a single
+ *     space (word-boundary rule). `"git commits"` is NOT a match
+ *     (N1). `"git  commit"` (double space) is also NOT a match (N2,
+ *     judgment call for literal-prefix semantics).
+ *   - No alias resolution: `gc -m …` does NOT match (N7).
+ *
+ * Module-private (no callers outside `findCommitAuthoringTurnIndex`).
+ */
+function isGitCommitCommand(command: string): boolean {
+  // Strip leading whitespace and parens — matches the "shell would run this"
+  // intuition that drives P3 (`  git commit …`) while keeping the prefix
+  // rule literal after the strip.
+  const trimmed = command.replace(/^[\s()]+/, "");
+  // Word-boundary after "commit": either end-of-string (bare `git commit`)
+  // or a single space before the next token. Space literal — NOT \s+ — so
+  // `git  commit` (double space) stays out per N2.
+  if (trimmed === "git commit") return true;
+  if (trimmed.startsWith("git commit ")) return true;
+  return false;
+}
+
+/**
+ * Bidirectional `startsWith` — true when either string is a prefix of the
+ * other. Handles SHA format variance pinned by P8: the tool_result may carry
+ * a short 7-char SHA while the caller queries with the full 40-char SHA
+ * (or vice versa).
+ *
+ * Module-private (only caller is `findCommitAuthoringTurnIndex`).
+ */
+function shaPrefixMatch(a: string, b: string): boolean {
+  return a.startsWith(b) || b.startsWith(a);
+}
+
+/**
  * Locate the index of the assistant turn whose Bash tool_use authored the
  * commit identified by `sha`. "Authored" means: the assistant ran a
- * `git commit ...` command whose matching tool_result (from the next user
- * turn) contains `sha` (partial match in either direction; see P8 in the
- * ENG-5051 test list).
+ * `git commit ...` command whose matching tool_result (in a following user
+ * turn, paired by `toolUseId`) contains `sha` (partial match in either
+ * direction; see P8 in the ENG-5051 test list).
  *
  * Returns `null` when no such turn exists — either because no Bash tool_use
  * was executed, or because no tool_result contained the target SHA.
  *
+ * Same-SHA pathological (G3): if two tool_results match the query SHA, the
+ * first assistant turn in traversal order wins (deterministic first-match).
+ * This is impossible in real git (content-addressed SHAs), but hand-crafted
+ * fixtures can produce it — the choice is stable across runs rather than
+ * behavior-significant.
+ *
  * Module-private helper (YAGNI per ENG-5051 scope note): the only callers
  * today are `extractTrigger` and `extractOutcome` in this same file.
  * Named generically so a future slice can export it without a rename.
- *
- * RED STUB — implementation lands in the Green phase.
  */
 function findCommitAuthoringTurnIndex(
   turns: Turn[],
   sha: string,
 ): number | null {
-  // TODO(ENG-5051 Green): extractTrigger + extractOutcome both delegate here;
-  // implement SHA→turn-index lookup using the `[branch sha]`-extraction +
-  // bidirectional-startsWith rule pinned by P7+P8.
-  void turns;
-  void sha;
+  for (let i = 0; i < turns.length; i += 1) {
+    const turn = turns[i];
+    if (!turn || turn.role !== "assistant") continue;
+    // Walk every Bash tool_use on this turn. A single assistant turn can
+    // carry multiple tool calls (e.g. `git add` then `git commit` in one
+    // shot); only the ones that are `git commit` invocations are candidates.
+    for (const call of turn.toolCalls) {
+      if (call.name !== "Bash") continue;
+      const command = call.input.command;
+      if (typeof command !== "string") continue;
+      if (!isGitCommitCommand(command)) continue;
+      // Search forward for the matching tool_result (paired by toolUseId).
+      // Per fixture shape the result lives on the very next user turn, but
+      // we scan forward defensively — a real session could interleave a
+      // sidecar entry before the result lands.
+      for (let j = i + 1; j < turns.length; j += 1) {
+        const later = turns[j];
+        if (!later) continue;
+        const result = later.toolResults.find((r) => r.toolUseId === call.id);
+        if (!result) continue;
+        // Reuse the canonical `[branch sha] message` regex from
+        // `parse-turn.ts` — single source of truth for SHA extraction.
+        const commits = extractCommitsFromToolResult(result.content);
+        for (const commit of commits) {
+          if (shaPrefixMatch(commit.hash, sha)) {
+            return i;
+          }
+        }
+        // Only one tool_result per toolUseId exists; stop scanning forward.
+        break;
+      }
+    }
+  }
   return null;
 }
 
@@ -242,8 +322,6 @@ function findCommitAuthoringTurnIndex(
  * no real user turn precedes it.
  *
  * Return boundary (AC 15): result is `truncate`d to `CONTEXT_MAX_LEN`.
- *
- * RED STUB — fails at assertion level against the Tier-1 tests.
  */
 export function extractTrigger(turns: Turn[], sha: string): string | null {
   void turns;
