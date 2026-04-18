@@ -617,7 +617,13 @@ export function makeFakePlanBin(spec: FakePlanSpec = {}): FakePlanBin {
   // Build a POSIX shell script. Using `printf` (not `echo`) so we
   // round-trip exact bytes including newlines in the stdout payload
   // without worrying about echo's `-e` inconsistencies across shells.
-  const lines: string[] = ["#!/usr/bin/env bash", "set -u"];
+  // `set -eu` — `-e` makes any intermediate command failure (e.g.
+  // the `printf` that writes the stdout payload failing mid-write
+  // due to a closed pipe) abort the script with a nonzero exit,
+  // rather than silently falling through to the trailing `exit 0` as
+  // if the payload had written cleanly. `-u` keeps the unset-variable
+  // check from the prior revision.
+  const lines: string[] = ["#!/usr/bin/env bash", "set -eu"];
 
   // Argv assertion (when `expectArgs` is set). The fake compares its
   // runtime `$@` to the expected list and bails with a diagnostic on
