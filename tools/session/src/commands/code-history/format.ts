@@ -34,6 +34,9 @@ export const BODY_PREVIEW_MAX_LEN = 160;
  * char (Unicode `…`, U+2026) rather than three dots (`...`) — one char
  * makes the length arithmetic exact and matches what terminal-aware
  * output reviewers will recognize as "truncated, not end of sentence".
+ *
+ * Exported so tests and slices 4/5/6 reference the pinned character
+ * rather than hardcoding it.
  */
 export const BODY_PREVIEW_ELLIPSIS = "…";
 
