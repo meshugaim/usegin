@@ -32,7 +32,7 @@
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   parseCodeHistoryArgs,
@@ -1081,7 +1081,7 @@ function makePlanShowJson(overrides: Partial<{
 }
 
 describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
-  test.failing(
+  test(
     "ENG-5044 (AC 7, P1): ENG ref in body + plan show succeeds → `linear:` line renders after session block, before body",
     async () => {
       await withFakePlanBin(
@@ -1139,7 +1139,7 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (AC 7): linear line renders between session block and body when both are present",
     async () => {
       // Full plain-block shape: header → session → linear → body.
@@ -1226,7 +1226,7 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (AC 7): Green MUST invoke `plan show <id> --json` with exactly those argv (argv-pin via fake plan)",
     async () => {
       // Argv-pin: the fake `plan` binary asserts its `$@` matches the
@@ -1287,7 +1287,7 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (G3 / ENG-5042): over-long plan-show title → rendered title is truncated with `…` at CONTEXT_MAX_LEN",
     async () => {
       // Title-truncation pin. The agent's design #7 note on the
@@ -1378,7 +1378,7 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (N5 / AC 18): plan show exits non-zero → no `linear:` line, stderr warning names the id, exit 0",
     async () => {
       // The subprocess test for nonzero-exit failure. Fake `plan`
@@ -1430,7 +1430,7 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (N4 / AC 18): plan show returns unparseable JSON → no `linear:` line, stderr warning, exit 0",
     async () => {
       await withFakePlanBin(
@@ -1472,7 +1472,7 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (G4 / AC 18): plan show returns JSON missing required fields → treated as malformed, warn + omit",
     async () => {
       // Partial response — has `identifier` but missing `title` and
@@ -1523,12 +1523,22 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (N3 / AC 18): `plan` binary not on PATH → no `linear:` line, stderr warning, no crash, exit 0",
     async () => {
-      // Override PATH to an empty dir so `plan` can't be resolved.
-      // The subprocess spawn will fail with ENOENT — fetchLinearIssue
-      // catches it, returns null, decorator warns and omits.
+      // Override PATH to drop `plan` while keeping `bun` resolvable —
+      // `runCli` spawns `bun <cli.ts> …`, so the test process's env
+      // (`bun`, basic system dirs) must still be able to find `bun`.
+      // The subprocess then calls `Bun.spawn(["plan", …])` inside
+      // `fetchLinearIssue` — THAT lookup uses the PATH we pass, which
+      // only contains `bunDir + emptyBin`, and any dir seeded with a
+      // fake `plan` is deliberately NOT in it — the spawn fails with
+      // ENOENT, `fetchLinearIssue` catches it, decorator warns and
+      // omits. Using `process.execPath`'s dir (rather than whatever
+      // `/usr/local/bin` / nvm layout the host happens to have) keeps
+      // this test portable across devcontainer / CI / local-laptop
+      // setups.
+      const bunDir = dirname(process.execPath);
       await withTempDir("code-history-no-plan-", async (emptyBin) => {
         await withFixtureRepo(
           {
@@ -1545,8 +1555,11 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
               ["code-history", `${fx.file}:2`],
               fx.dir,
               {
-                // PATH is ONLY the empty dir — `plan` cannot resolve.
-                env: { PATH: emptyBin },
+                // PATH contains only bun's dir + an empty dir — `plan`
+                // cannot resolve. Deliberately excludes
+                // `process.env.PATH` so stray `plan` installs on the
+                // host don't leak in and silently satisfy the lookup.
+                env: { PATH: `${bunDir}:${emptyBin}` },
               },
             );
             expect(result.exitCode).toBe(0);
@@ -1565,7 +1578,7 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (N2 / G1 / AC 18): plan show exceeds 5s timeout → subprocess aborted, stderr warning, exit 0",
     async () => {
       // Fake `plan` sleeps 10s — comfortably beyond the 5s timeout.

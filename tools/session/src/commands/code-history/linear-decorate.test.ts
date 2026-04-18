@@ -15,7 +15,9 @@
  * "any-null-from-fetch collapses to warning + omit" contract
  * without the subprocess cost.
  *
- * The `test.failing` marks are the Red-phase pins.
+ * All tests land as plain `test`. Green (ENG-5044) removed the Red-phase
+ * `test.failing` marks once the real decorator + `fetchLinearIssue` started
+ * satisfying each assertion.
  */
 
 import { describe, test, expect } from "bun:test";
@@ -72,7 +74,7 @@ function makeDeps(
 // =============================================================================
 
 describe("decorateCommitWithLinear (ENG-5044)", () => {
-  test.failing(
+  test(
     "ENG-5044 (P1): ENG ref in body + fetch returns issue → commit.linear populated with {id,title,status}",
     async () => {
       const commit = makeCommit();
@@ -85,7 +87,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: decorator calls fetchLinearIssue with the ENG id extracted from the body",
     async () => {
       const commit = makeCommit({
@@ -107,7 +109,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (G2): multiple ENG refs in body → decorator fetches the FIRST match only",
     async () => {
       const commit = makeCommit({
@@ -169,7 +171,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (AC 18): ENG ref present but fetchLinearIssue returns null → commit.linear absent, warn fired with id-naming message",
     async () => {
       // Collapses all subprocess failure flavors (timeout, nonzero
@@ -195,7 +197,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044 (AC 18): warning identifies the EXTRACTED ENG id, not a hardcoded template placeholder",
     async () => {
       // Regression guard: an implementation that formatted the
@@ -220,7 +222,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5044: decorator returns a NEW object on the happy path (no mutation of the input commit)",
     async () => {
       // Mirrors `decorateCommitWithSession`'s immutability contract.

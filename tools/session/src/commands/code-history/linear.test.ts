@@ -15,9 +15,10 @@
  *   (b) subprocess-level integration tests in `code-history.test.ts`
  *       with a fake `plan` binary on `PATH`.
  *
- * The `test.failing` marks are the Red-phase pins — Green will remove
- * each mark as the real implementation lands. See CLAUDE.md /
- * `.claude/skills/tdd-ci` for the workflow.
+ * All tests land as plain `test`. Green (ENG-5044) removed the Red-phase
+ * `test.failing` marks once the real implementations in `./linear.ts`
+ * started satisfying each assertion. See CLAUDE.md / `.claude/skills/tdd-ci`
+ * for the workflow.
  */
 
 import { describe, test, expect } from "bun:test";

@@ -38,7 +38,7 @@
  * AC 18 says "on ANY failure, skip the line and warn".
  */
 
-import { extractLinearRef, fetchLinearIssue as realFetchLinearIssue } from "./linear";
+import { extractLinearRef } from "./linear";
 import type { LinearIssue } from "./linear";
 import type { DecoratedCommit } from "./types";
 
@@ -97,15 +97,23 @@ export async function decorateCommitWithLinear(
   commit: DecoratedCommit,
   deps: DecorateLinearDeps,
 ): Promise<DecoratedCommit> {
-  // Red stub — returns the commit unchanged. Tests that assert on
-  // `commit.linear` being populated (happy path) fail at the
-  // assertion level; tests that assert on "no linear / no warning"
-  // for the no-ENG-ref path would trivially pass today, so those
-  // are marked `test.failing` too until Green verifies via the
-  // positive counter-test that the decorator is actually wired.
-  void commit;
-  void deps;
-  void extractLinearRef;
-  void realFetchLinearIssue;
-  return commit;
+  const id = extractLinearRef(commit.body);
+  if (id === null) {
+    // No ENG ref — normal case, not a failure. Return unchanged, no
+    // fetch, no warn (AC 9 missing-layer invariant).
+    return commit;
+  }
+  const linear = await deps.fetchLinearIssue(id);
+  if (linear === null) {
+    // Fetch failed (AC 18). One-line stderr warning via injected
+    // `warn`. Leave `commit.linear` absent so the renderer omits
+    // the line.
+    deps.warn(formatLinearWarning(id));
+    return commit;
+  }
+  // Happy path: return a NEW object with `linear` populated. Mirrors
+  // `decorateCommitWithSession`'s immutability contract — a caller
+  // that wants to detect "decoration happened" via referential
+  // equality can, and the input `commit` stays untouched.
+  return { ...commit, linear };
 }
