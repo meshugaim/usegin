@@ -718,22 +718,18 @@ describe("extractTrigger + extractOutcome (AC 14 combined)", () => {
 });
 
 // ============================================================================
-// G3 pathological — same-SHA duplicate (non-crash guarantee)
+// G3 pathological — same-SHA duplicate (first-match-wins behavior pin)
 // ============================================================================
 //
 // Impossible in real git (SHAs are content-addressed), but hand-crafted
-// fixtures can produce two tool_results with the SAME full SHA. The
-// extractor must not crash and must return deterministically — any
-// implementation choice is fine as long as it's stable across runs.
-//
-// Plain `test` (not `test.failing`): the stubs don't crash on this input
-// (they return "<unimplemented>" / null without traversing), so the
-// non-crash assertion passes today and will keep passing through Green.
-// The purpose is to pin the invariant in place BEFORE the real impl
-// lands — so Green can't regress it.
+// fixtures can produce two tool_results with the SAME full SHA. Post-Green
+// this is pinned to `first-match-wins`: the earliest commit-authoring turn
+// in traversal order anchors BOTH `extractTrigger` and `extractOutcome`, so
+// the two extractors stay consistent with each other even under this
+// degenerate input.
 
 describe("G3 pathological — same-SHA duplicate", () => {
-  test("two tool_results with same SHA: both extractors run without crashing", () => {
+  test("two tool_results with same SHA: first-match-wins, extractors stay consistent", () => {
     const sha = "ffffffff"; // 8 chars, same in both results
     const [bashA_1, bashUser_1] = makeBashTurn(
       'git commit -m "first"',
@@ -753,14 +749,16 @@ describe("G3 pathological — same-SHA duplicate", () => {
       bashUser_2,
       makeAssistantTurn({ text: "Second done." }),
     ];
-    // Non-crash guarantee — the actual return is not pinned here
-    // (deterministic, but implementation-defined; once Green lands,
-    // a follow-up test can pin "first match wins" or similar).
+    // Non-crash guarantee — kept alongside the behavior pins so a future
+    // regression to a throw localizes here rather than inside the equality
+    // assertions below.
     expect(() => extractTrigger(turns, sha)).not.toThrow();
     expect(() => extractOutcome(turns, sha)).not.toThrow();
-    // TODO(ENG-5051 Green): once first-match-wins is deterministic, add:
-    //   expect(extractTrigger(turns, sha)).toBe("first ask")
-    // to promote this from a non-crash guarantee to a behavior pin.
+    // Behavior pin: the first commit-authoring turn anchors both extractors.
+    // Trigger is the user ask immediately preceding that turn; outcome is the
+    // first text-bearing assistant turn after it — NOT the second pair.
+    expect(extractTrigger(turns, sha)).toBe("first ask");
+    expect(extractOutcome(turns, sha)).toBe("First done.");
   });
 });
 
