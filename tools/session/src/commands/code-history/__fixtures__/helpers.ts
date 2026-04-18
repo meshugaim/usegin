@@ -86,6 +86,13 @@ export interface FixtureRepo {
   expectedSubject: string;
   /** Short (8-char) SHA of the final commit — lets E2E pin the exact header. */
   expectedSha: string;
+  /**
+   * Line number of an uncommitted line that exists in the working tree
+   * but has no committed history. Drives the AC 19 "No committed history"
+   * test without reusing a line number that's already been committed.
+   * See `makeFixtureRepo` for how this line is seeded.
+   */
+  uncommittedLine: number;
 }
 
 /**
@@ -139,11 +146,26 @@ export function makeFixtureRepo(spec: FixtureRepoSpec = {}): FixtureRepo {
     run(["git", "commit", "-q", "-m", message]);
   });
 
+  // After committing, append an UNCOMMITTED 4th line. This gives us a
+  // working-tree line that exists (so upfront file-length validation
+  // doesn't reject it) but has no committed history (so `git log -L`
+  // returns empty / errors, which the command surfaces via AC 19's
+  // "No committed history for <file>:<line>" path). Keeping this inside
+  // the fixture — rather than having each AC 19 test append its own line —
+  // means every test sees the same canonical "staged-only / uncommitted"
+  // shape.
+  const committedContents = `line 1\nline 2 v${commits.length}\nline 3\n`;
+  const uncommittedLine = 4;
+  writeFileSync(
+    join(dir, file),
+    `${committedContents}line ${uncommittedLine} uncommitted\n`,
+  );
+
   const expectedSubject = commits[commits.length - 1]!.subject;
   const fullSha = run(["git", "rev-parse", "HEAD"]).trim();
   const expectedSha = fullSha.slice(0, 8);
 
-  return { dir, file, expectedSubject, expectedSha };
+  return { dir, file, expectedSubject, expectedSha, uncommittedLine };
 }
 
 /**

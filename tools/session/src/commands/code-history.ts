@@ -12,6 +12,8 @@
  * `runCodeHistory` with session / linear / body lines and `--json`.
  */
 
+import { readFileSync, statSync } from "node:fs";
+
 import { parseCodeHistoryArgs } from "../cli-args";
 import { getMostRecentCommit } from "./code-history/git";
 import { formatHeader } from "./code-history/format";
@@ -71,16 +73,18 @@ export async function runCodeHistory(args: string[]): Promise<void> {
 
   const { file, line } = parsed;
 
-  // TODO(ENG-5040 Green): upfront validation lives HERE (AC 2) — before
-  // any git spawn.
-  //   - File existence (stat → throw "src/foo.ts: not found" or similar).
-  //   - Line-in-range (count \n in the file; throw "line 50 exceeds file
-  //     length (3 lines)" or similar).
-  // These errors MUST go through the `"Error: "`-prefixed throw → catch
-  // path above (so `console.error("Error: ...")` shapes them) and NOT
-  // through the plain `console.error(...)` path used by AC 19's
-  // `No committed history for <file>:<line>` — the AC 19 test asserts
-  // the exact no-prefix string, so collisions there would break it.
+  // Upfront validation (AC 2) — before any git spawn. These errors flow
+  // through the `"Error: "`-prefixed stderr path via throw → catch, which
+  // is distinct from AC 19's plain `console.error` "no committed history"
+  // path. Keeping them separate lets the AC 19 test pin the exact
+  // no-prefix wording without collision.
+  try {
+    validateFileAndLine(file, line);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error: ${msg}`);
+    process.exit(1);
+  }
 
   const commit = await getMostRecentCommit(file, line);
 
@@ -90,4 +94,54 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   }
 
   console.log(formatHeader(commit));
+}
+
+/**
+ * Upfront argument-semantics validation for `code-history`.
+ *
+ * Throws a clear `Error` when the file doesn't exist (or isn't a regular
+ * file) or when the 1-based line exceeds the file's line count. Per spec
+ * AC 2, these are "user typed something wrong" cases — distinct from
+ * AC 19's "line exists but was never committed" case, which is surfaced
+ * by `getMostRecentCommit` returning `null` and goes through a separate
+ * stderr path.
+ */
+function validateFileAndLine(file: string, line: number): void {
+  let stat;
+  try {
+    stat = statSync(file);
+  } catch {
+    throw new Error(`${file}: file not found`);
+  }
+  if (!stat.isFile()) {
+    throw new Error(`${file}: not a regular file`);
+  }
+
+  // Count newlines to derive the line total. Reading the file once here
+  // is fine — code-history is interactive (one invocation per run) and
+  // files under investigation are source code (kilobytes, not gigabytes).
+  // If that ever changes, swap in a streaming line counter.
+  const contents = readFileSync(file, "utf8");
+  const lineCount = countLines(contents);
+  if (line > lineCount) {
+    throw new Error(
+      `line ${line} is out of range for ${file} (file has ${lineCount} line${
+        lineCount === 1 ? "" : "s"
+      })`,
+    );
+  }
+}
+
+/**
+ * Count 1-based lines in a text file. A trailing newline does NOT add an
+ * extra empty line (matches how editors/`wc -l + 1` typically think about
+ * file length). A file with contents `"a\nb\n"` has 2 lines; `"a\nb"` also
+ * has 2 lines; empty file has 0 lines.
+ */
+function countLines(contents: string): number {
+  if (contents.length === 0) return 0;
+  const newlines = (contents.match(/\n/g) ?? []).length;
+  // If the file ends with \n, the newline count equals the line count.
+  // If not, there's one more "line" than \n (the trailing partial line).
+  return contents.endsWith("\n") ? newlines : newlines + 1;
 }

@@ -208,15 +208,21 @@ describe("session code-history end-to-end", () => {
   test(
     "ENG-5040 (AC 19): line with no committed history → stderr message, exit 0",
     () => {
-      // Line 999 in a 3-line file has no committed history.
+      // The fixture seeds an uncommitted line at `fixture.uncommittedLine`.
+      // That line exists in the working tree (so upfront file-length
+      // validation passes) but has no committed history (so `git log -L`
+      // produces no output → the command takes AC 19's degradation path).
+      // Using the sentinel instead of a magic number keeps this test's
+      // intent — "line exists but wasn't committed" — on the page.
+      const line = fixture.uncommittedLine;
       const result = runCli(
-        ["code-history", `${fixture.file}:999`],
+        ["code-history", `${fixture.file}:${line}`],
         fixture.dir,
       );
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toContain(
-        `No committed history for ${fixture.file}:999`,
+        `No committed history for ${fixture.file}:${line}`,
       );
       // Nothing goes to stdout in the "no history" path.
       expect(result.stdout.trim()).toBe("");
