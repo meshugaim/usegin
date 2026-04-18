@@ -128,6 +128,22 @@ describe("isCommandOrCaveat", () => {
   test.failing("returns true for <command-name> wrapper text", () => {
     expect(isCommandOrCaveat("<command-name>/retro</command-name>")).toBe(true);
   });
+
+  test.failing("returns true for <command-message> wrapper text", () => {
+    expect(isCommandOrCaveat("<command-message>retro</command-message>")).toBe(true);
+  });
+
+  test.failing("returns true for Caveat:-prefixed text", () => {
+    expect(isCommandOrCaveat("Caveat: system noise goes here")).toBe(true);
+  });
+
+  // Negative case: plain user prose → false. The stub returns `false` for
+  // everything, so this passes today. Kept as plain `test` (not `.failing`)
+  // because it's a true regression guard once Green lands — the real impl
+  // must not flag ordinary text as command-or-caveat.
+  test("returns false for plain user prose", () => {
+    expect(isCommandOrCaveat("fix the build")).toBe(false);
+  });
 });
 
 // ============================================================================
