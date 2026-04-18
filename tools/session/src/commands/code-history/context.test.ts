@@ -287,9 +287,7 @@ describe("truncate", () => {
 // ============================================================================
 //
 // Positive cases (P1–P8) and negative cases (N1–N8) mirror the pre-committed
-// test list from ENG-5051's Linear description. Each `test.failing` fails at
-// assertion level against the stub return of "<unimplemented>" — not at
-// import or function-missing level.
+// test list from ENG-5051's Linear description.
 
 describe("extractTrigger", () => {
   describe("positive cases", () => {
@@ -769,13 +767,6 @@ describe("G3 pathological — same-SHA duplicate", () => {
 // Mirror of the `extractIntent` idempotence meta-test: same input twice
 // → same result, input unchanged. Guards against input mutation and
 // stateful impls.
-//
-// Plain `test` (not `test.failing`): idempotence is a pure invariant that
-// any sane implementation — including today's stub that returns the same
-// "<unimplemented>" sentinel without touching `turns` — must satisfy, so
-// this passes today and keeps passing through Green. Same pattern as G3
-// (non-crash guarantee): pin the invariant in place BEFORE the real impl
-// lands so Green can't regress it.
 //
 // These tests intentionally do NOT pin a specific return value — value
 // pins belong in P-cases (P1 pins "fix the bug please", P-cases for
