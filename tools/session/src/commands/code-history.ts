@@ -86,7 +86,19 @@ export async function runCodeHistory(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const commit = await getMostRecentCommit(file, line);
+  let commit;
+  try {
+    commit = await getMostRecentCommit(file, line);
+  } catch (error) {
+    // Real git failure (not-a-repo, unreadable object, permission denied,
+    // etc.) — distinct from the "line has no committed history" path,
+    // which `getMostRecentCommit` returns as `null` instead of throwing.
+    // Route through the `"Error: "`-prefixed stderr path so the user sees
+    // git's actual complaint, not a misleading "No committed history".
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error: ${msg}`);
+    process.exit(1);
+  }
 
   if (commit === null) {
     console.error(`No committed history for ${file}:${line}`);

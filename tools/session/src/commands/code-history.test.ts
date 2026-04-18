@@ -19,7 +19,7 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -284,6 +284,35 @@ describe("session code-history end-to-end", () => {
       expect(result.stderr).toMatch(
         /src\/does-not-exist\.ts.*(not.*found|no such|does not exist)|((not.*found|no such|does not exist).*src\/does-not-exist\.ts)/i,
       );
+    },
+  );
+
+  test(
+    "ENG-5040: running outside a git repo → non-zero exit with a clear git error, NOT a misleading 'No committed history' message",
+    () => {
+      // Regression for the Green-phase bug where any `git log` nonzero exit
+      // was silently routed to AC 19's "No committed history" path. Outside
+      // a git repo, git errors with `fatal: not a git repository` — that
+      // must surface to the user, not get squashed into the no-history path.
+      const noRepoDir = mkdtempSync(join(tmpdir(), "code-history-norepo-"));
+      try {
+        // Create a real file so upfront file-existence validation passes —
+        // we want to exercise the git-layer failure path, not the AC 2
+        // "file not found" path.
+        const file = "target.ts";
+        writeFileSync(join(noRepoDir, file), "line 1\nline 2\nline 3\n");
+
+        const result = runCli(["code-history", `${file}:1`], noRepoDir);
+
+        expect(result.exitCode).not.toBe(0);
+        // Must surface the real git error under the `"Error: "` prefix.
+        expect(result.stderr).toContain("Error:");
+        // Must NOT take AC 19's no-history path — that would hide the real
+        // failure from the user.
+        expect(result.stderr).not.toContain(`No committed history for ${file}:1`);
+      } finally {
+        rmSync(noRepoDir, { recursive: true, force: true });
+      }
     },
   );
 
