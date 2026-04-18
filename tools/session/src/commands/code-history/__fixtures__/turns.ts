@@ -11,10 +11,10 @@
  *   - This file produces `Turn[]` only. It does NOT touch commit-fixture
  *     machinery (see `./helpers.ts` for `FixtureCommitSpec` / git repos).
  *     Slice 4 (ENG-5043) wires the two together at a higher layer.
- *   - Part A (ENG-5050) lands `makeUserTurn` / `makeAssistantTurn` /
- *     `makeBashTurn`. Part B (ENG-5051) will add helpers for the
- *     trigger/outcome extractors — by extending this module, not by
- *     modifying these three helpers (which stay pure).
+ *   - The current helpers (`makeUserTurn` / `makeAssistantTurn` /
+ *     `makeBashTurn`) stay stable: future extractor slices extend this
+ *     module rather than modifying these three, so existing tests keep
+ *     reading the same shape.
  *
  * Why not reuse `src/testing/turns.ts`?
  *   The top-level `userTurn`/`assistantTurn` factories require a UUID as
