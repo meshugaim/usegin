@@ -169,9 +169,12 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // body content" — per AC 9 ("missing layer → no line") we omit the
   // `body:` line entirely in that case rather than emitting a placeholder.
   //
-  // Pattern: "missing layer = no line" — slices 4/5 will mirror this for
-  // session: / linear: lines. Not extracting an `emitLayerLine` helper
-  // yet (YAGNI with one call site); revisit when slice 4 lands.
+  // Pattern: "missing layer = no line" — the session block above mirrors
+  // this (returns `null` → we skip the `console.log`); slice 5's `linear:`
+  // line will be the third call site. Not extracting an `emitLayerLine`
+  // helper yet — the two current sites have different shapes (single
+  // string vs. multi-line block), so a premature helper would be a lossy
+  // abstraction. Revisit at slice 5 once there's a third shape to compare.
   const bodyPreview = formatBody(decorated.body);
   if (bodyPreview.length > 0) {
     console.log(`body: ${bodyPreview}`);
