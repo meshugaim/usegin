@@ -113,14 +113,76 @@ export interface LinearIssue {
 export async function fetchLinearIssue(
   id: string,
 ): Promise<LinearIssue | null> {
-  // Red stub — returns null so tests that assert on the happy path
-  // fail at their expectations; tests that assert null-on-failure
-  // pass today but are still listed under `test.failing` until Green
-  // lands the real implementation, because without the real spawn
-  // they're asserting a trivial always-null.
-  void id;
-  void truncate;
-  return null;
+  // One outer try/catch: spec AC 18 collapses every failure mode to
+  // null (decorator owns the warning). Classifying here (timeout vs
+  // ENOENT vs JSON.parse) would force the decorator to carry a
+  // tagged-union back — instead the decorator is "we tried to fetch
+  // and got nothing", keeping the warning template identical across
+  // all failure modes (AC 18 pins ONE wording, naming the id).
+  //
+  // Covers:
+  //   - Bun.spawn sync throw (ENOENT when `plan` is not on PATH)
+  //   - AbortError raised via `AbortSignal.timeout(LINEAR_FETCH_TIMEOUT_MS)`
+  //   - Nonzero exit (we branch on `exitCode !== 0` → return null)
+  //   - Malformed stdout (JSON.parse throws, caught below)
+  //   - Partial response (type-narrow each required field; absent /
+  //     non-string → return null without touching the happy-path
+  //     return)
+  let proc: ReturnType<typeof Bun.spawn> | undefined;
+  try {
+    proc = Bun.spawn(["plan", "show", id, "--json"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      signal: AbortSignal.timeout(LINEAR_FETCH_TIMEOUT_MS),
+    });
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) return null;
+    const stdout = await new Response(proc.stdout).text();
+    const parsed = JSON.parse(stdout) as unknown;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof (parsed as { identifier?: unknown }).identifier !== "string" ||
+      typeof (parsed as { title?: unknown }).title !== "string" ||
+      typeof (parsed as { status?: unknown }).status !== "string"
+    ) {
+      return null;
+    }
+    const record = parsed as {
+      identifier: string;
+      title: string;
+      status: string;
+    };
+    // G3: title truncation at the extractor boundary mirrors ENG-5042.
+    // `truncate` never returns null when called with a non-null string,
+    // but its signature includes the null-overload so the `!` is needed.
+    return {
+      id: record.identifier,
+      title: truncate(record.title)!,
+      status: record.status,
+    };
+  } catch {
+    return null;
+  } finally {
+    // `AbortSignal.timeout` SIGTERMs the direct `plan` child, but any
+    // grandchild it spawned (a bash wrapper `exec`'ing + spawning
+    // `sleep`, say — or, in the integration tests' fake, literal
+    // `sleep 10`) inherits the stdout/stderr pipe fds and keeps them
+    // open until it exits naturally. Bun's event loop stays alive
+    // waiting on those read ends, which means the whole
+    // `code-history` process hangs until the grandchild finishes —
+    // erasing the user-visible benefit of the timeout.
+    //
+    // `unref` drops the event-loop refcount for the subprocess so
+    // the parent can exit cleanly even though the fds are still held
+    // downstream. Safe to call post-`await proc.exited`: we've
+    // already read everything we need (or gave up).
+    try {
+      proc?.unref();
+    } catch {
+      // Some proc shapes may not expose `unref` in older Bun; swallow.
+    }
+  }
 }
 
 /**
