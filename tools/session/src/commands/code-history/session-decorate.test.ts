@@ -42,6 +42,15 @@ const FIXTURE_COMMIT_SHA = "4fff467fb48a632519c742358505e9a0a739d525";
  * Minimal `ParsedSession` wrapper — only the `turns` field is read by
  * the extractors. Other fields are stubbed with plausible empty values
  * so TypeScript is happy without dragging in a full session factory.
+ *
+ * TODO(schema-drift): reuse src/testing/sessions.ts when it gains a
+ * ParsedSession helper that accepts a caller-supplied `sessionId`.
+ * `makeSession` there defaults to TEST_SESSION_ID, but these tests pin
+ * a specific FIXTURE_UUID to assert on — so a direct swap would break
+ * the `.session!.id === FIXTURE_UUID` assertions until `makeSession`
+ * cleanly threads an override (it already does via `Partial<ParsedSession>`,
+ * but the cast-to-branded-SessionId dance would still live here).
+ * Revisit when another caller needs the same shape.
  */
 function makeStubSession(turns: ParsedSession["turns"]): ParsedSession {
   return {
