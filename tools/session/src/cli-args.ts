@@ -293,10 +293,10 @@ export interface CodeHistoryArgs {
  *
  *   - Returns `"help"` if `--help` / `-h` is present.
  *   - Returns `{ file, line }` on a valid `file.ts:42` positional.
- *   - Throws a clear `Error` for: missing positional, no `:` separator,
- *     empty file or line portion, non-integer or non-positive line.
- *     Exact wording for the no-colon case is pinned by the tests:
- *     `Expected <file>:<line>, got "<arg>"`.
+ *   - Throws a clear `Error` for: missing positional, extra positionals,
+ *     no `:` separator, empty file or line portion, non-integer or
+ *     non-positive line. Exact wording for the no-colon case is pinned
+ *     by the tests: `Expected <file>:<line>, got "<arg>"`.
  *
  * The caller (`runCodeHistory`) turns thrown errors into stderr + non-zero
  * exit. Existence / line-in-range checks live in the command layer
@@ -313,11 +313,21 @@ export function parseCodeHistoryArgs(
     }
   }
 
-  // Find the first non-flag positional. The spec only accepts one.
-  const positional = args.find((a) => !a.startsWith("-"));
-  if (positional === undefined) {
+  // Find positionals. The spec accepts EXACTLY one — no more, no less.
+  // Previously any extra positionals were silently ignored, which meant
+  // `session code-history foo:1 bar:2` took `foo:1` and dropped `bar:2`
+  // without warning. Close the grammar: one positional, or we throw.
+  const positionals = args.filter((a) => !a.startsWith("-"));
+  if (positionals.length === 0) {
     throw new Error("Missing argument: expected <file>:<line>");
   }
+  if (positionals.length > 1) {
+    throw new Error(
+      `Unexpected extra arguments: expected one <file>:<line>, got ${positionals.length} ` +
+        `(${positionals.map((p) => JSON.stringify(p)).join(", ")})`,
+    );
+  }
+  const positional = positionals[0]!;
 
   // Split on the LAST colon so absolute paths (`/foo/bar.ts:42`) and
   // paths with embedded colons (`weird:name.ts:42`) parse correctly.

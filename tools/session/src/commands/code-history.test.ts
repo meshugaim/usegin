@@ -109,6 +109,21 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
   test("ENG-5040: throws when the file portion is empty", () => {
     expect(() => parseCodeHistoryArgs([":42"])).toThrow(/file/i);
   });
+
+  test("ENG-5040: throws when extra positionals are present (grammar is exactly one)", () => {
+    // Regression for the Green-phase bug where the parser silently kept
+    // the first positional and dropped the rest — `session code-history
+    // foo:1 bar:2` used to take `foo:1` and ignore `bar:2` with no
+    // warning. Close the grammar: extras are a hard error.
+    expect(() =>
+      parseCodeHistoryArgs(["src/foo.ts:1", "src/bar.ts:2"]),
+    ).toThrow(/extra|unexpected|one <file>:<line>/i);
+    // The error message should echo all the positionals the user typed so
+    // they can see what we saw.
+    expect(() =>
+      parseCodeHistoryArgs(["src/foo.ts:1", "src/bar.ts:2"]),
+    ).toThrow(/src\/bar\.ts:2/);
+  });
 });
 
 // =============================================================================
