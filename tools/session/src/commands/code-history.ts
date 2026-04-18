@@ -26,6 +26,11 @@ import { formatHeader } from "./code-history/format";
  * they land.
  */
 export function printCodeHistoryHelp(): void {
+  // TODO(ENG-5041 Green): add a RESERVED section listing
+  // `CODE_HISTORY_RESERVED_FLAGS` from ../cli-args so the help text
+  // tells users "-n/--all/-L/--func are reserved for ENG-5048" before
+  // they try them. The red-phase reviewer flagged this as Green-phase
+  // scope for ENG-5041, not Red.
   console.log(`
 session code-history - Show the commit + transcript context for a line of code
 
