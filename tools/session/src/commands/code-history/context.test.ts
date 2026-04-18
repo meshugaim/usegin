@@ -351,6 +351,23 @@ describe("extractTrigger", () => {
       expect(extractTrigger(turns, "2222222")).toBe("amend the last commit");
     });
 
+    test.failing("P4b: `git commit --no-verify` is detected", () => {
+      // Spec P4 lists `--amend` AND `--no-verify` as flagged variants of
+      // `git commit` that still qualify. Sibling to the `--amend` case above.
+      const [bashA, bashUser] = makeBashTurn(
+        'git commit --no-verify -m "chore: bypass hooks"',
+        "[main 2222223] chore: bypass hooks",
+      );
+      const turns = [
+        makeUserTurn("commit without running hooks"),
+        bashA,
+        bashUser,
+      ];
+      expect(extractTrigger(turns, "2222223")).toBe(
+        "commit without running hooks",
+      );
+    });
+
     test.failing(
       "P5: multi-commit session — call with SHA_B returns commit_B's preceding user msg",
       () => {
