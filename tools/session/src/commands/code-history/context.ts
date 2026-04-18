@@ -189,3 +189,71 @@ export function extractIntent(turns: Turn[]): string | null {
   // above already filtered empty text.
   return intent ? truncateString(intent.text) : null;
 }
+
+// ============================================================================
+// extractTrigger / extractOutcome (ENG-5051 — STUBS)
+// ============================================================================
+
+/**
+ * Locate the index of the assistant turn whose Bash tool_use authored the
+ * commit identified by `sha`. "Authored" means: the assistant ran a
+ * `git commit ...` command whose matching tool_result (from the next user
+ * turn) contains `sha` (partial match in either direction; see P8 in the
+ * ENG-5051 test list).
+ *
+ * Returns `null` when no such turn exists — either because no Bash tool_use
+ * was executed, or because no tool_result contained the target SHA.
+ *
+ * Module-private helper (YAGNI per ENG-5051 scope note): the only callers
+ * today are `extractTrigger` and `extractOutcome` in this same file.
+ * Named generically so a future slice can export it without a rename.
+ *
+ * RED STUB — implementation lands in the Green phase.
+ */
+function findCommitAuthoringTurnIndex(
+  turns: Turn[],
+  sha: string,
+): number | null {
+  void turns;
+  void sha;
+  return null;
+}
+
+/**
+ * Extract the user message that triggered the commit identified by `sha`.
+ * "Triggered" is defined as the nearest real user turn preceding the
+ * commit-authoring Bash turn (see `findCommitAuthoringTurnIndex`), walking
+ * backward past any system-injected wrappers via `isRealUserTurn`.
+ *
+ * Returns `null` when the commit-authoring turn cannot be located, or when
+ * no real user turn precedes it.
+ *
+ * Return boundary (AC 15): result is `truncate`d to `CONTEXT_MAX_LEN`.
+ *
+ * RED STUB — fails at assertion level against the Tier-1 tests.
+ */
+export function extractTrigger(turns: Turn[], sha: string): string | null {
+  void turns;
+  void sha;
+  return "<unimplemented>";
+}
+
+/**
+ * Extract the assistant text immediately reporting the outcome of the
+ * commit identified by `sha`. The outcome is the first text-bearing
+ * assistant turn following the commit-authoring Bash turn (see
+ * `findCommitAuthoringTurnIndex`), skipping over tool-only assistant
+ * turns and whitespace-only text turns.
+ *
+ * Returns `null` when the commit-authoring turn cannot be located, or
+ * when no text-bearing assistant turn follows it.
+ *
+ * Return boundary (AC 15): result is `truncate`d to `CONTEXT_MAX_LEN`.
+ *
+ * RED STUB — fails at assertion level against the Tier-1 tests.
+ */
+export function extractOutcome(turns: Turn[], sha: string): string | null {
+  void turns;
+  void sha;
+  return "<unimplemented>";
+}

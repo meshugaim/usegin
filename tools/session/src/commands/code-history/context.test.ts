@@ -13,10 +13,16 @@ import {
   CONTEXT_ELLIPSIS,
   CONTEXT_MAX_LEN,
   extractIntent,
+  extractOutcome,
+  extractTrigger,
   isCommandOrCaveat,
   truncate,
 } from "./context";
-import { makeAssistantTurn, makeUserTurn } from "./__fixtures__/turns";
+import {
+  makeAssistantTurn,
+  makeBashTurn,
+  makeUserTurn,
+} from "./__fixtures__/turns";
 
 // ============================================================================
 // Pure-module invariant (AC 16) — plain test, passes today
@@ -273,5 +279,155 @@ describe("truncate", () => {
     // Input string is primitive so can't be mutated, but assert reference
     // equality as a sanity check.
     expect(input).toBe("hello\nworld");
+  });
+});
+
+// ============================================================================
+// extractTrigger (AC 11) — ENG-5051
+// ============================================================================
+//
+// Positive cases (P1–P8) and negative cases (N1–N8) mirror the pre-committed
+// test list from ENG-5051's Linear description. Each `test.failing` fails at
+// assertion level against the stub return of "<unimplemented>" — not at
+// import or function-missing level.
+
+describe("extractTrigger", () => {
+  describe("positive cases", () => {
+    test.failing(
+      "P1: basic `git commit -m` with SHA in tool result → preceding user msg",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "fix: something"',
+          "[main abc1234] fix: something\n 1 file changed",
+        );
+        const turns = [
+          makeUserTurn("fix the bug please"),
+          makeAssistantTurn({ text: "on it" }),
+          bashA,
+          bashUser,
+        ];
+        expect(extractTrigger(turns, "abc1234")).toBe("fix the bug please");
+      },
+    );
+
+    test.failing(
+      "P2: heredoc `git commit -m \"$(cat <<EOF...EOF)\"` detected as git commit",
+      () => {
+        const heredoc =
+          'git commit -m "$(cat <<\'EOF\'\nfix: multiline commit body\n\nBody line here.\nEOF\n)"';
+        const [bashA, bashUser] = makeBashTurn(
+          heredoc,
+          "[main def5678] fix: multiline commit body",
+        );
+        const turns = [
+          makeUserTurn("please commit with a heredoc"),
+          bashA,
+          bashUser,
+        ];
+        expect(extractTrigger(turns, "def5678")).toBe(
+          "please commit with a heredoc",
+        );
+      },
+    );
+
+    test.failing(
+      "P3: leading whitespace / parens before `git commit` → detected after trim",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          "  git commit -m \"chore: indented\"",
+          "[main 1111111] chore: indented",
+        );
+        const turns = [makeUserTurn("go ahead and commit"), bashA, bashUser];
+        expect(extractTrigger(turns, "1111111")).toBe("go ahead and commit");
+      },
+    );
+
+    test.failing("P4: `git commit --amend` is detected", () => {
+      const [bashA, bashUser] = makeBashTurn(
+        "git commit --amend --no-edit",
+        "[main 2222222] fix: amended",
+      );
+      const turns = [makeUserTurn("amend the last commit"), bashA, bashUser];
+      expect(extractTrigger(turns, "2222222")).toBe("amend the last commit");
+    });
+
+    test.failing(
+      "P5: multi-commit session — call with SHA_B returns commit_B's preceding user msg",
+      () => {
+        const [bashA_A, bashA_User] = makeBashTurn(
+          'git commit -m "first"',
+          "[main aaaaaaa] first",
+        );
+        const [bashB_A, bashB_User] = makeBashTurn(
+          'git commit -m "second"',
+          "[main bbbbbbb] second",
+        );
+        const turns = [
+          makeUserTurn("do the first change"),
+          bashA_A,
+          bashA_User,
+          makeUserTurn("now do the second change"),
+          bashB_A,
+          bashB_User,
+        ];
+        // Critical correctness: SHA_B's trigger is the second user ask,
+        // NOT the first one.
+        expect(extractTrigger(turns, "bbbbbbb")).toBe(
+          "now do the second change",
+        );
+      },
+    );
+
+    test.failing(
+      "P6: backward walk skips <command-name> / caveat user turns",
+      () => {
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "chore"',
+          "[main 3333333] chore",
+        );
+        const turns = [
+          makeUserTurn("real user request"),
+          makeUserTurn("<command-name>/retro</command-name>"),
+          makeUserTurn("<local-command-stdout>noise</local-command-stdout>"),
+          makeUserTurn("Caveat: a system preamble"),
+          bashA,
+          bashUser,
+        ];
+        // Backward walk must skip the three wrapper turns and land on
+        // "real user request".
+        expect(extractTrigger(turns, "3333333")).toBe("real user request");
+      },
+    );
+
+    test.failing(
+      "P7: tool-result has leading noise before SHA line → still detected via substring",
+      () => {
+        const noisyOutput =
+          "warning: CRLF will be replaced by LF\nhint: foo\n[main 4444444] fix: noisy";
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "fix: noisy"',
+          noisyOutput,
+        );
+        const turns = [makeUserTurn("commit the noisy one"), bashA, bashUser];
+        expect(extractTrigger(turns, "4444444")).toBe("commit the noisy one");
+      },
+    );
+
+    test.failing(
+      "P8: SHA format variance — query with full 40-char SHA matches short SHA in result",
+      () => {
+        // Tool result carries the short 7-char SHA (as git prints it).
+        // Caller passes the full 40-char SHA. Rule: match succeeds when
+        // either string startsWith the other.
+        const shortSha = "5555555";
+        const fullSha = "5555555" + "f".repeat(33); // 40 chars, startsWith shortSha
+        const [bashA, bashUser] = makeBashTurn(
+          'git commit -m "fix: sha variance"',
+          `[main ${shortSha}] fix: sha variance`,
+        );
+        const turns = [makeUserTurn("commit with sha variance"), bashA, bashUser];
+        expect(extractTrigger(turns, fullSha)).toBe("commit with sha variance");
+      },
+    );
   });
 });
