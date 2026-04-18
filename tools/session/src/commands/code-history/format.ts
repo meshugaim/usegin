@@ -14,8 +14,15 @@ import type { DecoratedCommit } from "./types";
  * and is what the spec pins. */
 const SHORT_SHA_LEN = 8;
 
-/** Field separator in the header line (spec AC 5). */
-const FIELD_SEP = "  ";
+/**
+ * Visible field separator in the header line (spec AC 5) — two spaces.
+ *
+ * Named `HEADER_FIELD_SEP` to disambiguate from the NUL separator used
+ * in `./git.ts` (`GIT_LOG_FIELD_SEP`). Both files previously used a
+ * constant called `FIELD_SEP`, which made grepping ambiguous once more
+ * formatted lines get added in slices 2+ (session / linear / body).
+ */
+const HEADER_FIELD_SEP = "  ";
 
 /**
  * Render the first line of a commit block:
@@ -30,5 +37,5 @@ const FIELD_SEP = "  ";
  */
 export function formatHeader(commit: DecoratedCommit): string {
   const shortSha = commit.sha.slice(0, SHORT_SHA_LEN);
-  return `${shortSha}${FIELD_SEP}${commit.date}${FIELD_SEP}${commit.subject}`;
+  return `${shortSha}${HEADER_FIELD_SEP}${commit.date}${HEADER_FIELD_SEP}${commit.subject}`;
 }
