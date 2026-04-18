@@ -740,3 +740,53 @@ describe("G3 pathological — same-SHA duplicate", () => {
     expect(() => extractOutcome(turns, sha)).not.toThrow();
   });
 });
+
+// ============================================================================
+// idempotence meta-tests — extractTrigger + extractOutcome
+// ============================================================================
+//
+// Mirror of the `extractIntent` idempotence meta-test: same input twice
+// → same result, input unchanged. Guards against input mutation and
+// stateful impls. Once Green lands with a real result, these will pin
+// stability across repeated calls.
+
+describe("idempotence meta-tests", () => {
+  test.failing(
+    "extractTrigger: same input twice → same result, input unchanged",
+    () => {
+      const [bashA, bashUser] = makeBashTurn(
+        'git commit -m "x"',
+        "[main 1234abc] x",
+      );
+      const turns = [makeUserTurn("trigger user"), bashA, bashUser];
+      const snapshot = JSON.parse(JSON.stringify(turns));
+      const first = extractTrigger(turns, "1234abc");
+      const second = extractTrigger(turns, "1234abc");
+      expect(second).toBe(first);
+      expect(first).toBe("trigger user"); // Pins the non-stub result
+      expect(turns).toEqual(snapshot);
+    },
+  );
+
+  test.failing(
+    "extractOutcome: same input twice → same result, input unchanged",
+    () => {
+      const [bashA, bashUser] = makeBashTurn(
+        'git commit -m "x"',
+        "[main 5678def] x",
+      );
+      const turns = [
+        makeUserTurn("trigger user"),
+        bashA,
+        bashUser,
+        makeAssistantTurn({ text: "outcome here" }),
+      ];
+      const snapshot = JSON.parse(JSON.stringify(turns));
+      const first = extractOutcome(turns, "5678def");
+      const second = extractOutcome(turns, "5678def");
+      expect(second).toBe(first);
+      expect(first).toBe("outcome here"); // Pins the non-stub result
+      expect(turns).toEqual(snapshot);
+    },
+  );
+});
