@@ -28,8 +28,15 @@
 import { readFileSync, statSync } from "node:fs";
 
 import { parseCodeHistoryArgs, CODE_HISTORY_RESERVED_FLAGS } from "../cli-args";
+import { fetchSession } from "../fetch";
+import { parseSession } from "../parser";
 import { getMostRecentCommit } from "./code-history/git";
-import { formatHeader, formatBody } from "./code-history/format";
+import {
+  formatHeader,
+  formatBody,
+  formatSessionBlock,
+} from "./code-history/format";
+import { decorateCommitWithSession } from "./code-history/session-decorate";
 
 /**
  * Print the command-specific help for `session code-history`.
@@ -122,7 +129,36 @@ export async function runCodeHistory(args: string[]): Promise<void> {
     return;
   }
 
-  console.log(formatHeader(commit));
+  // Session decoration (slice 4 — ENG-5043 AC 6, AC 13). Runs BEFORE
+  // rendering so the session block can be composed synchronously in
+  // its canonical position (after header, before body). The decorator
+  // is pass-through when the commit body has no `Claude-Session:`
+  // trailer; it populates `commit.session` otherwise. On
+  // SessionNotFoundError it degrades to `{id, sinceTimestampCmd}` only
+  // (no extractors) per AC 13 — no throw, no stderr noise.
+  let decorated;
+  try {
+    decorated = await decorateCommitWithSession(commit, {
+      fetchSession,
+      parseSession,
+    });
+  } catch (error) {
+    // Non-SessionNotFound errors propagate from the decorator (spec:
+    // "don't swallow real errors as fetch failures"). Route through
+    // the same `"Error: "`-prefixed stderr path used by upfront
+    // validation so the user sees a consistent shape.
+    bailWithError(error);
+  }
+
+  console.log(formatHeader(decorated));
+
+  // Session block (AC 6) — renders as the SECOND block, after the
+  // header and before body. Returns null when `decorated.session` is
+  // absent (missing-layer → no lines, AC 9 invariant).
+  const sessionBlock = formatSessionBlock(decorated);
+  if (sessionBlock !== null) {
+    console.log(sessionBlock);
+  }
 
   // Body preview (AC 8). `formatBody` strips trailers, joins the first
   // two non-blank lines, and truncates. Empty string means "no non-trailer
@@ -132,7 +168,7 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // Pattern: "missing layer = no line" — slices 4/5 will mirror this for
   // session: / linear: lines. Not extracting an `emitLayerLine` helper
   // yet (YAGNI with one call site); revisit when slice 4 lands.
-  const bodyPreview = formatBody(commit.body);
+  const bodyPreview = formatBody(decorated.body);
   if (bodyPreview.length > 0) {
     console.log(`body: ${bodyPreview}`);
   }
