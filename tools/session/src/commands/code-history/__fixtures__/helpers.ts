@@ -24,7 +24,7 @@
 
 import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 /**
  * Path to the CLI entrypoint so `Bun.spawn` can invoke it. The `"..", "..",
@@ -218,22 +218,33 @@ export function composeCommitMessage(commit: FixtureCommitSpec): string {
  * Fixture repo seeded with a file that was RENAMED across commits.
  *
  * Used by the AC 20 E2E test (ENG-5041) to confirm `git log -L` follows
- * renames inherently when `--no-follow` is NOT passed. The default repo has:
+ * renames inherently when `--no-follow` is NOT passed. The DEFAULT repo
+ * has:
  *
- *   1. commit 1: create `src/original.ts` with known content on 3 lines.
- *   2. commit 2: `git mv src/original.ts src/renamed.ts`, no content change.
+ *   1. pre-rename commit: create `src/original.ts` with known content
+ *      on 3 lines.
+ *   2. rename commit: `git mv src/original.ts src/renamed.ts`, no
+ *      content change.
  *
- * So `session code-history src/renamed.ts:2` — asking for a line under the
- * POST-rename path whose last edit happened in commit 1 under the PRE-rename
- * path — only returns commit 1 when rename-following works. If a future
- * regression passed `--no-follow`, the command would return "no history"
- * for that query. That's the AC 20 invariant this fixture forces.
+ * So `session code-history src/renamed.ts:2` — asking for a line under
+ * the POST-rename path whose last edit happened in the pre-rename
+ * commit under the PRE-rename path — only returns that commit when
+ * rename-following works. If a future regression passed `--no-follow`,
+ * the command would return "no history" for that query. That's the AC
+ * 20 invariant this fixture forces.
  *
- * Deliberately MINIMAL (no post-rename content edit) so the query line's
- * last commit is unambiguously the pre-rename commit. An earlier version
- * included a third commit that edited line 2 of `renamed.ts` directly,
- * which defeated the test: `git log -L 2,2:renamed.ts -n 1` returned that
- * third commit regardless of whether follow worked — a false safety net.
+ * The default shape is deliberately MINIMAL (no post-rename content
+ * edit) so the query line's last commit is unambiguously the pre-
+ * rename commit. An earlier version included a third commit that
+ * edited line 2 of `renamed.ts` directly, which defeated the test:
+ * `git log -L 2,2:renamed.ts -n 1` returned that third commit
+ * regardless of whether follow worked — a false safety net.
+ *
+ * Slices 4+ can parameterize this fixture via {@link FixtureRepoWithRenameSpec}
+ * to embed `Claude-Session:` / `Part of: ENG-XXXX` trailers on either
+ * side of the rename. The parameterization is designed to KEEP the
+ * "line 2 never edited post-creation" invariant even when extra
+ * commits are added.
  */
 export interface FixtureRepoWithRename {
   /** Repo root. */
@@ -245,10 +256,57 @@ export interface FixtureRepoWithRename {
   /**
    * Subject of the commit that introduced the watched line (pre-rename).
    * If rename-following works, `git log -L 2,2:<renamedFile>` reaches it.
-   * This is also the `expectedSubject` the AC 20 test asserts against —
-   * reaching the pre-rename subject is the whole point of the test.
+   * This is also the subject the AC 20 test asserts against — reaching
+   * the pre-rename subject is the whole point of the test.
    */
   preRenameSubject: string;
+  /**
+   * The post-rename commits that were applied (if any). Exposed so
+   * future slices can assert on trailers / session IDs in post-rename
+   * history without re-deriving the commit list. Empty when the default
+   * minimal fixture is used.
+   */
+  postRenameCommits: FixtureCommitSpec[];
+}
+
+/**
+ * Optional spec for {@link makeFixtureRepoWithRename}.
+ *
+ * Mirrors {@link FixtureRepoSpec}'s `{ commits: [...] }` shape so
+ * callers don't have to learn two different fixture idioms. All fields
+ * optional — omitting the spec entirely yields the minimal
+ * "create then rename" fixture the AC 20 test uses today.
+ *
+ * Slices 4+ can pass `preRenameCommits` / `postRenameCommits` to embed
+ * `Claude-Session:` / `Part of: ENG-XXXX` trailers on either side of
+ * the rename without forking another helper.
+ */
+export interface FixtureRepoWithRenameSpec {
+  /**
+   * Commits to apply BEFORE the rename, in order. The first commit
+   * creates `rename.from` with 3 known lines (watched line at line 2).
+   * Subsequent pre-rename commits (if any) edit lines 1 and 3 only —
+   * they never touch line 2 — so the AC 20 invariant (line 2's last
+   * touch is the introducing commit) survives extra commits.
+   *
+   * Default: a single `"initial: add original.ts with watched line"`.
+   */
+  preRenameCommits?: FixtureCommitSpec[];
+  /**
+   * The rename pair. Default: `{ from: "src/original.ts", to:
+   * "src/renamed.ts" }`. Done via `git mv` so `git log --follow` sees
+   * a 100% similarity move.
+   */
+  rename?: { from: string; to: string };
+  /**
+   * Commits to apply AFTER the rename, in order. Each post-rename
+   * commit edits lines OTHER than line 2, preserving the AC 20
+   * invariant (otherwise we'd be back to the "commit 3 edits line 2"
+   * pitfall that defeated the earlier fixture).
+   *
+   * Default: none (minimal fixture).
+   */
+  postRenameCommits?: FixtureCommitSpec[];
 }
 
 /**
@@ -256,32 +314,96 @@ export interface FixtureRepoWithRename {
  * {@link FixtureRepoWithRename} for the exact shape.
  *
  * Caller is responsible for `rmSync(dir, { recursive: true, force: true })`.
+ *
+ * @param spec Optional — defaults to a minimal "create then rename"
+ * fixture that preserves the AC 20 invariant. Pass `preRenameCommits`
+ * / `postRenameCommits` to embed trailers while keeping that invariant.
  */
-export function makeFixtureRepoWithRename(): FixtureRepoWithRename {
-  const dir = mkdtempSync(join(tmpdir(), "code-history-rename-fixture-"));
-  const originalFile = "src/original.ts";
-  const renamedFile = "src/renamed.ts";
-  const preRenameSubject = "initial: add original.ts with watched line";
+export function makeFixtureRepoWithRename(
+  spec: FixtureRepoWithRenameSpec = {},
+): FixtureRepoWithRename {
+  const preRenameCommits: FixtureCommitSpec[] = spec.preRenameCommits ?? [
+    { subject: "initial: add original.ts with watched line" },
+  ];
+  if (preRenameCommits.length === 0) {
+    // Without at least one pre-rename commit there's nothing to rename.
+    // Fail loudly rather than producing a repo where `git mv` errors
+    // out mid-seed.
+    throw new Error(
+      "makeFixtureRepoWithRename: preRenameCommits must include at least one commit (the one that creates the file to be renamed)",
+    );
+  }
+  const rename = spec.rename ?? {
+    from: "src/original.ts",
+    to: "src/renamed.ts",
+  };
+  const postRenameCommits = spec.postRenameCommits ?? [];
 
-  mkdirSync(join(dir, "src"), { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "code-history-rename-fixture-"));
+  const preRenameSubject = preRenameCommits[0]!.subject;
+
+  // `from` and `to` may live in different subdirs. Create the parent
+  // dir of each on demand so callers aren't forced to pick paths under
+  // a single pre-existing subdir.
+  mkdirSync(join(dir, dirname(rename.from)), { recursive: true });
+  mkdirSync(join(dir, dirname(rename.to)), { recursive: true });
 
   runGit(dir, ["git", "init", "-q", "-b", "main"]);
 
-  // Commit 1 — create original file with a known watched line at line 2.
-  writeFileSync(join(dir, originalFile), `line 1\nline 2 original\nline 3\n`);
-  runGit(dir, ["git", "add", originalFile]);
-  runGit(dir, ["git", "commit", "-q", "-m", preRenameSubject]);
+  // Pre-rename commits. The first commit creates the file with 3 known
+  // lines (watched line at line 2). Each subsequent pre-rename commit
+  // edits line 1 or line 3 ONLY — never the watched line 2 — so the
+  // AC 20 invariant (line 2's last touch is commit 0) survives extra
+  // commits.
+  preRenameCommits.forEach((commit, index) => {
+    // Alternate edits between line 1 and line 3 so each extra commit
+    // produces a diff a reviewer can read off at a glance.
+    const lineIdx = index % 2 === 0 ? 0 : 2;
+    const contents = [
+      `line 1${index === 0 ? "" : lineIdx === 0 ? ` v${index}` : ""}`,
+      "line 2 original",
+      `line 3${index === 0 ? "" : lineIdx === 2 ? ` v${index}` : ""}`,
+    ];
+    writeFileSync(join(dir, rename.from), `${contents.join("\n")}\n`);
+    runGit(dir, ["git", "add", rename.from]);
+    runGit(dir, ["git", "commit", "-q", "-m", composeCommitMessage(commit)]);
+  });
 
-  // Commit 2 — pure rename, no content change. Using `git mv` (vs fs
-  // rename + `git add -A`) is intentional: `git mv` stages the rename
-  // deterministically so `git log --follow` sees a 100% similarity move
-  // without relying on rename-detection heuristics. Critically, we do NOT
-  // follow up with a content edit: the query line's only touch-point is
-  // commit 1 (pre-rename), so the test only passes when follow works.
-  runGit(dir, ["git", "mv", originalFile, renamedFile]);
-  runGit(dir, ["git", "commit", "-q", "-m", "chore: rename original.ts to renamed.ts"]);
+  // Rename commit — pure `git mv`, no content change. Using `git mv`
+  // (vs fs rename + `git add -A`) is intentional: `git mv` stages the
+  // rename deterministically so `git log --follow` sees a 100%
+  // similarity move without relying on rename-detection heuristics.
+  runGit(dir, ["git", "mv", rename.from, rename.to]);
+  runGit(dir, [
+    "git",
+    "commit",
+    "-q",
+    "-m",
+    `chore: rename ${rename.from} to ${rename.to}`,
+  ]);
 
-  return { dir, originalFile, renamedFile, preRenameSubject };
+  // Post-rename commits. Same "never touch line 2" invariant as the
+  // pre-rename sequence — otherwise we'd be back to the pitfall where
+  // a post-rename edit defeats the rename-follow test.
+  postRenameCommits.forEach((commit, index) => {
+    const lineIdx = index % 2 === 0 ? 0 : 2;
+    const contents = [
+      `line 1${lineIdx === 0 ? ` post${index}` : ""}`,
+      "line 2 original",
+      `line 3${lineIdx === 2 ? ` post${index}` : ""}`,
+    ];
+    writeFileSync(join(dir, rename.to), `${contents.join("\n")}\n`);
+    runGit(dir, ["git", "add", rename.to]);
+    runGit(dir, ["git", "commit", "-q", "-m", composeCommitMessage(commit)]);
+  });
+
+  return {
+    dir,
+    originalFile: rename.from,
+    renamedFile: rename.to,
+    preRenameSubject,
+    postRenameCommits,
+  };
 }
 
 export interface CliResult {
