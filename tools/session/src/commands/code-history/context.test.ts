@@ -567,7 +567,7 @@ describe("extractTrigger", () => {
 
 describe("extractOutcome", () => {
   describe("positive cases", () => {
-    test.failing(
+    test(
       "P1: assistant text turn immediately after commit-authoring → returns its text",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -584,7 +584,7 @@ describe("extractOutcome", () => {
       },
     );
 
-    test.failing(
+    test(
       "P2: tool-only assistant turn between commit and text → skip tool-only, return later text",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -606,7 +606,7 @@ describe("extractOutcome", () => {
       },
     );
 
-    test.failing(
+    test(
       "P3: distant outcome — text-bearing assistant many turns after commit → returned (no window)",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -635,7 +635,7 @@ describe("extractOutcome", () => {
   });
 
   describe("negative cases", () => {
-    test.failing("N1: whitespace-only text after commit → skipped, null if no other text", () => {
+    test("N1: whitespace-only text after commit → skipped, null if no other text", () => {
       const [bashA, bashUser] = makeBashTurn(
         'git commit -m "done"',
         "[main f111111] done",
@@ -650,7 +650,7 @@ describe("extractOutcome", () => {
       expect(extractOutcome(turns, "f111111")).toBeNull();
     });
 
-    test.failing("N2: no following text-bearing assistant turn → null", () => {
+    test("N2: no following text-bearing assistant turn → null", () => {
       const [bashA, bashUser] = makeBashTurn(
         'git commit -m "done"',
         "[main f222222] done",
@@ -665,7 +665,7 @@ describe("extractOutcome", () => {
       expect(extractOutcome(turns, "f222222")).toBeNull();
     });
 
-    test.failing(
+    test(
       "N3: commit-authoring turn not found (SHA mismatch) → null",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -695,7 +695,7 @@ describe("extractOutcome", () => {
 // user turn regardless.
 
 describe("extractTrigger + extractOutcome (AC 14 combined)", () => {
-  test.failing(
+  test(
     "SHA not in any tool result → trigger + outcome both null; extractIntent unaffected",
     () => {
       const [bashA, bashUser] = makeBashTurn(

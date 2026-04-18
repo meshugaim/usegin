@@ -337,6 +337,21 @@ export function extractTrigger(turns: Turn[], sha: string): string | null {
 }
 
 /**
+ * Module-private predicate: true when `turn` is an assistant turn carrying
+ * real prose (not empty, not whitespace-only). Mirrors `isRealUserTurn`'s
+ * shape for the outcome extractor — the two predicates stay close in the
+ * file so a future reader sees the family together.
+ *
+ * Separate from `isRealUserTurn` because the outcome side doesn't need the
+ * command/caveat skip (assistants don't emit those wrappers) — the only
+ * rule is "text after .trim() must be non-empty", which also handles the
+ * tool-only assistant turns (text: "") from `makeAssistantTurn({ bash })`.
+ */
+function isTextBearingAssistantTurn(turn: Turn): boolean {
+  return turn.role === "assistant" && turn.text.trim() !== "";
+}
+
+/**
  * Extract the assistant text immediately reporting the outcome of the
  * commit identified by `sha`. The outcome is the first text-bearing
  * assistant turn following the commit-authoring Bash turn (see
@@ -347,11 +362,12 @@ export function extractTrigger(turns: Turn[], sha: string): string | null {
  * when no text-bearing assistant turn follows it.
  *
  * Return boundary (AC 15): result is `truncate`d to `CONTEXT_MAX_LEN`.
- *
- * RED STUB — fails at assertion level against the Tier-1 tests.
  */
 export function extractOutcome(turns: Turn[], sha: string): string | null {
-  void turns;
-  void sha;
-  return "<unimplemented>";
+  const idx = findCommitAuthoringTurnIndex(turns, sha);
+  if (idx === null) return null;
+  // Forward walk: first text-bearing assistant turn after the commit.
+  // `.slice(idx + 1).find(...)` mirrors the family-of-three rhyme.
+  const outcome = turns.slice(idx + 1).find(isTextBearingAssistantTurn);
+  return outcome ? truncateString(outcome.text) : null;
 }
