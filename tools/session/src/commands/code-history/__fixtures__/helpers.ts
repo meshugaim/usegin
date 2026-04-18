@@ -90,8 +90,10 @@ function runGit(
 /**
  * One commit in a fixture repo.
  *
- * Slices 2+ will use `body` to add `Claude-Session: <id>` / `ENG-XXXX`
- * trailers when wiring up the session- and linear-line context.
+ * Slice 2 (ENG-5041) uses `body` + `trailers` for the body-preview and
+ * trailer-stripping tests. Slices 4/5 will reuse the same shape to embed
+ * `Claude-Session: <id>` / `ENG-XXXX` trailers when wiring up the session-
+ * and linear-line context.
  */
 export interface FixtureCommitSpec {
   /** Commit subject line. */
@@ -100,7 +102,7 @@ export interface FixtureCommitSpec {
   body?: string;
   /**
    * Optional trailers (appended under `body` with a blank line). Convenience
-   * for slice 2+ which will assert on `Claude-Session:` / `ENG-XXXX`.
+   * for slices 4/5 which will assert on `Claude-Session:` / `ENG-XXXX`.
    * Example: `{ "Claude-Session": "abc-123", "Part of": "ENG-5041" }`.
    */
   trailers?: Record<string, string>;
