@@ -44,6 +44,7 @@ import {
   makeFixtureRepoWithRename,
   runCli,
   seedSessionJsonl,
+  withFakePlanBin,
   withFixtureRepo,
   withTempDir,
   type FixtureRepo,
@@ -53,6 +54,12 @@ import {
   SESSION_FIXTURE_ID,
   SESSION_FIXTURE_SHORT_ID,
 } from "./code-history/__fixtures__/session";
+import {
+  LINEAR_FIXTURE_ID,
+  LINEAR_FIXTURE_TITLE,
+  LINEAR_FIXTURE_STATUS,
+  EXPECTED_LINEAR_LINE,
+} from "./code-history/__fixtures__/linear";
 import { userEntry, assistantEntry, systemEntry } from "../testing";
 
 // =============================================================================
@@ -981,5 +988,456 @@ describe("session code-history session block (AC 6, AC 13) — ENG-5043", () => 
         );
       });
     },
+  );
+});
+
+// =============================================================================
+// END-TO-END CLI — linear line (AC 7, AC 18) — ENG-5044
+// =============================================================================
+//
+// Exercises the full slice-5 pipeline through the CLI: raw-body scan
+// for `ENG-\d+` → spawn `plan show <id> --json` → parse JSON →
+// populate `commit.linear` → render. A fake `plan` binary seeded on
+// PATH (`withFakePlanBin`) stands in for the real Linear CLI so these
+// tests are deterministic and don't hit the Linear API.
+//
+// In-process failure-path tests in `code-history/linear-decorate.test.ts`
+// cover the decorator's null-from-fetch → warn-and-omit contract
+// without subprocess cost. These tests here pin the stdout shape
+// produced by the real CLI across the spec's AC-18 failure flavors:
+// timeout, nonzero exit, malformed JSON, missing `plan` CLI.
+
+/**
+ * Shape of the JSON that `plan show <id> --json` emits, stripped to the
+ * three fields the decorator reads. Kept local to the test file because
+ * it's fixture data — the prod code reads directly from the plan-cli
+ * JSON output and the decorator's type lives in `linear.ts`.
+ */
+function makePlanShowJson(overrides: Partial<{
+  identifier: string;
+  title: string;
+  status: string;
+}> = {}): string {
+  return JSON.stringify({
+    id: "uuid-of-issue",
+    identifier: overrides.identifier ?? LINEAR_FIXTURE_ID,
+    title: overrides.title ?? LINEAR_FIXTURE_TITLE,
+    status: overrides.status ?? LINEAR_FIXTURE_STATUS,
+    url: "https://linear.app/askeffi/issue/ENG-5039/foo",
+    description: "Some description.",
+    labels: ["Feature"],
+  });
+}
+
+describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
+  test.failing(
+    "ENG-5044 (AC 7, P1): ENG ref in body + plan show succeeds → `linear:` line renders after session block, before body",
+    async () => {
+      await withFakePlanBin(
+        { stdout: makePlanShowJson(), exitCode: 0 },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed target file" },
+                {
+                  subject: "feat: wire the linear line",
+                  body: `Implements ${LINEAR_FIXTURE_ID}.`,
+                  trailers: { "Part of": LINEAR_FIXTURE_ID },
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              const lines = result.stdout.split("\n");
+              const nonEmpty = lines.filter((l) => l.length > 0);
+
+              // Find the linear line — exact bytes match the pinned
+              // fixture.
+              const linearLine = nonEmpty.find((l) =>
+                l.trimStart().startsWith("linear:"),
+              );
+              expect(linearLine).toBeDefined();
+              expect(linearLine).toBe(EXPECTED_LINEAR_LINE);
+
+              // Ordering — linear line after header, before body.
+              const headerIdx = 0;
+              const linearIdx = nonEmpty.indexOf(linearLine!);
+              const bodyIdx = nonEmpty.findIndex((l) => l.startsWith("body:"));
+              expect(linearIdx).toBeGreaterThan(headerIdx);
+              expect(bodyIdx).toBeGreaterThan(linearIdx);
+
+              // No stderr on the happy path.
+              expect(result.stderr).toBe("");
+            },
+          );
+        },
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5044 (AC 7): linear line renders between session block and body when both are present",
+    async () => {
+      // Full plain-block shape: header → session → linear → body.
+      // Uses BOTH a Claude-Session trailer (so the session block
+      // renders) AND an ENG ref (so the linear line renders).
+      await withFakePlanBin(
+        { stdout: makePlanShowJson(), exitCode: 0 },
+        async (bin) => {
+          await withTempDir("code-history-linear-full-", async (homeDir) => {
+            await withFixtureRepo(
+              {
+                commits: [
+                  { subject: "initial: seed target file" },
+                  {
+                    subject: "feat: full plain block",
+                    body: `Implements ${LINEAR_FIXTURE_ID}.`,
+                    trailers: {
+                      "Claude-Session": SESSION_FIXTURE_ID,
+                      "Part of": LINEAR_FIXTURE_ID,
+                    },
+                  },
+                ],
+              },
+              async (fx) => {
+                // Seed a session JSONL so the session block renders
+                // with full extractors. Makes the ordering assertion
+                // across all 3 layers (session / linear / body)
+                // unambiguous.
+                seedSessionJsonl(
+                  homeDir,
+                  fx.dir,
+                  SESSION_FIXTURE_ID,
+                  // Minimal valid JSONL — the exact contents don't
+                  // matter for this test (we only assert on
+                  // ordering, not on extracted values).
+                  JSON.stringify(systemEntry("sys-init")) +
+                    "\n" +
+                    JSON.stringify(
+                      userEntry("u1", "Do the thing.", {
+                        parentUuid: null,
+                        timestamp: "2026-04-18T08:13:00.000Z",
+                      }),
+                    ) +
+                    "\n",
+                );
+
+                const result = runCli(
+                  ["code-history", `${fx.file}:2`],
+                  fx.dir,
+                  {
+                    env: {
+                      HOME: homeDir,
+                      PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                    },
+                  },
+                );
+                expect(result.exitCode).toBe(0);
+
+                const lines = result.stdout.split("\n").filter((l) => l.length > 0);
+                const sessionIdx = lines.findIndex((l) =>
+                  l.trimStart().startsWith("session:"),
+                );
+                const linearIdx = lines.findIndex((l) =>
+                  l.trimStart().startsWith("linear:"),
+                );
+                const bodyIdx = lines.findIndex((l) => l.startsWith("body:"));
+
+                expect(sessionIdx).toBeGreaterThan(-1);
+                expect(linearIdx).toBeGreaterThan(sessionIdx);
+                expect(bodyIdx).toBeGreaterThan(linearIdx);
+
+                // Also pin the linear line bytes.
+                expect(lines[linearIdx]).toBe(EXPECTED_LINEAR_LINE);
+
+                // No spurious stderr on the happy path.
+                expect(result.stderr).toBe("");
+              },
+            );
+          });
+        },
+      );
+    },
+  );
+
+  test(
+    "ENG-5044 (N1 / AC 9): no ENG ref in body → no `linear:` line, no stderr warning, exit 0",
+    async () => {
+      // Plain `test` — the Red stub + Green both naturally satisfy
+      // this: when `extractLinearRef` returns null, decorator
+      // returns commit unchanged; renderer sees `decorated.linear`
+      // absent and omits the line. Regression-guard for AC 9.
+      await withFixtureRepo(undefined, (fx) => {
+        const result = runCli(
+          ["code-history", `${fx.file}:2`],
+          fx.dir,
+        );
+        expect(result.exitCode).toBe(0);
+        const hasLinearLine = result.stdout
+          .split("\n")
+          .some((l) => l.trimStart().startsWith("linear:"));
+        expect(hasLinearLine).toBe(false);
+        // No AC-18 warning either — missing ref is the normal case.
+        expect(result.stderr).not.toContain("plan show");
+      });
+    },
+  );
+
+  test.failing(
+    "ENG-5044 (N5 / AC 18): plan show exits non-zero → no `linear:` line, stderr warning names the id, exit 0",
+    async () => {
+      // The subprocess test for nonzero-exit failure. Fake `plan`
+      // exits 1 with no output. AC 18: one-line stderr warning
+      // naming the id, linear line omitted, overall command still
+      // exits 0 (the linear failure doesn't fail the whole command).
+      await withFakePlanBin(
+        { exitCode: 1 },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed" },
+                {
+                  subject: "feat: references an unknown issue",
+                  body: `Fixes ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              // Linear line omitted.
+              const hasLinearLine = result.stdout
+                .split("\n")
+                .some((l) => l.trimStart().startsWith("linear:"));
+              expect(hasLinearLine).toBe(false);
+
+              // AC 18: single-line stderr warning naming the id.
+              expect(result.stderr).toContain(LINEAR_FIXTURE_ID);
+              expect(result.stderr).toContain("plan show");
+              // One line — strip the trailing newline and assert no
+              // other newline inside.
+              const warningLine = result.stderr.replace(/\n$/, "");
+              expect(warningLine).not.toContain("\n");
+            },
+          );
+        },
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5044 (N4 / AC 18): plan show returns unparseable JSON → no `linear:` line, stderr warning, exit 0",
+    async () => {
+      await withFakePlanBin(
+        { stdout: "<not-json>", exitCode: 0 },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed" },
+                {
+                  subject: "feat: malformed plan output",
+                  body: `Fixes ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              const hasLinearLine = result.stdout
+                .split("\n")
+                .some((l) => l.trimStart().startsWith("linear:"));
+              expect(hasLinearLine).toBe(false);
+
+              expect(result.stderr).toContain(LINEAR_FIXTURE_ID);
+              expect(result.stderr).toContain("plan show");
+            },
+          );
+        },
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5044 (G4 / AC 18): plan show returns JSON missing required fields → treated as malformed, warn + omit",
+    async () => {
+      // Partial response — has `identifier` but missing `title` and
+      // `status`. Per G4, all three are required; partial response
+      // → treat as malformed → null from fetch → warn + omit.
+      const partialJson = JSON.stringify({
+        id: "uuid",
+        identifier: LINEAR_FIXTURE_ID,
+        // title missing
+        // status missing
+        url: "https://linear.app/x",
+      });
+      await withFakePlanBin(
+        { stdout: partialJson, exitCode: 0 },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed" },
+                {
+                  subject: "feat: partial plan output",
+                  body: `Fixes ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              const hasLinearLine = result.stdout
+                .split("\n")
+                .some((l) => l.trimStart().startsWith("linear:"));
+              expect(hasLinearLine).toBe(false);
+
+              expect(result.stderr).toContain(LINEAR_FIXTURE_ID);
+            },
+          );
+        },
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5044 (N3 / AC 18): `plan` binary not on PATH → no `linear:` line, stderr warning, no crash, exit 0",
+    async () => {
+      // Override PATH to an empty dir so `plan` can't be resolved.
+      // The subprocess spawn will fail with ENOENT — fetchLinearIssue
+      // catches it, returns null, decorator warns and omits.
+      await withTempDir("code-history-no-plan-", async (emptyBin) => {
+        await withFixtureRepo(
+          {
+            commits: [
+              { subject: "initial: seed" },
+              {
+                subject: "feat: no plan CLI available",
+                body: `Fixes ${LINEAR_FIXTURE_ID}.`,
+              },
+            ],
+          },
+          (fx) => {
+            const result = runCli(
+              ["code-history", `${fx.file}:2`],
+              fx.dir,
+              {
+                // PATH is ONLY the empty dir — `plan` cannot resolve.
+                env: { PATH: emptyBin },
+              },
+            );
+            expect(result.exitCode).toBe(0);
+
+            const hasLinearLine = result.stdout
+              .split("\n")
+              .some((l) => l.trimStart().startsWith("linear:"));
+            expect(hasLinearLine).toBe(false);
+
+            // AC 18: stderr warning naming the id.
+            expect(result.stderr).toContain(LINEAR_FIXTURE_ID);
+            expect(result.stderr).toContain("plan show");
+          },
+        );
+      });
+    },
+  );
+
+  test.failing(
+    "ENG-5044 (N2 / G1 / AC 18): plan show exceeds 5s timeout → subprocess aborted, stderr warning, exit 0",
+    async () => {
+      // Fake `plan` sleeps 10s — comfortably beyond the 5s timeout.
+      // The decorator's subprocess should be aborted via
+      // AbortSignal.timeout(5000), fetchLinearIssue returns null,
+      // warn + omit.
+      await withFakePlanBin(
+        { sleepSeconds: 10, exitCode: 0 },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed" },
+                {
+                  subject: "feat: slow plan show",
+                  body: `Fixes ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const start = Date.now();
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              const elapsed = Date.now() - start;
+
+              expect(result.exitCode).toBe(0);
+              // The subprocess timeout is 5s — the whole command
+              // should finish comfortably under 10s (the fake's
+              // sleep). Asserting < 9s gives headroom for CI jitter
+              // + bun startup while still catching "timeout didn't
+              // fire and we waited the full sleep".
+              expect(elapsed).toBeLessThan(9000);
+
+              const hasLinearLine = result.stdout
+                .split("\n")
+                .some((l) => l.trimStart().startsWith("linear:"));
+              expect(hasLinearLine).toBe(false);
+
+              expect(result.stderr).toContain(LINEAR_FIXTURE_ID);
+              expect(result.stderr).toContain("plan show");
+            },
+          );
+        },
+      );
+    },
+    // Bun test default per-test timeout is 5s. Bump to 20s so the
+    // 10s fake-plan sleep + the command's 5s internal timeout have
+    // headroom. If the timeout DOESN'T fire (regression), the test
+    // still fails on the elapsed-time assertion at ~10s.
+    20000,
   );
 });

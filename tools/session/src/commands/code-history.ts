@@ -14,17 +14,17 @@
  *   - Rename following    — AC 20       (ENG-5041 slice 2)
  *   - Reserved-flag rejection — AC 24   (ENG-5041 slice 2)
  *   - `session:` line     — AC 6, AC 13 (ENG-5043 slice 4)
+ *   - `linear:` line      — AC 7, AC 18 (ENG-5044 slice 5)
  *
  * Future slices extend `runCodeHistory` with:
- *   - `linear:` line (slice 5)
  *   - `--json` mode (slice 6)
  *
- * TODO: Slice numbering mirrors ENG-5040's plan. If the remaining slices
- * re-number (e.g., JSON lands before linear), sweep FORWARD-LOOKING
- * references to `slice 5` / `slice 6` across this module. "Slice N landed
- * in …" attributions (slices 1, 2, 4) are historical and stay pinned.
+ * TODO: Slice numbering mirrors ENG-5040's plan. With slice 5 landed,
+ * only `slice 6` (JSON mode, ENG-5045) is forward-looking. "Slice N
+ * landed in …" attributions (slices 1, 2, 4, 5) are historical and
+ * stay pinned.
  * Grep hint:
- *   grep -nE 'slice [56]' tools/session/src/commands/code-history{.ts,/*.ts}
+ *   grep -nE 'slice 6' tools/session/src/commands/code-history{.ts,/*.ts}
  */
 
 import { readFileSync, statSync } from "node:fs";
@@ -42,6 +42,8 @@ import {
   formatBody,
   formatSessionBlock,
 } from "./code-history/format";
+import { formatLinearLine, fetchLinearIssue } from "./code-history/linear";
+import { decorateCommitWithLinear } from "./code-history/linear-decorate";
 import { decorateCommitWithSession } from "./code-history/session-decorate";
 
 /**
@@ -156,14 +158,46 @@ export async function runCodeHistory(args: string[]): Promise<void> {
     bailWithError(error);
   }
 
+  // Linear decoration (slice 5 — ENG-5044 AC 7, AC 18). Runs AFTER
+  // session decoration so the pipeline's order matches the plain-
+  // block render order (header → session → linear → body). The
+  // decorator is pass-through when the commit body has no `ENG-\d+`
+  // reference; it populates `commit.linear` when the subprocess
+  // succeeds and emits a single-line stderr warning (via the
+  // injected `warn` hook) when the subprocess fails — `commit.linear`
+  // stays absent in that case so the renderer omits the line.
+  //
+  // Unlike the session decorator, this one has no "real error"
+  // propagation path: all failures (timeout, nonzero exit, missing
+  // `plan` CLI, malformed JSON, partial response) collapse to a
+  // stderr warning + omit (spec AC 18). `fetchLinearIssue` itself
+  // returns null for every failure mode — see its docstring for the
+  // exhaustive list.
+  decorated = await decorateCommitWithLinear(decorated, {
+    fetchLinearIssue,
+    warn: (msg) => console.error(msg),
+  });
+
   console.log(formatHeader(decorated));
 
   // Session block (AC 6) — renders as the SECOND block, after the
-  // header and before body. Returns null when `decorated.session` is
-  // absent (missing-layer → no lines, AC 9 invariant).
+  // header and before linear + body. Returns null when
+  // `decorated.session` is absent (missing-layer → no lines, AC 9
+  // invariant).
   const sessionBlock = formatSessionBlock(decorated);
   if (sessionBlock !== null) {
     console.log(sessionBlock);
+  }
+
+  // Linear line (AC 7) — renders as the THIRD line, after the session
+  // block and before the body. Returns null when `decorated.linear`
+  // is absent: either because the commit body has no `ENG-\d+` ref
+  // (AC 9 missing-layer invariant) or because `plan show` failed
+  // and the decorator already emitted an AC-18 warning to stderr.
+  // In both cases the renderer omits the line cleanly.
+  const linearLine = formatLinearLine(decorated.linear);
+  if (linearLine !== null) {
+    console.log(linearLine);
   }
 
   // Body preview (AC 8). `formatBody` strips trailers, joins the first
@@ -171,12 +205,14 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // body content" — per AC 9 ("missing layer → no line") we omit the
   // `body:` line entirely in that case rather than emitting a placeholder.
   //
-  // Pattern: "missing layer = no line" — the session block above mirrors
-  // this (returns `null` → we skip the `console.log`); slice 5's `linear:`
-  // line will be the third call site. Not extracting an `emitLayerLine`
-  // helper yet — the two current sites have different shapes (single
-  // string vs. multi-line block), so a premature helper would be a lossy
-  // abstraction. Revisit at slice 5 once there's a third shape to compare.
+  // Pattern: "missing layer = no line" — the session block above
+  // (returns null → skip console.log) and the linear line above
+  // (same shape) mirror this. With three call sites now all sharing
+  // the "format returns null/empty → skip the write" shape, an
+  // `emitLayerLine` helper would be worth extracting — but the
+  // session block is MULTI-line while linear / body are SINGLE-line,
+  // so the helper would need a branch. Deferred until slice 6 lands
+  // the JSON mode and gives us a clearer abstraction boundary.
   const bodyPreview = formatBody(decorated.body);
   if (bodyPreview.length > 0) {
     console.log(`body: ${bodyPreview}`);

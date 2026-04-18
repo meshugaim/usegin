@@ -535,6 +535,112 @@ export function seedSessionJsonl(
   return sessionPath;
 }
 
+// =============================================================================
+// Fake `plan` binary (slice 5 — ENG-5044)
+// =============================================================================
+
+/**
+ * Spec for a fake `plan` executable that the `code-history` subprocess
+ * will pick up on `PATH`. Each field controls one failure mode we want
+ * to exercise:
+ *
+ *   - `stdout`: text emitted to stdout (typically JSON). `undefined`
+ *     means "don't echo anything".
+ *   - `stderr`: text emitted to stderr. Useful for asserting the fake
+ *     didn't leak output into the test's captured stderr (it
+ *     shouldn't — the AC-18 warning is emitted by our decorator, not
+ *     by `plan` itself).
+ *   - `exitCode`: what the fake exits with. `0` = success, non-zero =
+ *     failure path (AC 18 N5 / N6).
+ *   - `sleepSeconds`: when set, the fake sleeps this long before
+ *     exiting. Pair with `runCli`'s PATH override and a timeout test
+ *     to exercise the 5s subprocess timeout (AC 18 N2).
+ *
+ * Returns the absolute path to a fresh tmp directory containing the
+ * fake `plan` executable. Caller is responsible for `rmSync(dir,
+ * {recursive: true, force: true})`.
+ *
+ * The fake is a POSIX shell script — Bun.spawn on linux/mac picks up
+ * the shebang. The caller must prepend the returned directory to the
+ * subprocess's PATH (see {@link runCli} env merge).
+ *
+ * Shared so integration tests in `code-history.test.ts` don't each
+ * re-implement the "write a shell script, `chmod +x`, prepend PATH"
+ * dance. Slice 6 (JSON mode) will reuse this fixture for its own
+ * plan-show round-trip tests.
+ */
+export interface FakePlanSpec {
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+  /**
+   * Seconds to sleep before exiting. Use to exercise the subprocess
+   * timeout (G1 — 5s). A sleep of e.g. `10` comfortably exceeds the
+   * timeout while keeping the test under a typical `bun test`
+   * per-test wall budget.
+   */
+  sleepSeconds?: number;
+}
+
+export interface FakePlanBin {
+  /** Absolute path to the temp directory that contains the fake `plan` executable. */
+  dir: string;
+}
+
+/**
+ * Create a temp directory with an executable `plan` script matching
+ * the given spec. The returned `dir` must be prepended to the
+ * subprocess's PATH via `runCli({ env: { PATH: `${bin.dir}:${process.env.PATH}` } })`.
+ */
+export function makeFakePlanBin(spec: FakePlanSpec = {}): FakePlanBin {
+  const dir = mkdtempSync(join(tmpdir(), "code-history-fake-plan-"));
+  const scriptPath = join(dir, "plan");
+
+  // Build a POSIX shell script. Using `printf` (not `echo`) so we
+  // round-trip exact bytes including newlines in the stdout payload
+  // without worrying about echo's `-e` inconsistencies across shells.
+  const lines: string[] = ["#!/usr/bin/env bash", "set -u"];
+  if (spec.sleepSeconds !== undefined) {
+    lines.push(`sleep ${spec.sleepSeconds}`);
+  }
+  if (spec.stdout !== undefined) {
+    // Single-quote the payload and replace any embedded single quote
+    // with `'\''` (close, escaped-quote, reopen) — standard POSIX
+    // idiom for preserving arbitrary bytes inside a single-quoted
+    // string.
+    const escaped = spec.stdout.replace(/'/g, "'\\''");
+    lines.push(`printf '%s' '${escaped}'`);
+  }
+  if (spec.stderr !== undefined) {
+    const escaped = spec.stderr.replace(/'/g, "'\\''");
+    lines.push(`printf '%s' '${escaped}' 1>&2`);
+  }
+  const exitCode = spec.exitCode ?? 0;
+  lines.push(`exit ${exitCode}`);
+
+  writeFileSync(scriptPath, lines.join("\n") + "\n", { mode: 0o755 });
+  return { dir };
+}
+
+/**
+ * Run `fn` with a freshly seeded fake `plan` binary on PATH, then
+ * clean up the temp directory no matter what `fn` does. Callers
+ * typically pass the fake's dir into their `runCli` invocation via
+ * the `env.PATH` override — see the slice-5 integration tests for
+ * the canonical shape.
+ */
+export async function withFakePlanBin<T>(
+  spec: FakePlanSpec,
+  fn: (bin: FakePlanBin) => T | Promise<T>,
+): Promise<T> {
+  const bin = makeFakePlanBin(spec);
+  try {
+    return await fn(bin);
+  } finally {
+    rmSync(bin.dir, { recursive: true, force: true });
+  }
+}
+
 /**
  * Build a fixture repo with the given `spec`, hand it to `fn`, then remove
  * the repo no matter what `fn` does. The scoped-cleanup counterpart to
