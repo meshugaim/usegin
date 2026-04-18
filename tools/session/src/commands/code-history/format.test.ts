@@ -1,13 +1,12 @@
 /**
  * Pure-formatter tests for `session code-history`.
  *
- * These assert the shape of the human-readable header line (spec AC 5).
- * ENG-5040 slice 1 — pinned shape; future slices layer the session /
- * linear / body lines on top of the same `DecoratedCommit`.
+ * Golden-test style: pin the exact bytes we emit so slices 4/5/6 (session
+ * line, linear line, JSON) can layer on top of a stable rule set.
  *
- * Golden-test style: pin the exact bytes we emit. Future slices will add
- * more golden tests here (session line, linear line, body line) that
- * layer on top of the same `DecoratedCommit` shape.
+ * Coverage so far:
+ *   - `formatHeader` — AC 5         (ENG-5040 slice 1)
+ *   - `formatBody`   — AC 8, AC 9   (ENG-5041 slice 2)
  */
 
 import { describe, test, expect } from "bun:test";

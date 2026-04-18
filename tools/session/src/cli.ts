@@ -240,7 +240,7 @@ async function main() {
     return;
   }
 
-  // Check for 'code-history' subcommand (ENG-5039 / ENG-5040 slice 1)
+  // Check for 'code-history' subcommand (ENG-5039; slices ENG-5040, ENG-5041+)
   if (rawArgs[0] === "code-history") {
     await runCodeHistory(rawArgs.slice(1));
     return;

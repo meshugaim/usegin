@@ -4,12 +4,20 @@
  *
  * This file is the thin command-layer wiring: parse args → call git layer
  * → format → write to stdout / stderr. All heavy lifting lives in
- * `./code-history/{git,format,context,linear,types}.ts` so each piece is
+ * `./code-history/{git,format,trailers,types}.ts` so each piece is
  * independently testable.
  *
- * Slice 1 (ENG-5040) implements only the header line (AC 4, AC 5) and the
- * "no committed history" degradation path (AC 19). Later slices extend
- * `runCodeHistory` with session / linear / body lines and `--json`.
+ * Currently implemented:
+ *   - Header line         — AC 4, AC 5 (ENG-5040 slice 1)
+ *   - "No committed history" degradation — AC 19 (ENG-5040 slice 1)
+ *   - Body preview line   — AC 8, AC 9 (ENG-5041 slice 2)
+ *   - Rename following    — AC 20       (ENG-5041 slice 2)
+ *   - Reserved-flag rejection — AC 24   (ENG-5041 slice 2)
+ *
+ * Future slices extend `runCodeHistory` with:
+ *   - `session:` line (slice 4)
+ *   - `linear:` line (slice 5)
+ *   - `--json` mode (slice 6)
  */
 
 import { readFileSync, statSync } from "node:fs";

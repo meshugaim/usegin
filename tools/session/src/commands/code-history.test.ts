@@ -1,18 +1,30 @@
 /**
  * Tests for `session code-history` command.
  *
- * Covers ENG-5040 slice 1 — the skeleton that implements AC 1, 2, 3, 4, 5,
- * and 19. Later slices extend this suite with session / linear / body
- * lines and `--json` mode.
+ * Covers acceptance criteria landed so far:
+ *   - AC 1, 2     — arg parsing + upfront validation (ENG-5040 slice 1)
+ *   - AC 3        — command-specific help            (ENG-5040 slice 1)
+ *   - AC 4, 5, 19 — header line + no-history path    (ENG-5040 slice 1)
+ *   - AC 8, 9     — body preview + missing-layer rule (ENG-5041 slice 2)
+ *   - AC 20       — rename following                 (ENG-5041 slice 2)
+ *   - AC 24       — reserved-flag rejection          (ENG-5041 slice 2)
+ *
+ * Later slices will extend this suite with session / linear lines and
+ * `--json` mode (slices 4-6).
  *
  * Layout:
- *   1. `parseCodeHistoryArgs` — pure arg parsing (AC 1, AC 2)
- *   2. `session code-history --help` — help output (AC 3)
- *   3. End-to-end CLI behavior (AC 4, AC 5, AC 19) against a fixture git repo
+ *   1. `parseCodeHistoryArgs` — pure arg parsing
+ *   2. Reserved flags at the parser layer
+ *   3. `session code-history --help` — help output
+ *   4. End-to-end CLI behavior against a fixture git repo
+ *   5. Body preview + missing-layer ("no `body:` line") cases
+ *   6. Rename-following regression guard
+ *   7. Reserved flags at the E2E layer
  *
- * Shared fixture helpers (`makeFixtureRepo`, `runCli`) live in
- * `./code-history/__fixtures__/helpers.ts` so slices 2+ can extend them
- * with trailers/bodies without forking a new helper.
+ * Shared fixture helpers (`makeFixtureRepo`, `runCli`, `withFixtureRepo`,
+ * `withTempDir`) live in `./code-history/__fixtures__/helpers.ts` so
+ * slices 4+ can extend them with session / linear trailers without
+ * forking a new helper.
  *
  * Tests MUST NOT read from the real monorepo's git history — that couples
  * to real commits and will break on every rewrite.
