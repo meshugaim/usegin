@@ -208,7 +208,7 @@ export function extractIntent(turns: Turn[]): string | null {
 }
 
 // ============================================================================
-// extractTrigger / extractOutcome (ENG-5051 — STUBS)
+// extractTrigger / extractOutcome (ENG-5051)
 // ============================================================================
 
 /**
