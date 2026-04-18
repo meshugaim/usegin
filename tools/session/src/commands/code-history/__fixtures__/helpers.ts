@@ -199,30 +199,37 @@ export function composeCommitMessage(commit: FixtureCommitSpec): string {
  * Fixture repo seeded with a file that was RENAMED across commits.
  *
  * Used by the AC 20 E2E test (ENG-5041) to confirm `git log -L` follows
- * renames inherently when `--no-follow` is NOT passed. The repo has:
+ * renames inherently when `--no-follow` is NOT passed. The default repo has:
  *
- *   1. commit 1: create `src/original.ts` with a known line at line 2.
+ *   1. commit 1: create `src/original.ts` with known content on 3 lines.
  *   2. commit 2: `git mv src/original.ts src/renamed.ts`, no content change.
- *   3. commit 3: modify `src/renamed.ts` line 2 with a new subject.
  *
- * So `session code-history src/renamed.ts:2` should surface commit 3
- * (most recent change to that line post-rename), AND if a future
- * regression passed `--no-follow`, asking for the SAME line BEFORE the
- * rename would yield "no history" — the presence of commit 1 in the
- * follow-renames history is the AC 20 invariant.
+ * So `session code-history src/renamed.ts:2` — asking for a line under the
+ * POST-rename path whose last edit happened in commit 1 under the PRE-rename
+ * path — only returns commit 1 when rename-following works. If a future
+ * regression passed `--no-follow`, the command would return "no history"
+ * for that query. That's the AC 20 invariant this fixture forces.
+ *
+ * Deliberately MINIMAL (no post-rename content edit) so the query line's
+ * last commit is unambiguously the pre-rename commit. An earlier version
+ * included a third commit that edited line 2 of `renamed.ts` directly,
+ * which defeated the test: `git log -L 2,2:renamed.ts -n 1` returned that
+ * third commit regardless of whether follow worked — a false safety net.
  */
 export interface FixtureRepoWithRename {
   /** Repo root. */
   dir: string;
   /** The pre-rename path (first commit's file). */
   originalFile: string;
-  /** The post-rename path (the one users query after commit 2). */
+  /** The post-rename path (the one users query after the rename commit). */
   renamedFile: string;
-  /** Subject of the FIRST commit — the one that introduced the original line.
-   *  If rename-following works, `git log -L 2,2:<renamedFile>` reaches it. */
+  /**
+   * Subject of the commit that introduced the watched line (pre-rename).
+   * If rename-following works, `git log -L 2,2:<renamedFile>` reaches it.
+   * This is also the `expectedSubject` the AC 20 test asserts against —
+   * reaching the pre-rename subject is the whole point of the test.
+   */
   preRenameSubject: string;
-  /** Subject of the most recent commit that touched the watched line. */
-  expectedSubject: string;
 }
 
 /**
@@ -236,7 +243,6 @@ export function makeFixtureRepoWithRename(): FixtureRepoWithRename {
   const originalFile = "src/original.ts";
   const renamedFile = "src/renamed.ts";
   const preRenameSubject = "initial: add original.ts with watched line";
-  const expectedSubject = "feat(renamed): change the watched line post-rename";
 
   mkdirSync(join(dir, "src"), { recursive: true });
 
@@ -260,7 +266,7 @@ export function makeFixtureRepoWithRename(): FixtureRepoWithRename {
 
   run(["git", "init", "-q", "-b", "main"]);
 
-  // Commit 1 — create original file with watched line at line 2.
+  // Commit 1 — create original file with a known watched line at line 2.
   writeFileSync(join(dir, originalFile), `line 1\nline 2 original\nline 3\n`);
   run(["git", "add", originalFile]);
   run(["git", "commit", "-q", "-m", preRenameSubject]);
@@ -268,16 +274,13 @@ export function makeFixtureRepoWithRename(): FixtureRepoWithRename {
   // Commit 2 — pure rename, no content change. Using `git mv` (vs fs
   // rename + `git add -A`) is intentional: `git mv` stages the rename
   // deterministically so `git log --follow` sees a 100% similarity move
-  // without relying on rename-detection heuristics.
+  // without relying on rename-detection heuristics. Critically, we do NOT
+  // follow up with a content edit: the query line's only touch-point is
+  // commit 1 (pre-rename), so the test only passes when follow works.
   run(["git", "mv", originalFile, renamedFile]);
   run(["git", "commit", "-q", "-m", "chore: rename original.ts to renamed.ts"]);
 
-  // Commit 3 — change the watched line post-rename.
-  writeFileSync(join(dir, renamedFile), `line 1\nline 2 updated\nline 3\n`);
-  run(["git", "add", renamedFile]);
-  run(["git", "commit", "-q", "-m", expectedSubject]);
-
-  return { dir, originalFile, renamedFile, preRenameSubject, expectedSubject };
+  return { dir, originalFile, renamedFile, preRenameSubject };
 }
 
 export interface CliResult {

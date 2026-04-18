@@ -541,9 +541,15 @@ describe("session code-history follows renames (AC 20)", () => {
   // this fails loudly. The spec calls out AC 20 as a "test only, no
   // production change" acceptance criterion for this slice.
   //
+  // The fixture commits are: (1) create `original.ts` with the watched
+  // line, (2) `git mv` it to `renamed.ts`. We query a line UNDER the
+  // post-rename path whose ONLY commit-touch lives pre-rename. The only
+  // way to reach that commit is rename-following — which is exactly why
+  // this test fails loudly if follow ever breaks.
+  //
   // Separate fixture because the rename case seeds a different set of
   // commits and files than the default fixture. `beforeAll`/`afterAll`
-  // amortize the `git init` + 3 commits across the tests in this describe.
+  // amortize the `git init` + commits across the tests in this describe.
   let fx: FixtureRepoWithRename;
 
   beforeAll(() => {
@@ -555,21 +561,23 @@ describe("session code-history follows renames (AC 20)", () => {
   });
 
   test(
-    "ENG-5041 (AC 20): querying the post-rename path surfaces the most recent commit that touched the line, exit 0",
+    "ENG-5041 (AC 20): querying a post-rename path whose line was last touched pre-rename surfaces the pre-rename commit, exit 0",
     () => {
-      // Simplest assertion: the header prints the expected post-rename
-      // subject. If rename-following ever broke (e.g. someone added
-      // `--no-follow` back), this fails.
+      // The watched line (line 2 of `renamed.ts`) was introduced under
+      // `original.ts` in commit 1 and never edited after the rename — so
+      // reaching it requires following the rename back to `original.ts`.
+      // If `--no-follow` ever leaks into the git layer, this test fails
+      // because the line has no history under `renamed.ts` alone.
       const result = runCli(
         ["code-history", `${fx.renamedFile}:2`],
         fx.dir,
       );
       expect(result.exitCode).toBe(0);
       // The header's subject field is the final field on the first
-      // non-empty stdout line — pin it exactly.
+      // non-empty stdout line — pin it to the PRE-rename subject.
       const firstLine =
         result.stdout.split("\n").find((l) => l.length > 0) ?? "";
-      expect(firstLine.endsWith(fx.expectedSubject)).toBe(true);
+      expect(firstLine.endsWith(fx.preRenameSubject)).toBe(true);
     },
   );
 });
