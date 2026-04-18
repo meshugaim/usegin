@@ -58,13 +58,26 @@ const MIN_FIELDS = 4;
  *   - "file X has only N lines"               — line beyond committed range
  *   - "no such path X in the commit"          — older git phrasing for the same
  *
+ * Test coverage (keep aligned as patterns evolve):
+ *   - "no path"       → exercised by nonexistent-file test in `./git.test.ts`
+ *                       and by the E2E nonexistent-file test in
+ *                       `../code-history.test.ts`
+ *   - "has only "     → exercised by the uncommitted-line test in
+ *                       `./git.test.ts` (line beyond committed range) and
+ *                       the AC 19 E2E test in `../code-history.test.ts`
+ *   - "no such path"  → legacy git phrasing, not currently exercised by a
+ *                       dedicated test — kept as a defensive hedge against
+ *                       older git versions that may still reach this layer
+ *
  * These are substring matches — git formats the messages with variable
- * filenames / line numbers, so we match on the stable prefix.
+ * filenames / line numbers, so we match on the stable prefix. The trailing
+ * space in `"has only "` forces a following token so a hypothetical future
+ * git string like `has_only` or `has onlyXYZ` can't accidentally match.
  */
 const NO_HISTORY_STDERR_PATTERNS: readonly string[] = [
   "no path",
   "no such path",
-  "has only",
+  "has only ",
 ];
 
 /**
