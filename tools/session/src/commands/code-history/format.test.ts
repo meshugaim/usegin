@@ -2,9 +2,8 @@
  * Pure-formatter tests for `session code-history`.
  *
  * These assert the shape of the human-readable header line (spec AC 5).
- * All tests are RED-phase (`test.failing`) stubs for ENG-5040 — the
- * formatter currently exists but Green will confirm its contract by
- * flipping these to passing.
+ * ENG-5040 slice 1 — pinned shape; future slices layer the session /
+ * linear / body lines on top of the same `DecoratedCommit`.
  *
  * Golden-test style: pin the exact bytes we emit. Future slices will add
  * more golden tests here (session line, linear line, body line) that
@@ -27,7 +26,7 @@ function makeCommit(overrides: Partial<DecoratedCommit> = {}): DecoratedCommit {
 }
 
 describe("formatHeader (AC 5)", () => {
-  test.failing(
+  test(
     "ENG-5040: emits `<short-sha>  <YYYY-MM-DD>  <subject>` with two spaces between fields",
     () => {
       const commit = makeCommit();
@@ -37,7 +36,7 @@ describe("formatHeader (AC 5)", () => {
     },
   );
 
-  test.failing("ENG-5040: uses exactly 8-char short SHA", () => {
+  test("ENG-5040: uses exactly 8-char short SHA", () => {
     const commit = makeCommit({ sha: "abcdef0123456789abcdef0123456789abcdef01" });
     const header = formatHeader(commit);
     // The short SHA is the first 8 hex chars.
@@ -47,7 +46,7 @@ describe("formatHeader (AC 5)", () => {
     expect(header.startsWith("abcdef0123  ")).toBe(false);
   });
 
-  test.failing("ENG-5040: separates each field with exactly two spaces", () => {
+  test("ENG-5040: separates each field with exactly two spaces", () => {
     const header = formatHeader(
       makeCommit({ sha: "a".repeat(40), date: "2026-01-02", subject: "hello world" }),
     );
@@ -56,13 +55,13 @@ describe("formatHeader (AC 5)", () => {
     expect(header).not.toContain("\t");
   });
 
-  test.failing("ENG-5040: preserves the subject verbatim (no trimming, no truncation)", () => {
+  test("ENG-5040: preserves the subject verbatim (no trimming, no truncation)", () => {
     const subject = "feat(thing): a subject   with   weird  spacing";
     const header = formatHeader(makeCommit({ subject }));
     expect(header.endsWith(subject)).toBe(true);
   });
 
-  test.failing(
+  test(
     "ENG-5040: defensively handles a SHA shorter than 8 chars — never happens in practice, but the format layer should not blow up",
     () => {
       // Real SHAs are 40 hex chars; git's short form is 7+. We still
