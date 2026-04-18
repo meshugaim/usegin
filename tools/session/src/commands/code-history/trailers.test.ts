@@ -5,9 +5,6 @@
  *   - Slice 2 (ENG-5041): body-preview line strips trailers before truncating.
  *   - Slice 4 (session line): extract `Claude-Session: <uuid>` trailers.
  *   - Slice 5 (linear line): extract `Part of: ENG-XXXX` / `Closes: ENG-XXXX`.
- *
- * All tests are `test.failing` per the tdd-ci skill — Green-phase implementor
- * removes the marker after `stripTrailers` actually implements the rules.
  */
 
 import { describe, test, expect } from "bun:test";
@@ -121,10 +118,9 @@ describe("stripTrailers (ENG-5041)", () => {
 });
 
 describe("isTrailerLine (ENG-5041)", () => {
-  // isTrailerLine is already implemented against a regex — these tests lock
-  // in the exact contract so slices 4/5 can build extractors on top of it
-  // without re-discovering the edge cases. Not `test.failing` because the
-  // regex is live code, not a stub.
+  // isTrailerLine is a regex check — these tests lock in the exact
+  // contract so slices 4/5 can build extractors on top of it without
+  // re-discovering the edge cases.
   test("ENG-5041: matches canonical trailer keys", () => {
     expect(isTrailerLine("Co-Authored-By: Claude <noreply@anthropic.com>")).toBe(true);
     expect(isTrailerLine("Claude-Session: abc-123")).toBe(true);

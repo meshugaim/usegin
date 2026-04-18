@@ -17,7 +17,7 @@ const SHORT_SHA_LEN = 8;
 
 /**
  * Maximum length of the body-preview line (spec AC 8 — "truncated to
- * ~160 chars with '…'"). The truncation rule Green will implement:
+ * ~160 chars with '…'"). The truncation rule:
  *
  *   if the joined preview exceeds BODY_PREVIEW_MAX_LEN chars, keep the
  *   first (BODY_PREVIEW_MAX_LEN - 1) chars and append `…`, for a final

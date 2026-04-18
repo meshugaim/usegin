@@ -230,10 +230,11 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
   );
 
   // Split into two separate tests: the constant-shape check is a pure
-  // data assertion that passes today (no `test.failing`), and the
-  // parser-contract check is the Red-phase invariant that Green will
-  // flip. Clearer signal: the failure output tells you which part is
-  // under Green's control vs which part is already a stable fact.
+  // data assertion over the exported string, and the parser-contract
+  // check asserts the parser actually throws the pinned constant (not
+  // a hand-rolled copy of its text). Clearer signal: if the parser
+  // starts building its own message, only the parser-contract test
+  // fires, pointing right at the drift.
 
   test(
     "ENG-5041 (AC 24): the pinned message references ENG-5048 and says 'not yet' so users know where the follow-up lives",
@@ -489,14 +490,11 @@ describe("session code-history end-to-end", () => {
 // exactly what's committed.
 
 describe("session code-history body preview (AC 8, AC 9)", () => {
-  // Mix of `test.failing` and plain `test`:
-  //   - AC 8 (body line IS rendered) is test.failing until Green wires
-  //     `formatBody` into the output pipeline.
-  //   - AC 9 (NO body line when empty) is a plain `test` because the
-  //     slice-1 output has no body line at all, so the invariant already
-  //     holds. These tests then act as REGRESSION GUARDS for Green:
-  //     adding body rendering must not start emitting a spurious empty
-  //     `body:` line for subject-only or trailers-only commits.
+  // AC 8 pins the positive case (body line IS rendered when there's
+  // real body content). AC 9 pins the negative case (NO `body:` line
+  // when the body is empty or pure trailers). The AC 9 tests also act
+  // as regression guards against future slices emitting a spurious
+  // empty `body:` line for subject-only / trailers-only commits.
 
   test(
     "ENG-5041 (AC 8): commit with body + trailers → stdout includes `body:` line after the header",
