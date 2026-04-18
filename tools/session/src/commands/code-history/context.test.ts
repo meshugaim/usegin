@@ -23,6 +23,15 @@ import { makeUserTurn } from "./__fixtures__/turns";
 // ============================================================================
 
 describe("context.ts pure-module invariant", () => {
+  // Known limits: the comment-stripping pass below is intentionally naive —
+  // it removes block/line comments but does NOT remove string literals,
+  // template literals, or regex literals. A string/template/regex containing
+  // the substring `async function` or `from "fs"` would false-positive this
+  // test. Today `context.ts` contains none of those, so the grep is reliable.
+  // If a legitimate future edit to `context.ts` trips this test (e.g. a
+  // string literal that mentions `async function` in user-facing text),
+  // extend the strip to remove string/regex literals first rather than
+  // weakening the forbidden-token list.
   test("source contains no fs/node:/Bun/async imports or calls", () => {
     const raw = readFileSync(
       join(import.meta.dir, "context.ts"),
