@@ -21,7 +21,6 @@ const BOLD_BLACK_ON_YELLOW = "\x1b[1;30;48;2;255;255;0m";
 const DIM = "\x1b[2m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
-const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
 
 // Git status
@@ -79,35 +78,10 @@ const modelEmoji = modelName.includes("opus")
       ? pick(["😵‍💫", "🫠", "😅", "🤔", "😬", "🥴"])
       : "🤖";
 
-// Effort level from CLAUDE_CODE_EFFORT_LEVEL env var.
-// Initial value set by launch command; kept in sync on Shift+Tab via patched CLI.
-const rawEffort = Bun.env.CLAUDE_CODE_EFFORT_LEVEL;
-function resolveEffort(val: unknown): { label: string; color: string } | null {
-  if (typeof val === "string") {
-    const map: Record<string, { label: string; color: string }> = {
-      max: { label: "high", color: GREEN },
-      high: { label: "high", color: GREEN },
-      medium: { label: "med", color: YELLOW },
-      low: { label: "low", color: RED },
-    };
-    return map[val] ?? null;
-  }
-  if (typeof val === "number") {
-    if (val >= 200) return { label: "high", color: GREEN };
-    if (val >= 100) return { label: "med", color: YELLOW };
-    return { label: "low", color: RED };
-  }
-  return null;
-}
-const effortResolved = resolveEffort(rawEffort);
-const effortDisplay = effortResolved
-  ? ` ${effortResolved.color}${effortResolved.label}${RESET}`
-  : ` ${DIM}effort:--${RESET}`;
-
 if (modelName.includes("opus")) {
-  parts.push(`${modelEmoji} ${GREEN}${input.model.display_name}${RESET}${effortDisplay}`);
+  parts.push(`${modelEmoji} ${GREEN}${input.model.display_name}${RESET}`);
 } else {
-  parts.push(`${modelEmoji} ${BOLD_BLACK_ON_YELLOW}${input.model.display_name}${RESET}${effortDisplay}`);
+  parts.push(`${modelEmoji} ${BOLD_BLACK_ON_YELLOW}${input.model.display_name}${RESET}`);
 }
 
 if (git) parts.push(git);
