@@ -110,11 +110,20 @@ export function isCommandOrCaveat(text: string): boolean {
  *   - `turns` has no user turns, OR
  *   - every user turn's text is a command/caveat wrapper.
  *
- * Pure: the input array is not mutated.
+ * Returns the raw text — no whitespace collapse, no truncation.
+ * Callers (slices 4/5/6 renderers) apply `truncate` at the render
+ * boundary when they need a single-line bounded string. Keeping the
+ * extractor raw lets callers decide whether they want the full intent
+ * (e.g. a JSON export) or a preview (e.g. a trailer row).
  *
- * @returns unimplemented sentinel until the Green phase lands
+ * Pure: the input array is not mutated; a `for…of` walk reads each
+ * turn exactly once and exits on the first match.
  */
 export function extractIntent(turns: Turn[]): string | null {
-  void turns;
-  return "<unimplemented>";
+  for (const turn of turns) {
+    if (turn.role !== "user") continue;
+    if (isCommandOrCaveat(turn.text)) continue;
+    return turn.text;
+  }
+  return null;
 }

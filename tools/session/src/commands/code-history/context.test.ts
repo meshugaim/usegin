@@ -74,7 +74,7 @@ describe("context.ts pure-module invariant", () => {
 // ============================================================================
 
 describe("extractIntent", () => {
-  test.failing("P1: skips caveat + command-name, returns first real msg", () => {
+  test("P1: skips caveat + command-name, returns first real msg", () => {
     const turns = [
       makeUserTurn("<caveat>system noise</caveat>"),
       makeUserTurn("<command-name>/retro</command-name>"),
@@ -83,7 +83,7 @@ describe("extractIntent", () => {
     expect(extractIntent(turns)).toBe("fix the build");
   });
 
-  test.failing("P2: returns first real msg when it is the first turn", () => {
+  test("P2: returns first real msg when it is the first turn", () => {
     // Insert an assistant turn between the two user turns so the fixture
     // mirrors real-session alternation (user → assistant → user).
     // `extractIntent` behavior is unchanged — it still finds "hello claude"
@@ -96,7 +96,7 @@ describe("extractIntent", () => {
     expect(extractIntent(turns)).toBe("hello claude");
   });
 
-  test.failing("N1: all user turns are wrappers → null", () => {
+  test("N1: all user turns are wrappers → null", () => {
     const turns = [
       makeUserTurn("<caveat>...</caveat>"),
       makeUserTurn("<command-name>/foo</command-name>"),
@@ -105,7 +105,7 @@ describe("extractIntent", () => {
     expect(extractIntent(turns)).toBeNull();
   });
 
-  test.failing("N2: no user turns → null", () => {
+  test("N2: no user turns → null", () => {
     expect(extractIntent([])).toBeNull();
   });
 
