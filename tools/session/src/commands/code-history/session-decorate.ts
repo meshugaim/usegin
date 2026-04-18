@@ -26,7 +26,16 @@
 import type { ParsedSession } from "../../types";
 import type { FetchResult } from "../../fetch";
 import { SessionNotFoundError } from "../../errors";
+import { extractIntent, extractTrigger, extractOutcome } from "./context";
+import { formatSinceTimestamp } from "./format";
+import { extractClaudeSessionTrailer } from "./trailers";
 import type { DecoratedCommit } from "./types";
+
+/** Length of the short session UUID embedded in the `sinceTimestampCmd`
+ * hint — matches the 8-char short SHA used elsewhere in the formatter
+ * so the `(→ session <shortId> …)` hint line-reads next to a commit's
+ * short SHA without visual asymmetry. */
+const SHORT_SESSION_ID_LEN = 8;
 
 /**
  * Dependency hooks for `decorateCommitWithSession`.
@@ -55,21 +64,59 @@ export interface DecorateSessionDeps {
  * `session-decorate.test.ts` (in-process failure classification).
  */
 export async function decorateCommitWithSession(
-  _commit: DecoratedCommit,
-  _deps: DecorateSessionDeps,
+  commit: DecoratedCommit,
+  deps: DecorateSessionDeps,
 ): Promise<DecoratedCommit> {
-  // Red-phase stub — populates a pinned `<unimplemented>` sentinel
-  // session so EVERY test.failing assertion (including the
-  // "no-trailer → session absent" case) fails at the assertion level
-  // rather than passing by accident. Green phase replaces this with
-  // the real extract → compose → deps → populate flow.
-  return {
-    ..._commit,
-    session: {
-      id: "<unimplemented>",
-      sinceTimestampCmd: "<unimplemented>",
-    },
+  const uuid = extractClaudeSessionTrailer(commit.body);
+  if (uuid === null) {
+    // No `Claude-Session:` trailer on this commit — nothing to decorate.
+    // Return the input commit unchanged so the pipeline can fall through
+    // to the body preview without emitting a session block.
+    return commit;
+  }
+
+  // Compose the copy-paste hint up-front. AC 13 degradation still uses
+  // this hint even when fetch fails, so it lives outside the try/catch.
+  const shortId = uuid.slice(0, SHORT_SESSION_ID_LEN);
+  const sinceTimestamp = formatSinceTimestamp(commit.committedAt);
+  const sinceTimestampCmd =
+    `session ${shortId} --since-timestamp ${sinceTimestamp}`;
+
+  let parsed: ParsedSession;
+  try {
+    const fetchResult = await deps.fetchSession(uuid);
+    parsed = await deps.parseSession(fetchResult.localPath);
+  } catch (error) {
+    if (error instanceof SessionNotFoundError) {
+      // AC 13 — session JSONL not available locally or in the archive.
+      // Degrade to `{id, sinceTimestampCmd}` without extractors so the
+      // session line + hint still render. Any OTHER error (malformed
+      // JSONL, permission denied, etc.) propagates unmodified.
+      return {
+        ...commit,
+        session: { id: uuid, sinceTimestampCmd },
+      };
+    }
+    throw error;
+  }
+
+  // Extractors produce `null` when the session doesn't carry the
+  // relevant turn shape (e.g. a non-commit-authoring session). Convert
+  // `null` to "omit the key" so the renderer's `undefined`-check omits
+  // the line entirely — no placeholder, no blank line.
+  const intent = extractIntent(parsed.turns);
+  const trigger = extractTrigger(parsed.turns, commit.sha);
+  const outcome = extractOutcome(parsed.turns, commit.sha);
+
+  const sessionCtx: NonNullable<DecoratedCommit["session"]> = {
+    id: uuid,
+    sinceTimestampCmd,
   };
+  if (intent !== null) sessionCtx.intent = intent;
+  if (trigger !== null) sessionCtx.trigger = trigger;
+  if (outcome !== null) sessionCtx.outcome = outcome;
+
+  return { ...commit, session: sessionCtx };
 }
 
 // Re-export so callers can catch the classification. Keeping this

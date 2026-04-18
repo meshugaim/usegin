@@ -133,7 +133,7 @@ function makeDeps(overrides: Partial<DecorateSessionDeps> = {}): DecorateSession
 }
 
 describe("decorateCommitWithSession (ENG-5043)", () => {
-  test.failing(
+  test(
     "ENG-5043: happy path — Claude-Session trailer + resolvable session → full commit.session populated",
     async () => {
       const commit = makeCommit();
@@ -154,7 +154,7 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: no Claude-Session trailer → commit.session stays absent",
     async () => {
       const commit = makeCommit({
@@ -165,7 +165,7 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: multiple Claude-Session trailers (amend case) → last match wins",
     async () => {
       const UUID_A = "00000000-0000-4000-8000-000000000001";
@@ -190,7 +190,7 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 13): SessionNotFoundError → degrades to { id, sinceTimestampCmd }, no throw, no extractors",
     async () => {
       const commit = makeCommit();
@@ -217,7 +217,7 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: non-SessionNotFound error from fetchSession → propagates (don't swallow real errors)",
     async () => {
       const commit = makeCommit();
@@ -232,7 +232,7 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: non-SessionNotFound error from parseSession → propagates (corrupt JSONL surfaces)",
     async () => {
       // parseSession throwing (e.g. malformed JSONL) is a real error, not

@@ -765,7 +765,7 @@ function makeSessionJsonl(commitShortSha: string): string {
 }
 
 describe("session code-history session block (AC 6, AC 13) — ENG-5043", () => {
-  test.failing(
+  test(
     "ENG-5043 (AC 6): Claude-Session trailer + resolvable session JSONL → full block renders after header, before body",
     async () => {
       await withTempDir("code-history-session-home-", async (homeDir) => {
@@ -843,7 +843,7 @@ describe("session code-history session block (AC 6, AC 13) — ENG-5043", () => 
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 6): commit without Claude-Session trailer → no session line in stdout",
     async () => {
       // Default-shape fixture: commits have subject only, no trailers.
@@ -863,7 +863,7 @@ describe("session code-history session block (AC 6, AC 13) — ENG-5043", () => 
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 6): multiple Claude-Session trailers (amend case) → LAST trailer's UUID used in session line",
     async () => {
       const UUID_EARLIER = "11111111-1111-4111-8111-111111111111";
@@ -920,7 +920,7 @@ describe("session code-history session block (AC 6, AC 13) — ENG-5043", () => 
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043 (AC 13): Claude-Session trailer but JSONL missing on disk → session line only, no extractors, exit 0, no stderr noise",
     async () => {
       // SessionNotFoundError path. The trailer points at a UUID for which
