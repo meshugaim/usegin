@@ -61,4 +61,22 @@ describe("formatHeader (AC 5)", () => {
     const header = formatHeader(makeCommit({ subject }));
     expect(header.endsWith(subject)).toBe(true);
   });
+
+  test.failing(
+    "ENG-5040: defensively handles a SHA shorter than 8 chars — never happens in practice, but the format layer should not blow up",
+    () => {
+      // Real SHAs are 40 hex chars; git's short form is 7+. We still
+      // want this layer to be total: if a synthesized or mocked commit
+      // slips in with a 3-char SHA, emit it as-is (no padding, no
+      // truncation to empty) rather than crashing or producing a
+      // header that loses the SHA entirely.
+      const header = formatHeader(
+        makeCommit({ sha: "abc", date: "2026-01-02", subject: "x" }),
+      );
+      expect(header.startsWith("abc")).toBe(true);
+      // Must not be padded to 8 chars (no trailing spaces/zeros sneaking in).
+      expect(header.startsWith("abc0")).toBe(false);
+      expect(header.startsWith("abc ")).toBe(true); // "abc" then the two-space separator
+    },
+  );
 });
