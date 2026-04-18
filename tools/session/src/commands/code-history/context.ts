@@ -86,6 +86,12 @@ export function truncate(value: string | null): string | null {
  * real user turn, and will be reused by Part B's `extractTrigger`
  * backward-walk to find the last real user ask before an assistant turn.
  *
+ * Known false-positive: a user message starting with literal `<` in prose
+ * would be skipped. In practice this hasn't been observed — Claude Code's
+ * command wrappers always occupy leading position — but if a real case
+ * surfaces, the real message is ignored and the next non-wrapper turn is
+ * returned.
+ *
  * Pure: no side effects, no I/O.
  */
 export function isCommandOrCaveat(text: string): boolean {
