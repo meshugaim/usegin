@@ -215,7 +215,11 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // the JSON mode and gives us a clearer abstraction boundary.
   const bodyPreview = formatBody(decorated.body);
   if (bodyPreview.length > 0) {
-    console.log(`body: ${bodyPreview}`);
+    // 4-space indent + `body:` (5 chars incl colon) + 5 spaces = value
+    // starts at column 14. Pinned by the spec's Concrete example and
+    // matches `session:` / `linear:` value-column alignment so the
+    // plain block's three layer lines stay visually columnar.
+    console.log(`    body:     ${bodyPreview}`);
   }
 }
 

@@ -549,10 +549,56 @@ describe("session code-history body preview (AC 8, AC 9)", () => {
           // Pin the exact preview content — trailers stripped, two lines
           // space-joined.
           const lines = result.stdout.split("\n").filter((l) => l.length > 0);
-          const bodyLine = lines.find((l) => l.startsWith("body:"));
+          const bodyLine = lines.find((l) => l.trimStart().startsWith("body:"));
           expect(bodyLine).toBeDefined();
+          // 4-space indent + `body:` + 5 spaces so the value column
+          // aligns at col 14 with `session:` / `linear:` (spec's
+          // Concrete example).
           expect(bodyLine).toBe(
-            "body: This commit does the thing. It also does the other thing.",
+            "    body:     This commit does the thing. It also does the other thing.",
+          );
+        },
+      );
+    },
+  );
+
+  test(
+    "ENG-5041 (AC 8): body line renders at 4-space indent with value at column 14 (spec's Concrete example — regression for pre-existing ENG-5041 drift)",
+    async () => {
+      // Regression guard for the pre-existing drift where the `body:`
+      // line rendered at column 0 (`body: <preview>`) instead of the
+      // spec's 4-space indent (`    body:     <preview>`). Pinning the
+      // indent + column-14 alignment here keeps `body:` consistent
+      // with `session:` / `linear:` across the plain block.
+      await withFixtureRepo(
+        {
+          commits: [
+            { subject: "initial: seed target file" },
+            {
+              subject: "feat: pin the body indent",
+              body: "Every run appends a JSONL record.",
+            },
+          ],
+        },
+        (fx) => {
+          const result = runCli(["code-history", `${fx.file}:2`], fx.dir);
+          expect(result.exitCode).toBe(0);
+
+          const bodyLine = result.stdout
+            .split("\n")
+            .find((l) => l.trimStart().startsWith("body:"));
+          expect(bodyLine).toBeDefined();
+          // Indent is exactly 4 spaces.
+          expect(bodyLine!.startsWith("    body:")).toBe(true);
+          expect(bodyLine!.startsWith("   body:")).toBe(false);
+          expect(bodyLine!.startsWith("     body:")).toBe(false);
+          // Value column is at char index 14 (matches
+          // `session:` / `linear:` value columns so the three layer
+          // lines stay visually columnar).
+          expect(bodyLine![14]).toBe("E");
+          // And the exact bytes, for a belt-and-braces pin.
+          expect(bodyLine).toBe(
+            "    body:     Every run appends a JSONL record.",
           );
         },
       );
@@ -582,11 +628,13 @@ describe("session code-history body preview (AC 8, AC 9)", () => {
         (fx) => {
           const result = runCli(["code-history", `${fx.file}:2`], fx.dir);
           expect(result.exitCode).toBe(0);
-          // No line in stdout may START with "body:" — searching the raw
-          // output catches even a line with trailing whitespace.
+          // No line in stdout (after trimming leading indent) may
+          // start with "body:". Using `trimStart` so the assertion
+          // survives the 4-space body-line indent (spec's Concrete
+          // example).
           const hasBodyLine = result.stdout
             .split("\n")
-            .some((l) => l.startsWith("body:"));
+            .some((l) => l.trimStart().startsWith("body:"));
           expect(hasBodyLine).toBe(false);
         },
       );
@@ -605,7 +653,7 @@ describe("session code-history body preview (AC 8, AC 9)", () => {
         expect(result.exitCode).toBe(0);
         const hasBodyLine = result.stdout
           .split("\n")
-          .some((l) => l.startsWith("body:"));
+          .some((l) => l.trimStart().startsWith("body:"));
         expect(hasBodyLine).toBe(false);
       });
     },
@@ -839,10 +887,12 @@ describe("session code-history session block (AC 6, AC 13) — ENG-5043", () => 
             );
             // Body line comes AFTER the session block — pin ordering
             // explicitly so a future tweak that re-orders doesn't slip.
-            const bodyIdx = nonEmpty.findIndex((l) => l.startsWith("body:"));
+            const bodyIdx = nonEmpty.findIndex((l) =>
+              l.trimStart().startsWith("body:"),
+            );
             expect(bodyIdx).toBeGreaterThan(4);
             expect(nonEmpty[bodyIdx]).toBe(
-              "body: Make the plain-mode render cover the session layer.",
+              "    body:     Make the plain-mode render cover the session layer.",
             );
           },
         );
@@ -1073,7 +1123,9 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
               // Ordering — linear line after header, before body.
               const headerIdx = 0;
               const linearIdx = nonEmpty.indexOf(linearLine!);
-              const bodyIdx = nonEmpty.findIndex((l) => l.startsWith("body:"));
+              const bodyIdx = nonEmpty.findIndex((l) =>
+                l.trimStart().startsWith("body:"),
+              );
               expect(linearIdx).toBeGreaterThan(headerIdx);
               expect(bodyIdx).toBeGreaterThan(linearIdx);
 
@@ -1152,7 +1204,9 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
                 const linearIdx = lines.findIndex((l) =>
                   l.trimStart().startsWith("linear:"),
                 );
-                const bodyIdx = lines.findIndex((l) => l.startsWith("body:"));
+                const bodyIdx = lines.findIndex((l) =>
+                  l.trimStart().startsWith("body:"),
+                );
 
                 expect(sessionIdx).toBeGreaterThan(-1);
                 expect(linearIdx).toBeGreaterThan(sessionIdx);
