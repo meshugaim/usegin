@@ -141,12 +141,17 @@ export function formatBody(body: string): string {
  * Implementation: `new Date(iso) - 30*60*1000`, re-serialize with
  * `.toISOString()` (always UTC `Z`), slice off seconds.
  */
-export function formatSinceTimestamp(_commitISO: string): string {
-  // Red-phase stub — `<unimplemented>` is a pinned sentinel so the
-  // test.failing assertions (which compare against the real expected
-  // timestamps) fail at the assertion level rather than the import
-  // level. Removed in the Green phase.
-  return "<unimplemented>";
+export function formatSinceTimestamp(commitISO: string): string {
+  // `new Date(iso)` normalizes any offset (`+02:00`, `Z`, etc.) into UTC
+  // milliseconds since epoch. Subtracting 30 minutes there keeps the
+  // arithmetic timezone-agnostic: day / month / year boundaries are
+  // handled natively by the Date object's wrap-around.
+  const t = new Date(commitISO).getTime() - 30 * 60 * 1000;
+  // `toISOString()` always emits `YYYY-MM-DDTHH:MM:SS.sssZ` (UTC). Slicing
+  // the first 16 chars drops seconds + milliseconds + the `Z`; appending
+  // a literal `Z` gives the pinned `YYYY-MM-DDTHH:MMZ` minute-precision
+  // shape without a numeric offset ever sneaking in.
+  return new Date(t).toISOString().slice(0, 16) + "Z";
 }
 
 // =============================================================================

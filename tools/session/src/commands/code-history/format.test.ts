@@ -254,13 +254,13 @@ describe("formatBody (AC 8, AC 9)", () => {
 // relitigating the rounding rule.
 
 describe("formatSinceTimestamp (AC 6)", () => {
-  test.failing("ENG-5043: basic — 08:43 commit → 08:13 since-timestamp", () => {
+  test("ENG-5043: basic — 08:43 commit → 08:13 since-timestamp", () => {
     expect(formatSinceTimestamp("2026-04-18T08:43:00Z")).toBe(
       "2026-04-18T08:13Z",
     );
   });
 
-  test.failing(
+  test(
     "ENG-5043: minute=00 — 09:00 commit → 08:30 (pins exact arithmetic)",
     () => {
       expect(formatSinceTimestamp("2026-04-18T09:00:00Z")).toBe(
@@ -269,7 +269,7 @@ describe("formatSinceTimestamp (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: day boundary — 00:15 commit → previous day 23:45",
     () => {
       expect(formatSinceTimestamp("2026-04-18T00:15:00Z")).toBe(
@@ -278,7 +278,7 @@ describe("formatSinceTimestamp (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: month+year boundary — Jan 1 00:15 UTC → Dec 31 23:45 (prev year)",
     () => {
       expect(formatSinceTimestamp("2026-01-01T00:15:00Z")).toBe(
@@ -287,7 +287,7 @@ describe("formatSinceTimestamp (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: non-UTC input — `+02:00` offset normalizes to UTC before subtraction",
     () => {
       // 10:43+02:00 == 08:43 UTC — minus 30m == 08:13Z. Guards against a
@@ -298,7 +298,7 @@ describe("formatSinceTimestamp (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: output always ends with `Z` (UTC), never a numeric offset",
     () => {
       // Format pin — guard against a future change that accidentally emits
@@ -310,7 +310,7 @@ describe("formatSinceTimestamp (AC 6)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: minute precision — seconds are dropped (pinned format is `HH:MMZ`)",
     () => {
       // Even when the source has seconds, the output truncates to the
