@@ -55,6 +55,10 @@ export interface MakeUserTurnOptions {
  * Build a plain user turn carrying `text` (no tool results).
  *
  * Defaults: fresh auto-generated UUID, `isOnCurrentBranch: true`.
+ *
+ * Does NOT trim text — tests construct literal strings; callers needing
+ * production-equivalent (trim + whitespace-collapse as applied by
+ * `parse-turn.ts` / `truncate` in `context.ts`) must pre-trim.
  */
 export function makeUserTurn(text: string, opts: MakeUserTurnOptions = {}): Turn {
   const uuid = opts.uuid ?? nextUuid("u");
