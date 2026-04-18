@@ -18,8 +18,8 @@ import type { DecoratedCommit } from "./types";
  * chars of the full SHA. The date is passed through as-is — `git log
  * --format=%cs` already emits ISO `YYYY-MM-DD`.
  *
- * Red-phase stub: returns a placeholder so format.test.ts fails at
- * assertion level. The Green agent implements the real rendering.
+ * TODO(ENG-5040 Green): returns a placeholder so format.test.ts fails at
+ * assertion level. Implement the real rendering.
  */
 export function formatHeader(_commit: DecoratedCommit): string {
   return "<header unimplemented>";

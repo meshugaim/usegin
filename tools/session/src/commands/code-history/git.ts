@@ -12,6 +12,19 @@
 import type { DecoratedCommit } from "./types";
 
 /**
+ * Options for `getMostRecentCommit`.
+ *
+ * `cwd` lets callers run `git log` in a specific repo without relying on
+ * `process.cwd()` — useful for unit tests (no `process.chdir()` dance)
+ * and for future slices that may need to query a sibling worktree.
+ * Command-layer callers default to `process.cwd()`.
+ */
+export interface GetMostRecentCommitOptions {
+  /** Working directory for the `git log` invocation. Defaults to `process.cwd()`. */
+  cwd?: string;
+}
+
+/**
  * Find the single most recent commit that touched `line` in `file`.
  *
  * Returns `null` when the line has no committed history (untracked file,
@@ -23,11 +36,14 @@ import type { DecoratedCommit } from "./types";
  *   - Parse NUL-separated fields (robust to SHAs/dates/subjects with spaces).
  *   - Empty stdout OR nonzero exit that looks like "no history" → null.
  *   - Do NOT pass `--no-follow`: renames must be followed (spec AC 20).
+ *   - Honor `options.cwd` (fall back to `process.cwd()`).
  */
 export async function getMostRecentCommit(
   _file: string,
   _line: number,
+  _options?: GetMostRecentCommitOptions,
 ): Promise<DecoratedCommit | null> {
-  // Red-phase stub — Green agent implements the real `git log -L` spawn.
+  // TODO(ENG-5040 Green): implement the real `git log -L` spawn per the
+  // notes above.
   throw new Error("getMostRecentCommit not yet implemented");
 }

@@ -71,11 +71,16 @@ export async function runCodeHistory(args: string[]): Promise<void> {
 
   const { file, line } = parsed;
 
-  // Slice 1: bare "is it there?" check. A fuller validation (line in
-  // range, binary file detection) is implemented in the Green phase so
-  // the AC-2 tests assert actual behavior, not placeholders.
-  // NOTE: intentionally minimal — real validation lives in the Green agent's
-  // diff.
+  // TODO(ENG-5040 Green): upfront validation lives HERE (AC 2) — before
+  // any git spawn.
+  //   - File existence (stat → throw "src/foo.ts: not found" or similar).
+  //   - Line-in-range (count \n in the file; throw "line 50 exceeds file
+  //     length (3 lines)" or similar).
+  // These errors MUST go through the `"Error: "`-prefixed throw → catch
+  // path above (so `console.error("Error: ...")` shapes them) and NOT
+  // through the plain `console.error(...)` path used by AC 19's
+  // `No committed history for <file>:<line>` — the AC 19 test asserts
+  // the exact no-prefix string, so collisions there would break it.
 
   const commit = await getMostRecentCommit(file, line);
 

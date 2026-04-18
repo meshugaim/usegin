@@ -278,6 +278,13 @@ export interface CodeHistoryArgs {
 /**
  * Parse arguments for `session code-history <file>:<line>`.
  *
+ * Pattern reference: `parseFetchArgs` above (same positional-only shape,
+ * same throw-on-bad-input discipline). code-history is UNIQUE in this
+ * codebase in taking a `file:line` positional — the only parser with a
+ * colon-embedded positional — so see the arg-parser tests in
+ * `commands/code-history.test.ts` for edge cases (absolute paths,
+ * embedded colons in paths: the separator is the LAST colon).
+ *
  * Red-phase stub: returns a deliberately-wrong default so the Red tests
  * fail at ASSERTION level (not import level). The Green agent replaces
  * this body with the real parser. Contract (per spec AC 1, AC 2):
@@ -286,15 +293,26 @@ export interface CodeHistoryArgs {
  *   - Returns `{ file, line }` on a valid `file.ts:42` positional.
  *   - Throws a clear `Error` for: missing positional, no `:` separator,
  *     empty file or line portion, non-integer or non-positive line.
+ *     Exact wording for the no-colon case is pinned by the tests:
+ *     `Expected <file>:<line>, got "<arg>"`.
  *
  * The caller (`runCodeHistory`) turns thrown errors into stderr + non-zero
  * exit. Existence / line-in-range checks live in the command layer
  * because they need `fs` access — this parser stays pure.
+ *
+ * IMPORTANT for the Green agent: The end-to-end error tests in
+ * `code-history.test.ts` are currently guarded by `getMostRecentCommit`'s
+ * Red-phase throw, which masks order-of-operations bugs. Do NOT implement
+ * the git layer before the parser (and upfront file-existence /
+ * line-in-range validation) is in place — otherwise half the AC-2 error
+ * tests will false-green against a bubbled `git log -L` error rather than
+ * the clear user-facing message the spec requires.
  */
 export function parseCodeHistoryArgs(
   _args: string[],
 ): CodeHistoryArgs | "help" {
-  // Red stub: return a non-matching shape so assertion-level checks fail.
+  // TODO(ENG-5040 Green): return a non-matching shape so assertion-level
+  // checks fail. Replace with the real parser per the contract above.
   return { file: "<unimplemented>", line: 0 };
 }
 

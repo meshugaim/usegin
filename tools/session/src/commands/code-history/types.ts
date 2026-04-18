@@ -21,6 +21,14 @@ export interface DecoratedCommit {
   date: string;
   /** Commit subject line. */
   subject: string;
-  /** Full commit body (may be empty). Trailer stripping happens in format layer. */
+  /**
+   * Full commit body. Trailer stripping happens in the format layer.
+   *
+   * Empty body is represented as `""` (empty string) — NOT `null`, NOT
+   * `undefined`, NOT omitted. The JSON mode (slice 6) MUST emit `body`
+   * as `""` in the empty case so consumers can rely on the key being
+   * present and string-typed. Resolves an ambiguity surfaced in the
+   * ENG-5040 Red review.
+   */
   body: string;
 }
