@@ -10,6 +10,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { asEntryUuid } from "../../../types";
 import { makeAssistantTurn, makeBashTurn, makeUserTurn } from "./turns";
 
 describe("makeUserTurn", () => {
@@ -25,7 +26,7 @@ describe("makeUserTurn", () => {
 
   test("honors uuid and timestamp overrides", () => {
     const turn = makeUserTurn("hi", { uuid: "u-custom", timestamp: "2026-01-01T00:00:00Z" });
-    expect(turn.uuid).toBe("u-custom" as typeof turn.uuid);
+    expect(turn.uuid).toBe(asEntryUuid("u-custom"));
     expect(turn.timestamp).toBe("2026-01-01T00:00:00Z");
   });
 });
