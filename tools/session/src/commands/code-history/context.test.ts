@@ -227,6 +227,10 @@ describe("truncate", () => {
     expect(truncate(null)).toBeNull();
   });
 
+  test("empty string → empty string", () => {
+    expect(truncate("")).toBe("");
+  });
+
   test("collapses single \\n to space", () => {
     expect(truncate("a\nb")).toBe("a b");
   });
