@@ -61,9 +61,7 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   try {
     parsed = parseCodeHistoryArgs(args);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error(`Error: ${msg}`);
-    process.exit(1);
+    bailWithError(error);
   }
 
   if (parsed === "help") {
@@ -81,9 +79,7 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   try {
     validateFileAndLine(file, line);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error(`Error: ${msg}`);
-    process.exit(1);
+    bailWithError(error);
   }
 
   let commit;
@@ -95,9 +91,7 @@ export async function runCodeHistory(args: string[]): Promise<void> {
     // which `getMostRecentCommit` returns as `null` instead of throwing.
     // Route through the `"Error: "`-prefixed stderr path so the user sees
     // git's actual complaint, not a misleading "No committed history".
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error(`Error: ${msg}`);
-    process.exit(1);
+    bailWithError(error);
   }
 
   if (commit === null) {
@@ -106,6 +100,23 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   }
 
   console.log(formatHeader(commit));
+}
+
+/**
+ * Write an `"Error: <msg>"` line to stderr and exit with code 1.
+ *
+ * Command-internal helper for the AC 2 / git-failure stderr path. Kept
+ * private (not exported) because it's the specific shape this command
+ * needs — other commands in this codebase do their own error formatting.
+ *
+ * Typed as `never` so TypeScript knows the caller's control flow
+ * terminates; lets callers write `bailWithError(e)` without a follow-up
+ * `return` or narrowing dance.
+ */
+function bailWithError(error: unknown): never {
+  const msg = error instanceof Error ? error.message : String(error);
+  console.error(`Error: ${msg}`);
+  process.exit(1);
 }
 
 /**
