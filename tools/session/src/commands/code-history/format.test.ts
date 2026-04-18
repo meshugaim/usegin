@@ -12,7 +12,12 @@
 
 import { describe, test, expect } from "bun:test";
 
-import { formatHeader } from "./format";
+import {
+  formatHeader,
+  formatBody,
+  BODY_PREVIEW_MAX_LEN,
+  BODY_PREVIEW_ELLIPSIS,
+} from "./format";
 import type { DecoratedCommit } from "./types";
 
 function makeCommit(overrides: Partial<DecoratedCommit> = {}): DecoratedCommit {
@@ -76,6 +81,132 @@ describe("formatHeader (AC 5)", () => {
       // Must not be padded to 8 chars (no trailing spaces/zeros sneaking in).
       expect(header.startsWith("abc0")).toBe(false);
       expect(header.startsWith("abc ")).toBe(true); // "abc" then the two-space separator
+    },
+  );
+});
+
+// =============================================================================
+// formatBody (AC 8, AC 9) — ENG-5041
+// =============================================================================
+//
+// Pin the exact contract of the body-preview renderer so slices 4 (session
+// line), 5 (linear line), and 6 (JSON) layer on top of a stable rule set.
+// Key invariants:
+//   - Strips trailers at the END only (mid-body `Key: value` is preserved)
+//   - Takes first 2 non-blank body lines, joined by a single space
+//   - Truncates to exactly BODY_PREVIEW_MAX_LEN chars with the ellipsis
+//     counting as one char (no off-by-one on what "160 max" means)
+//   - Returns `""` when the body has no non-trailer content — caller
+//     omits the `body:` line entirely (AC 9 "missing layer → no line")
+
+describe("formatBody (AC 8, AC 9)", () => {
+  test.failing(
+    "ENG-5041 (AC 8): 5-line body with 2 trailing trailers → first 2 non-trailer lines, space-joined, under max len",
+    () => {
+      const body = [
+        "First line of body.",
+        "Second line of body.",
+        "Third line of body.",
+        "",
+        "Co-Authored-By: Claude <noreply@anthropic.com>",
+        "Part of: ENG-5041",
+      ].join("\n");
+      expect(formatBody(body)).toBe("First line of body. Second line of body.");
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 8): truncates to exactly BODY_PREVIEW_MAX_LEN with trailing ellipsis when first line is too long",
+    () => {
+      // One long first line, no second. Preview length = max; last char = ellipsis.
+      const longLine = "x".repeat(BODY_PREVIEW_MAX_LEN * 2);
+      const preview = formatBody(longLine);
+      expect(preview.length).toBe(BODY_PREVIEW_MAX_LEN);
+      expect(preview.endsWith(BODY_PREVIEW_ELLIPSIS)).toBe(true);
+      // The chars before the ellipsis are all from the original input
+      // (no weird padding or marker chars sneaking in).
+      expect(preview.slice(0, BODY_PREVIEW_MAX_LEN - 1)).toBe(
+        "x".repeat(BODY_PREVIEW_MAX_LEN - 1),
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 8): truncation boundary — body exactly at max stays unchanged (no ellipsis added)",
+    () => {
+      // Pins the "only truncate if STRICTLY over the limit" rule. A body
+      // that happens to be exactly BODY_PREVIEW_MAX_LEN chars stays whole.
+      const exact = "y".repeat(BODY_PREVIEW_MAX_LEN);
+      const preview = formatBody(exact);
+      expect(preview.length).toBe(BODY_PREVIEW_MAX_LEN);
+      expect(preview).toBe(exact);
+      expect(preview.endsWith(BODY_PREVIEW_ELLIPSIS)).toBe(false);
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 8): blank lines between content are skipped — first 2 NON-BLANK lines are taken",
+    () => {
+      // Gap-happy body: blank line between real content should not be
+      // counted as "a line". Otherwise a body like "foo\n\nbar" would
+      // render as "foo " (with a trailing space) which looks like a bug.
+      const body = ["First.", "", "Second.", "", "Third."].join("\n");
+      expect(formatBody(body)).toBe("First. Second.");
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 9): body that's pure trailers → empty string (caller omits the `body:` line)",
+    () => {
+      const body = [
+        "Co-Authored-By: Claude <noreply@anthropic.com>",
+        "Claude-Session: abc-123",
+      ].join("\n");
+      expect(formatBody(body)).toBe("");
+    },
+  );
+
+  test.failing("ENG-5041 (AC 9): empty body → empty string", () => {
+    expect(formatBody("")).toBe("");
+  });
+
+  test.failing(
+    "ENG-5041 (AC 8): mid-body trailer-lookalike is NOT stripped — `Note:` stays, both lines kept",
+    () => {
+      // Regression guard for the "mid-body `Foo: bar` looks like a trailer
+      // but isn't" rule. Green must not naively match TRAILER_LINE_RE
+      // against every line.
+      const body = [
+        "Note: this applies to edge cases.",
+        "More context here.",
+      ].join("\n");
+      expect(formatBody(body)).toBe(
+        "Note: this applies to edge cases. More context here.",
+      );
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 8): strips a variety of trailer keys (Co-Authored-By, Claude-Session, Part of, Closes, Signed-off-by, arbitrary Key)",
+    () => {
+      const body = [
+        "Real body line.",
+        "",
+        "Co-Authored-By: Claude <noreply@anthropic.com>",
+        "Claude-Session: abc-123",
+        "Part of: ENG-5041",
+        "Closes: ENG-5678",
+        "Signed-off-by: foo <foo@example.com>",
+        "XyZ-Name: arbitrary trailer",
+      ].join("\n");
+      expect(formatBody(body)).toBe("Real body line.");
+    },
+  );
+
+  test.failing(
+    "ENG-5041 (AC 8): single-line body under max length is returned as-is (no ellipsis, no trimming)",
+    () => {
+      expect(formatBody("Short body.")).toBe("Short body.");
     },
   );
 });
