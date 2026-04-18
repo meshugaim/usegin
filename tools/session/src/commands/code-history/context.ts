@@ -136,25 +136,31 @@ export function isCommandOrCaveat(text: string): boolean {
 }
 
 // ============================================================================
-// isRealUserTurn
+// Module-private Turn predicates
 // ============================================================================
+//
+// The three extractors in this module form a family:
+//
+//   - `extractIntent`  — `turns.find(isRealUserTurn)`            (first match)
+//   - `extractTrigger` — backward-walk, same `isRealUserTurn`    (nearest before)
+//   - `extractOutcome` — forward-walk, `isTextBearingAssistantTurn` (nearest after)
+//
+// The predicates are clustered here so the family shape is visible at a
+// glance — intent vs trigger share a predicate; outcome has its own. Keep
+// them together: if the caveat rule changes, both user-side extractors must
+// stay in sync.
 
 /**
  * Module-private predicate: true when `turn` is a human-authored user turn
  * carrying real prose (not empty, not a system-injected wrapper).
  *
- * Hoisted from `extractIntent`'s inline `Array.find` callback (ENG-5051 N-1)
- * so the three extractors in this module form a consistent family:
+ * Hoisted from `extractIntent`'s inline `Array.find` callback so the family
+ * of three extractors (intent / trigger / outcome) reads as a set.
  *
- *   - `extractIntent`  — `turns.find(isRealUserTurn)` (first match)
- *   - `extractTrigger` — backward-walk from commit-authoring turn, same predicate
- *   - `extractOutcome` — forward-walk for text-bearing assistant (separate predicate)
- *
- * Coupling to `isCommandOrCaveat` (ENG-5051 N-4): this predicate is the sole
- * caller of `isCommandOrCaveat` within the extractor family. Any change to the
- * caveat rule affects every extractor that reuses this helper — tests in both
- * ENG-5050's `extractIntent` block and ENG-5051's `extractTrigger` block must
- * continue to pass after such a change.
+ * Coupling to `isCommandOrCaveat`: this predicate is the sole caller of
+ * `isCommandOrCaveat` within the extractor family. Any change to the caveat
+ * rule affects both `extractIntent` and `extractTrigger` — tests in both
+ * blocks must continue to pass after such a change.
  *
  * **Strengthened over ENG-5039 spec's backward-walk rule.** The spec says
  * "nearest preceding user turn whose text doesn't start with `<`". We
@@ -177,6 +183,20 @@ function isRealUserTurn(turn: Turn): boolean {
     // guards against system-injected wrappers.
     !isCommandOrCaveat(turn.text)
   );
+}
+
+/**
+ * Module-private predicate: true when `turn` is an assistant turn carrying
+ * real prose (not empty, not whitespace-only). Used by `extractOutcome`'s
+ * forward walk.
+ *
+ * Separate from `isRealUserTurn` because the outcome side doesn't need the
+ * command/caveat skip (assistants don't emit those wrappers) — the only
+ * rule is "text after .trim() must be non-empty", which also handles the
+ * tool-only assistant turns (text: "") from `makeAssistantTurn({ bash })`.
+ */
+function isTextBearingAssistantTurn(turn: Turn): boolean {
+  return turn.role === "assistant" && turn.text.trim() !== "";
 }
 
 // ============================================================================
@@ -351,21 +371,6 @@ export function extractTrigger(turns: Turn[], sha: string): string | null {
   // consumers receive a ready-to-render string. Mirrors `extractIntent`'s
   // post-follow-up-fix shape.
   return trigger ? truncateString(trigger.text) : null;
-}
-
-/**
- * Module-private predicate: true when `turn` is an assistant turn carrying
- * real prose (not empty, not whitespace-only). Mirrors `isRealUserTurn`'s
- * shape for the outcome extractor — the two predicates stay close in the
- * file so a future reader sees the family together.
- *
- * Separate from `isRealUserTurn` because the outcome side doesn't need the
- * command/caveat skip (assistants don't emit those wrappers) — the only
- * rule is "text after .trim() must be non-empty", which also handles the
- * tool-only assistant turns (text: "") from `makeAssistantTurn({ bash })`.
- */
-function isTextBearingAssistantTurn(turn: Turn): boolean {
-  return turn.role === "assistant" && turn.text.trim() !== "";
 }
 
 /**
