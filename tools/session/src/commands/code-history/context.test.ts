@@ -432,18 +432,21 @@ describe("extractTrigger", () => {
   });
 
   describe("negative cases", () => {
-    test.failing("N1: `git commits` (no word boundary) → NOT detected", () => {
-      // Bash command starts with "git commits" (plural) — the extractor
-      // must require a word boundary so this does NOT qualify. Even though
-      // the tool result contains the SHA, the command string is not a
-      // `git commit` invocation.
-      const [bashA, bashUser] = makeBashTurn(
-        "git commits --list",
-        "[main 6666666] fake: should not match",
-      );
-      const turns = [makeUserTurn("list my commits"), bashA, bashUser];
-      expect(extractTrigger(turns, "6666666")).toBeNull();
-    });
+    test.failing(
+      "N1: `git commits` (command name lacks word boundary after 'commit') → NOT detected (spec: `^git commit\\b`)",
+      () => {
+        // Bash command starts with "git commits" (plural) — the command name
+        // "commits" lacks a word boundary after "commit", so the spec rule
+        // `^git commit\b` does NOT match. Even though the tool result contains
+        // the SHA, the command string is not a `git commit` invocation.
+        const [bashA, bashUser] = makeBashTurn(
+          "git commits --list",
+          "[main 6666666] fake: should not match",
+        );
+        const turns = [makeUserTurn("list my commits"), bashA, bashUser];
+        expect(extractTrigger(turns, "6666666")).toBeNull();
+      },
+    );
 
     test.failing(
       "N2: `git  commit` (double space) → NOT detected (literal-prefix semantics)",
