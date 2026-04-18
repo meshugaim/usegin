@@ -324,9 +324,16 @@ function findCommitAuthoringTurnIndex(
  * Return boundary (AC 15): result is `truncate`d to `CONTEXT_MAX_LEN`.
  */
 export function extractTrigger(turns: Turn[], sha: string): string | null {
-  void turns;
-  void sha;
-  return "<unimplemented>";
+  const idx = findCommitAuthoringTurnIndex(turns, sha);
+  if (idx === null) return null;
+  // Backward walk: nearest real user turn before the commit-authoring turn.
+  // `findLast` mirrors the `extractIntent` → `.find` rhyme: the family of
+  // three extractors reads as a set (first / nearest-backward / nearest-forward).
+  const trigger = turns.slice(0, idx).findLast(isRealUserTurn);
+  // AC 15: apply truncate at the extractor's return boundary so downstream
+  // consumers receive a ready-to-render string. Mirrors `extractIntent`'s
+  // post-follow-up-fix shape.
+  return trigger ? truncateString(trigger.text) : null;
 }
 
 /**

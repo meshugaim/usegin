@@ -293,7 +293,7 @@ describe("truncate", () => {
 
 describe("extractTrigger", () => {
   describe("positive cases", () => {
-    test.failing(
+    test(
       "P1: basic `git commit -m` with SHA in tool result → preceding user msg",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -310,7 +310,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "P2: heredoc `git commit -m \"$(cat <<EOF...EOF)\"` detected as git commit",
       () => {
         const heredoc =
@@ -330,7 +330,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "P3: leading whitespace / parens before `git commit` → detected after trim",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -342,7 +342,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing("P4: `git commit --amend` is detected", () => {
+    test("P4: `git commit --amend` is detected", () => {
       const [bashA, bashUser] = makeBashTurn(
         "git commit --amend --no-edit",
         "[main 2222222] fix: amended",
@@ -351,7 +351,7 @@ describe("extractTrigger", () => {
       expect(extractTrigger(turns, "2222222")).toBe("amend the last commit");
     });
 
-    test.failing("P4b: `git commit --no-verify` is detected", () => {
+    test("P4b: `git commit --no-verify` is detected", () => {
       // Spec P4 lists `--amend` AND `--no-verify` as flagged variants of
       // `git commit` that still qualify. Sibling to the `--amend` case above.
       const [bashA, bashUser] = makeBashTurn(
@@ -368,7 +368,7 @@ describe("extractTrigger", () => {
       );
     });
 
-    test.failing(
+    test(
       "P5: multi-commit session — call with SHA_B returns commit_B's preceding user msg",
       () => {
         const [bashA_A, bashA_User] = makeBashTurn(
@@ -395,7 +395,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "P6: backward walk skips <command-name> / caveat user turns",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -416,7 +416,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "P7: tool-result body carries leading noise before the [branch sha] line — detector extracts SHA tokens from the [branch sha] pattern, then matches via bidirectional startsWith (same rule as P8)",
       () => {
         const noisyOutput =
@@ -430,7 +430,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "P8: SHA format variance — query with full 40-char SHA matches short SHA in result via bidirectional startsWith",
       () => {
         // Tool result carries the short 7-char SHA (as git prints it).
@@ -449,7 +449,7 @@ describe("extractTrigger", () => {
   });
 
   describe("negative cases", () => {
-    test.failing(
+    test(
       "N1: `git commits` (command name lacks word boundary after 'commit') → NOT detected (spec: `^git commit\\b`)",
       () => {
         // Bash command starts with "git commits" (plural) — the command name
@@ -465,7 +465,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "N2: `git  commit` (double space) → NOT detected (literal-prefix semantics)",
       () => {
         // Judgment call per companion: spec says "starts with `git commit`",
@@ -480,7 +480,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "N3: `git checkout` / `git cherry-pick` → NOT detected",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -492,7 +492,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "N4: plain text mentioning `git commit` (not a Bash tool_use) → NOT detected",
       () => {
         // An assistant text turn that *says* "git commit" in prose but
@@ -508,7 +508,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "N5: Bash tool_use exists but SHA not in any tool result → null",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -521,7 +521,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing("N6: no Bash tool_use at all → null", () => {
+    test("N6: no Bash tool_use at all → null", () => {
       const turns = [
         makeUserTurn("hi"),
         makeAssistantTurn({ text: "hello back" }),
@@ -529,7 +529,7 @@ describe("extractTrigger", () => {
       expect(extractTrigger(turns, "abcdef0")).toBeNull();
     });
 
-    test.failing(
+    test(
       "N7: aliased `gc -m` → NOT detected (literal check, no alias resolution)",
       () => {
         const [bashA, bashUser] = makeBashTurn(
@@ -541,7 +541,7 @@ describe("extractTrigger", () => {
       },
     );
 
-    test.failing(
+    test(
       "N8: commit-authoring Bash turn with no preceding real user turn → null",
       () => {
         const [bashA, bashUser] = makeBashTurn(
