@@ -165,11 +165,15 @@ const CLAUDE_SESSION_TRAILER_RE = /^Claude-Session:\s*(\S+)\s*$/gm;
  * `DecoratedCommit.session`. Slice 5 will add a matching
  * `extractLinearTrailer` once the Linear-line work lands.
  */
-export function extractClaudeSessionTrailer(_body: string): string | null {
-  // Red-phase stub — returns the pinned `<unimplemented>` sentinel so
-  // test.failing assertions that compare against real UUIDs fail at
-  // the assertion level, and the null-case assertion fails against a
-  // non-null return. Green phase replaces this with the real
-  // `matchAll` + last-match implementation.
-  return "<unimplemented>";
+export function extractClaudeSessionTrailer(body: string): string | null {
+  // Enumerate every line that matches the pinned Claude-Session regex.
+  // `matchAll` returns each occurrence in document order; the LAST one
+  // is the one that reflects the final session touching the commit
+  // (amend case). Using `matchAll` over `match(/…/g)` so we get the
+  // capture group on each hit.
+  let last: string | null = null;
+  for (const m of body.matchAll(CLAUDE_SESSION_TRAILER_RE)) {
+    last = m[1] ?? null;
+  }
+  return last;
 }

@@ -162,7 +162,7 @@ const FIXTURE_UUID_A = "533a2546-684a-4724-b592-34aa88aac626";
 const FIXTURE_UUID_B = "6e1b04b8-3f88-47a0-9a6c-88a4e5b9f001";
 
 describe("extractClaudeSessionTrailer (ENG-5043)", () => {
-  test.failing(
+  test(
     "ENG-5043: returns the UUID when a single Claude-Session trailer is present",
     () => {
       const body = [
@@ -175,7 +175,7 @@ describe("extractClaudeSessionTrailer (ENG-5043)", () => {
     },
   );
 
-  test.failing("ENG-5043: returns null when NO trailer is present", () => {
+  test("ENG-5043: returns null when NO trailer is present", () => {
     const body = [
       "feat: add the thing",
       "",
@@ -184,11 +184,11 @@ describe("extractClaudeSessionTrailer (ENG-5043)", () => {
     expect(extractClaudeSessionTrailer(body)).toBeNull();
   });
 
-  test.failing("ENG-5043: returns null on an empty body", () => {
+  test("ENG-5043: returns null on an empty body", () => {
     expect(extractClaudeSessionTrailer("")).toBeNull();
   });
 
-  test.failing(
+  test(
     "ENG-5043: takes the LAST match when multiple trailers are present (amend case)",
     () => {
       // An amended commit accumulates trailers from each amendment; the
@@ -203,7 +203,7 @@ describe("extractClaudeSessionTrailer (ENG-5043)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: regex is line-anchored — `Claude-Session:` embedded mid-line does NOT match",
     () => {
       // Guards against a non-anchored match that would pick up prose
@@ -214,7 +214,7 @@ describe("extractClaudeSessionTrailer (ENG-5043)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5043: tolerates incidental whitespace around the UUID value",
     () => {
       // The spec regex uses `\s*` on both sides of the capture. A stray
