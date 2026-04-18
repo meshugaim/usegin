@@ -696,3 +696,47 @@ describe("extractTrigger + extractOutcome (AC 14 combined)", () => {
     },
   );
 });
+
+// ============================================================================
+// G3 pathological — same-SHA duplicate (non-crash guarantee)
+// ============================================================================
+//
+// Impossible in real git (SHAs are content-addressed), but hand-crafted
+// fixtures can produce two tool_results with the SAME full SHA. The
+// extractor must not crash and must return deterministically — any
+// implementation choice is fine as long as it's stable across runs.
+//
+// Plain `test` (not `test.failing`): the stubs don't crash on this input
+// (they return "<unimplemented>" / null without traversing), so the
+// non-crash assertion passes today and will keep passing through Green.
+// The purpose is to pin the invariant in place BEFORE the real impl
+// lands — so Green can't regress it.
+
+describe("G3 pathological — same-SHA duplicate", () => {
+  test("two tool_results with same SHA: both extractors run without crashing", () => {
+    const sha = "ffffffff"; // 8 chars, same in both results
+    const [bashA_1, bashUser_1] = makeBashTurn(
+      'git commit -m "first"',
+      `[main ${sha}] first`,
+    );
+    const [bashA_2, bashUser_2] = makeBashTurn(
+      'git commit -m "second"',
+      `[main ${sha}] second`,
+    );
+    const turns = [
+      makeUserTurn("first ask"),
+      bashA_1,
+      bashUser_1,
+      makeAssistantTurn({ text: "First done." }),
+      makeUserTurn("second ask"),
+      bashA_2,
+      bashUser_2,
+      makeAssistantTurn({ text: "Second done." }),
+    ];
+    // Non-crash guarantee — the actual return is not pinned here
+    // (deterministic, but implementation-defined; once Green lands,
+    // a follow-up test can pin "first match wins" or similar).
+    expect(() => extractTrigger(turns, sha)).not.toThrow();
+    expect(() => extractOutcome(turns, sha)).not.toThrow();
+  });
+});
