@@ -115,6 +115,10 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // two non-blank lines, and truncates. Empty string means "no non-trailer
   // body content" — per AC 9 ("missing layer → no line") we omit the
   // `body:` line entirely in that case rather than emitting a placeholder.
+  //
+  // Pattern: "missing layer = no line" — slices 4/5 will mirror this for
+  // session: / linear: lines. Not extracting an `emitLayerLine` helper
+  // yet (YAGNI with one call site); revisit when slice 4 lands.
   const bodyPreview = formatBody(commit.body);
   if (bodyPreview.length > 0) {
     console.log(`body: ${bodyPreview}`);
