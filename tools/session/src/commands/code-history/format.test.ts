@@ -15,6 +15,7 @@ import {
   formatHeader,
   formatBody,
   formatSinceTimestamp,
+  formatSessionBlock,
   BODY_PREVIEW_MAX_LEN,
   BODY_PREVIEW_ELLIPSIS,
 } from "./format";
@@ -314,6 +315,169 @@ describe("formatSinceTimestamp (AC 6)", () => {
       expect(out).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/);
       // Subtract 30 from 43 → 13. Seconds :37 get dropped.
       expect(out).toBe("2026-04-18T08:13Z");
+    },
+  );
+});
+
+// =============================================================================
+// formatSessionBlock (AC 6) — ENG-5043
+// =============================================================================
+//
+// Pin the exact multi-line block bytes so slice 5 (Linear) / slice 6
+// (JSON) can layer on a stable shape. Each nested line is OPTIONAL —
+// missing extractors produce OMITTED lines, NOT placeholders.
+
+/**
+ * Canonical UUID used in session-block tests. Full 36-char form; the
+ * first 8 chars (`533a2546`) appear in the `--since-timestamp` hint.
+ *
+ * Pinned from the ENG-5039 "Concrete example" for shape parity with the
+ * spec's rendering. Reused across multiple tests so the short form can
+ * be asserted exactly.
+ */
+const SESSION_FIXTURE_ID = "533a2546-684a-4724-b592-34aa88aac626";
+const SESSION_FIXTURE_SHORT_ID = "533a2546";
+
+/**
+ * Canonical `sinceTimestampCmd` string used in tests. Mirrors what
+ * the pipeline produces at runtime (`session <shortId> --since-timestamp
+ * <t-30m>`). Kept as a literal here because the tests pin the block
+ * bytes exactly — deriving it from `formatSinceTimestamp` would couple
+ * these tests to that helper's Green-phase correctness.
+ */
+const SESSION_FIXTURE_HINT_CMD =
+  `session ${SESSION_FIXTURE_SHORT_ID} --since-timestamp 2026-04-18T08:13Z`;
+
+function commitWithSession(
+  session?: Partial<NonNullable<DecoratedCommit["session"]>>,
+): DecoratedCommit {
+  const commit: DecoratedCommit = {
+    sha: "4fff467fb48a632519c742358505e9a0a739d525",
+    date: "2026-04-18",
+    committedAt: "2026-04-18T08:43:00+00:00",
+    subject: "chore(pre-push): instrument per-stage timings + logger",
+    body: "",
+  };
+  if (session !== undefined) {
+    commit.session = {
+      id: SESSION_FIXTURE_ID,
+      sinceTimestampCmd: SESSION_FIXTURE_HINT_CMD,
+      ...session,
+    };
+  }
+  return commit;
+}
+
+describe("formatSessionBlock (AC 6)", () => {
+  test.failing(
+    "ENG-5043 (AC 6): all fields present — 4-line block with exact indents + alignment",
+    () => {
+      const commit = commitWithSession({
+        intent: "Wire session extractors into code-history.",
+        trigger: "Add the session block to the plain-mode output.",
+        outcome: "Session line and three nested context lines rendered.",
+      });
+      const block = formatSessionBlock(commit);
+      // Exact bytes — all 4 lines joined with `\n`. Pinning the entire
+      // block (rather than line-by-line) catches label-column drift in
+      // one place and documents the full output shape in-source.
+      const expected = [
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `      intent:   Wire session extractors into code-history.`,
+        `      trigger:  Add the session block to the plain-mode output.`,
+        `      outcome:  Session line and three nested context lines rendered.`,
+      ].join("\n");
+      expect(block).toBe(expected);
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 6): `session` absent on commit → returns null (missing layer → no line)",
+    () => {
+      const commit = commitWithSession(undefined);
+      expect(formatSessionBlock(commit)).toBeNull();
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 6): intent only (trigger + outcome undefined) → session + intent lines only",
+    () => {
+      // AC 9 invariant: missing extractors → lines omitted entirely,
+      // no placeholder, no blank line.
+      const commit = commitWithSession({ intent: "Just the intent." });
+      const block = formatSessionBlock(commit);
+      const expected = [
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `      intent:   Just the intent.`,
+      ].join("\n");
+      expect(block).toBe(expected);
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 6): trigger only → session + trigger lines only",
+    () => {
+      const commit = commitWithSession({ trigger: "Only trigger." });
+      const block = formatSessionBlock(commit);
+      const expected = [
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `      trigger:  Only trigger.`,
+      ].join("\n");
+      expect(block).toBe(expected);
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 6): outcome only → session + outcome lines only",
+    () => {
+      const commit = commitWithSession({ outcome: "Only outcome." });
+      const block = formatSessionBlock(commit);
+      const expected = [
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`,
+        `      outcome:  Only outcome.`,
+      ].join("\n");
+      expect(block).toBe(expected);
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 13): none of intent/trigger/outcome → just the session line (fetch-failure degradation)",
+    () => {
+      // AC 13: on SessionNotFoundError, pipeline populates `commit.session`
+      // with `{id, sinceTimestampCmd}` only — no extractors. Block renders
+      // as a SINGLE line, useful because the `→` hint is still actionable.
+      const commit = commitWithSession({});
+      const block = formatSessionBlock(commit);
+      const expected =
+        `    session:  ${SESSION_FIXTURE_ID}  (→ ${SESSION_FIXTURE_HINT_CMD})`;
+      expect(block).toBe(expected);
+    },
+  );
+
+  test.failing(
+    "ENG-5043 (AC 6): label alignment — values in the nested group start at the same column regardless of which lines are present",
+    () => {
+      // Column-alignment regression guard. The value column for the
+      // nested block is `6 spaces indent + 8-char label incl colon + 2 spaces = 16`.
+      // Intent's label is 7 chars (intent:), so it pads to 10 chars total
+      // (intent: + 3 spaces). Trigger/outcome are 8 chars (trigger:, outcome:),
+      // so they pad to 10 (trigger: + 2 spaces). Values align at column 16.
+      const commit = commitWithSession({
+        intent: "I",
+        trigger: "T",
+        outcome: "O",
+      });
+      const block = formatSessionBlock(commit) ?? "";
+      const lines = block.split("\n");
+      const nestedLines = lines.filter((l) => /^ {6}/.test(l));
+      expect(nestedLines).toHaveLength(3);
+      for (const line of nestedLines) {
+        // Value (single char "I" / "T" / "O") MUST start at column 16
+        // (0-indexed). If alignment drifts, this assertion catches it
+        // regardless of which lines are present.
+        expect(line.length).toBe(17); // 16 cols + 1 char value
+        expect(line[16]).toMatch(/[ITO]/);
+      }
     },
   );
 });

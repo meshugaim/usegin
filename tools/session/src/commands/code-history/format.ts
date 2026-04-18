@@ -148,3 +148,52 @@ export function formatSinceTimestamp(_commitISO: string): string {
   // level. Removed in the Green phase.
   return "<unimplemented>";
 }
+
+// =============================================================================
+// formatSessionBlock (AC 6 — ENG-5043)
+// =============================================================================
+
+/**
+ * Render the multi-line session block emitted after the header in plain
+ * mode. Returns `null` when `commit.session` is absent — same
+ * "missing layer → no line" convention as `formatBody` (AC 9), so the
+ * caller omits the whole block cleanly with no blank-line padding.
+ *
+ * Format (values left-align via fixed-width label padding):
+ *
+ * ```
+ *     session:  <full-uuid>  (→ session <8char-uuid> --since-timestamp <t-30m>)
+ *       intent:   <value>
+ *       trigger:  <value>
+ *       outcome:  <value>
+ * ```
+ *
+ * Layout rules (pinned by `format.test.ts`):
+ *   - `session:` line at 4-space indent. `session:` is the widest label
+ *     in the 4-space group (slice 5 adds `linear:`; slice 2 already emits
+ *     `body:` via `formatBody` but not inside this block), so labels at
+ *     the 4-space level pad to width 8 + ":" + 2 spaces before the value.
+ *     For `session:` specifically that's `session:` (8 chars incl colon)
+ *     + 2 spaces = value starts at column 4 + 8 + 2 = 14.
+ *   - Nested `intent:` / `trigger:` / `outcome:` at 6-space indent. The
+ *     widest labels in this group are `trigger:` and `outcome:` (8 chars
+ *     incl colon). `intent:` (7 chars) pads with 3 spaces; `trigger:` /
+ *     `outcome:` pad with 2 spaces. Values align at column 6 + 8 + 2 = 16.
+ *   - Nested lines whose extractor returned `undefined` are OMITTED —
+ *     no placeholder, no blank line (AC 9 invariant reused for the
+ *     session-block nested lines). A session with only `intent`
+ *     populated renders as `session:` + `intent:` lines, nothing else.
+ *   - The `session:` line ALWAYS renders when `commit.session` is set.
+ *     AC 13 (auto-fetch graceful degradation) relies on this: on
+ *     `SessionNotFoundError`, the pipeline populates `commit.session`
+ *     with just `id` + `sinceTimestampCmd` (no extractors), and the
+ *     block renders as just the session line + hint.
+ */
+export function formatSessionBlock(_commit: DecoratedCommit): string | null {
+  // Red-phase stub — returns a pinned `<unimplemented>` sentinel so
+  // EVERY test.failing assertion (including the "session absent → null"
+  // case) fails at the assertion level rather than passing by accident.
+  // Green phase replaces this with the real renderer (which returns
+  // `null` legitimately when `commit.session` is absent).
+  return "<unimplemented>";
+}
