@@ -7,6 +7,7 @@
  * the `--json` branch.
  */
 
+import { stripTrailers } from "./trailers";
 import type { DecoratedCommit } from "./types";
 
 /** Length of the short SHA we emit in headers. Git's default `--short` is
@@ -65,7 +66,7 @@ export function formatHeader(commit: DecoratedCommit): string {
 /**
  * Render the body-preview string (spec AC 8) from a raw commit body.
  *
- * Green-phase rules this stub will implement (pinned by `format.test.ts`):
+ * Rules (pinned by `format.test.ts`):
  *
  *   1. Strip trailing trailers using `stripTrailers` (see `./trailers.ts`).
  *   2. Split the remaining body into lines and drop blank lines.
@@ -84,10 +85,21 @@ export function formatHeader(commit: DecoratedCommit): string {
  * `body:` line. Slices 4/5 will follow the same "empty string → omit
  * line" pattern for session / linear rendering.
  */
-export function formatBody(_body: string): string {
-  // Red-phase stub — Green-phase implementation will apply the rules
-  // enumerated in this function's doc comment. The stub returns a sentinel
-  // so every `test.failing` in `format.test.ts` asserts against a known
-  // wrong value rather than silently passing.
-  return "<unimplemented>";
+export function formatBody(body: string): string {
+  const stripped = stripTrailers(body);
+  if (stripped.length === 0) return "";
+
+  // Drop blank lines so `"foo\n\nbar"` renders as `"foo bar"`, not
+  // `"foo "`. Taking the first 2 non-blank lines matches the spec's
+  // "first 2 lines" rule without being tripped up by incidental gaps.
+  const nonBlank = stripped.split("\n").filter((l) => l.length > 0);
+  if (nonBlank.length === 0) return "";
+
+  const joined = nonBlank.slice(0, 2).join(" ");
+
+  // Only truncate when STRICTLY over the limit. A body that is exactly
+  // BODY_PREVIEW_MAX_LEN chars long stays whole; MAX+1 gets cut to
+  // (MAX - 1) chars + ellipsis, for a final length of exactly MAX.
+  if (joined.length <= BODY_PREVIEW_MAX_LEN) return joined;
+  return joined.slice(0, BODY_PREVIEW_MAX_LEN - 1) + BODY_PREVIEW_ELLIPSIS;
 }

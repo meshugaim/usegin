@@ -100,7 +100,7 @@ describe("formatHeader (AC 5)", () => {
 //     omits the `body:` line entirely (AC 9 "missing layer → no line")
 
 describe("formatBody (AC 8, AC 9)", () => {
-  test.failing(
+  test(
     "ENG-5041 (AC 8): 5-line body with 2 trailing trailers → first 2 non-trailer lines, space-joined, under max len",
     () => {
       const body = [
@@ -115,7 +115,7 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): truncates to exactly BODY_PREVIEW_MAX_LEN with trailing ellipsis when first line is too long",
     () => {
       // One long first line, no second. Preview length = max; last char = ellipsis.
@@ -131,7 +131,7 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): truncation boundary — body exactly at max stays unchanged (no ellipsis added)",
     () => {
       // Pins the "only truncate if STRICTLY over the limit" rule. A body
@@ -144,7 +144,7 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): truncation boundary — body at MAX+1 chars truncates to MAX with ellipsis",
     () => {
       // The tight edge case between "exactly at max → keep" and "truncate".
@@ -165,7 +165,7 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): blank lines between content are skipped — first 2 NON-BLANK lines are taken",
     () => {
       // Gap-happy body: blank line between real content should not be
@@ -176,7 +176,7 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 9): body that's pure trailers → empty string (caller omits the `body:` line)",
     () => {
       const body = [
@@ -187,11 +187,11 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing("ENG-5041 (AC 9): empty body → empty string", () => {
+  test("ENG-5041 (AC 9): empty body → empty string", () => {
     expect(formatBody("")).toBe("");
   });
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): mid-body trailer-lookalike is NOT stripped — `Note:` stays, both lines kept",
     () => {
       // Regression guard for the "mid-body `Foo: bar` looks like a trailer
@@ -207,7 +207,7 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): strips a variety of trailer keys (Co-Authored-By, Claude-Session, Part of, Closes, Signed-off-by, arbitrary Key)",
     () => {
       const body = [
@@ -224,7 +224,7 @@ describe("formatBody (AC 8, AC 9)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041 (AC 8): single-line body under max length is returned as-is (no ellipsis, no trimming)",
     () => {
       expect(formatBody("Short body.")).toBe("Short body.");
