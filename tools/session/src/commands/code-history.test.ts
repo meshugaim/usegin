@@ -263,11 +263,10 @@ describe("parseCodeHistoryArgs reserved flags (AC 24)", () => {
   test(
     "ENG-5041 (AC 24): the parser actually USES the pinned constant (guards against drift to a hardcoded string)",
     () => {
-      // Parser-contract check — Green flips this to passing. If the
-      // parser ever builds its own string instead of throwing the
-      // pinned constant, this fails even if the basic-presence tests
-      // above still pass (since they only check `.toThrow(substring)`
-      // against the same constant's text).
+      // Parser-contract check. If the parser ever builds its own string
+      // instead of throwing the pinned constant, this fails even if the
+      // basic-presence tests above still pass (since they only check
+      // `.toThrow(substring)` against the same constant's text).
       expect(() => parseCodeHistoryArgs(["-n", "3", "src/foo.ts:1"])).toThrow(
         CODE_HISTORY_RESERVED_FLAG_MESSAGE,
       );
@@ -602,12 +601,12 @@ describe("session code-history body preview (AC 8, AC 9)", () => {
 // =============================================================================
 
 describe("session code-history follows renames (AC 20)", () => {
-  // NOT `test.failing` — slice 1 already passes this invariant because
+  // Regression guard only — slice 1 already passes this invariant because
   // `getMostRecentCommit` deliberately omits `--no-follow`, so `git log
-  // -L` follows renames inherently. This test exists as a REGRESSION
-  // GUARD: if anyone ever adds `--no-follow` (or switches to `--no-renames`),
-  // this fails loudly. The spec calls out AC 20 as a "test only, no
-  // production change" acceptance criterion for this slice.
+  // -L` follows renames inherently. If anyone ever adds `--no-follow` (or
+  // switches to `--no-renames`), this fails loudly. The spec calls out
+  // AC 20 as a "test only, no production change" acceptance criterion
+  // for this slice.
   //
   // The fixture commits are: (1) create `original.ts` with the watched
   // line, (2) `git mv` it to `renamed.ts`. We query a line UNDER the

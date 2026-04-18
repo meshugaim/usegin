@@ -194,8 +194,8 @@ describe("formatBody (AC 8, AC 9)", () => {
     "ENG-5041 (AC 8): mid-body trailer-lookalike is NOT stripped — `Note:` stays, both lines kept",
     () => {
       // Regression guard for the "mid-body `Foo: bar` looks like a trailer
-      // but isn't" rule. Green must not naively match TRAILER_LINE_RE
-      // against every line.
+      // but isn't" rule. `formatBody` must not naively match
+      // TRAILER_LINE_RE against every line.
       const body = [
         "Note: this applies to edge cases.",
         "More context here.",
