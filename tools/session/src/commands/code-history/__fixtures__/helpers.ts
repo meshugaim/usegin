@@ -265,8 +265,12 @@ export interface FixtureRepoWithRename {
    * future slices can assert on trailers / session IDs in post-rename
    * history without re-deriving the commit list. Empty when the default
    * minimal fixture is used.
+   *
+   * `readonly` because consumers shouldn't mutate the fixture's record
+   * of what was built — if a test needs a different set of post-rename
+   * commits, it passes a different `spec.postRenameCommits` in.
    */
-  postRenameCommits: FixtureCommitSpec[];
+  postRenameCommits: readonly FixtureCommitSpec[];
 }
 
 /**
@@ -325,10 +329,13 @@ export function makeFixtureRepoWithRename(
   const preRenameCommits: FixtureCommitSpec[] = spec.preRenameCommits ?? [
     { subject: "initial: add original.ts with watched line" },
   ];
-  if (preRenameCommits.length === 0) {
+  const firstPreRenameCommit = preRenameCommits[0];
+  if (!firstPreRenameCommit) {
     // Without at least one pre-rename commit there's nothing to rename.
     // Fail loudly rather than producing a repo where `git mv` errors
-    // out mid-seed.
+    // out mid-seed. The narrowing here also gives TypeScript what it
+    // needs to type `preRenameSubject` as `string` without a non-null
+    // assertion.
     throw new Error(
       "makeFixtureRepoWithRename: preRenameCommits must include at least one commit (the one that creates the file to be renamed)",
     );
@@ -340,7 +347,7 @@ export function makeFixtureRepoWithRename(
   const postRenameCommits = spec.postRenameCommits ?? [];
 
   const dir = mkdtempSync(join(tmpdir(), "code-history-rename-fixture-"));
-  const preRenameSubject = preRenameCommits[0]!.subject;
+  const preRenameSubject = firstPreRenameCommit.subject;
 
   // `from` and `to` may live in different subdirs. Create the parent
   // dir of each on demand so callers aren't forced to pick paths under
@@ -355,15 +362,25 @@ export function makeFixtureRepoWithRename(
   // edits line 1 or line 3 ONLY — never the watched line 2 — so the
   // AC 20 invariant (line 2's last touch is commit 0) survives extra
   // commits.
+  //
+  // We track the non-watched lines as mutable state so each commit's
+  // diff touches exactly ONE line: the index-th commit rewrites only
+  // `line 1` (when `index` is even) or only `line 3` (when odd). The
+  // other line keeps the content the previous commit wrote. This
+  // matters for reviewers reading diffs — "commit N changed exactly
+  // one line" is an invariant you can state; "commit N's diff depends
+  // on whether commit N-1 reverted line X" is a pitfall.
+  let preLine1 = "line 1";
+  let preLine3 = "line 3";
   preRenameCommits.forEach((commit, index) => {
-    // Alternate edits between line 1 and line 3 so each extra commit
-    // produces a diff a reviewer can read off at a glance.
-    const lineIdx = index % 2 === 0 ? 0 : 2;
-    const contents = [
-      `line 1${index === 0 ? "" : lineIdx === 0 ? ` v${index}` : ""}`,
-      "line 2 original",
-      `line 3${index === 0 ? "" : lineIdx === 2 ? ` v${index}` : ""}`,
-    ];
+    if (index > 0) {
+      if (index % 2 === 0) {
+        preLine1 = `line 1 v${index}`;
+      } else {
+        preLine3 = `line 3 v${index}`;
+      }
+    }
+    const contents = [preLine1, "line 2 original", preLine3];
     writeFileSync(join(dir, rename.from), `${contents.join("\n")}\n`);
     runGit(dir, ["git", "add", rename.from]);
     runGit(dir, ["git", "commit", "-q", "-m", composeCommitMessage(commit)]);
@@ -385,13 +402,21 @@ export function makeFixtureRepoWithRename(
   // Post-rename commits. Same "never touch line 2" invariant as the
   // pre-rename sequence — otherwise we'd be back to the pitfall where
   // a post-rename edit defeats the rename-follow test.
+  //
+  // Same incremental-state pattern as the pre-rename loop: each commit
+  // rewrites exactly ONE of line 1 / line 3. We start from whatever
+  // the rename commit left in the file (which matches the last
+  // pre-rename commit's contents) so the first post-rename commit
+  // produces a clean single-line diff against that baseline.
+  let postLine1 = preLine1;
+  let postLine3 = preLine3;
   postRenameCommits.forEach((commit, index) => {
-    const lineIdx = index % 2 === 0 ? 0 : 2;
-    const contents = [
-      `line 1${lineIdx === 0 ? ` post${index}` : ""}`,
-      "line 2 original",
-      `line 3${lineIdx === 2 ? ` post${index}` : ""}`,
-    ];
+    if (index % 2 === 0) {
+      postLine1 = `line 1 post${index}`;
+    } else {
+      postLine3 = `line 3 post${index}`;
+    }
+    const contents = [postLine1, "line 2 original", postLine3];
     writeFileSync(join(dir, rename.to), `${contents.join("\n")}\n`);
     runGit(dir, ["git", "add", rename.to]);
     runGit(dir, ["git", "commit", "-q", "-m", composeCommitMessage(commit)]);
