@@ -157,14 +157,22 @@ function validateFileAndLine(file: string, line: number): void {
 
 /**
  * Count 1-based lines in a text file. A trailing newline does NOT add an
- * extra empty line (matches how editors/`wc -l + 1` typically think about
- * file length). A file with contents `"a\nb\n"` has 2 lines; `"a\nb"` also
- * has 2 lines; empty file has 0 lines.
+ * extra empty line (matches how editors / `wc -l + 1` typically think
+ * about file length). Examples:
+ *   `""`      → 0
+ *   `"a"`     → 1
+ *   `"a\n"`   → 1
+ *   `"a\nb"`  → 2
+ *   `"a\nb\n"`→ 2
+ *
+ * Implementation: split on `\n`, then drop a trailing empty segment if
+ * the file ended with a newline. That's one pass and two lines, and reads
+ * the same way editors describe line length ("this file has N lines").
  */
 function countLines(contents: string): number {
   if (contents.length === 0) return 0;
-  const newlines = (contents.match(/\n/g) ?? []).length;
-  // If the file ends with \n, the newline count equals the line count.
-  // If not, there's one more "line" than \n (the trailing partial line).
-  return contents.endsWith("\n") ? newlines : newlines + 1;
+  const parts = contents.split("\n");
+  // A trailing newline produces a trailing empty segment we don't want to
+  // count as "an extra line".
+  return parts[parts.length - 1] === "" ? parts.length - 1 : parts.length;
 }
