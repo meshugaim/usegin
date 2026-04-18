@@ -109,6 +109,39 @@ describe("extractIntent", () => {
     expect(extractIntent([])).toBeNull();
   });
 
+  // AC 15: truncate is applied at the extractor's return boundary so
+  // downstream consumers receive a ready-to-render string. These two
+  // tests pin that boundary — they would fail against a raw-return impl.
+  test("long intent is truncated per AC 15 at extractor boundary", () => {
+    const turns = [makeUserTurn("a".repeat(300))];
+    const result = extractIntent(turns);
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(200);
+    expect(result!.endsWith("…")).toBe(true);
+    expect(result!.slice(0, 199)).toBe("a".repeat(199));
+  });
+
+  test("intent with embedded \\n\\t is collapsed per AC 15", () => {
+    const turns = [makeUserTurn("line1\nline2\tline3")];
+    expect(extractIntent(turns)).toBe("line1 line2 line3");
+  });
+
+  // Empty-text guard: a pure tool-result user turn (no prose) must be
+  // skipped rather than returned as the intent. Kept separate from the
+  // command/caveat skip rule because the two questions are distinct.
+  test("empty-text user turns are skipped (e.g. pure tool-result)", () => {
+    const turns = [makeUserTurn(""), makeUserTurn("hello")];
+    expect(extractIntent(turns)).toBe("hello");
+  });
+
+  test("all empty or command/caveat user turns → null", () => {
+    const turns = [
+      makeUserTurn(""),
+      makeUserTurn("<caveat>noise</caveat>"),
+    ];
+    expect(extractIntent(turns)).toBeNull();
+  });
+
   // Meta-test — plain test, guards against input mutation / stateful impls.
   test("idempotence: same input twice → same result, input unchanged", () => {
     const turns = [makeUserTurn("hello")];
