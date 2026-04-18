@@ -138,6 +138,16 @@ export function isCommandOrCaveat(text: string): boolean {
  * ENG-5050's `extractIntent` block and ENG-5051's `extractTrigger` block must
  * continue to pass after such a change.
  *
+ * **Strengthened over ENG-5039 spec's backward-walk rule.** The spec says
+ * "nearest preceding user turn whose text doesn't start with `<`". We
+ * additionally skip empty-text user turns, because pure tool-result user
+ * turns (text="") are not real user asks. Without this strengthening,
+ * `extractTrigger`'s backward walk would return "" whenever a commit-authoring
+ * Bash is immediately preceded by another Bash's tool-result turn (which is
+ * the common case in a multi-step commit flow). This is an inferred decision
+ * per ENG-5042 spec-gap discipline — documented here at the code site rather
+ * than in the spec, because the decision is local to the predicate.
+ *
  * Not exported — callers should compose the family-level extractors instead.
  */
 function isRealUserTurn(turn: Turn): boolean {
