@@ -42,21 +42,65 @@ const TRAILER_LINE_RE = /^[A-Za-z][A-Za-z0-9-]*(?: [A-Za-z][A-Za-z0-9-]*)*:\s/;
  * Remove the trailing trailer block from a commit body and return the
  * remaining body lines.
  *
- * Rules (Red-phase placeholder — Green will implement):
+ * Rules:
  *   - The trailer block is the contiguous run of trailer-shaped lines at
- *     the END of the body, preceded by at least one blank line.
- *   - Mid-body lines that look like trailers are NOT stripped.
+ *     the END of the body. In canonical git form it's preceded by at
+ *     least one blank line, but we also collapse a body that is ONLY
+ *     trailer-shaped lines (no preamble) to `""` — defensive against
+ *     malformed `%b` output.
+ *   - Mid-body lines that look like trailers are NOT stripped: the
+ *     trailer block must either (a) start at line 0, or (b) be preceded
+ *     by one or more blank lines.
  *   - If the entire body is trailers (or empty), returns `""`.
  *   - Otherwise, returns the body with the trailing blank line(s) and
  *     trailer block removed, and no trailing `\n`.
  *
  * @param body Raw commit body as produced by `git log --format=%b` (or empty).
  */
-export function stripTrailers(_body: string): string {
-  // Red-phase stub: not yet implemented. Tests marked `test.failing` drive
-  // the Green-phase implementation that will use `TRAILER_LINE_RE` and the
-  // block-at-end-preceded-by-blank rule described in the module header.
-  return "<unimplemented>";
+export function stripTrailers(body: string): string {
+  if (body.length === 0) return "";
+
+  const lines = body.split("\n");
+
+  // Walk backwards from the end, consuming a contiguous run of
+  // trailer-shaped lines. That run is the candidate trailer block.
+  let trailerStart = lines.length;
+  while (trailerStart > 0 && isTrailerLine(lines[trailerStart - 1]!)) {
+    trailerStart -= 1;
+  }
+
+  // No trailer-shaped tail → no stripping needed (modulo trimming
+  // trailing blank lines, which we do unconditionally at the end).
+  if (trailerStart === lines.length) {
+    return trimTrailingBlank(lines).join("\n");
+  }
+
+  // The trailer block is only a real trailer block when it starts at
+  // the top of the body OR is preceded by at least one blank line.
+  // Otherwise those lines are mid-body prose that happens to be
+  // trailer-shaped (e.g. "Note: this applies to edge cases.") and we
+  // leave them in place.
+  const precededByBlank =
+    trailerStart === 0 || lines[trailerStart - 1] === "";
+  if (!precededByBlank) {
+    return trimTrailingBlank(lines).join("\n");
+  }
+
+  // Strip the trailer block, then also strip the blank-line separator(s)
+  // that preceded it so callers don't get a phantom blank tail.
+  const kept = lines.slice(0, trailerStart);
+  return trimTrailingBlank(kept).join("\n");
+}
+
+/**
+ * Drop trailing blank lines from a line array. Used after trailer
+ * stripping so the preserved body ends on a real content line with no
+ * trailing `\n`.
+ */
+function trimTrailingBlank(lines: string[]): string[] {
+  let end = lines.length;
+  while (end > 0 && lines[end - 1] === "") end -= 1;
+  return lines.slice(0, end);
 }
 
 /**

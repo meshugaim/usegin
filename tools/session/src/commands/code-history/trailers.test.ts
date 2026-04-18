@@ -15,7 +15,7 @@ import { describe, test, expect } from "bun:test";
 import { stripTrailers, isTrailerLine } from "./trailers";
 
 describe("stripTrailers (ENG-5041)", () => {
-  test.failing("ENG-5041: strips a trailing trailer block separated by a blank line", () => {
+  test("ENG-5041: strips a trailing trailer block separated by a blank line", () => {
     const body = [
       "This is the real body.",
       "It has two lines.",
@@ -26,7 +26,7 @@ describe("stripTrailers (ENG-5041)", () => {
     expect(stripTrailers(body)).toBe("This is the real body.\nIt has two lines.");
   });
 
-  test.failing(
+  test(
     "ENG-5041: returns empty string when the body is entirely trailers (after a blank-line preamble)",
     () => {
       // Git's `%b` for a commit with no body but trailers will often emit
@@ -41,7 +41,7 @@ describe("stripTrailers (ENG-5041)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041: returns empty string when the body is ONLY trailers with no preamble",
     () => {
       // Defensive: even if git ever emits the trailer block without a
@@ -55,11 +55,11 @@ describe("stripTrailers (ENG-5041)", () => {
     },
   );
 
-  test.failing("ENG-5041: returns empty string for an empty body", () => {
+  test("ENG-5041: returns empty string for an empty body", () => {
     expect(stripTrailers("")).toBe("");
   });
 
-  test.failing(
+  test(
     "ENG-5041: does NOT strip mid-body trailer-lookalikes when real body content follows",
     () => {
       // The rule is "trailers at the END" — a `Key: value` line in the
@@ -78,7 +78,7 @@ describe("stripTrailers (ENG-5041)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041: strips a variety of trailer keys (Co-Authored-By, Claude-Session, Part of, Closes, Signed-off-by, arbitrary)",
     () => {
       // The spec says "any `FooBar: baz` line that matches the git-trailer
@@ -98,14 +98,14 @@ describe("stripTrailers (ENG-5041)", () => {
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041: a single line of plain prose is returned unchanged",
     () => {
       expect(stripTrailers("Just one plain line.")).toBe("Just one plain line.");
     },
   );
 
-  test.failing(
+  test(
     "ENG-5041: trims trailing blank lines from the stripped result so callers get no phantom blank tail",
     () => {
       const body = [
