@@ -19,10 +19,12 @@
  *   - `linear:` line (slice 5)
  *   - `--json` mode (slice 6)
  *
- * TODO: Slice numbering mirrors ENG-5040's plan. If slices re-number
- * (e.g., JSON lands before linear), sweep references across this module:
- * grep `slice 5|slice 6` in
- * tools/session/src/commands/code-history{,.ts,.test.ts,/format.ts,/trailers.ts}.
+ * TODO: Slice numbering mirrors ENG-5040's plan. If the remaining slices
+ * re-number (e.g., JSON lands before linear), sweep FORWARD-LOOKING
+ * references to `slice 5` / `slice 6` across this module. "Slice N landed
+ * in …" attributions (slices 1, 2, 4) are historical and stay pinned.
+ * Grep hint:
+ *   grep -nE 'slice [56]' tools/session/src/commands/code-history{.ts,/*.ts}
  */
 
 import { readFileSync, statSync } from "node:fs";
