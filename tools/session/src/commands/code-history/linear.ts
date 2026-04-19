@@ -191,11 +191,11 @@ export async function fetchLinearIssue(
     // the parent can exit cleanly even though the fds are still held
     // downstream. Safe to call post-`await proc.exited`: we've
     // already read everything we need (or gave up).
-    try {
-      proc?.unref();
-    } catch {
-      // Some proc shapes may not expose `unref` in older Bun; swallow.
-    }
+    //
+    // Safe to call unconditionally: `Subprocess.unref()` has been on
+    // Bun since 1.0, and unref-after-exit is a no-op (not an error),
+    // so no try/catch belt-and-suspenders needed.
+    proc?.unref();
   }
 }
 
