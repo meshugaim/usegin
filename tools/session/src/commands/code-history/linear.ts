@@ -178,19 +178,21 @@ export async function fetchLinearIssue(
   } catch {
     return null;
   } finally {
-    // `AbortSignal.timeout` SIGTERMs the direct `plan` child, but any
-    // grandchild it spawned (a bash wrapper `exec`'ing + spawning
-    // `sleep`, say — or, in the integration tests' fake, literal
-    // `sleep 10`) inherits the stdout/stderr pipe fds and keeps them
-    // open until it exits naturally. Bun's event loop stays alive
-    // waiting on those read ends, which means the whole
-    // `code-history` process hangs until the grandchild finishes —
-    // erasing the user-visible benefit of the timeout.
+    // Today's `plan` is a direct Bun process — no grandchild — so the
+    // event-loop refcount for this subprocess drops naturally once
+    // `await proc.exited` resolves. `unref` is test-fixture insurance
+    // + future-proofing against a wrapper-shim rewrite.
     //
-    // `unref` drops the event-loop refcount for the subprocess so
-    // the parent can exit cleanly even though the fds are still held
-    // downstream. Safe to call post-`await proc.exited`: we've
-    // already read everything we need (or gave up).
+    // The integration tests' fake `plan` is a shell script that spawns
+    // `sleep 10`; the grandchild `sleep` inherits the stdout/stderr
+    // pipe fds and keeps them open until it exits naturally. Bun's
+    // event loop stays alive waiting on those read ends, which would
+    // hang the whole `code-history` process past the timeout window.
+    // `unref` drops the event-loop refcount for the subprocess so the
+    // parent can exit cleanly even though the fds are still held
+    // downstream. If a future `plan`-wrapper-shim rewrite reintroduces
+    // a real grandchild in production, the same insurance applies
+    // there — the one-line call costs nothing.
     //
     // Safe to call unconditionally: `Subprocess.unref()` has been on
     // Bun since 1.0, and unref-after-exit is a no-op (not an error),
