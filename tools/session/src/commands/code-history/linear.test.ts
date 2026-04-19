@@ -10,8 +10,9 @@
  * `fetchLinearIssue` is NOT covered here — it shells out to the `plan`
  * CLI and is exercised via:
  *   (a) in-process failure-path tests in `linear-decorate.test.ts`
- *       (decorator DI stubs the fetch to return null/value without
- *        touching subprocess), and
+ *       (decorator DI stubs the fetch to return the discriminated
+ *        `{ ok: false, detail? }` | `{ id, title, status }` shape
+ *        without touching subprocess), and
  *   (b) subprocess-level integration tests in `code-history.test.ts`
  *       with a fake `plan` binary on `PATH`.
  *

@@ -148,7 +148,7 @@ export async function decorateCommitWithLinear(
     return commit;
   }
   const result = await deps.fetchLinearIssue(id);
-  if ("ok" in result) {
+  if ("ok" in result && result.ok === false) {
     // Fetch failed (AC 18). One-line stderr warning via injected
     // `warn`, threading `detail` through when present so users see
     // actionable signal (`rate limited`, `not authenticated`) rather

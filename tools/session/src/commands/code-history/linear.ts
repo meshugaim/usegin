@@ -150,8 +150,8 @@ export interface FetchLinearIssueFailure {
  */
 function fetchFailure(stderrText: string | undefined): FetchLinearIssueFailure {
   if (stderrText === undefined) return { ok: false };
-  // First non-empty line — trimStart before the empty check so a
-  // leading `\n` doesn't win the split race.
+  // First non-empty line — trim each line before the empty check so
+  // a leading `\n` or surrounding whitespace doesn't win the split race.
   const firstLine = stderrText
     .split("\n")
     .map((l) => l.trim())
@@ -192,7 +192,7 @@ async function readStderr(
   proc: ReturnType<typeof Bun.spawn>,
 ): Promise<string | undefined> {
   const stream = proc.stderr;
-  if (!stream) return "";
+  if (!stream) return undefined;
   // Explicit reader + manual drain so we can `cancel()` on timeout.
   // A bare `new Response(stream).text()` keeps the underlying reader
   // pending when the stream's other end is held open by a grandchild

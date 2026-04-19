@@ -1703,8 +1703,8 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
     async () => {
       // Fake `plan` sleeps 10s — comfortably beyond the 5s timeout.
       // The decorator's subprocess should be aborted via
-      // AbortSignal.timeout(5000), fetchLinearIssue returns null,
-      // warn + omit.
+      // AbortSignal.timeout(5000), fetchLinearIssue returns
+      // `{ ok: false }`, warn + omit.
       await withFakePlanBin(
         { sleepSeconds: 10, exitCode: 0 },
         async (bin) => {

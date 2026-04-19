@@ -5,14 +5,14 @@
  * These tests stub `DecorateLinearDeps` so they can pin:
  *   - Happy path: extract → fetch returns {id,title,status} → commit.linear populated.
  *   - No ENG ref: fetch NOT called, commit.linear stays absent, NO warning.
- *   - Fetch returns null (the one-way-to-fail contract, per G4):
+ *   - Fetch returns `{ ok: false }` (the one-way-to-fail contract, per G4):
  *     commit.linear stays absent, AC-18 warning fired.
  *
  * Subprocess-level integration tests in `../code-history.test.ts`
  * exercise the same pipeline end-to-end through the CLI for the
  * timeout / malformed-JSON / nonzero-exit / missing-`plan`-CLI
  * failure flavors. This file focuses on the decorator's
- * "any-null-from-fetch collapses to warning + omit" contract
+ * "any-failure-from-fetch collapses to warning + omit" contract
  * without the subprocess cost.
  *
  * All tests land as plain `test`. Green (ENG-5044) removed the Red-phase
