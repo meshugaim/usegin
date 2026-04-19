@@ -1290,13 +1290,15 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
   test(
     "ENG-5044 (G3 / ENG-5042): over-long plan-show title → rendered title is truncated with `…` at CONTEXT_MAX_LEN",
     async () => {
-      // Title-truncation pin. The agent's design #7 note on the
-      // decorator calls out that `fetchLinearIssue` applies `truncate`
-      // to the title for consistency with the session extractors
-      // (ENG-5042 — 200-char cap with `…`). Without this test, a
-      // Green implementation could forget the truncate call and the
-      // happy-path assertions would still pass (they use a short
-      // fixture title).
+      // Title-truncation pin. Per ENG-5044 S-6, truncation happens
+      // at the format layer (`formatLinearLine`) — `fetchLinearIssue`
+      // returns the raw title, `DecoratedCommit.linear.title` carries
+      // the raw string, and slice 6's JSON mode emits it verbatim.
+      // This test asserts the RENDER-layer invariant: a 250-char
+      // upstream title shows up with `…` at CONTEXT_MAX_LEN (200) in
+      // the plain block. Without this test, a regression that removes
+      // the `truncateString` call in `formatLinearLine` would pass
+      // the short-fixture happy-path assertions.
       //
       // Build a title that exceeds CONTEXT_MAX_LEN (200 chars) so the
       // output MUST contain `…`. Asserting `<= CONTEXT_MAX_LEN` keeps

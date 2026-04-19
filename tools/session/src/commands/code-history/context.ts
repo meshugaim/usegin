@@ -65,15 +65,21 @@ export const CONTEXT_MAX_LEN = 200;
 export const CONTEXT_ELLIPSIS = "…";
 
 /**
- * Internal string-only variant of `truncate`: applies the collapse-then-cap
- * rule without the null passthrough. Callers that already know their input
- * is non-null (e.g. `extractIntent` after an empty-text guard) can skip the
- * null-overload routing. Not exported — the public API is `truncate`.
+ * String-only variant of `truncate`: applies the collapse-then-cap rule
+ * without the null passthrough. Callers that already know their input is
+ * non-null (e.g. `extractIntent` after an empty-text guard, or
+ * `formatLinearLine` rendering a required `linear.title`) can skip the
+ * null-overload routing that forces a `!` at the call site.
+ *
+ * Exported for format-layer consumers (ENG-5044 S-6: slice-5's
+ * `formatLinearLine` applies truncation at render time so
+ * `DecoratedCommit.linear.title` can carry the raw string for slice 6's
+ * JSON mode — see `types.ts` docstring).
  *
  * See `truncate` below for the full semantics (whitespace collapse scope,
  * cap-inclusive ellipsis, collapse-before-cap ordering).
  */
-function truncateString(value: string): string {
+export function truncateString(value: string): string {
   // Run-collapse: every run of \n/\t (any mix, any length) → single space.
   const collapsed = value.replace(/[\n\t]+/g, " ");
   if (collapsed.length <= CONTEXT_MAX_LEN) return collapsed;

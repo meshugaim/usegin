@@ -9,12 +9,13 @@
  *      spec-explicit (ENG-5039 Algorithm step 5b) — no multi-issue
  *      handling in v1.
  *   2. {@link fetchLinearIssue}  — spawn `plan show <id> --json`,
- *      parse `{ identifier, title, status }` from the JSON, apply
- *      `truncate` to the title (ENG-5042 consistency). Returns `null`
- *      on ANY failure: nonzero exit, timeout (5s via
+ *      parse `{ identifier, title, status }` from the JSON, and
+ *      return the RAW record (no title truncation — that's a
+ *      render-time concern, see step 3 and `types.ts`). Returns
+ *      `null` on ANY failure: nonzero exit, timeout (5s via
  *      `AbortSignal.timeout`), missing `plan` CLI, unparseable JSON,
- *      or partial response (any of the three required fields absent
- *      or non-string).
+ *      or partial response (any of the three required fields absent,
+ *      non-string, or empty-string).
  *   3. {@link formatLinearLine}  — render the one-line output for the
  *      plain-mode block at 4-space indent. Returns `null` when the
  *      commit has no `linear` field populated (AC 9 missing-layer
@@ -34,7 +35,7 @@
  * stderr) and lets tests assert on the warning separately.
  */
 
-import { truncate } from "./context";
+import { truncateString } from "./context";
 import type { DecoratedCommit } from "./types";
 
 /**
@@ -107,8 +108,13 @@ export interface LinearIssue {
  * with no side effects of its own so it's subprocess-testable in
  * isolation.
  *
- * The returned `title` is already `truncate`d (CONTEXT_MAX_LEN=200 with
- * "…" ellipsis) for consistency with the session extractors (ENG-5042).
+ * The returned `title` is the RAW upstream string (no truncation).
+ * Truncation is applied at render time by `formatLinearLine` — keeping
+ * the raw title on `DecoratedCommit.linear.title` lets slice 6's JSON
+ * mode emit the full title while the plain renderer stays capped at
+ * `CONTEXT_MAX_LEN`. Mirrors `DecoratedCommit.body`'s raw-in-JSON
+ * pattern (ENG-5044 S-6 revision of the original "truncate-at-fetch"
+ * design).
  */
 export async function fetchLinearIssue(
   id: string,
@@ -167,12 +173,18 @@ export async function fetchLinearIssue(
     ) {
       return null;
     }
-    // G3: title truncation at the extractor boundary mirrors ENG-5042.
-    // `truncate` never returns null when called with a non-null string,
-    // but its signature includes the null-overload so the `!` is needed.
+    // G3 (revised per ENG-5044 S-6): title is returned RAW here —
+    // truncation happens at the format layer (`formatLinearLine`).
+    // Rationale: `DecoratedCommit.linear.title` feeds both the plain
+    // renderer (which wants the 200-char capped form) and slice 6's
+    // JSON mode (which wants the raw upstream title, mirroring
+    // `DecoratedCommit.body`'s raw-in-JSON pattern). Keeping the raw
+    // string on the decorated-commit record lets each renderer apply
+    // its own truncation policy without the fetch boundary lossy-
+    // baking the cap into shared state.
     return {
       id: record.identifier,
-      title: truncate(record.title)!,
+      title: record.title,
       status: record.status,
     };
   } catch {
@@ -228,8 +240,14 @@ export function formatLinearLine(
   linear: DecoratedCommit["linear"],
 ): string | null {
   if (linear === undefined) return null;
+  // Truncate title at RENDER time (ENG-5044 S-6). The raw title lives
+  // on `DecoratedCommit.linear.title` so slice 6's JSON mode can emit
+  // the full string — mirroring `DecoratedCommit.body`'s raw-in-JSON
+  // pattern. Plain mode caps at `CONTEXT_MAX_LEN` (200) to keep the
+  // block scannable, matching the session-context extractors' budget.
+  const title = truncateString(linear.title);
   // 4-space indent + `linear:` (7 chars) + 3 spaces → value column 14,
   // matching `session:` / `body:`. Fields separated by 2 spaces, status
   // wrapped in brackets. Layout pinned by `linear.test.ts`.
-  return `    linear:   ${linear.id}  ${linear.title}  [${linear.status}]`;
+  return `    linear:   ${linear.id}  ${title}  [${linear.status}]`;
 }

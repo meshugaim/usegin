@@ -238,6 +238,41 @@ describe("formatLinearLine (ENG-5044)", () => {
   );
 
   test(
+    "ENG-5044 (S-6): long title is truncated at RENDER time (`…` at CONTEXT_MAX_LEN), raw title untouched on the input",
+    () => {
+      // S-6 refactor: truncation moved from `fetchLinearIssue` to
+      // `formatLinearLine`. `DecoratedCommit.linear.title` carries the
+      // raw upstream string so slice 6's JSON mode can emit it
+      // verbatim; plain mode applies the 200-char cap at render.
+      //
+      // Unit-level pin for the render invariant — complements the
+      // subprocess-level integration test in `../code-history.test.ts`
+      // (`ENG-5044 (G3 / ENG-5042): over-long plan-show title …`).
+      // If a future refactor drops the `truncateString` call in
+      // `formatLinearLine`, this test fires without needing the
+      // fake-`plan`-bin fixture.
+      const CONTEXT_MAX_LEN = 200;
+      const longTitle = "x".repeat(250);
+      const input = {
+        id: "ENG-1",
+        title: longTitle,
+        status: "Todo",
+      };
+      const line = formatLinearLine(input) ?? "";
+
+      // Raw 250-char title must NOT appear verbatim.
+      expect(line).not.toContain(longTitle);
+      // Ellipsis present — truncate was applied.
+      expect(line).toContain("…");
+      // The input object is unchanged (render-layer truncation doesn't
+      // mutate the record — guards against a future implementation
+      // that rewrites `linear.title` in place, which would defeat
+      // slice 6's raw-in-JSON invariant).
+      expect(input.title).toBe(longTitle);
+    },
+  );
+
+  test(
     "ENG-5044: status with spaces (`In Progress`) renders without quoting",
     () => {
       // Multi-word statuses ("In Progress", "In Review") are common

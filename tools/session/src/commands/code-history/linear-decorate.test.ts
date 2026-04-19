@@ -223,6 +223,39 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
   );
 
   test(
+    "ENG-5044 (S-6): long title from fetch → `commit.linear.title` stays RAW (not truncated at decorator boundary)",
+    async () => {
+      // S-6 refactor pin: title truncation moved from fetch to
+      // render. The decorator must thread the fetch result through
+      // unchanged, so `DecoratedCommit.linear.title` carries the raw
+      // upstream string for slice 6's JSON mode. Render-layer
+      // truncation lives in `formatLinearLine` (see `linear.test.ts`).
+      //
+      // Regression guard: if a future refactor accidentally reintroduces
+      // title truncation at this layer (for instance by wrapping the
+      // fetch result through a "normalize" helper that calls truncate),
+      // this test fires immediately without needing the fake-`plan`
+      // subprocess fixture.
+      const longTitle = "x".repeat(250);
+      const commit = makeCommit();
+      const deps = makeDeps({
+        fetchLinearIssue: async (id) => ({
+          id,
+          title: longTitle,
+          status: "Todo",
+        }),
+      });
+      const decorated = await decorateCommitWithLinear(commit, deps);
+
+      expect(decorated.linear).toBeDefined();
+      // Raw title passes through verbatim — no collapse, no cap, no `…`.
+      expect(decorated.linear!.title).toBe(longTitle);
+      expect(decorated.linear!.title).not.toContain("…");
+      expect(decorated.linear!.title.length).toBe(250);
+    },
+  );
+
+  test(
     "ENG-5044: decorator returns a NEW object on the happy path (no mutation of the input commit)",
     async () => {
       // Mirrors `decorateCommitWithSession`'s immutability contract.

@@ -82,9 +82,12 @@ export interface DecoratedCommit {
    *   - `id`     — the Linear identifier (e.g. `ENG-5039`). Populated
    *     from `identifier` in the JSON (renamed here to `id` for
    *     consistency with `session.id`).
-   *   - `title`  — issue title, already `truncate`d (ENG-5042 convention
-   *     — consistency with every other user-visible string in the
-   *     plain block).
+   *   - `title`  — issue title, RAW (no truncation at the fetch
+   *     boundary — ENG-5044 S-6 revision). Truncation is applied at
+   *     render time by `formatLinearLine` for plain mode; slice 6's
+   *     JSON mode emits the raw string verbatim. Mirrors `body`'s
+   *     raw-in-JSON pattern so the two user-visible long-text fields
+   *     follow one rule.
    *   - `status` — issue state display name (e.g. "In Progress").
    */
   linear?: {
