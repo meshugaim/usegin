@@ -1524,6 +1524,60 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
   );
 
   test(
+    "ENG-5044 (G4 / AC 18): plan show returns JSON with empty-string title/status/identifier → treated as malformed, warn + omit",
+    async () => {
+      // Empty-string partial-response. All three required fields are
+      // present and string-typed, but one is `""`. Without a length
+      // check the decorator would render
+      //   `    linear:   ENG-5039    []`
+      // (or similar) with column misalignment and no user-visible
+      // signal that the upstream response was broken. G4 rule: empty
+      // = absent = malformed → null → warn + omit. Guards against a
+      // `plan show` backend hiccup that emits placeholder empties.
+      const emptyFieldsJson = JSON.stringify({
+        identifier: LINEAR_FIXTURE_ID,
+        title: "", // ← empty
+        status: "In Progress",
+      });
+      await withFakePlanBin(
+        { stdout: emptyFieldsJson, exitCode: 0 },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed" },
+                {
+                  subject: "feat: empty-field plan output",
+                  body: `Fixes ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              const hasLinearLine = result.stdout
+                .split("\n")
+                .some((l) => l.trimStart().startsWith("linear:"));
+              expect(hasLinearLine).toBe(false);
+
+              expect(result.stderr).toContain(LINEAR_FIXTURE_ID);
+            },
+          );
+        },
+      );
+    },
+  );
+
+  test(
     "ENG-5044 (N3 / AC 18): `plan` binary not on PATH → no `linear:` line, stderr warning, no crash, exit 0",
     async () => {
       // Override PATH to drop `plan` while keeping `bun` resolvable —

@@ -153,6 +153,20 @@ export async function fetchLinearIssue(
       title: string;
       status: string;
     };
+    // Empty-string guard (partial-response → null per G4). A `plan show`
+    // response with `{identifier: "", title: "x", status: "y"}` would
+    // otherwise render `    linear:   <empty>  x  [y]` with column
+    // misalignment and no user-visible signal that something went
+    // wrong. Treat empty as absent — the decorator's AC-18 warning
+    // then names the id so the user knows which fetch produced the
+    // bad shape.
+    if (
+      record.identifier.length === 0 ||
+      record.title.length === 0 ||
+      record.status.length === 0
+    ) {
+      return null;
+    }
     // G3: title truncation at the extractor boundary mirrors ENG-5042.
     // `truncate` never returns null when called with a non-null string,
     // but its signature includes the null-overload so the `!` is needed.
