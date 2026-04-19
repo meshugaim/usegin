@@ -144,6 +144,26 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // trailer; it populates `commit.session` otherwise. On
   // SessionNotFoundError it degrades to `{id, sinceTimestampCmd}` only
   // (no extractors) per AC 13 — no throw, no stderr noise.
+  //
+  // Sequential decoration (session → linear): deliberately NOT
+  // parallelized via Promise.all. Both decorators can emit AC-18-style
+  // stderr warnings (session: AC 13 fetch-skipped, linear: AC 18 plan-
+  // show-failed), and each layer's warning must land in pipeline
+  // order so the one-line-per-failure grep invariant stays stable
+  // (`rg '^Warning:'` sees session warning before linear warning).
+  // Parallel would save up to 5s on the double-worst-case (both
+  // decorators hit the full 5s subprocess timeout at once), but
+  // latency isn't a current pain point — `code-history` is
+  // interactive, one-commit-at-a-time, and the worst case is rare.
+  // If latency becomes load-bearing (e.g. a `code-history --all`
+  // mode), revisit — parallelization would need to buffer warnings
+  // and flush in order to preserve the invariant.
+  //
+  // Multi-warning shape: each layer may emit its own AC-18-style
+  // warning; order follows pipeline order. Consolidating warnings
+  // into a single line (e.g. "Warning: session AND linear failed")
+  // is an anti-pattern here — it breaks the one-line-per-failure
+  // invariant that log-greppers and diagnostic tools rely on.
   let decorated;
   try {
     decorated = await decorateCommitWithSession(commit, {
