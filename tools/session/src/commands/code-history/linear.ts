@@ -12,10 +12,13 @@
  *      parse `{ identifier, title, status }` from the JSON, and
  *      return the RAW record (no title truncation — that's a
  *      render-time concern, see step 3 and `types.ts`). Returns
- *      `null` on ANY failure: nonzero exit, timeout (5s via
+ *      a {@link FetchLinearIssueFailure} shape (`{ ok: false,
+ *      detail? }`) on ANY failure: nonzero exit, timeout (5s via
  *      `AbortSignal.timeout`), missing `plan` CLI, unparseable JSON,
  *      or partial response (any of the three required fields absent,
- *      non-string, or empty-string).
+ *      non-string, or empty-string). `detail` carries the first line
+ *      of `plan`'s stderr when available, so the decorator's AC-18
+ *      warning can surface actionable hints (`rate limited`, etc.).
  *   3. {@link formatLinearLine}  — render the one-line output for the
  *      plain-mode block at 4-space indent. Returns `null` when the
  *      commit has no `linear` field populated (AC 9 missing-layer
@@ -26,13 +29,14 @@
  * `Closes: ENG-XXXX` trailer (forward-pointer context from prior
  * slices).
  *
- * Failure → null contract (G4): every failure path in
- * `fetchLinearIssue` collapses to `null`. The decorator
+ * Failure contract (G4): every failure path in `fetchLinearIssue`
+ * collapses to `{ ok: false, detail? }`. The decorator
  * (`decorateCommitWithLinear`, in `linear-decorate.ts`) is responsible
- * for translating null into (a) omitting the `linear` key and (b)
- * emitting the AC-18 stderr warning naming the issue id. Splitting
- * these concerns keeps `fetchLinearIssue` pure (no side effects, no
- * stderr) and lets tests assert on the warning separately.
+ * for translating the failure into (a) omitting the `linear` key and
+ * (b) emitting the AC-18 stderr warning naming the issue id (with
+ * optional inline detail). Splitting these concerns keeps
+ * `fetchLinearIssue` pure (no side effects, no stderr) and lets tests
+ * assert on the warning separately.
  */
 
 import { truncateString } from "./context";

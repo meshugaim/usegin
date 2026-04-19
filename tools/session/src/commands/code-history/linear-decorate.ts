@@ -12,23 +12,31 @@
  *      field, no stderr warning — "no ENG ref in body" is the normal
  *      case, not a failure (AC 9 missing-layer invariant).
  *   3. If ref found: call `fetchLinearIssue(id)` (injectable via
- *      {@link DecorateLinearDeps}). On a non-null result, populate
- *      `commit.linear = { id, title, status }`.
- *   4. On a null result: emit the single-line stderr warning naming
- *      the issue id (AC 18) via the injectable `warn` hook, leaving
- *      `commit.linear` absent so the plain renderer omits the line.
+ *      {@link DecorateLinearDeps}). On a `LinearIssue` result,
+ *      populate `commit.linear = { id, title, status }`.
+ *   4. On a `{ ok: false, detail? }` failure: emit the single-line
+ *      stderr warning naming the issue id (AC 18, with any `detail`
+ *      folded into the template) via the injectable `warn` hook,
+ *      leaving `commit.linear` absent so the plain renderer omits
+ *      the line.
  *
- * All failures collapse into one path (null from fetch → warn +
+ * All failures collapse into one path (failure from fetch → warn +
  * omit). `fetchLinearIssue` owns the subprocess/JSON/timeout/partial
  * failure classification; this decorator only cares about "we tried
- * to fetch and got nothing". That split keeps the warning shape
- * independent of the specific failure mode (spec AC 18 pins ONE
- * line, naming the id — it doesn't prescribe different wording for
- * timeouts vs nonzero exits).
+ * to fetch and got nothing (plus optionally a stderr hint)". That
+ * split keeps the warning shape independent of the specific failure
+ * mode (spec AC 18 pins ONE template, naming the id — it doesn't
+ * prescribe different wording for timeouts vs nonzero exits; the
+ * `detail` slot surfaces actionable signal without forcing the
+ * template to classify).
  *
  * Dependency injection (`DecorateLinearDeps`) exists for testing:
- *   - Unit / integration tests stub `fetchLinearIssue` to return null
- *     or a specific {id, title, status} without spawning `plan`.
+ *   - Unit / integration tests stub `fetchLinearIssue` to return a
+ *     canned {id, title, status} for happy path, `{ ok: false }` (or
+ *     `{ ok: false, detail: "…" }`) for AC-18 failure paths — all
+ *     subprocess failure flavors (timeout, nonzero exit, malformed
+ *     JSON, missing `plan` CLI, partial / empty-string response)
+ *     collapse to the same decorator branch.
  *   - Tests stub `warn` to capture stderr output without redirecting
  *     a real stderr handle. Prod callers pass
  *     `(msg) => console.error(msg)`.
@@ -57,8 +65,10 @@ import type { DecoratedCommit } from "./types";
  * Exposed so tests can stub:
  *   - `fetchLinearIssue` — unit-test the decorator without spawning
  *     `plan show`. Tests pass a canned {id, title, status} for happy
- *     path, `null` for AC-18 failure paths (timeout, nonzero exit,
- *     malformed JSON, missing `plan` CLI — all collapse to null).
+ *     path, `{ ok: false }` (or `{ ok: false, detail: "…" }`) for
+ *     AC-18 failure paths (timeout, nonzero exit, malformed JSON,
+ *     missing `plan` CLI, partial / empty-string response — all
+ *     collapse to the same failure branch).
  *   - `warn` — capture the AC-18 single-line stderr warning in-memory
  *     rather than redirecting stderr. Prod wires `console.error`.
  *

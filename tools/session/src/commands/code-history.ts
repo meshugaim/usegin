@@ -146,23 +146,25 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // (no extractors) per AC 13 — no throw, no stderr noise.
   //
   // Sequential decoration (session → linear): deliberately NOT
-  // parallelized via Promise.all. Both decorators can emit AC-18-style
-  // stderr warnings (session: AC 13 fetch-skipped, linear: AC 18 plan-
-  // show-failed), and each layer's warning must land in pipeline
-  // order so the one-line-per-failure grep invariant stays stable
-  // (`rg '^Warning:'` sees session warning before linear warning).
-  // Parallel would save up to 5s on the double-worst-case (both
-  // decorators hit the full 5s subprocess timeout at once), but
-  // latency isn't a current pain point — `code-history` is
-  // interactive, one-commit-at-a-time, and the worst case is rare.
-  // If latency becomes load-bearing (e.g. a `code-history --all`
-  // mode), revisit — parallelization would need to buffer warnings
-  // and flush in order to preserve the invariant.
+  // parallelized via Promise.all. Keeps output order deterministic
+  // (renderer consumes fields in a fixed sequence anyway) and
+  // simplifies the warning-order story: the linear decorator's
+  // AC-18 warning today, and any future AC-18-style warning from
+  // another layer tomorrow, lands in pipeline order. Parallel would
+  // save up to 5s on the double-worst-case (both decorators hit
+  // a full 5s subprocess timeout at once), but latency isn't a
+  // current pain point — `code-history` is interactive,
+  // one-commit-at-a-time. If latency becomes load-bearing (e.g. a
+  // `code-history --all` mode), revisit — parallelization would
+  // need to buffer warnings and flush in pipeline order to
+  // preserve the invariant.
   //
-  // Multi-warning shape: each layer may emit its own AC-18-style
-  // warning; order follows pipeline order. Consolidating warnings
-  // into a single line (e.g. "Warning: session AND linear failed")
-  // is an anti-pattern here — it breaks the one-line-per-failure
+  // Multi-warning shape: today only the linear decorator emits an
+  // AC-18 stderr warning; session's AC 13 degradation is silent by
+  // spec. If future slices add a warning from another layer, each
+  // layer's warning must stay its own line — consolidating into a
+  // single `"Warning: session AND linear failed"` line is an
+  // anti-pattern because it breaks the one-line-per-failure
   // invariant that log-greppers and diagnostic tools rely on.
   let decorated;
   try {
@@ -191,8 +193,9 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   // propagation path: all failures (timeout, nonzero exit, missing
   // `plan` CLI, malformed JSON, partial response) collapse to a
   // stderr warning + omit (spec AC 18). `fetchLinearIssue` itself
-  // returns null for every failure mode — see its docstring for the
-  // exhaustive list.
+  // returns `{ ok: false, detail? }` for every failure mode — see
+  // its docstring for the exhaustive list, and `formatLinearWarning`
+  // for how the optional `detail` lands in the warning template.
   decorated = await decorateCommitWithLinear(decorated, {
     fetchLinearIssue,
     warn: (msg) => console.error(msg),
