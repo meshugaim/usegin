@@ -1433,6 +1433,70 @@ describe("session code-history linear line (AC 7, AC 18) — ENG-5044", () => {
   );
 
   test(
+    "ENG-5044 (S-2 / AC 18): plan show exits non-zero WITH stderr hint → warning folds first stderr line into `(detail)`",
+    async () => {
+      // S-2 stderr-propagation pin. A bare "plan show ENG-X failed"
+      // swallows `plan`'s actionable errors (`rate limited`,
+      // `not authenticated`, `issue not found`). The decorator
+      // should thread the first stderr line through the warning
+      // so users see WHY the fetch failed.
+      //
+      // Covers the "subprocess ran, wrote stderr, exited nonzero"
+      // failure mode — the most common one in practice (Linear API
+      // 4xx, missing auth, unknown issue).
+      await withFakePlanBin(
+        {
+          exitCode: 1,
+          stderr: "not authenticated: run `plan auth login`",
+        },
+        async (bin) => {
+          await withFixtureRepo(
+            {
+              commits: [
+                { subject: "initial: seed" },
+                {
+                  subject: "feat: references an issue while auth expired",
+                  body: `Fixes ${LINEAR_FIXTURE_ID}.`,
+                },
+              ],
+            },
+            (fx) => {
+              const result = runCli(
+                ["code-history", `${fx.file}:2`],
+                fx.dir,
+                {
+                  env: {
+                    PATH: `${bin.dir}:${process.env.PATH ?? ""}`,
+                  },
+                },
+              );
+              expect(result.exitCode).toBe(0);
+
+              const hasLinearLine = result.stdout
+                .split("\n")
+                .some((l) => l.trimStart().startsWith("linear:"));
+              expect(hasLinearLine).toBe(false);
+
+              // The warning carries the first stderr line inline.
+              expect(result.stderr).toContain(LINEAR_FIXTURE_ID);
+              expect(result.stderr).toContain("not authenticated");
+              // Pinned template shape — detail in parens between id
+              // and the semicolon clause.
+              expect(result.stderr).toContain(
+                `(not authenticated: run \`plan auth login\`)`,
+              );
+              // Single-line invariant still holds (AC 18): strip the
+              // trailing newline, no other newline inside the warning.
+              const warningLine = result.stderr.replace(/\n$/, "");
+              expect(warningLine).not.toContain("\n");
+            },
+          );
+        },
+      );
+    },
+  );
+
+  test(
     "ENG-5044 (N4 / AC 18): plan show returns unparseable JSON → no `linear:` line, stderr warning, exit 0",
     async () => {
       await withFakePlanBin(

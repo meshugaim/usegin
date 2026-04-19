@@ -39,7 +39,7 @@
  */
 
 import { extractLinearRef } from "./linear";
-import type { LinearIssue } from "./linear";
+import type { FetchLinearIssueFailure, LinearIssue } from "./linear";
 import type { DecoratedCommit } from "./types";
 
 /**
@@ -57,8 +57,15 @@ import type { DecoratedCommit } from "./types";
  * from `./linear.ts` and `(msg) => console.error(msg)`.
  */
 export interface DecorateLinearDeps {
-  /** Fetch a Linear issue by ENG id. Returns null on any failure. */
-  fetchLinearIssue: (id: string) => Promise<LinearIssue | null>;
+  /**
+   * Fetch a Linear issue by ENG id. Returns a `LinearIssue` on
+   * success, a `FetchLinearIssueFailure` on any failure — the
+   * failure carries an optional `detail` (first line of stderr,
+   * truncated) that the decorator folds into the AC-18 warning.
+   */
+  fetchLinearIssue: (
+    id: string,
+  ) => Promise<LinearIssue | FetchLinearIssueFailure>;
   /** Emit a single-line stderr warning (AC 18). */
   warn: (message: string) => void;
 }
@@ -72,17 +79,35 @@ export interface DecorateLinearDeps {
  *
  *   `Warning: plan show <id> failed; linear context skipped`
  *
+ * or, when `detail` is present (first line of `plan`'s stderr, already
+ * truncated by `fetchFailure` to `LINEAR_FETCH_DETAIL_MAX_LEN`):
+ *
+ *   `Warning: plan show <id> failed (<detail>); linear context skipped`
+ *
  * `Warning:` (capital W) matches the dominant shape across the
  * `session` CLI (`list.ts`, `find.ts` — `console.error(\`Warning:
  * …\`)`). Keeping the prefix consistent across commands means
  * greps like `rg '^Warning:'` stay stable as slices 5/6/… add more
  * stderr writes.
  *
+ * Single-line invariant (AC 18): `detail` MUST NOT contain a
+ * newline. `fetchFailure` enforces this by taking the first line of
+ * stderr only; the check here is a final guard — if somehow a
+ * newline slips in, the warning still stays on one line by
+ * replacing embedded newlines with spaces.
+ *
  * Exported so tests can assert on the exact bytes without hardcoding
  * the template separately.
  */
-export function formatLinearWarning(id: string): string {
-  return `Warning: plan show ${id} failed; linear context skipped`;
+export function formatLinearWarning(id: string, detail?: string): string {
+  if (detail === undefined || detail.length === 0) {
+    return `Warning: plan show ${id} failed; linear context skipped`;
+  }
+  // Belt-and-suspenders: collapse any residual newlines to keep the
+  // single-line invariant (AC 18). `fetchFailure` already takes the
+  // first stderr line, so this shouldn't fire in practice.
+  const oneLine = detail.replace(/[\n\r]+/g, " ");
+  return `Warning: plan show ${id} failed (${oneLine}); linear context skipped`;
 }
 
 /**
@@ -103,17 +128,19 @@ export async function decorateCommitWithLinear(
     // fetch, no warn (AC 9 missing-layer invariant).
     return commit;
   }
-  const linear = await deps.fetchLinearIssue(id);
-  if (linear === null) {
+  const result = await deps.fetchLinearIssue(id);
+  if ("ok" in result) {
     // Fetch failed (AC 18). One-line stderr warning via injected
-    // `warn`. Leave `commit.linear` absent so the renderer omits
-    // the line.
-    deps.warn(formatLinearWarning(id));
+    // `warn`, threading `detail` through when present so users see
+    // actionable signal (`rate limited`, `not authenticated`) rather
+    // than just a generic "plan show ENG-X failed". Leave
+    // `commit.linear` absent so the renderer omits the line.
+    deps.warn(formatLinearWarning(id, result.detail));
     return commit;
   }
   // Happy path: return a NEW object with `linear` populated. Mirrors
   // `decorateCommitWithSession`'s immutability contract — a caller
   // that wants to detect "decoration happened" via referential
   // equality can, and the input `commit` stays untouched.
-  return { ...commit, linear };
+  return { ...commit, linear: result };
 }

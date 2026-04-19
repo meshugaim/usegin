@@ -157,7 +157,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
       const deps: DecorateLinearDeps = {
         fetchLinearIssue: async () => {
           fetchCalled = true;
-          return null;
+          return { ok: false };
         },
         warn: () => {
           warnCalled = true;
@@ -172,15 +172,17 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
   );
 
   test(
-    "ENG-5044 (AC 18): ENG ref present but fetchLinearIssue returns null → commit.linear absent, warn fired with id-naming message",
+    "ENG-5044 (AC 18): ENG ref present but fetchLinearIssue returns failure → commit.linear absent, warn fired with id-naming message",
     async () => {
       // Collapses all subprocess failure flavors (timeout, nonzero
       // exit, malformed JSON, missing `plan` CLI) — the decorator
-      // doesn't distinguish; fetch returning null IS the signal.
+      // doesn't distinguish; fetch returning `{ ok: false }` IS the
+      // signal. Detail-less shape here; the detail-propagation path
+      // is pinned separately (S-2 test below).
       const commit = makeCommit();
       const warnings: string[] = [];
       const deps: DecorateLinearDeps = {
-        fetchLinearIssue: async () => null,
+        fetchLinearIssue: async () => ({ ok: false }),
         warn: (msg) => warnings.push(msg),
       };
       const decorated = await decorateCommitWithLinear(commit, deps);
@@ -193,6 +195,36 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
       expect(warnings[0]).toBe(formatLinearWarning(LINEAR_FIXTURE_ID));
       expect(warnings[0]).toContain(LINEAR_FIXTURE_ID);
       // Single-line only — no embedded newlines (AC 18 "one line").
+      expect(warnings[0]).not.toContain("\n");
+    },
+  );
+
+  test(
+    "ENG-5044 (S-2 / AC 18): fetch failure with `detail` → warn includes the stderr hint inline",
+    async () => {
+      // S-2 stderr-propagation pin. Without this, a `rate limited` or
+      // `not authenticated` response from `plan` would get swallowed —
+      // the user would see only "plan show ENG-5039 failed" with no
+      // actionable signal. The decorator folds `detail` into the
+      // single-line warning template.
+      const commit = makeCommit();
+      const warnings: string[] = [];
+      const deps: DecorateLinearDeps = {
+        fetchLinearIssue: async () => ({
+          ok: false,
+          detail: "rate limited",
+        }),
+        warn: (msg) => warnings.push(msg),
+      };
+      await decorateCommitWithLinear(commit, deps);
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toBe(
+        formatLinearWarning(LINEAR_FIXTURE_ID, "rate limited"),
+      );
+      expect(warnings[0]).toContain("rate limited");
+      expect(warnings[0]).toContain(LINEAR_FIXTURE_ID);
+      // Single-line invariant (AC 18) holds even with detail embedded.
       expect(warnings[0]).not.toContain("\n");
     },
   );
@@ -211,7 +243,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
       });
       const warnings: string[] = [];
       const deps: DecorateLinearDeps = {
-        fetchLinearIssue: async () => null,
+        fetchLinearIssue: async () => ({ ok: false }),
         warn: (msg) => warnings.push(msg),
       };
       await decorateCommitWithLinear(commit, deps);
@@ -280,7 +312,7 @@ describe("decorateCommitWithLinear (ENG-5044)", () => {
 // helper that already works at Red, not a behavior test.
 
 describe("formatLinearWarning (ENG-5044)", () => {
-  test("ENG-5044 (AC 18): canonical shape for a known id", () => {
+  test("ENG-5044 (AC 18): canonical shape for a known id (no detail)", () => {
     expect(formatLinearWarning("ENG-5044")).toBe(
       "Warning: plan show ENG-5044 failed; linear context skipped",
     );
@@ -291,5 +323,34 @@ describe("formatLinearWarning (ENG-5044)", () => {
     // appending a "try running … manually" hint). AC 18 explicitly
     // pins "one line".
     expect(formatLinearWarning("ENG-1")).not.toContain("\n");
+  });
+
+  test("ENG-5044 (S-2 / AC 18): detail present → rendered inline in parens", () => {
+    // S-2 stderr-propagation shape: when the failure carries a hint
+    // (first line of `plan` stderr), the warning folds it into
+    // `(detail)` between the id and the semicolon clause. Pinned
+    // template so the decorator's warning and subprocess-level
+    // integration assertions share one format.
+    expect(formatLinearWarning("ENG-5044", "rate limited")).toBe(
+      "Warning: plan show ENG-5044 failed (rate limited); linear context skipped",
+    );
+  });
+
+  test("ENG-5044 (S-2 / AC 18): empty detail → rendered as if omitted", () => {
+    // Defensive: a caller that accidentally passes `""` shouldn't
+    // produce `failed (); linear context skipped`. Treat empty as
+    // absent.
+    expect(formatLinearWarning("ENG-5044", "")).toBe(
+      "Warning: plan show ENG-5044 failed; linear context skipped",
+    );
+  });
+
+  test("ENG-5044 (S-2 / AC 18): detail with embedded newline → collapsed to a space (single-line invariant)", () => {
+    // Belt-and-suspenders: `fetchFailure` already takes the first
+    // line of stderr, so this shouldn't fire in practice — but the
+    // formatter defends the AC-18 one-line invariant regardless.
+    const withNewline = formatLinearWarning("ENG-1", "line1\nline2");
+    expect(withNewline).not.toContain("\n");
+    expect(withNewline).toContain("line1 line2");
   });
 });
