@@ -45,8 +45,12 @@ import type { DecoratedCommit } from "./types";
  * Non-global — we only want the first match and want the capture to
  * behave as a single-match result. If a future slice needs all matches,
  * switch callers to `matchAll` and an `/ENG-\d+/g` form.
+ *
+ * Module-private (S-9): the only consumer is `extractLinearRef` in
+ * this file. Tests assert against `extractLinearRef`'s behavior, not
+ * the regex literal — keeps the public API surface small.
  */
-export const LINEAR_REF_RE = /ENG-\d+/;
+const LINEAR_REF_RE = /ENG-\d+/;
 
 /**
  * Subprocess timeout for `plan show` (G1). 5 seconds tolerates
