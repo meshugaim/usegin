@@ -34,8 +34,17 @@
  *     `(msg) => console.error(msg)`.
  *
  * Unlike `session-decorate`, this decorator has NO classification of
- * errors — every failure is null. That's a spec-explicit G4 call:
- * AC 18 says "on ANY failure, skip the line and warn".
+ * errors — every failure collapses to `{ ok: false, detail? }`.
+ * That's a spec-explicit G4 call: AC 18 says "on ANY failure, skip
+ * the line and warn".
+ *
+ * Warnings emit to stderr (via the injected `warn` hook, prod-wired
+ * to `console.error`). Slice 6 JSON mode MUST preserve this shape —
+ * do NOT move warnings into a JSON field like `{ "warnings": […] }`
+ * or append them to stdout. The one-line-per-failure shape is the
+ * thing that makes `code-history` observable from log-greps and
+ * terminal pipelines; collapsing it into structured JSON defeats
+ * that affordance.
  */
 
 import { extractLinearRef } from "./linear";
