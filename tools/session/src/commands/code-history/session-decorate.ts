@@ -116,7 +116,7 @@ export async function decorateCommitWithSession(
     // end-to-end; absent → we fell through to graceful degradation. Plain
     // mode doesn't surface `shortId` directly (it embeds the short form
     // inside `sinceTimestampCmd`), so the field is inert for plain output.
-    shortId: shortId,
+    shortId,
     sinceTimestampCmd,
   };
   if (intent !== null) sessionCtx.intent = intent;
