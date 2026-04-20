@@ -76,36 +76,38 @@ Trailers (`Co-Authored-By:`, `Claude-Session:`, `Part of:`, `Closes:`, etc.) are
 
 ## `--json` mode
 
-Single object on stdout, field order `sha, date, subject, body, session?, linear?`. Absent layers (`session`, `linear`) are **omitted**; an empty post-trailer-strip body is emitted as `null`.
+Single object on stdout, single line, no trailing newline inside the JSON. Field order: `sha, date, subject, body, session?, linear?`. Absent layers (`session`, `linear`) are **omitted**; an empty post-trailer-strip body is emitted as `null`. The `shortId` key on `session` is the discriminator for JSON consumers: present → session fully resolved; absent → AC-13 graceful-degradation branch (`{id, sinceTimestampCmd}` only).
 
 ```bash
 session code-history src/foo.ts:42 --json
 ```
+
+Pretty-printed (the raw output is a single line — pipe through `jq .` to reformat):
 
 ```json
 {
   "sha": "4fff467fb48a632519c742358505e9a0a739d525",
   "date": "2026-04-18",
   "subject": "chore(pre-push): instrument per-stage timings + logger",
-  "body": "Every run appends a JSONL record to .git/pre-push-timings.jsonl …",
+  "body": "Every run appends a JSONL record to .git/pre-push-timings.jsonl (shared across worktrees, never tracked) with the wall time plus per-stage breakdown of `pre-commit`, `test`, and `lint` phases. The JSONL is append-only, one record per push, and the writer fsyncs before exit so a killed push still leaves a valid record. Rotation is handled lazily on read — no background daemon.\n\nPart of: ENG-5033",
   "session": {
     "id": "533a2546-8d19-4d43-9f32-0896102367bc",
     "shortId": "533a2546",
     "intent": "please look at issue 5032",
     "trigger": "let's measure yes",
-    "outcome": "Done. Committed as 4fff467fb (not pushed …)",
+    "outcome": "Done. Committed as 4fff467fb (not pushed — yours to push when ready). What you get now: every pre-push run appends a JSONL rec…",
     "sinceTimestampCmd": "session 533a2546 --since-timestamp 2026-04-18T08:13Z"
   },
   "linear": {
     "id": "ENG-5033",
     "title": "chore(pre-push): instrument per-stage timings + logger",
     "status": "Done",
-    "url": "https://linear.app/askeffi/issue/ENG-5033/..."
+    "url": "https://linear.app/askeffi/issue/ENG-5033/chorepre-push-instrument-per-stage-timings-logger"
   }
 }
 ```
 
-JSON mode emits the **raw** title and body — no truncation. Plain-mode caps (160 for body, 200 for `linear.title` / context extractors) are render-time concerns only.
+JSON mode emits the **raw** title and body — no render-time truncation. Note that `session.intent` / `trigger` / `outcome` ARE truncated (200 chars with `…`) — but at the extractor boundary (AC 15), so the cap applies identically in both modes; the values in `--json` are byte-for-byte the same strings plain mode sees. The full `body` string above is over 400 characters; contrast with the 160-char plain-mode preview.
 
 ### `jq` recipes
 
@@ -140,7 +142,7 @@ Three invariants worth internalizing — they make the output predictable and ch
 
 1. **Missing layer → no line** (AC 9). No `session:` trailer in the commit? The whole session block is omitted. No `ENG-` reference? The `linear:` line is omitted. Empty body after trailer-stripping? The `body:` line is omitted. Never a blank line, never a placeholder like `session: none`.
 
-2. **Graceful degradation on session fetch failure** (AC 13). If the commit body has a `Claude-Session:` trailer but the session JSONL isn't resolvable (locally or in `~/agent-records/`), the `session:` line still renders with the full UUID and the `(→ session … --since-timestamp …)` hint — just without the `intent` / `trigger` / `outcome` extractors. You still get the pointer to the authoring session; you just don't get the pre-extracted context.
+2. **Graceful degradation on session fetch failure** (AC 13). If the commit body has a `Claude-Session:` trailer but the session JSONL isn't resolvable (locally or in `~/agent-records/`), the `session:` line still renders with the full UUID and the `(→ session … --since-timestamp …)` hint — just without the `intent` / `trigger` / `outcome` extractors. You still get the pointer to the authoring session; you just don't get the pre-extracted context. In `--json` mode the degraded object is `{id, sinceTimestampCmd}` only — the absence of the `shortId` key is the discriminator.
 
 3. **Linear fetch failure → warn + omit** (AC 18). If `plan show <id> --json` times out, exits nonzero, returns malformed JSON, or isn't on PATH, the `linear:` line is omitted and a single line goes to stderr:
 
@@ -158,13 +160,14 @@ Three invariants worth internalizing — they make the output predictable and ch
 
 ### "No committed history"
 
-When the file exists but the line has never been committed (untracked file, staged-only change, line beyond the committed range), the command prints a plain stderr message and **exits 0**:
+When the file exists but the line has never been committed (untracked file, staged-only change, line beyond the committed range), the two modes diverge — plain mode treats it as a soft-miss and exits 0, while `--json` mode treats it as an error so pipeline consumers never see an ambiguous zero-exit + empty-stdout:
 
-```
-No committed history for src/foo.ts:42
-```
+| Mode | Exit | stderr | stdout |
+|---|---|---|---|
+| plain | 0 | `No committed history for <file>:<line>` | empty |
+| `--json` | 1 | `Error: No committed history for <file>:<line>` | empty |
 
-This is distinct from a genuine error (missing file, line out of range, git failure), which is prefixed with `Error:` and exits non-zero. In `--json` mode the "no committed history" case routes through the error path instead — a zero-exit with empty stdout would be ambiguous for a JSON consumer.
+This is distinct from a genuine error (missing file, line out of range, git failure), which is prefixed with `Error:` and exits non-zero in both modes.
 
 ## Reserved flags (not yet)
 
