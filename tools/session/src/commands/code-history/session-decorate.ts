@@ -110,6 +110,13 @@ export async function decorateCommitWithSession(
 
   const sessionCtx: NonNullable<DecoratedCommit["session"]> = {
     id: uuid,
+    // `shortId` is populated ONLY on the fully-resolved path — the AC-13
+    // degraded branch above returns before reaching here. Slice 6's JSON
+    // mode relies on this split: `shortId` present → session was parsed
+    // end-to-end; absent → we fell through to graceful degradation. Plain
+    // mode doesn't surface `shortId` directly (it embeds the short form
+    // inside `sinceTimestampCmd`), so the field is inert for plain output.
+    shortId: shortId,
     sinceTimestampCmd,
   };
   if (intent !== null) sessionCtx.intent = intent;

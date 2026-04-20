@@ -60,6 +60,17 @@ export interface DecoratedCommit {
    */
   session?: {
     id: string;
+    /**
+     * First 8 chars of `id` — populated ONLY on the
+     * session-fully-resolved path (`decorateCommitWithSession` success
+     * branch). Absent on the AC-13 graceful-degradation branch
+     * (SessionNotFoundError → `{id, sinceTimestampCmd}` only), which is
+     * how slice 6's JSON mode distinguishes "session resolved" from
+     * "session pointer was there but unresolvable". Plain mode doesn't
+     * render shortId as a standalone value — it appears only inside
+     * `sinceTimestampCmd`.
+     */
+    shortId?: string;
     intent?: string;
     trigger?: string;
     outcome?: string;
@@ -94,5 +105,13 @@ export interface DecoratedCommit {
     id: string;
     title: string;
     status: string;
+    /**
+     * Click-through URL from `plan show`'s JSON (slice 6 — ENG-5055).
+     * Optional: plain mode doesn't render it, and `fetchLinearIssue`
+     * treats absent/non-string `url` as a soft miss (record succeeds
+     * without `url`) rather than a hard failure. JSON mode emits the
+     * `url` key only when populated.
+     */
+    url?: string;
   };
 }

@@ -98,6 +98,15 @@ export interface LinearIssue {
   id: string;
   title: string;
   status: string;
+  /**
+   * Click-through URL from `plan show`'s JSON. Optional because
+   * we treat a malformed/missing `url` as a soft miss (plain mode
+   * doesn't care about url, and slice 6's JSON mode omits the key
+   * when absent). Consistent with the AC-17 "absent optional fields
+   * omitted" decision — a partial-but-useful response still produces
+   * a rendered line in plain mode.
+   */
+  url?: string;
 }
 
 /**
@@ -367,10 +376,23 @@ export async function fetchLinearIssue(
     // string on the decorated-commit record lets each renderer apply
     // its own truncation policy without the fetch boundary lossy-
     // baking the cap into shared state.
+    //
+    // `url` (slice 6 / ENG-5055) is captured from plan-show's JSON when
+    // present and string-typed. Missing / non-string / empty-string → we
+    // omit the field rather than fail the whole fetch — url is a
+    // nice-to-have for the JSON consumer (click-through to Linear), not
+    // load-bearing the way identifier/title/status are. Plain mode
+    // doesn't render it, so absence is invisible there.
+    const url =
+      typeof (parsed as { url?: unknown }).url === "string" &&
+      (parsed as { url: string }).url.length > 0
+        ? (parsed as { url: string }).url
+        : undefined;
     return {
       id: record.identifier,
       title: record.title,
       status: record.status,
+      ...(url !== undefined ? { url } : {}),
     };
   } catch {
     // ENOENT (sync Bun.spawn throw), AbortError (timeout), or
