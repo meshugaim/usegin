@@ -24,13 +24,45 @@
 
 import { describe, test, expect } from "bun:test";
 
-import { extractLinearRef, formatLinearLine } from "./linear";
+import { extractLinearRef, fetchLinearIssue, formatLinearLine } from "./linear";
 import {
   LINEAR_FIXTURE_ID,
   LINEAR_FIXTURE_TITLE,
   LINEAR_FIXTURE_STATUS,
   EXPECTED_LINEAR_LINE,
 } from "./__fixtures__/linear";
+import { withFakePlanBin } from "./__fixtures__/helpers";
+
+/**
+ * Build the JSON that a fake `plan show <id> --json` would emit. Mirrors
+ * the `makePlanShowJson` shape used in `code-history.test.ts` /
+ * `code-history.json.test.ts` — kept local to this file because these
+ * tests want to flex the `url` field directly (absent / null / "" /
+ * non-empty), which the shared helper doesn't parameterize.
+ */
+function makePlanShowJson(
+  overrides: Partial<{
+    identifier: string;
+    title: string;
+    status: string;
+    url: string | null | undefined;
+  }> = {},
+): string {
+  const base: Record<string, unknown> = {
+    id: "uuid-of-issue",
+    identifier: overrides.identifier ?? LINEAR_FIXTURE_ID,
+    title: overrides.title ?? LINEAR_FIXTURE_TITLE,
+    status: overrides.status ?? LINEAR_FIXTURE_STATUS,
+    description: "Some description.",
+    labels: ["Feature"],
+  };
+  // Caller sentinels: `undefined` → omit `url` from the JSON entirely,
+  // `null` → emit `"url": null`, string → emit verbatim (including "").
+  if ("url" in overrides) {
+    base.url = overrides.url;
+  }
+  return JSON.stringify(base);
+}
 
 // =============================================================================
 // extractLinearRef — unit (ENG-5044)
@@ -285,6 +317,141 @@ describe("formatLinearLine (ENG-5044)", () => {
         status: "In Progress",
       });
       expect(line).toBe("    linear:   ENG-1  t  [In Progress]");
+    },
+  );
+});
+
+// =============================================================================
+// fetchLinearIssue — `url` soft-miss unit coverage (ENG-5055)
+// =============================================================================
+//
+// `url` is a slice-6 addition: the JSON renderer emits `linear.url` when
+// `plan show` returned a non-empty string, and OMITS the key otherwise.
+// Plain mode doesn't render url — so if this contract drifts, only JSON
+// consumers notice, and only if they happen to exercise the failure path.
+// Pin the four shapes directly on `fetchLinearIssue` with a fake `plan`
+// binary on PATH so a future refactor can't silently narrow / widen the
+// soft-miss set.
+//
+// Why here rather than in `linear-decorate.test.ts`: these pin the
+// fetch layer's observable behavior (subprocess → record) rather than
+// the decorator's warning-and-omit contract. Decorator tests already
+// cover the "fetch failed → warn + omit" path; fetch tests own
+// "fetch succeeded, but with/without url" — an orthogonal axis.
+//
+// These tests use `withFakePlanBin` and override `process.env.PATH` for
+// the duration of each call. `fetchLinearIssue` is async + spawns a
+// subprocess, so tests are async and the `await` is load-bearing —
+// omitting it would let the subprocess outlive the test body.
+
+describe("fetchLinearIssue url soft-miss (ENG-5055)", () => {
+  // Helper: run `fn` with `process.env.PATH` prepended by `extraDir`,
+  // then restore PATH no matter what. Mirrors the scoped-cleanup
+  // pattern used elsewhere (`withFixtureRepo`, `withTempDir`,
+  // `withFakePlanBin`) — test failures mustn't leak PATH mutations
+  // into sibling tests that also care about PATH (e.g. the subprocess
+  // integration tests above).
+  async function withPathPrepended<T>(
+    extraDir: string,
+    fn: () => T | Promise<T>,
+  ): Promise<T> {
+    const original = process.env.PATH;
+    process.env.PATH = `${extraDir}:${original ?? ""}`;
+    try {
+      return await fn();
+    } finally {
+      process.env.PATH = original;
+    }
+  }
+
+  test(
+    "url present (non-empty string) → populated on the returned issue record",
+    async () => {
+      await withFakePlanBin(
+        {
+          stdout: makePlanShowJson({
+            url: "https://linear.app/askeffi/issue/ENG-5039/foo",
+          }),
+          exitCode: 0,
+        },
+        async (bin) => {
+          await withPathPrepended(bin.dir, async () => {
+            const result = await fetchLinearIssue(LINEAR_FIXTURE_ID);
+            // Happy path: id/title/status still populated, url too.
+            expect("ok" in result).toBe(false);
+            if ("ok" in result) return;
+            expect(result.id).toBe(LINEAR_FIXTURE_ID);
+            expect(result.title).toBe(LINEAR_FIXTURE_TITLE);
+            expect(result.status).toBe(LINEAR_FIXTURE_STATUS);
+            expect(result.url).toBe(
+              "https://linear.app/askeffi/issue/ENG-5039/foo",
+            );
+          });
+        },
+      );
+    },
+  );
+
+  test(
+    "url absent (key missing from JSON) → id/title/status returned, no url key",
+    async () => {
+      await withFakePlanBin(
+        // Omit `url` via the `in` sentinel in makePlanShowJson.
+        { stdout: makePlanShowJson(), exitCode: 0 },
+        async (bin) => {
+          await withPathPrepended(bin.dir, async () => {
+            const result = await fetchLinearIssue(LINEAR_FIXTURE_ID);
+            expect("ok" in result).toBe(false);
+            if ("ok" in result) return;
+            expect(result.id).toBe(LINEAR_FIXTURE_ID);
+            expect(result.title).toBe(LINEAR_FIXTURE_TITLE);
+            expect(result.status).toBe(LINEAR_FIXTURE_STATUS);
+            // Soft miss: record succeeds, url key absent.
+            expect("url" in result).toBe(false);
+          });
+        },
+      );
+    },
+  );
+
+  test(
+    "url null → id/title/status returned, no url key (null is not a string)",
+    async () => {
+      await withFakePlanBin(
+        { stdout: makePlanShowJson({ url: null }), exitCode: 0 },
+        async (bin) => {
+          await withPathPrepended(bin.dir, async () => {
+            const result = await fetchLinearIssue(LINEAR_FIXTURE_ID);
+            expect("ok" in result).toBe(false);
+            if ("ok" in result) return;
+            expect(result.id).toBe(LINEAR_FIXTURE_ID);
+            // Soft miss: null is non-string, url omitted from record.
+            expect("url" in result).toBe(false);
+          });
+        },
+      );
+    },
+  );
+
+  test(
+    "url empty string → id/title/status returned, no url key (empty string treated as absent)",
+    async () => {
+      await withFakePlanBin(
+        { stdout: makePlanShowJson({ url: "" }), exitCode: 0 },
+        async (bin) => {
+          await withPathPrepended(bin.dir, async () => {
+            const result = await fetchLinearIssue(LINEAR_FIXTURE_ID);
+            expect("ok" in result).toBe(false);
+            if ("ok" in result) return;
+            expect(result.id).toBe(LINEAR_FIXTURE_ID);
+            // Soft miss: empty string is not a useful click-through.
+            // The fetch layer omits the key so JSON mode doesn't emit
+            // `"url": ""` — which would look like a bug to a consumer
+            // clicking through to a blank page.
+            expect("url" in result).toBe(false);
+          });
+        },
+      );
     },
   );
 });
