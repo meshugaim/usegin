@@ -8,23 +8,18 @@
  * independently testable.
  *
  * Currently implemented:
- *   - Header line         — AC 4, AC 5 (ENG-5040 slice 1)
- *   - "No committed history" degradation — AC 19 (ENG-5040 slice 1)
- *   - Body preview line   — AC 8, AC 9 (ENG-5041 slice 2)
- *   - Rename following    — AC 20       (ENG-5041 slice 2)
- *   - Reserved-flag rejection — AC 24   (ENG-5041 slice 2)
- *   - `session:` line     — AC 6, AC 13 (ENG-5043 slice 4)
- *   - `linear:` line      — AC 7, AC 18 (ENG-5044 slice 5)
+ *   - Header line         — AC 4, AC 5      (ENG-5040 slice 1)
+ *   - "No committed history" degradation — AC 19 plain side (ENG-5040 slice 1)
+ *   - Body preview line   — AC 8, AC 9      (ENG-5041 slice 2)
+ *   - Rename following    — AC 20           (ENG-5041 slice 2)
+ *   - Reserved-flag rejection — AC 24       (ENG-5041 slice 2)
+ *   - `session:` line     — AC 6, AC 13     (ENG-5043 slice 4)
+ *   - `linear:` line      — AC 7, AC 18     (ENG-5044 slice 5)
+ *   - `--json` mode       — AC 17, AC 18 JSON side, AC 19 JSON side
+ *                                            (ENG-5055 slice 6)
  *
- * Future slices extend `runCodeHistory` with:
- *   - `--json` mode (slice 6)
- *
- * TODO: Slice numbering mirrors ENG-5040's plan. With slice 5 landed,
- * only `slice 6` (JSON mode, ENG-5045) is forward-looking. "Slice N
- * landed in …" attributions (slices 1, 2, 4, 5) are historical and
- * stay pinned.
- * Grep hint:
- *   grep -nE 'slice 6' tools/session/src/commands/code-history{.ts,/*.ts}
+ * "Slice N landed in …" attributions (slices 1, 2, 4, 5, 6) are
+ * historical and stay pinned.
  */
 
 import { readFileSync, statSync } from "node:fs";
