@@ -34,6 +34,7 @@
 
 import { describe, test, expect } from "bun:test";
 
+import { parseCodeHistoryArgs } from "../cli-args";
 import {
   runCli,
   seedSessionJsonl,
@@ -867,3 +868,62 @@ describe("session code-history --json (ENG-5055) — failure modes (AC 18)", () 
   );
 });
 
+// =============================================================================
+// 15-17: Parser layer (AC 17)
+// =============================================================================
+//
+// Parser-layer tests — pure in-process, no subprocess. Pin the
+// `--json` flag recognition on `parseCodeHistoryArgs` and the
+// `--help` precedence.
+
+describe("parseCodeHistoryArgs --json (ENG-5055) — parser layer", () => {
+  test.failing(
+    "ENG-5055 (test 15): --json flag recognized → { file, line, json: true }",
+    () => {
+      // Parser surface contract: `CodeHistoryArgs` grows a
+      // `json: boolean` field. Default false (absence → plain
+      // mode). Presence of `--json` → true.
+      //
+      // Two assertions in one test — the positive case (flag
+      // present) is the load-bearing pin for test 15. The
+      // default-false case is covered by the other `test.failing`
+      // marks on this describe: every "no --json" subprocess
+      // test above passes `[fx.file:N]` without `--json` and
+      // expects JSON stdout to be absent, which is equivalent
+      // to `json: false` going through the pipeline.
+      const result = parseCodeHistoryArgs(["--json", "src/foo.ts:42"]);
+      // Narrow off the "help" return value.
+      expect(result).not.toBe("help");
+      expect(result).toEqual({
+        file: "src/foo.ts",
+        line: 42,
+        json: true,
+      });
+    },
+  );
+
+  test("ENG-5055 (test 16): `--help --json` → 'help' (help wins over --json)", () => {
+    // GNU convention + pinned decision in ENG-5055: --help
+    // precedes --json. When both are present, help takes
+    // priority and the JSON path is NOT invoked.
+    //
+    // Plain `test` (not `test.failing`) — today's parser
+    // already scans pass 1 for --help and returns "help"
+    // before reaching any flag it doesn't recognize (current
+    // behavior ignores --json silently). Once Green adds
+    // --json recognition, this precedence still holds because
+    // --help stays in pass 1. The pin guards the precedence
+    // from future drift (e.g. if someone ever added --json
+    // recognition BEFORE the --help pass).
+    expect(parseCodeHistoryArgs(["--help", "--json"])).toBe("help");
+  });
+
+  test("ENG-5055 (test 17): `--json --help` → 'help' (order-independent)", () => {
+    // Same as test 16 with reversed order — the precedence
+    // rule doesn't depend on argv position. Mirrors pass-1 in
+    // parseCodeHistoryArgs which already scans for --help
+    // before any other recognition. Plain `test` for the same
+    // reason as test 16.
+    expect(parseCodeHistoryArgs(["--json", "--help"])).toBe("help");
+  });
+});
