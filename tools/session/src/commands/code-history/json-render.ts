@@ -67,6 +67,52 @@ import { stripTrailers } from "./trailers";
 import type { DecoratedCommit } from "./types";
 
 /**
+ * Shape of the JSON object emitted by `renderJson` (slice 6 — ENG-5055).
+ *
+ * Mirrors AC 17's pinned field ordering: `sha, date, subject, body,
+ * session?, linear?`. Absent layers (session / linear) are OMITTED from
+ * the JSON output; an empty post-trailer-strip body is emitted as
+ * `null`. All other top-level keys are always present.
+ *
+ * Exported so test fixtures, downstream consumers, and docs can reach
+ * for one authoritative type (rather than duplicating the shape inline
+ * or reaching into `DecoratedCommit`, which carries plain-mode-only
+ * fields like `committedAt`).
+ *
+ * Keep this type in sync with `renderJson`'s builder. If a future slice
+ * widens the JSON shape, update BOTH — the builder's `Record<string,
+ * unknown>` intentionally doesn't bind to this type (to avoid a cast
+ * inside `renderJson`), so drift is caught at the assertion sites, not
+ * at build time.
+ */
+export interface CodeHistoryJson {
+  sha: string;
+  date: string;
+  subject: string;
+  /**
+   * Body AFTER trailer stripping. `null` when the stripped body is empty
+   * (subject-only commit, or body that was only trailers). Otherwise the
+   * raw stripped body — no truncation, no ellipsis (AC 17 exception to
+   * the omit-when-absent rule).
+   */
+  body: string | null;
+  session?: {
+    id: string;
+    shortId?: string;
+    intent?: string;
+    trigger?: string;
+    outcome?: string;
+    sinceTimestampCmd: string;
+  };
+  linear?: {
+    id: string;
+    title: string;
+    status: string;
+    url?: string;
+  };
+}
+
+/**
  * Serialize a `DecoratedCommit` to the AC 17-pinned JSON string for
  * stdout. Emits exactly one JSON object, no trailing newline (the
  * caller adds one via `console.log`).
