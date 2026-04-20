@@ -33,12 +33,18 @@ export interface DecoratedCommit {
   /** Commit subject line. */
   subject: string;
   /**
-   * Full commit body. Trailer stripping happens in the format layer.
+   * Full commit body as produced by `git log --format=%b`. Always a
+   * string on `DecoratedCommit` (possibly empty) — NEVER `null`, NEVER
+   * `undefined`, NEVER omitted at this layer. Trailer stripping happens
+   * in the format / JSON renderers.
    *
-   * Empty body is represented as `""` (empty string) — NOT `null`, NOT
-   * `undefined`, NOT omitted. The JSON mode (slice 6) MUST emit `body`
-   * as `""` in the empty case so consumers can rely on the key being
-   * present and string-typed.
+   * JSON-mode nullify: the JSON renderer (slice 6 / ENG-5055) strips
+   * trailers first, then emits `body: null` when the result is empty
+   * (subject-only commit, or body that was only trailers) and
+   * `body: "<stripped>"` otherwise. `body` is the lone key in the JSON
+   * shape that is allowed to be `null` — all other optional layers
+   * (`session`, `linear`) are OMITTED when absent. See AC 17 and
+   * `json-render.ts` for the exact rule.
    */
   body: string;
   /**
