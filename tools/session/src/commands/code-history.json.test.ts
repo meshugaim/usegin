@@ -877,7 +877,7 @@ describe("session code-history --json (ENG-5055) — failure modes (AC 18)", () 
 // `--help` precedence.
 
 describe("parseCodeHistoryArgs --json (ENG-5055) — parser layer", () => {
-  test.failing(
+  test(
     "ENG-5055 (test 15): --json flag recognized → { file, line, json: true }",
     () => {
       // Parser surface contract: `CodeHistoryArgs` grows a

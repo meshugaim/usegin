@@ -273,6 +273,17 @@ export interface CodeHistoryArgs {
   file: string;
   /** 1-based line number (positive integer). */
   line: number;
+  /**
+   * Emit a single JSON object on stdout instead of the human-readable
+   * plain block. Absence → plain mode. See ENG-5055 (slice 6).
+   *
+   * Layering: this flag changes ONLY the render step. The git layer,
+   * session/linear decoration, and stderr side-effects (AC-18 warning,
+   * AC-19 "no committed history" path) all stay identical — JSON mode
+   * just replaces plain's line-by-line `console.log` with one
+   * `JSON.stringify` write.
+   */
+  json: boolean;
 }
 
 /**
@@ -365,6 +376,18 @@ export function parseCodeHistoryArgs(
     }
   }
 
+  // Pass 3: recognize `--json` (slice 6 — ENG-5055). A bare flag: no
+  // value, so no `requireArgValue` dance. Absent in argv → plain mode
+  // (default `json: false` on the returned `CodeHistoryArgs`).
+  // `--help` already won in pass 1, so `--help --json` and
+  // `--json --help` both return `"help"` regardless of order.
+  let json = false;
+  for (const arg of args) {
+    if (arg === "--json") {
+      json = true;
+    }
+  }
+
   // Find positionals. The spec accepts EXACTLY one — no more, no less.
   // Previously any extra positionals were silently ignored, which meant
   // `session code-history foo:1 bar:2` took `foo:1` and dropped `bar:2`
@@ -410,7 +433,7 @@ export function parseCodeHistoryArgs(
     );
   }
 
-  return { file, line };
+  return { file, line, json };
 }
 
 // =============================================================================

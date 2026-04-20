@@ -75,9 +75,14 @@ import { LINEAR_FETCH_TIMEOUT_MS } from "./code-history/linear";
 
 describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
   test("ENG-5040: parses `file.ts:42` into { file, line }", () => {
+    // `json: false` is the default when `--json` is absent (slice 6 —
+    // ENG-5055). The parser always returns the full shape; tests assert
+    // the default-false explicitly so a regression that accidentally
+    // flipped the default fires here.
     expect(parseCodeHistoryArgs(["src/foo.ts:42"])).toEqual({
       file: "src/foo.ts",
       line: 42,
+      json: false,
     });
   });
 
@@ -85,6 +90,7 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
     expect(parseCodeHistoryArgs(["./src/foo.ts:1"])).toEqual({
       file: "./src/foo.ts",
       line: 1,
+      json: false,
     });
   });
 
@@ -94,6 +100,7 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
     ).toEqual({
       file: "/workspaces/test-mvp/src/foo.ts",
       line: 42,
+      json: false,
     });
   });
 
@@ -106,6 +113,7 @@ describe("parseCodeHistoryArgs (AC 1, AC 2)", () => {
       expect(parseCodeHistoryArgs(["weird:name.ts:42"])).toEqual({
         file: "weird:name.ts",
         line: 42,
+        json: false,
       });
     },
   );
