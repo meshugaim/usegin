@@ -84,9 +84,15 @@ import type { DecoratedCommit } from "./types";
 export function renderJson(commit: DecoratedCommit): string {
   // Build the top-level object in the pinned order (`sha, date,
   // subject, body, session?, linear?`). Conditional keys use the
-  // spread-when-present pattern so absent layers are OMITTED (AC 17
-  // default rule), while `body` is always present with an explicit
-  // `string | null` value (AC 17 exception).
+  // assignment-after-base-literal pattern: start with an object literal
+  // containing the four always-present keys in their pinned order, then
+  // assign `session` / `linear` with `if (x !== undefined) out.key = …`.
+  // Preserves the obvious order at the literal (a reader sees the pinned
+  // quartet at a glance) and keeps the conditional writes plainly
+  // `if`-guarded rather than hidden inside `...(cond ? {k:v} : {})`
+  // spread noise. `body` is always present with an explicit
+  // `string | null` value (AC 17 exception); absent layers are OMITTED
+  // (AC 17 default rule).
   const strippedBody = stripTrailers(commit.body);
   const body: string | null =
     strippedBody.length === 0 ? null : strippedBody;
