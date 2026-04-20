@@ -13,6 +13,8 @@ plan list --status "In Progress"              # Filter by status
 plan list --assignee @me                      # My issues
 plan list --active                            # Sort by recent activity
 plan list --latest                            # Sort by creation date
+plan list --flat                              # Flat list of every issue (top-level + sub-issues)
+plan list --flat --latest                     # Flat chronological feed across all depths
 plan list --json                              # Output as JSON (for agents)
 plan list --json --group-by status            # Grouped JSON output
 plan list --json --page 1 --page-size 10      # Paginated JSON output

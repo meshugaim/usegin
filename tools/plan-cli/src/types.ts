@@ -36,6 +36,12 @@ export interface ListOptions {
   label?: string[];
   search?: string;
   groupBy?: "label" | "project" | "status";
+  /**
+   * Return a flat list of all matching issues (top-level + sub-issues).
+   * When set, drops the `parent: { null: true }` GraphQL filter and skips
+   * nested children fetch — every issue is its own row.
+   */
+  flat?: boolean;
 }
 
 export interface ListResult {

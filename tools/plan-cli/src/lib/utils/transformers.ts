@@ -73,6 +73,16 @@ export function transformGqlIssue(
     }
   }
 
+  // Prefer the explicit parentInfo (set when transforming a recursively-fetched
+  // child), but fall back to the GQL `parent` field for top-level rows. The
+  // fallback matters in flat mode, where former sub-issues come back as their
+  // own rows and we want their parent reference preserved in the output.
+  const parent =
+    parentInfo ??
+    (gqlIssue.parent
+      ? { id: gqlIssue.parent.id, identifier: gqlIssue.parent.identifier }
+      : undefined);
+
   return {
     id: gqlIssue.id,
     identifier: gqlIssue.identifier,
@@ -89,7 +99,7 @@ export function transformGqlIssue(
           displayName: gqlIssue.assignee.displayName,
         }
       : undefined,
-    parent: parentInfo,
+    parent,
     labels: gqlIssue.labels.nodes.map((l) => l.name),
     project: gqlIssue.project?.name,
     children,

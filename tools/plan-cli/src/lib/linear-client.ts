@@ -334,7 +334,11 @@ export class LinearClient {
    * Build the issue fields fragment for GraphQL (exposed for testing)
    * @private
    */
-  private buildIssueFields(depth: number, currentDepth: number = 0): string {
-    return buildIssueFields(depth, currentDepth);
+  private buildIssueFields(
+    depth: number,
+    currentDepth: number = 0,
+    options: { includeChildren?: boolean } = {}
+  ): string {
+    return buildIssueFields(depth, currentDepth, options);
   }
 }

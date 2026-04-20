@@ -42,6 +42,7 @@ export function createListCommand(): Command {
     .option("--assignee <user>", "Filter by assignee (@me for self)")
     .option("--latest", "Sort by creation date (newest first)")
     .option("--active", "Sort by recent activity (most recently updated first)")
+    .option("--flat", "Return all issues (top-level + sub-issues) as a flat list, no tree nesting")
     .option("--json", "Output as JSON")
     .option("--fzf", "Interactive selection with fzf (returns identifier)")
     .option("--multi", "Allow multiple selection (with --fzf)")
@@ -79,6 +80,7 @@ async function runList(opts: {
   json?: boolean;
   latest?: boolean;
   active?: boolean;
+  flat?: boolean;
   fzf?: boolean;
   multi?: boolean;
   showDone?: boolean;
@@ -181,15 +183,21 @@ async function runList(opts: {
       }
     }
 
+    // --flat returns every matching issue as its own row, so depth nesting is
+    // meaningless. Normalise to depth=0 so downstream renderers don't double-walk.
+    const requestedDepth = parseInt(opts.depth ?? "0", 10);
+    const depth = opts.flat ? 0 : requestedDepth;
+
     const options: ListOptions = {
       team,
       project: opts.project ?? process.env.PLAN_PROJECT,
       label: opts.label,
       search: opts.search,
       groupBy: opts.groupBy as ListOptions["groupBy"],
-      depth: parseInt(opts.depth ?? "0", 10),
+      depth,
       status: opts.status,
       assignee: opts.assignee,
+      flat: opts.flat,
     };
 
     let issues: PlanIssue[];

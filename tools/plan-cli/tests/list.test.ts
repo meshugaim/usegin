@@ -70,6 +70,49 @@ describe("plan list command", () => {
   // Note: Tests that require actual Linear API are in tests/e2e/
 });
 
+describe("createListCommand --flat option", () => {
+  it("has --flat defined", () => {
+    const cmd = createListCommand();
+    const flatOption = cmd.options.find((opt) => opt.long === "--flat");
+    expect(flatOption).toBeDefined();
+  });
+
+  it("parses --flat flag", () => {
+    const cmd = createListCommand();
+    let capturedOpts: Record<string, unknown> = {};
+    cmd.action((opts: Record<string, unknown>) => {
+      capturedOpts = opts;
+    });
+
+    cmd.parse(["node", "plan", "--flat"], { from: "user" });
+    expect(capturedOpts.flat).toBe(true);
+  });
+
+  it("defaults flat to undefined when not passed", () => {
+    const cmd = createListCommand();
+    let capturedOpts: Record<string, unknown> = {};
+    cmd.action((opts: Record<string, unknown>) => {
+      capturedOpts = opts;
+    });
+
+    cmd.parse(["node", "plan"], { from: "user" });
+    expect(capturedOpts.flat).toBeUndefined();
+  });
+
+  it("parses --flat together with --latest and --json", () => {
+    const cmd = createListCommand();
+    let capturedOpts: Record<string, unknown> = {};
+    cmd.action((opts: Record<string, unknown>) => {
+      capturedOpts = opts;
+    });
+
+    cmd.parse(["node", "plan", "--flat", "--latest", "--json"], { from: "user" });
+    expect(capturedOpts.flat).toBe(true);
+    expect(capturedOpts.latest).toBe(true);
+    expect(capturedOpts.json).toBe(true);
+  });
+});
+
 describe("createListCommand --json option", () => {
   it("has --json defined as a boolean option", () => {
     const cmd = createListCommand();

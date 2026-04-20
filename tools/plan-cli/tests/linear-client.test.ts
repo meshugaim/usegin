@@ -68,5 +68,17 @@ describe("LinearClient", () => {
       const parentMatches = fields.match(/parent \{/g) || [];
       expect(parentMatches.length).toBe(1);
     });
+
+    it("omits children block entirely when includeChildren is false (flat mode)", () => {
+      const fields = buildIssueFields(0, 0, { includeChildren: false });
+      expect(fields).toContain("identifier");
+      expect(fields).toContain("parent { id identifier }");
+      expect(fields).not.toContain("children");
+    });
+
+    it("flat mode at non-zero depth still omits children (depth is meaningless)", () => {
+      const fields = buildIssueFields(3, 0, { includeChildren: false });
+      expect(fields).not.toContain("children");
+    });
   });
 });

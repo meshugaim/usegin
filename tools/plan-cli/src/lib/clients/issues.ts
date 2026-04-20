@@ -21,10 +21,13 @@ export class IssuesClient {
    * List issues from Linear with pagination support
    */
   async listIssues(options: ListOptions = {}): Promise<PlanIssue[]> {
-    // Build filter - always filter for top-level issues (no parent)
-    const filterParts: string[] = [
-      `parent: { null: true }`,
-    ];
+    // Build filter. By default we restrict to top-level issues so the tree
+    // renderer can fetch children via nested GraphQL selection. In flat mode
+    // we drop that restriction so sub-issues come back as their own rows.
+    const filterParts: string[] = [];
+    if (!options.flat) {
+      filterParts.push(`parent: { null: true }`);
+    }
 
     if (options.team) {
       const team = await this.metadata.getTeamByKey(options.team);
@@ -59,9 +62,10 @@ export class IssuesClient {
 
     const filterStr = `filter: { ${filterParts.join(", ")} }`;
 
-    // Build GraphQL query with dynamic depth for nested children
-    const depth = options.depth ?? 0;
-    const issueFields = buildIssueFields(depth);
+    // Build GraphQL query with dynamic depth for nested children.
+    // In flat mode we never nest — every issue is its own row.
+    const depth = options.flat ? 0 : (options.depth ?? 0);
+    const issueFields = buildIssueFields(depth, 0, { includeChildren: !options.flat });
 
     // Paginate through all results
     const allIssues: GqlIssue[] = [];

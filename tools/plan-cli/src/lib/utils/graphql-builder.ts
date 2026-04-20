@@ -4,9 +4,17 @@
 
 /**
  * Build the issue fields fragment for GraphQL, with nested children up to specified depth.
- * At the deepest level, we still fetch children IDs to show counts of hidden sub-issues.
+ * At the deepest level, we still fetch children IDs to show counts of hidden sub-issues —
+ * unless `includeChildren` is false (flat mode), in which case the children block is
+ * omitted entirely.
  */
-export function buildIssueFields(depth: number, currentDepth: number = 0): string {
+export function buildIssueFields(
+  depth: number,
+  currentDepth: number = 0,
+  options: { includeChildren?: boolean } = {}
+): string {
+  const includeChildren = options.includeChildren ?? true;
+
   const baseFields = `
     id
     identifier
@@ -23,9 +31,13 @@ export function buildIssueFields(depth: number, currentDepth: number = 0): strin
   // Add parent only at top level
   const parentField = currentDepth === 0 ? "\n    parent { id identifier }" : "";
 
+  if (!includeChildren) {
+    return `${baseFields}${parentField}`;
+  }
+
   // Recursively add children if we haven't reached max depth
   if (currentDepth < depth) {
-    const childFields = buildIssueFields(depth, currentDepth + 1);
+    const childFields = buildIssueFields(depth, currentDepth + 1, options);
     return `${baseFields}${parentField}
     children {
       nodes {${childFields}
