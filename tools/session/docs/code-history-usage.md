@@ -45,6 +45,8 @@ session code-history <file>:<line>
 
 The block is a stack of layers. Each layer is independent — missing layers are **omitted cleanly**, no placeholders, no blank lines.
 
+Label column is fixed: `session:` / `linear:` / `body:` all left-align at column 4, with their values starting at column 14 — useful for `awk '{print $NF}'`-style parsing or grep anchoring against plain-mode output.
+
 ## What each output block means
 
 ### Header — always present
@@ -68,13 +70,13 @@ Each of `intent` / `trigger` / `outcome` is independently omitted when the extra
 ```
     linear:   <id>  <title>  [<status>]
 ```
-The title is truncated to 200 chars in plain mode. First `ENG-` match wins — no multi-issue handling.
+The title is truncated to 200 chars in plain mode. See the "first ENG- match wins" invariant below for multi-issue handling.
 
 ### `body:` line — present when the stripped commit body has non-trailer content
 ```
     body:     <first 2 non-blank body lines, joined with spaces, capped at ~160 chars>
 ```
-Trailers (`Co-Authored-By:`, `Claude-Session:`, `Part of:`, `Closes:`, etc.) are stripped first so the preview shows real prose, not boilerplate.
+Trailers (`Co-Authored-By:`, `Claude-Session:`, `Part of:`, `Closes:`, etc.) are stripped first so the preview shows real prose, not boilerplate. The 160-char cap is **character-based, not word-boundary** — the preview can (and often will) cut mid-word and end with the `…` ellipsis.
 
 ## `--json` mode
 
@@ -138,13 +140,15 @@ sid=$(session code-history src/foo.ts:42 --json | jq -r '.session.id // empty')
 
 ## The underlying contract
 
-Three invariants worth internalizing — they make the output predictable and chainable:
+Four invariants worth internalizing — they make the output predictable and chainable:
 
 1. **Missing layer → no line** (AC 9). No `session:` trailer in the commit? The whole session block is omitted. No `ENG-` reference? The `linear:` line is omitted. Empty body after trailer-stripping? The `body:` line is omitted. Never a blank line, never a placeholder like `session: none`.
 
 2. **Graceful degradation on session fetch failure** (AC 13). If the commit body has a `Claude-Session:` trailer but the session JSONL isn't resolvable (locally or in `~/agent-records/`), the `session:` line still renders with the full UUID and the `(→ session … --since-timestamp …)` hint — just without the `intent` / `trigger` / `outcome` extractors. You still get the pointer to the authoring session; you just don't get the pre-extracted context. In `--json` mode the degraded object is `{id, sinceTimestampCmd}` only — the absence of the `shortId` key is the discriminator.
 
-3. **Linear fetch failure → warn + omit** (AC 18). If `plan show <id> --json` times out, exits nonzero, returns malformed JSON, or isn't on PATH, the `linear:` line is omitted and a single line goes to stderr:
+3. **First `ENG-` match wins** — no multi-issue handling. When a commit body contains multiple references (e.g. `Closes: ENG-1234` alongside `Part of: ENG-5678`), `linear:` resolves the first match in body order and ignores the rest. If you need the full set, read the commit body directly (`git show <sha>`) — `session code-history` only surfaces one.
+
+4. **Linear fetch failure → warn + omit** (AC 18). If `plan show <id> --json` times out, exits nonzero, returns malformed JSON, or isn't on PATH, the `linear:` line is omitted and a single line goes to stderr:
 
    ```
    Warning: plan show ENG-5033 failed; linear context skipped
@@ -171,7 +175,7 @@ This is distinct from a genuine error (missing file, line out of range, git fail
 
 ## Reserved flags (not yet)
 
-These are reserved in the parser and currently error out. Follow-up work is tracked in ENG-5048:
+These are reserved in the parser and currently error out. Follow-up work is tracked in ENG-5048 (run `plan show ENG-5048` for current status). See `session code-history --help` for the full RESERVED section.
 
 - `-n <N>` — walk N most recent commits
 - `--all` — walk every commit that touched the line
