@@ -247,6 +247,32 @@ describe("truncate", () => {
     expect(truncate("a\n\n\tb")).toBe("a b");
   });
 
+  // ENG-5055: direct `truncate` pins for the `\s+` widening that the
+  // extractors inherit. Before slice 6 the collapse regex was `\n`/`\t`
+  // only, so a user message like `"Wire   JSON\tmode"` would survive
+  // with its multi-space / tab runs intact into the session block. The
+  // widening to `\s+` is pinned indirectly by the subprocess-level test
+  // 12 in `code-history.json.test.ts` (JSON mode must produce no
+  // multi-space runs in extractor output); these tests pin it DIRECTLY
+  // on `truncate` so a future regex narrowing fires without needing
+  // the fake-`plan`-bin / session-JSONL fixture chain.
+
+  test("\\s+ widening: collapses multi-space run to single space", () => {
+    expect(truncate("a   b")).toBe("a b");
+  });
+
+  test("\\s+ widening: collapses tab runs and mixed tabs to single spaces", () => {
+    expect(truncate("a\tb\t\tc")).toBe("a b c");
+  });
+
+  test("\\s+ widening: collapses carriage return (\\r) to space", () => {
+    expect(truncate("a\rb")).toBe("a b");
+  });
+
+  test("\\s+ widening: collapses non-breaking space (U+00A0) to space", () => {
+    expect(truncate("a\u00a0b")).toBe("a b");
+  });
+
   test("truncation is applied AFTER whitespace collapse", () => {
     // Raw length 255, but consecutive `\n`s collapse into a single run
     // → collapsed value is far under the 200-char cap and must NOT be
