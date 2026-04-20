@@ -313,6 +313,15 @@ export async function fetchLinearIssue(
     proc = Bun.spawn(["plan", "show", id, "--json"], {
       stdout: "pipe",
       stderr: "pipe",
+      // Explicit `env: process.env` (vs. omitted) so subsequent
+      // `process.env.PATH` mutations in the same process ARE picked
+      // up. Bun.spawn's default env snapshots at module load, not per
+      // call, so unit tests that prepend a fake-`plan` dir to PATH
+      // in-process (see `linear.test.ts` / fetchLinearIssue url
+      // soft-miss suite, ENG-5055) need the live env handoff. In
+      // production this is a no-op — nothing else in the command
+      // layer mutates PATH — so the change is purely test-enabling.
+      env: process.env,
       signal: AbortSignal.timeout(LINEAR_FETCH_TIMEOUT_MS),
     });
     const exitCode = await proc.exited;
