@@ -92,7 +92,7 @@ This file maps security domains to their concrete locations in the codebase. It 
 | Service | Purpose | Code Location | In DPA? |
 |---------|---------|---------------|---------|
 | **Anthropic** | AI/LLM engine | `python-services/agent_api/chat_service.py` | Yes |
-| **Google (GFS/VAIS)** | File search, indexing | `python-services/agent_api/admin_gfs_service.py`, `admin_vais_service.py` | Yes |
+| **Google (GFS/VAIS)** | File search, indexing | `python-services/agent_api/gfs_admin/admin_gfs_service.py`, `vais/admin/admin_vais_service.py` | Yes |
 | **Supabase** | Auth, database, storage | Throughout — `lib/supabase/`, `supabase_client.py` | Yes |
 | **Railway** | Cloud hosting | `railway.json`, deployment config | Yes |
 | **Resend** | Transactional email | `python-services/agent_api/api/email.py` | Yes |
@@ -149,7 +149,7 @@ This file maps security domains to their concrete locations in the codebase. It 
 
 ### Admin Monitoring
 - Data summary RPC: `supabase/migrations/20260219135717_get_data_summary.sql`
-- GFS health: `python-services/agent_api/admin_gfs_service.py`
+- GFS health: `python-services/agent_api/gfs_admin/admin_gfs_service.py`
 - Admin dashboard: `nextjs-app/app/admin/page.tsx`
 
 ---
