@@ -45,9 +45,9 @@ import { decorateCommitWithSession } from "./code-history/session-decorate";
 /**
  * Print the command-specific help for `session code-history`.
  *
- * Kept in sync with the spec (ENG-5039). Slice 1 wires it up; later slices
- * document new flags (`--json`, reserved `-n`/`--all`/`-L`/`--func`) as
- * they land.
+ * Kept in sync with the spec (ENG-5039). Slice 1 wired it up; slice 6
+ * (ENG-5055) added the `--json` entry. Reserved `-n`/`--all`/`-L`/
+ * `--func` stay in the RESERVED section until ENG-5048 lands them.
  */
 export function printCodeHistoryHelp(): void {
   // RESERVED section lists flags that the parser rejects with the
@@ -71,6 +71,10 @@ ARGUMENTS:
 
 OPTIONS:
   --help, -h      Show this help
+  --json          Emit a single-line JSON object on stdout instead of the
+                  plain block (field order: sha, date, subject, body,
+                  session?, linear?). Absent layers are OMITTED; an empty
+                  post-trailer-strip body is emitted as null.
 
 RESERVED:
   The following flags are reserved for a follow-up (tracked in ENG-5048)
@@ -80,6 +84,7 @@ ${reservedList}
 EXAMPLES:
   session code-history tools/session/src/cli.ts:42
   session code-history ./nextjs-app/app/page.tsx:1
+  session code-history tools/session/src/cli.ts:42 --json | jq .
 `);
 }
 
