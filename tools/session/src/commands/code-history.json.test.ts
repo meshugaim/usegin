@@ -306,6 +306,18 @@ describe("session code-history --json (ENG-5055) — positive shape (AC 17)", ()
                   "session",
                   "linear",
                 ]);
+                // ENG-5055: positive pin on the session.shortId
+                // discriminator at the full-layer path. `shortId`
+                // presence signals the session was resolved end-to-end
+                // (vs. the AC-13 graceful-degradation branch, which
+                // test 4 pins as absence). Pinning it HERE as well
+                // (alongside the all-six-keys assertion) guards against
+                // a regression where the top-level keys stay intact
+                // but `session.shortId` quietly drops — which would
+                // break the "resolved vs degraded" JSON discriminator
+                // without surfacing on the field-ordering pin.
+                const session = obj.session as Record<string, unknown>;
+                expect(session.shortId).toBe(SESSION_FIXTURE_SHORT_ID);
               },
             );
           },
