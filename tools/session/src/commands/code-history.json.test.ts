@@ -207,7 +207,7 @@ function parseJsonStdout(stdout: string): Record<string, unknown> {
 // one place.
 
 describe("session code-history --json (ENG-5055) — positive shape (AC 17)", () => {
-  test.failing(
+  test(
     "ENG-5055 (AC 17, P1): minimal commit → { sha, date, subject, body: null }, no session / linear keys",
     async () => {
       // Default fixture's last commit has subject only: no body,
@@ -240,7 +240,7 @@ describe("session code-history --json (ENG-5055) — positive shape (AC 17)", ()
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 17, P2): full-layer commit → all six keys present in pinned order",
     async () => {
       // Full-layer commit: body + session trailer + ENG ref +
@@ -314,7 +314,7 @@ describe("session code-history --json (ENG-5055) — positive shape (AC 17)", ()
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 17, P3): session resolvable → session.{id, shortId, intent, trigger, outcome, sinceTimestampCmd}",
     async () => {
       await withTempDir("code-history-json-session-ok-", async (homeDir) => {
@@ -367,7 +367,7 @@ describe("session code-history --json (ENG-5055) — positive shape (AC 17)", ()
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 17, P4): session fetch fails (SessionNotFoundError) → session: { id, sinceTimestampCmd } only",
     async () => {
       // AC 13 graceful degradation — the trailer points at a UUID
@@ -423,7 +423,7 @@ describe("session code-history --json (ENG-5055) — positive shape (AC 17)", ()
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 17, P5): linear resolvable → linear: { id, title, status, url }",
     async () => {
       // Spec AC 17 shape: linear has {id, title, status, url}. The
@@ -476,7 +476,7 @@ describe("session code-history --json (ENG-5055) — positive shape (AC 17)", ()
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 17, P6): linear fetch fails → no `linear` key, AC-18 warning on stderr (see also test 13)",
     async () => {
       // N5 parity with plain mode: fake plan exits 1. JSON path
@@ -522,7 +522,7 @@ describe("session code-history --json (ENG-5055) — positive shape (AC 17)", ()
 // `body: string | null` as the lone exception.
 
 describe("session code-history --json (ENG-5055) — omit invariants (AC 17)", () => {
-  test.failing(
+  test(
     "ENG-5055 (AC 17, I1): body empty → body: null (NOT omitted)",
     async () => {
       // Commit with subject only, no body. AC 17 exception: body
@@ -552,7 +552,7 @@ describe("session code-history --json (ENG-5055) — omit invariants (AC 17)", (
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 17, I2): no Claude-Session trailer → no `session` key at all",
     async () => {
       // Session is omitted, not null. Plain `test` would be fine
@@ -572,7 +572,7 @@ describe("session code-history --json (ENG-5055) — omit invariants (AC 17)", (
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 17, I3): no ENG ref in body → no `linear` key at all",
     async () => {
       // Mirrors test I2 for the linear side. Missing-layer invariant.
@@ -601,7 +601,7 @@ describe("session code-history --json (ENG-5055) — omit invariants (AC 17)", (
 // same collapsed form (no re-truncation at render).
 
 describe("session code-history --json (ENG-5055) — G3 + AC 15 raw/truncated invariants", () => {
-  test.failing(
+  test(
     "ENG-5055 (G3, test 10): linear.title > 60 chars → JSON emits FULL raw title (no truncation, no ellipsis)",
     async () => {
       // Plain mode's linear line truncates titles at CONTEXT_MAX_LEN
@@ -651,7 +651,7 @@ describe("session code-history --json (ENG-5055) — G3 + AC 15 raw/truncated in
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (G3, test 11): body > 200 chars → JSON emits FULL raw body (no truncation, no ellipsis)",
     async () => {
       // Plain mode's body preview caps at BODY_PREVIEW_MAX_LEN
@@ -691,7 +691,7 @@ describe("session code-history --json (ENG-5055) — G3 + AC 15 raw/truncated in
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (AC 15, test 12): intent/trigger/outcome with whitespace runs → JSON emits the collapsed form (same as plain mode's session block)",
     async () => {
       // AC 15 invariant: whitespace collapse + 200-char cap lives
@@ -774,7 +774,7 @@ describe("session code-history --json (ENG-5055) — G3 + AC 15 raw/truncated in
 // discoverability from slice 5 S-10 carries forward.
 
 describe("session code-history --json (ENG-5055) — failure modes (AC 18)", () => {
-  test.failing(
+  test(
     "ENG-5055 (test 13, AC 18): plan show fails in --json mode → stdout is pure JSON (no `linear` key); stderr carries the AC-18 warning",
     async () => {
       await withFakePlanBin({ exitCode: 1 }, async (bin) => {
@@ -822,7 +822,7 @@ describe("session code-history --json (ENG-5055) — failure modes (AC 18)", () 
     },
   );
 
-  test.failing(
+  test(
     "ENG-5055 (test 14, AC 19): no commit history for file:line in --json mode → non-zero exit, error on stderr, stdout EMPTY (no partial JSON)",
     async () => {
       // AC 19 path + JSON discipline: when the command can't

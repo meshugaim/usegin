@@ -42,6 +42,7 @@ import {
   formatBody,
   formatSessionBlock,
 } from "./code-history/format";
+import { renderJson } from "./code-history/json-render";
 import { formatLinearLine, fetchLinearIssue } from "./code-history/linear";
 import { decorateCommitWithLinear } from "./code-history/linear-decorate";
 import { decorateCommitWithSession } from "./code-history/session-decorate";
@@ -107,7 +108,7 @@ export async function runCodeHistory(args: string[]): Promise<void> {
     return;
   }
 
-  const { file, line } = parsed;
+  const { file, line, json } = parsed;
 
   // Upfront validation (AC 2) — before any git spawn. These errors flow
   // through the `"Error: "`-prefixed stderr path via throw → catch, which
@@ -133,6 +134,17 @@ export async function runCodeHistory(args: string[]): Promise<void> {
   }
 
   if (commit === null) {
+    // AC 19 — "no committed history" path. Plain mode exits 0 with a
+    // plain `console.error` (not `"Error: "`-prefixed; distinct from
+    // the `bailWithError` path). JSON mode (slice 6 — ENG-5055) routes
+    // through `bailWithError` instead: a 0-exit + empty-stdout would
+    // be ambiguous from a pipeline consumer's view ("success but
+    // empty"), whereas a non-zero exit + stderr error is the
+    // unambiguous signal that there's no JSON object to consume.
+    // stdout stays empty so `jq` et al. don't see partial-JSON.
+    if (json) {
+      bailWithError(new Error(`No committed history for ${file}:${line}`));
+    }
     console.error(`No committed history for ${file}:${line}`);
     return;
   }
@@ -200,6 +212,18 @@ export async function runCodeHistory(args: string[]): Promise<void> {
     fetchLinearIssue,
     warn: (msg) => console.error(msg),
   });
+
+  // stdout render (slice 6 — ENG-5055). The JSON mode branch diverges
+  // ONLY at the final emit: all upstream steps (git layer, session
+  // decoration, linear decoration + AC-18 stderr warning) ran identically
+  // above. Stderr side-effects (AC-18 warning via `decorateCommitWithLinear`'s
+  // injected `warn`, AC-19 error via `bailWithError`) stay on stderr in
+  // both modes — JSON consumers `jq` the stdout without seeing "Warning:"
+  // bleed-through. Pinned by tests 13 + 14 in code-history.json.test.ts.
+  if (json) {
+    console.log(renderJson(decorated));
+    return;
+  }
 
   console.log(formatHeader(decorated));
 
