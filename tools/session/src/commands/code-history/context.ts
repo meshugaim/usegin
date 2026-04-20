@@ -80,8 +80,19 @@ export const CONTEXT_ELLIPSIS = "…";
  * cap-inclusive ellipsis, collapse-before-cap ordering).
  */
 export function truncateString(value: string): string {
-  // Run-collapse: every run of \n/\t (any mix, any length) → single space.
-  const collapsed = value.replace(/[\n\t]+/g, " ");
+  // Run-collapse: every run of whitespace (spaces, tabs, newlines, any
+  // mix, any length) collapses to a single space. Strengthened from the
+  // original `\n`/`\t`-only rule during ENG-5055 slice 6 — test 12
+  // pins that the session-context extractors produce NO multi-space
+  // runs regardless of mode (plain or JSON), so the extractor boundary
+  // (not the render layer) has to collapse them. Plain mode inherits
+  // the strengthening for free: a user message like
+  // `"Wire   JSON\tmode   into\n\ncode-history."` now renders in the
+  // session block as `"Wire JSON mode into code-history."` instead of
+  // preserving the triple-space runs (which were an accident of the
+  // old regex, not a spec pin — no existing test asserts multi-space
+  // survival).
+  const collapsed = value.replace(/\s+/g, " ");
   if (collapsed.length <= CONTEXT_MAX_LEN) return collapsed;
   // Total length budget INCLUDES the ellipsis (1 char), so keep
   // CONTEXT_MAX_LEN - 1 chars of content + ellipsis = CONTEXT_MAX_LEN total.
@@ -92,12 +103,14 @@ export function truncateString(value: string): string {
  * Collapse runs of internal whitespace and cap length at `CONTEXT_MAX_LEN`
  * (including the trailing "…" when truncation is required).
  *
- * Semantics (matches ENG-5050 AC 15):
+ * Semantics (matches ENG-5050 AC 15, strengthened for ENG-5055 test 12):
  *   - `null` → `null`
- *   - Consecutive `\n`/`\t` runs collapse to a single space
- *     (so `"a\n\n\tb"` → `"a b"`). Collapses only `\n` and `\t`
- *     (and runs thereof); other whitespace (`\r`, `\v`, NBSP, and
- *     runs of regular spaces) passes through unchanged.
+ *   - Consecutive whitespace runs (spaces, tabs, newlines — any JS
+ *     `\s+` match) collapse to a single space (so `"a\n\n\tb"` →
+ *     `"a b"` and `"a   b"` → `"a b"`). Strengthened during slice 6
+ *     (ENG-5055) from the original `\n`/`\t`-only rule — the JSON test
+ *     pins that extractor output carries no multi-space runs, so plain
+ *     mode inherits the same tightened collapse for free.
  *   - Truncation is applied AFTER whitespace collapse, so a 300-char
  *     input that's mostly `\n` can end up short of the cap.
  *   - When the collapsed value exceeds the cap, output is exactly
