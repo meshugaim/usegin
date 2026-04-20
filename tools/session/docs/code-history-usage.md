@@ -17,8 +17,10 @@ Reach for this command when you need to understand **why** a line of code exists
 | Programmatic consumption | `session code-history src/foo.ts:42 --json` |
 | Pipe into `jq` | `session code-history src/foo.ts:42 --json \| jq .` |
 | Just the subject line | `session code-history src/foo.ts:42 --json \| jq -r .subject` |
-| Follow to the authoring session | copy-paste the `(→ session … --since-timestamp …)` hint from the output |
+| Follow to the authoring session (copy-paste) | use the `(→ session … --since-timestamp …)` hint from plain output |
+| Follow to the authoring session (scripted) | `x=$(session code-history src/foo.ts:42 --json \| jq -r '.session.id // empty'); [ -n "$x" ] && session resume "$x"` |
 | Follow to the Linear issue | `plan show $(session code-history src/foo.ts:42 --json \| jq -r .linear.id)` |
+| Open Linear in browser | `url=$(session code-history src/foo.ts:42 --json \| jq -r '.linear.url // empty'); [ -n "$url" ] && xdg-open "$url"` |
 | Command-specific help | `session code-history --help` |
 
 ## Basic Invocation
@@ -126,14 +128,12 @@ url=$(session code-history src/foo.ts:42 --json | jq -r '.linear.url // empty')
 [ -n "$url" ] && xdg-open "$url"
 
 # Chain into `plan show` for the full issue detail
-session code-history src/foo.ts:42 --json \
-  | jq -r '.linear.id // empty' \
-  | xargs -r plan show
+id=$(session code-history src/foo.ts:42 --json | jq -r '.linear.id // empty')
+[ -n "$id" ] && plan show "$id"
 
 # Chain into `session resume` to reopen the authoring session
-session code-history src/foo.ts:42 --json \
-  | jq -r '.session.id // empty' \
-  | xargs -r session resume
+sid=$(session code-history src/foo.ts:42 --json | jq -r '.session.id // empty')
+[ -n "$sid" ] && session resume "$sid"
 ```
 
 ## The underlying contract
@@ -188,7 +188,7 @@ If you need any of these today: fall back to `git log -L N,N:file` and cross-ref
 | Why does this line exist | `session code-history <file>:N` |
 | What session authored this commit | `session code-history <file>:N` (read `session:` line) |
 | The Linear issue for this commit | `session code-history <file>:N` (read `linear:` line) |
-| The full diff of the authoring commit | `session code-history <file>:N --json \| jq -r .sha \| xargs git show` |
+| The full diff of the authoring commit | `git show $(session code-history <file>:N --json \| jq -r .sha)` |
 
 ## See also
 
