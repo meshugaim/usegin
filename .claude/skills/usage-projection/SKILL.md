@@ -41,20 +41,27 @@ Skip the "Current session" bucket unless the user asks — rolling ~5h windows a
 
 Report the baseline. Then move to Pass 2.
 
-### Pass 2 — Active-hours refinement (offer via AskUserQuestion)
+### Pass 2 — Active-hours refinement (ask via AskUserQuestion)
 
 Calendar projection treats 3am and 3pm as equivalent. Real usage clusters in waking/working hours, so the calendar elapsed-fraction usually overstates effective elapsed time and understates headroom.
 
-Ask the user:
+**Always use the `AskUserQuestion` tool for this pass — never plain-text menus.** The tool renders proper selectable chips and lets the user type custom answers via the auto-provided "Other" slot, so don't add an "Other" option yourself.
 
-> **Refine with an active-hours model?**
-> - Yes, use defaults (09:00–23:00 local, all days counted equally)
-> - Yes, custom window
-> - No, baseline is enough
+**Step 1 — ask the mode.** Single `AskUserQuestion` call, one question:
 
-If **defaults**: confirm the local timezone if not already known (ask once).
-If **custom**: ask for `start_hour`, `end_hour`, weekend treatment (`full` / `half` / `off`), and timezone.
-If **no**: stop.
+- `question`: "Refine the projection with an active-hours model?"
+- `header`: "Refinement"
+- `multiSelect`: false
+- `options` (in this order):
+  1. `label`: "Defaults (Recommended)" — `description`: "09:00–23:00 local, weekends counted fully. I'll ask for your timezone next if I don't already know it."
+  2. `label`: "Custom window" — `description`: "Pick your own active hours, weekend treatment, and timezone."
+  3. `label`: "Skip" — `description`: "Baseline calendar projection is enough."
+
+**Step 2 — follow up based on the answer.**
+
+- **Defaults**: if timezone is already known (from conversation or memory), proceed to recompute. Otherwise ask timezone with a single `AskUserQuestion` — one question, options should include 2–3 plausible IANA zones (e.g. `Asia/Jerusalem`, `America/Los_Angeles`, `Europe/London`) so the user can pick or type their own via "Other".
+- **Custom window**: issue one `AskUserQuestion` call bundling up to 4 questions — `Start hour` (options like `07:00`, `09:00`, `10:00`), `End hour` (`21:00`, `23:00`, `01:00`), `Weekends` (`Full`, `Half`, `Off`), `Timezone` (same shape as above). The user can override any field via "Other".
+- **Skip**: stop. Do not recompute.
 
 Then recompute:
 
