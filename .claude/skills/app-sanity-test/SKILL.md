@@ -19,6 +19,17 @@ Start by running `playwright-cli --help` to familiarize yourself with available 
 
 **Local uses port 63000** (not 3000) to avoid conflicting with the developer's own `just dev` instance. Agents use `just agent-dev` for isolated processes.
 
+## Known Users
+
+Persisted across sessions — when the user tells you to use a specific account on an environment, add it here so future runs don't have to ask. Default to offering the matching env's user first (with "Other" as fallback) when prompting for sign-in.
+
+| Env | Email | Role | Notes |
+|-----|-------|------|-------|
+| Staging | `nitsan+staging.owner@askeffi.ai` | owner | Nitsan's owner account on staging |
+| Production | `nitsan@askeffi.ai` | owner | Nitsan's owner account on production |
+
+For local, see `bun scripts/pw-auth.ts` (uses `owner@test.local` by default).
+
 ---
 
 ## Flow
@@ -135,7 +146,7 @@ If `pw-auth.ts` fails, fall back to OTP sign-in via Inbucket:
 
 **Staging / Production** (one-time human in the loop):
 
-1. Use `AskUserQuestion` to ask which email to sign in with. Offer the user's known email (e.g., from a previous auth session or context) as the default option — "Other" lets them type a different one.
+1. Use `AskUserQuestion` to ask which email to sign in with. Offer the matching env's entry from the **Known Users** table at the top of this skill as the default option — "Other" lets them type a different one. If the user supplies a new email, update the Known Users table so the next run already has it.
 2. Navigate to `/sign-in`, fill email, click "Send code"
 3. Ask the user to paste the 6-digit code from their email (plain text — don't use `AskUserQuestion` for this, just ask and wait for their response)
 4. Fill the code into the "Verification code" input, click "Verify"
