@@ -97,6 +97,7 @@ Each entry states: the package, the component it lives in, the constraint, the *
 - **`rich` — stuck at 14.x (transitive).** `pyiceberg>=0.10.0` requires `rich>=10.11.0,<15.0.0`. Same supabase chain as `cachetools`; both unblock together.
 - **`websockets` — stuck at 15.x (transitive).** `realtime==2.28.3` requires `websockets>=11,<16`; `supabase==2.28.3` pins `realtime==2.28.3`. Verified sole path via `uv tree --package realtime --invert`. Newer `realtime` already requires `websockets>=16` — pure supabase-bump unblock.
 - **`protobuf` — stuck at 6.x (transitive).** `google-cloud-aiplatform>=1.136.0` requires `protobuf>4.21.5,<7.0.0`. **Not supabase** — blocked on Google's release cadence. Re-check upstream periodically.
+- **`pdfminer-six` — stuck at 20251230 (transitive).** `pdfplumber==0.11.9` exact-pins `pdfminer-six==20251230`. PyPI's latest pdfplumber is 0.11.9, so unblock requires a new pdfplumber release (0.11.10 or 0.12.x). Discovered 2026-04-23.
 
 ### `nextjs-app/`
 
