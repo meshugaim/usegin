@@ -53,7 +53,10 @@ export class LinearClient {
    */
   private async graphql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
     this._apiCallCount++;
-    const result = await this.sdk.client.rawRequest<T>(query, variables);
+    const result = await this.sdk.client.rawRequest<T, Record<string, unknown>>(query, variables);
+    if (!result.data) {
+      throw new Error("Linear GraphQL response had no data");
+    }
     return result.data;
   }
 

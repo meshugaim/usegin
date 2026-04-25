@@ -2,7 +2,7 @@ import { parseMeta } from "./plan-meta";
 
 const MIN_PREFIX_LENGTH = 8;
 
-export function filterBySession<T extends { description: string }>(
+export function filterBySession<T extends { description?: string }>(
   issues: T[],
   sessionQuery: string,
 ): T[] {
