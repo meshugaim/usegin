@@ -1,24 +1,23 @@
 import { describe, expect, it } from "bun:test";
 import { formatIssuesForFzf, extractIdentifier } from "../src/commands/browse";
 import type { PlanIssue } from "../src/types";
+import { makeIssue } from "./fixtures";
 
 const mockIssues: PlanIssue[] = [
-  {
+  makeIssue({
     id: "issue-1",
     identifier: "ENG-12",
     title: "Fix auth redirect",
     status: "In Progress",
     sortOrder: 1.0,
-    children: [],
-  },
-  {
+  }),
+  makeIssue({
     id: "issue-2",
     identifier: "ENG-20",
     title: "Refactor API client",
     status: "Backlog",
     sortOrder: 2.0,
-    children: [],
-  },
+  }),
 ];
 
 describe("formatIssuesForFzf", () => {

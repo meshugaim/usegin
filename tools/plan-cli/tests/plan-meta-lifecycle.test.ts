@@ -105,9 +105,9 @@ describe("plan-meta lifecycle: create", () => {
 
       // Timestamps should be valid ISO strings
       expect(meta!.created_at).toBeTruthy();
-      expect(new Date(meta!.created_at!).toISOString()).toBe(meta!.created_at);
+      expect(new Date(meta!.created_at!).toISOString()).toBe(meta!.created_at!);
       expect(meta!.updated_at).toBeTruthy();
-      expect(new Date(meta!.updated_at!).toISOString()).toBe(meta!.updated_at);
+      expect(new Date(meta!.updated_at!).toISOString()).toBe(meta!.updated_at!);
     },
     { timeout: 30_000 }
   );
