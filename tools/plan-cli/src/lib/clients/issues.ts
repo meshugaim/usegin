@@ -73,8 +73,8 @@ export class IssuesClient {
     let cursor: string | null = null;
 
     while (hasNextPage) {
-      const afterClause = cursor ? `, after: "${cursor}"` : "";
-      const query = `
+      const afterClause: string = cursor ? `, after: "${cursor}"` : "";
+      const query: string = `
         query ListIssues {
           issues(${filterStr}, first: 100${afterClause}) {
             pageInfo {
@@ -87,12 +87,8 @@ export class IssuesClient {
         }
       `;
 
-      const data = await this.graphql<{
-        issues: {
-          pageInfo: { hasNextPage: boolean; endCursor: string | null };
-          nodes: GqlIssue[];
-        };
-      }>(query);
+      const data: { issues: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: GqlIssue[] } } =
+        await this.graphql(query);
 
       allIssues.push(...data.issues.nodes);
       hasNextPage = data.issues.pageInfo.hasNextPage;
@@ -303,8 +299,8 @@ export class IssuesClient {
       let siblingsCursor: string | null = null;
 
       while (siblingsHasNextPage) {
-        const afterClause = siblingsCursor ? `, after: "${siblingsCursor}"` : "";
-        const siblingsQuery = `
+        const afterClause: string = siblingsCursor ? `, after: "${siblingsCursor}"` : "";
+        const siblingsQuery: string = `
           query GetSiblings($teamId: ID!) {
             issues(filter: {
               team: { id: { eq: $teamId } },
@@ -319,12 +315,12 @@ export class IssuesClient {
             }
           }
         `;
-        const siblingsData = await this.graphql<{
+        const siblingsData: {
           issues: {
             pageInfo: { hasNextPage: boolean; endCursor: string | null };
             nodes: Array<{ id: string; sortOrder: number }>;
           };
-        }>(siblingsQuery, { teamId: issue.team.id });
+        } = await this.graphql(siblingsQuery, { teamId: issue.team.id });
 
         allSiblings.push(...siblingsData.issues.nodes);
         siblingsHasNextPage = siblingsData.issues.pageInfo.hasNextPage;
@@ -523,6 +519,9 @@ export class IssuesClient {
     this.trackCall();
     const rawIssue = await this.sdk.issue(identifier);
     const team = await rawIssue.team;
+    if (!team) {
+      throw new Error(`Issue "${identifier}" has no team`);
+    }
     const teamId = team.id;
 
     // Build update input
@@ -679,8 +678,8 @@ export class IssuesClient {
     let cursor: string | null = null;
 
     while (hasNextPage) {
-      const afterClause = cursor ? `, after: "${cursor}"` : "";
-      const query = `
+      const afterClause: string = cursor ? `, after: "${cursor}"` : "";
+      const query: string = `
         query GetIssuesForReordering {
           issues(filter: { ${filterParts.join(", ")} }, first: 100${afterClause}) {
             pageInfo {
@@ -696,12 +695,8 @@ export class IssuesClient {
         }
       `;
 
-      const data = await this.graphql<{
-        issues: {
-          pageInfo: { hasNextPage: boolean; endCursor: string | null };
-          nodes: GqlIssue[];
-        };
-      }>(query);
+      const data: { issues: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: GqlIssue[] } } =
+        await this.graphql(query);
 
       allIssues.push(...data.issues.nodes);
       hasNextPage = data.issues.pageInfo.hasNextPage;
