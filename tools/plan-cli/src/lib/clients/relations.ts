@@ -2,6 +2,7 @@
  * Linear relations client - handles issue relationships (blocking, duplicate, related) and comments
  */
 
+import { IssueRelationType } from "@linear/sdk";
 import type { LinearClient as LinearSDK } from "@linear/sdk";
 import type { PlanIssue } from "../../types";
 
@@ -27,7 +28,7 @@ export class RelationsClient {
     await this.sdk.createIssueRelation({
       issueId: issue.id,
       relatedIssueId: blocks.id,
-      type: "blocks",
+      type: IssueRelationType.Blocks,
     });
   }
 
@@ -45,7 +46,7 @@ export class RelationsClient {
     await this.sdk.createIssueRelation({
       issueId: blocker.id,
       relatedIssueId: issue.id,
-      type: "blocks",
+      type: IssueRelationType.Blocks,
     });
   }
 
@@ -62,7 +63,7 @@ export class RelationsClient {
     await this.sdk.createIssueRelation({
       issueId: issue.id,
       relatedIssueId: related.id,
-      type: "related",
+      type: IssueRelationType.Related,
     });
   }
 
@@ -79,7 +80,7 @@ export class RelationsClient {
     await this.sdk.createIssueRelation({
       issueId: issue.id,
       relatedIssueId: original.id,
-      type: "duplicate",
+      type: IssueRelationType.Duplicate,
     });
   }
 
