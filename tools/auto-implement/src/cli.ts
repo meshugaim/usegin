@@ -54,16 +54,8 @@ async function spawnClaudePiped(
   delete env.CLAUDECODE;
 
   const args = [
-    "bun",
-    "run",
-    "--bun",
-    "claude",
+    "claude-canonical",
     "-p",
-    "--dangerously-skip-permissions",
-    "--model",
-    "claude-opus-4-6[1m]",
-    "--effort",
-    "high",
     "--session-id",
     sessionId,
   ];
