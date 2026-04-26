@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://askeffi.com/schemas/tdd-skills/impl-plan.schema.json",
+  "title": "impl-plan.md frontmatter",
+  "description": "Schema for the impl-plan.md artefact emitted by the tdd-impl-plan skill. Walked one cycle at a time by tdd-execute.",
+  "type": "object",
+  "required": ["test_plan", "spec", "generated_at", "generated_by", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "test_plan": {
+      "type": "string",
+      "description": "Relative path to the test-plan.md from test-architecture."
+    },
+    "spec": {
+      "type": "string",
+      "pattern": "^ENG-\\d+$",
+      "description": "Linear spec issue id."
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "generated_by": { "type": "string" },
+
+    "pre_red": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "formatter_commits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["cmd", "rationale"],
+            "additionalProperties": false,
+            "properties": {
+              "cmd": { "type": "string" },
+              "rationale": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "walking_skeleton": {
+      "type": "object",
+      "required": ["required"],
+      "additionalProperties": false,
+      "properties": {
+        "required": { "type": "boolean" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["description", "target_test_id"],
+            "additionalProperties": false,
+            "properties": {
+              "description": { "type": "string" },
+              "target_test_id": { "type": "string", "pattern": "^T\\d+$" }
+            }
+          }
+        }
+      },
+      "if": { "properties": { "required": { "const": true } } },
+      "then": { "required": ["required", "steps"] }
+    },
+
+    "steps": {
+      "type": "array",
+      "minItems": 2,
+      "description": "Ordered execution. First step must be outer-red; last must be outer-green referencing the same target_test_id.",
+      "items": {
+        "type": "object",
+        "required": ["n", "target_test_id", "layer", "role", "tdd_or_verification"],
+        "additionalProperties": false,
+        "properties": {
+          "n": { "type": "integer", "minimum": 1 },
+          "target_test_id": { "type": "string", "pattern": "^T\\d+$" },
+          "layer": {
+            "type": "string",
+            "enum": ["unit", "python-unit", "nextjs-db", "nextjs-browser", "python-db", "python-llm", "code-integration", "e2e", "external", "sql-rls", "e2e-cli-framework"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["outer-red", "inner-red", "inner-green", "inner-refactor", "outer-green", "verification-only", "scaffolding", "contract-check", "mutation-pass"]
+          },
+          "tdd_or_verification": {
+            "type": "object",
+            "required": ["tdd"],
+            "additionalProperties": false,
+            "properties": {
+              "tdd": { "type": "boolean" },
+              "reason": { "type": "string" }
+            },
+            "if": { "properties": { "tdd": { "const": false } } },
+            "then": { "required": ["tdd", "reason"] }
+          },
+          "transformation_hint": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "tpp_rank": { "type": "integer", "minimum": 1, "maximum": 11 }
+            }
+          },
+          "predicted_seam_touchpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["file", "kind"],
+              "additionalProperties": false,
+              "properties": {
+                "file": { "type": "string" },
+                "kind": { "type": "string", "enum": ["read", "write", "new"] }
+              }
+            }
+          },
+          "blocker_dependencies": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1 }
+          },
+          "deferred_red": { "type": "boolean", "default": false },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+
+    "mutation_pass": {
+      "type": "object",
+      "required": ["required"],
+      "additionalProperties": false,
+      "properties": {
+        "required": { "type": "boolean" },
+        "scope": { "type": "string" },
+        "mutations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "target_file", "mutation", "expected_to_be_caught_by"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^M\\d+$" },
+              "target_file": { "type": "string" },
+              "target_function": { "type": "string" },
+              "target_line": { "type": "integer" },
+              "mutation": { "type": "string" },
+              "expected_to_be_caught_by": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "pattern": "^T\\d+$" }
+              }
+            }
+          }
+        }
+      },
+      "if": { "properties": { "required": { "const": true } } },
+      "then": { "required": ["required", "scope", "mutations"] }
+    }
+  }
+}
