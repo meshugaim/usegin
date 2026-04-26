@@ -11,6 +11,9 @@
 > - `{{step}}` — the impl-plan step row (YAML block) for this cycle.
 > - `{{test_plan_row}}` — the test-architecture row for `step.target_test_id`.
 > - `{{spec_ac}}` — verbatim AC text for every `ac_id` referenced by the row.
+> - `{{test_file_path}}` — populated from `step.predicted_seam_touchpoints[0].file`
+>   (whichever entry has `kind: new` for the test file). The test you write goes
+>   here. Do not invent a different path. (F-PROMPT-3.)
 > - `{{prior_failure_message}}` — last failureMessage from a previous attempt;
 >   leave **empty** on the first spawn.
 > - `{{plan_pointer}}` — relative path to `impl-plan.md` (read-only reference).
@@ -30,14 +33,58 @@ exactly one reason. (Mandate #8.)
 
 ## Tool & path constraints (hard)
 
-- You may Edit/Write **only** files matching the test globs:
-  `**/*.test.{ts,tsx}`, `**/*.spec.{ts,tsx}`, `**/test_*.py`, `supabase/tests/**/*.sql`.
+- You may Edit/Write **only** files matching the canonical test globs:
+  - `**/*.test.{ts,tsx}` — bun-test (unit / nextjs-db / nextjs-browser / code-integration).
+  - `**/*.spec.{ts,tsx}` — Playwright e2e and code-integration spec form.
+  - `**/test_*.py` — pytest (python-unit / python-db / python-llm).
+  - `supabase/tests/**/*.sql` — pgTAP for sql-rls.
+  Verify the path you intend to write matches one of these *and* the testMatch
+  pattern of the layer's runner (see Per-layer idioms below — F-RT-1).
 - You may Read anything (spec, fixtures, existing tests in the same file).
 - The skill-scoped `PreToolUse` hook will **deny** any production-path Edit; do
   not try. If you find yourself wanting to, you are at the wrong granularity —
   escalate (see below).
 - You run **one** test command — the new test only — and capture its output.
-  Do not run the full suite.
+  Do not run the full suite. For e2e/external layers, the "one test" command
+  may invoke the test runner's full webServer + service-stack startup; that
+  counts as one test (F-RT-4).
+
+## Per-layer test idioms (F-PROMPT-2 / F-RT-2)
+
+Pick the runner and idiom from `step.layer`. One-line per layer; consult the
+referenced CLAUDE.md when in doubt — do not improvise.
+
+| layer | runner | one-line idiom | reference |
+|-------|--------|----------------|-----------|
+| `unit` | `bun test <file>` | `import { test, expect } from "bun:test"` then `expect(fn(...)).toBe(...)` | `nextjs-app/CLAUDE.md` |
+| `python-unit` | `pytest <file>::<test>` | `def test_x(): assert fn(...) == ...` (no fixtures unless required) | `python-services/CLAUDE.md` |
+| `nextjs-db` | `bun test <file>` | `createTestWorld` pattern; service-layer + RLS | `nextjs-app/tests/integration/CLAUDE.md` |
+| `nextjs-browser` | `bun test <file>` | RTL render + `expect(screen.getBy…).toBeInTheDocument()` | `nextjs-app/tests/integration/CLAUDE.md` |
+| `code-integration` | `bun test ./tests/code-integration/<file>` | component prop / API route contract | `tests/code-integration/CLAUDE.md` (if present) |
+| `python-db` | `pytest <file>` | real Supabase via testcontainer; assert via SQL fixture | `python-services/tests/integration/db/CLAUDE.md` |
+| `python-llm` | `pytest <file>` | SDK contract; fake-with-self-test pattern | `python-services/tests/integration/llm/CLAUDE.md` |
+| `e2e` | `bun playwright test <file>` | `import { test, expect } from "@playwright/test"` — NOT vitest, NOT bun:test. Page-object pattern; webServer + auth.json wired by `playwright.config.ts` | `tests/e2e/CLAUDE.md` and `playwright.config.ts` (testMatch authoritative) |
+| `external` | layer-specific (usually `bun test` or `pytest`) | contract-test convention: real call OR fake-with-self-test; `external_dependencies[].contract_check` names where the self-test lives | row's `rationale` cites the convention |
+| `sql-rls` | `bunx supabase test db` | pgTAP — `BEGIN; SELECT plan(N); … SELECT * FROM finish(); ROLLBACK;` | `supabase/tests/CLAUDE.md` (if present) |
+| `e2e-cli-framework` | `bun test tools/e2e/<file>` | tool-internal e2e; lives under `tools/e2e/` | `tools/e2e/CLAUDE.md` |
+
+**Glob/testMatch sanity (F-RT-1).** Before writing the file, confirm:
+- Playwright `testMatch` (in `playwright.config.ts`) matches the path you chose.
+- pytest collection (`pyproject.toml` `[tool.pytest.ini_options]` or
+  `pytest.ini`) discovers `test_*.py` under your chosen directory.
+If neither matches, the test will not run — escalate with `escalate: true`
+rather than silently writing where the runner can't see it.
+
+**Failure-message capture for Playwright (F-RT-5).** Capture the assertion
+error and its `file:line`. Also capture the first 5 lines of the trace summary
+(the "Test timeout" or "Locator …" block). Do **not** inline the `trace.zip`
+binary content; do **not** paste screenshots. Five lines is the cap.
+
+**Fixture build is not your job (F-RT-3).** Building a new fixture (auth.json,
+testcontainer wiring, fake-with-self-test client, env vars) belongs in the
+walking-skeleton step under `phase: pre-red`, run by ScaffoldingTweaker. If
+your test needs a fixture that doesn't exist yet, return with
+`escalate: true` and name the fixture. Do not invent fixtures inline.
 
 ## Inputs
 

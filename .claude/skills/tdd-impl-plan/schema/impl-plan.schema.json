@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://askeffi.com/schemas/tdd-skills/impl-plan.schema.json",
+  "$id": "https://askeffi.ai/schemas/tdd-skills/impl-plan.schema.json",
   "title": "impl-plan.md frontmatter",
-  "description": "Schema for the impl-plan.md artefact emitted by the tdd-impl-plan skill. Walked one cycle at a time by tdd-execute.",
+  "description": "Schema for the impl-plan.md artefact emitted by the tdd-impl-plan skill. Walked one cycle at a time by tdd-execute.\n\nStructural invariants enforced at runtime by the tdd-execute setup gate (F-SCHEMA-3, dry-run §4):\n  - steps[0].role == 'outer-red'\n  - steps[steps.length - 1].role == 'outer-green'\n  - steps[0].target_test_id == steps[steps.length - 1].target_test_id\n  - that target_test_id resolves to a row in the referenced test-plan with outermost: true\n  - steps[i].n == i + 1 (F-SCHEMA-4)\nPure-schema enforcement of these via prefixItems was judged over-engineered; the setup gate is the canonical check.",
   "type": "object",
   "required": ["test_plan", "spec", "generated_at", "generated_by", "steps"],
   "additionalProperties": false,
@@ -16,8 +16,33 @@
       "pattern": "^ENG-\\d+$",
       "description": "Linear spec issue id."
     },
+    "slice": {
+      "type": "string",
+      "description": "Slice identifier — Linear sub-issue id of the slice this impl-plan belongs to. Optional. When present, tdd-execute uses it to derive the workspace path .tdd-execute/<slice>/. Pattern allows a bare ENG-id (whole-spec slices) or a sub-issue id (ENG-XXXX-N). Must match the test-plan's slice field when both are set (F-COUPLE-4).",
+      "pattern": "^ENG-\\d+(-\\d+)?$"
+    },
     "generated_at": { "type": "string", "format": "date-time" },
     "generated_by": { "type": "string" },
+
+    "cycle_budgets": {
+      "type": "object",
+      "description": "Top-level defaults for cycle budgets. Per-step overrides take precedence (F-SCHEMA-5).",
+      "additionalProperties": false,
+      "properties": {
+        "lines_per_green": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 50,
+          "description": "Default cap on added/changed lines per Green cycle (excluding imports and whitespace). GreenTweaker reads this when step.line_budget is not set."
+        },
+        "retry_cap": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "Maximum re-spawn attempts per cycle before the Director escalates to the user."
+        }
+      }
+    },
 
     "pre_red": {
       "type": "object",
@@ -64,16 +89,21 @@
     "steps": {
       "type": "array",
       "minItems": 2,
-      "description": "Ordered execution. First step must be outer-red; last must be outer-green referencing the same target_test_id.",
+      "description": "Ordered execution. F-SCHEMA-3 invariants (enforced by tdd-execute setup gate, not by pure schema): steps[0].role == 'outer-red'; steps[last].role == 'outer-green'; both reference the same target_test_id; that target_test_id resolves to a test-plan row with outermost: true.",
       "items": {
         "type": "object",
         "required": ["n", "target_test_id", "layer", "role", "tdd_or_verification"],
         "additionalProperties": false,
         "properties": {
-          "n": { "type": "integer", "minimum": 1 },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-based step index. Invariant (F-SCHEMA-4, runtime-enforced by tdd-execute): steps[i].n == i + 1. Pure-schema enforcement via prefixItems was judged over-engineered."
+          },
           "target_test_id": { "type": "string", "pattern": "^T\\d+$" },
           "layer": {
             "type": "string",
+            "description": "Must stay in sync with test-plan.schema.json#/$defs/layer enum (single source of truth — F-SCHEMA-1).",
             "enum": ["unit", "python-unit", "nextjs-db", "nextjs-browser", "python-db", "python-llm", "code-integration", "e2e", "external", "sql-rls", "e2e-cli-framework"]
           },
           "role": {

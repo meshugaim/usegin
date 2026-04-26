@@ -12,6 +12,11 @@
       "description": "Linear issue id of the parent spec (e.g. ENG-XXXX).",
       "pattern": "^ENG-[0-9]+$"
     },
+    "slice": {
+      "type": "string",
+      "description": "Slice identifier — Linear sub-issue id of the slice this test-plan belongs to. Optional. When present, tdd-execute uses it to derive the workspace path .tdd-execute/<slice>/. Pattern allows a bare ENG-id (whole-spec slices) or a sub-issue id (ENG-XXXX-N).",
+      "pattern": "^ENG-\\d+(-\\d+)?$"
+    },
     "generated_at": {
       "type": "string",
       "format": "date-time"
@@ -23,8 +28,15 @@
     "tests": {
       "type": "array",
       "minItems": 1,
-      "description": "One row per test. Validation rules in SKILL.md 'Required slots' are enforced by the test-architecture skill before emission; the schema only enforces shape.",
-      "items": { "$ref": "#/$defs/testRow" }
+      "description": "One row per test. Validation rules in SKILL.md 'Required slots' are enforced by the test-architecture skill before emission; the schema only enforces shape. F-SCHEMA-2 (dry-run §4): exactly one row must have outermost: true.",
+      "items": { "$ref": "#/$defs/testRow" },
+      "contains": {
+        "type": "object",
+        "properties": { "outermost": { "const": true } },
+        "required": ["outermost"]
+      },
+      "minContains": 1,
+      "maxContains": 1
     }
   },
   "$defs": {
@@ -40,9 +52,10 @@
         "code-integration",
         "e2e",
         "external",
-        "sql-rls"
+        "sql-rls",
+        "e2e-cli-framework"
       ],
-      "description": "Canonical 10-name layer taxonomy from 05-doc-audit.md 'Proposed Canonical Taxonomy'. No aliases."
+      "description": "Canonical 11-name layer taxonomy from 05-doc-audit.md 'Proposed Canonical Taxonomy'. Must stay in sync with impl-plan.schema.json#/properties/steps/items/properties/layer/enum (single source of truth — see F-SCHEMA-1). No aliases."
     },
     "failureModeClass": {
       "type": "string",
@@ -121,7 +134,8 @@
         "failure_mode_class": { "$ref": "#/$defs/failureModeClass" },
         "mock_can_lie_note": {
           "type": "string",
-          "description": "REQUIRED when any external_dependencies[].kind == 'mocked'. Answers: 'what contract drift between this mock and production would this test fail to surface?' (ENG-4922 / ENG-4934 T1). Generic notes ('n/a', 'nothing') indicate the audit was skipped."
+          "minLength": 1,
+          "description": "REQUIRED when any external_dependencies[].kind == 'mocked'. Answers: 'what contract drift between this mock and production would this test fail to surface?' (ENG-4922 / ENG-4934 T1). Generic notes ('n/a', 'nothing') indicate the audit was skipped. minLength is hoisted (F-SCHEMA-6) so the empty string never validates even if a future schema edit removes the conditional gate below."
         }
       },
       "allOf": [

@@ -46,7 +46,7 @@ Six steps. The first five are silent research + drafting; the last is a single-i
 | 3 | Name outermost | For each user-visible behaviour, mark exactly one test `outermost: true` — the one that traverses the user-observable surface (Mandate #2). | spec AC id |
 | 4 | Enumerate writers + races | For derived/mirror fields, list every write-site -> one `failure_mode_class: contract` row each (ENG-5023). For ACs whose text mentions polling, optimistic UI, retry, race, concurrency: add a `failure_mode_class: race` sibling row (ENG-2821 chaos cluster). | ENG-5023, ENG-2821 |
 | 5 | Emit `test-plan.md` + summary | Write the YAML and a one-page summary for the liaison. Validate against `schema/test-plan.schema.json`. | — |
-| 6 | Unseeded reviewer pass | Spawn one reviewer with diff + spec + slices only. No "key questions." Apply **all** findings (per `feedback_liaison_fix_everything`). Single iteration. | feedback memos |
+| 6 | Unseeded reviewer pass | Spawn one reviewer with diff + spec + slices only. No "key questions." Apply **all** findings (per `feedback_liaison_fix_everything`). Single iteration. **F-FRICTION-5 small-plan relief:** the reviewer pass may be skipped for plans with **≤4 tests AND single layer** (cite `feedback_single_iteration_review` two-tier discipline). On skip, set frontmatter `reviewed: skipped` and `reviewed_reason: "small-plan-relief — N tests, layer X"`. Larger or multi-layer plans always get the reviewer pass. | feedback memos |
 
 Mandate #4 (red must be observed) is enforced at `tdd-execute`. Your job here: write the `assertion_shape` precisely enough that the RedTweaker's observed `failureMessage` can be compared against intent. The plan commits to *what failure should look like*; execute observes the actual failure.
 
@@ -80,8 +80,13 @@ Path: `docs/specs/<feature>/test-plan.md` (sibling of the spec) or `docs/researc
 
 ```yaml
 spec: ENG-XXXX
+slice: ENG-XXXX-N                  # slice id (pattern ^ENG-\d+(-\d+)?$).
+                                   # Mirrors the slice from slicing-specs; consumed
+                                   # by tdd-impl-plan and tdd-execute. Per F-COUPLE-4.
 generated_at: <iso>
 generated_by: test-architecture@<rev>
+reviewed: ok                       # "ok" (default) | "skipped"
+reviewed_reason: ""                # required if reviewed: skipped (per F-FRICTION-5)
 
 tests:
   - id: T1
@@ -118,6 +123,22 @@ The skill **refuses to emit** if any of these is violated. These are hard rules,
 | 3 | Write-site enumeration | For each derived/mirror field invariant, every writer has a `failure_mode_class: contract` row. | ENG-5023 |
 | 4 | Async-coordination flagging | Every AC mentioning polling / optimistic UI / retry / race / concurrency has a `failure_mode_class: race` row alongside the happy path. | ENG-2821 chaos cluster |
 | 5 | Mock-can-lie audit | Every test with any `external_dependencies.kind == mocked` has a `mock_can_lie_note`. | ENG-4922 / ENG-4934 T1 |
+
+## Single-layer features (F-FRICTION-1)
+
+For slices that satisfy **all** of the following:
+
+- every test row shares the same `layer`,
+- no `external_dependencies` block on any row, AND
+- no mirror invariants / derived-field write-sites,
+
+apply this relief path:
+
+1. **Outermost selection.** Mark the highest-`failure_mode_class` row as `outermost: true`, using the priority `contract > race > error > happy`. (Rationale: the test that pins the most demanding behaviour is the most useful endpoint to drive the slice green.) For pure single-class slices (e.g. four `happy` rows for a small pure function), pick the row whose `assertion_shape` exercises the broadest input — typically the case that forces the most branches.
+2. **Slot suppression.** Required Slots #3 (write-site enumeration), #4 (async-coordination flagging), and #5 (mock-can-lie audit) are vacuously satisfied. Emit explicit `n/a` notes in the per-slot audit table at the bottom of the test-plan (`'n/a — single-layer pure function'` is the canonical phrasing). Do NOT silently omit; reviewers and downstream readers should see the explicit suppression.
+3. **Reviewer scope.** Reviewer pass is still required (subject to F-FRICTION-5 small-plan relief below); the brief should include the simplified-feature flag so the reviewer doesn't surface noise findings from the suppressed slots.
+
+This is the trio's smallest sane footprint. The framing of "two layers per AC is normal" in the Layer picker §139 is correct for sliced multi-layer specs; this section names the exception path explicitly so reviewers don't bounce single-layer plans back to spec.
 
 ## Layer picker
 

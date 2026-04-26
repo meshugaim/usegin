@@ -60,6 +60,9 @@ Consumes: `test-plan.md` (from `test-architecture`) + the spec issue (for AC tex
 ---
 test_plan: <relative path>            # pointer to test-architecture output
 spec: ENG-XXXX
+slice: ENG-XXXX-N                     # slice id (pattern ^ENG-\d+(-\d+)?$).
+                                      # tdd-execute uses this to derive its workspace
+                                      # path: .tdd-execute/<slice>/. Per F-COUPLE-4.
 generated_at: <iso>
 generated_by: tdd-impl-plan@<rev>
 
@@ -184,6 +187,7 @@ Per `feedback_format_before_tdd`: when `pre_red.formatter_commits` is non-empty,
   - `.py` → `uv run ruff format --check <file>` AND `uv run ruff check <file>`
 - Group dirty files by area (one commit per area, max 3 commits).
 - Skip if formatters report clean.
+- **Skip dry-run for files with `kind: new` (F-FRICTION-2)** — formatters cannot check what doesn't exist yet. Surface those files in the *first* TDD commit's diff under formatter-clean conventions (the tweaker that creates them is responsible for emitting clean output). No `pre_red` entry is emitted for new files.
 
 **Commit messages:** `style(<area>): ruff format` / `style(<area>): prettier`. No mixed style+semantic commits.
 
@@ -200,6 +204,8 @@ Per GOOS §6: if the outer test cannot even *attempt* to run against HEAD (its i
 
 If "no", prepend a `walking_skeleton.steps[]` entry whose role is `scaffolding` and whose only purpose is to make the outer test *reachable* (not green). Outer-red still goes red — but for the right reason (assertion failure, not import error). Mandate #4 (Red must be observed for the right reason).
 
+**Single-export shortcut (F-FRICTION-3).** For new modules where the outer test is `unit` or `python-unit`, walking-skeleton may be a single zero-logic export of the module's main symbol (e.g. `export function fizzbuzz(n: number): string { throw new Error("not implemented"); }`). Log it as a 1-line scaffolding step in `walking_skeleton.steps[]` but do NOT require a separate commit — the scaffolding tweaker creates the file and the first inner-green commit absorbs the line. This avoids a one-line "skeleton" commit that adds ceremony without semantic content for tiny features.
+
 ---
 
 ## Step Roles
@@ -213,10 +219,24 @@ If "no", prepend a `walking_skeleton.steps[]` entry whose role is `scaffolding` 
 | `outer-green` | Confirm the outer test flips. Last step. Usually zero new code. | `true` only |
 | `verification-only` | Add an assertion-only test for behaviour already implemented (e.g. regression pin). | `false` allowed |
 | `scaffolding` | Walking-skeleton step — make outer test reachable. No production logic. | `false` allowed |
-| `contract-check` | Verify a write-site invariant for a mirrored field (per ENG-5023). | `true` preferred |
+| `contract-check` (**hint only — never emitted as a step role**) | Marks a test-plan row whose `failure_mode_class: contract` enumerates write-sites of a mirrored field (per ENG-5023). The planner MUST expand each `contract-check`-shaped test-plan row into N `(inner-red, inner-green)` step pairs at planning time — one pair per write-site. `tdd-execute` never sees `role: contract-check` (per F-CC-1; see "Contract-check expansion" below). | n/a (planning-only) |
 | `mutation-pass` | Run mutation epilogue: deliberately break production, confirm caught by ≥1 test. | n/a (epilogue) |
 
 ---
+
+## Contract-check expansion (F-CC-1)
+
+A test-plan row marked `failure_mode_class: contract` (e.g. ENG-5023 mirror invariants) covers **N writers** of a derived field. `tdd-execute` is single-target per step — one `target_test_id` and one `red_line` per cycle. To preserve that contract, **expand each contract-shaped row into N `(inner-red, inner-green)` step pairs at planning time**, one pair per write-site:
+
+1. Enumerate every write-site that produces the mirrored field. Use the `predicted_seam_touchpoints` of the slice's existing inner-green steps to discover them; reviewers cross-check against ENG-5023's write-site enumeration discipline.
+2. For each write-site, emit one `inner-red` step + one `inner-green` step with:
+   - `target_test_id` = the contract test row's id (all expanded steps share the same id; their distinct `predicted_seam_touchpoints` distinguish the writers).
+   - `notes` naming the specific writer being pinned.
+3. Order the expansion as a contiguous block. The optional `inner-refactor` step at the end is decision-or-defer per Mandate #6.
+
+Single-write-site contract rows collapse to one `(red, green)` pair. The example impl-plan (`examples/example-impl-plan.md`) shows the single-writer collapse for `csv_uploads.row_count`.
+
+`tdd-execute` rejects any plan that retains `role: contract-check` at the setup gate (per F-CC-1). Always emit the expansion.
 
 ## TDD-vs-verification Rules
 

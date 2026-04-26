@@ -8,8 +8,10 @@ The feature has four layers worth pinning: pure parser (`unit`), upload + persis
 
 ```yaml
 spec: ENG-9999
+slice: ENG-9999-1
 generated_at: 2026-04-26T11:00:00Z
 generated_by: test-architecture@v1.0.0
+reviewed: ok
 
 tests:
   - id: T1

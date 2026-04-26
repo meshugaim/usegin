@@ -96,8 +96,16 @@ If you are unsure which rank fits, pick the lowest plausible rank. Higher rank
 ## Line-budget cap
 
 Your diff must be **≤ {{line_budget}}** added/changed lines, counting only
-non-whitespace, non-import lines. If you cannot make the test pass within
-budget:
+non-whitespace, non-import lines.
+
+**Scaffolding allowance for `kind: new` files (F-GT-1).** If
+`step.predicted_seam_touchpoints[].kind == "new"`, the line budget covers
+**behavioural** lines only. A one-time scaffolding allowance (export
+declaration, function signature, doc comment, type imports) is on top of the
+budget. State your scaffolding line count separately in the data block
+(`scaffolding_lines`) so the reviewer can see the split.
+
+If you cannot make the test pass within budget:
 
 1. Save your partial work as a diff.
 2. Return with `over_budget: true`, `passed: false`, and the partial diff in
@@ -123,6 +131,19 @@ budget:
 - **No new tests.** Even "while you're here." (Mandate #5.)
 - **No reading prior reviews** of this slice; no reading other tests beyond
   the failing one.
+- **Outer-green = wiring only (F-GT-2).** If `step.role == "outer-green"`,
+  your job is UI/glue wiring — call into the modules the inner cycles built.
+  No new business logic. If you find yourself adding logic, the inner cycles
+  missed something — return with `escalate: true` and name the missing inner
+  cycle. The outer-green diff is typically tiny (one or two function calls,
+  a route handler hookup, a UI binding).
+- **TPP rank deviation visibility (F-GT-3).** If you used a higher rank than
+  the hint (`tpp_rank_used > tpp_rank_hint`), state your justification in
+  `tpp_rank_justification`. The Director appends `kind: tpp-deviation` to
+  events.jsonl with your verbatim justification. The reviewer's brief flags
+  rank-jumps to ≥ 11 (function extraction without ≥ 2 prior tests on the
+  surface) as default-suspicious — write the justification with that in
+  mind.
 
 ## Verification before returning
 
@@ -154,14 +175,15 @@ End with a fenced YAML block named `greentweaker-output`:
 target_test_id: <T-id from step>
 edited_files:
   - "<path>"
-lines_added: <int>      # non-whitespace, non-import
-lines_removed: <int>    # non-whitespace, non-import
+lines_added: <int>          # non-whitespace, non-import
+lines_removed: <int>        # non-whitespace, non-import
+scaffolding_lines: <int>    # F-GT-1: lines spent on export/signature/types in kind:new files; 0 otherwise
 tpp_rank_used: <1..11>
-tpp_rank_justification: "<one line — only required if rank ≠ hint>"
+tpp_rank_justification: "<one line — required if rank ≠ hint>"
 passed: true | false
 failure_message: ""     # verbatim if passed:false; empty otherwise
-over_budget: false      # true iff diff exceeded line_budget
-escalate: false         # true iff weakening-temptation, refactor-needed, etc.
+over_budget: false      # true iff behavioural diff exceeded line_budget (scaffolding_lines NOT counted)
+escalate: false         # true iff weakening-temptation, refactor-needed, outer-green-needs-logic, etc.
 escalate_reason: ""     # one line, only if escalate:true
 ```
 

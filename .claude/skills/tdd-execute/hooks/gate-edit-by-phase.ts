@@ -7,6 +7,7 @@
  *
  * Spec: docs/research/tdd-skills/99-design-memo.md §4c "Hook contract" + §6
  *       docs/research/tdd-skills/07-enforcement-mechanisms.md §1.2, §7
+ *       docs/research/tdd-skills/dry-runs/01-paper-review.md §4 (F-HOOK-*, F-DOC-5)
  *
  * Matchers (declared in tdd-execute's SKILL.md frontmatter — separate worker):
  *   PreToolUse:
@@ -20,12 +21,40 @@
  *   3. If neither yields a workspace, exit 0 (allow — the file is outside any
  *      tdd-execute slice).
  *
- * Decision rules (memo §4c "Hook contract"):
- *   phase=red       → file_path must match isTestPath(); else deny.
- *   phase=green     → file_path must NOT match isTestPath(); else deny.
- *   phase=refactor  → require last_test_run with failed==0 AND fresh
- *                     (within 5 min OR no source-edit events since the run).
- *   phase=complete  → deny all edits.
+ * Decision rules (memo §4c "Hook contract", extended per dry-run §4):
+ *   phase=pre-red       → production-path edits allowed only when file_path
+ *                         matches state.pre_red.allowed_paths[]; test-path
+ *                         edits always allowed. (F-HOOK-2)
+ *   phase=red           → file_path must match isTestPath(); else deny.
+ *   phase=green         → file_path must NOT match isTestPath(); else deny.
+ *   phase=refactor      → require last_test_run with failed==0 AND fresh
+ *                         (within 5 min OR no source-edit events since the run).
+ *                         (F-HOOK-3, F-HOOK-5)
+ *   phase=mutation-pass → production-path edits allowed only when file_path
+ *                         matches state.mutation_pass.allowed_paths[];
+ *                         test-path edits denied (mutation-pass touches
+ *                         production code only). (F-HOOK-2 / F-MUT-2)
+ *   phase=complete      → deny all edits.
+ *
+ * Bash gating (F-HOOK-1, F-HOOK-4, F-DOC-5):
+ *   The hook also intercepts Bash commands with source-mutating effects:
+ *     - shell redirects (>, >>, tee)
+ *     - git checkout/restore against pathspecs
+ *     - git stash push/pop
+ *     - mv / cp / rm with file targets
+ *     - sed -i with file target
+ *     - python -c / node -e that write to files
+ *   For each, the EFFECT path is parsed and run through the same phase rule.
+ *
+ *   Verifier carve-out (F-HOOK-1): the verifier sub-agent (spawned by the
+ *   Director with TDD_VERIFIER=1) needs `git checkout HEAD -- <prod-file>`
+ *   and `git stash push/pop` to perform the revert/restore proof during
+ *   green. When that env var is set, those specific commands are allowed
+ *   regardless of phase. Other source-mutating commands are still gated.
+ *
+ *   Early-exit (F-DOC-5): Bash commands with no source-mutating shape
+ *   short-circuit immediately (no workspace climb), so `bun install`,
+ *   `bun test`, `git status`, `git log`, etc. don't pay the discovery cost.
  *
  * Output channel: Channel B — JSON to stdout with permissionDecision (matches
  * the prior art at tools/worker-reviewer-experiment/hooks/validate-submission.ts).
@@ -49,7 +78,7 @@ import {
   readdirSync,
   statSync,
 } from "fs";
-import { dirname, join } from "path";
+import { dirname, join, resolve, isAbsolute } from "path";
 
 // ---- Hook input shape ---------------------------------------------------
 
@@ -81,41 +110,228 @@ function allow(): never {
   process.exit(0);
 }
 
-// ---- Bash redirect parsing ---------------------------------------------
+// ---- Path normalization (F-HOOK-4) -------------------------------------
 //
-// The Bash matcher is a sibling to the Edit matcher (memo §4c). We need to
-// catch the heredoc-bypass class — `cat > foo.ts <<EOF` — without false-
-// positiving on every Bash command. Strategy: scan the command for shell
-// redirection targets and pick the first one that looks like a source path
-// (i.e. anything not /dev/null or a /tmp scratch path).
+// Bash captures of redirect/effect paths can come in many shapes:
+//   > "src/foo.ts"      (quoted)
+//   > ./src/foo.ts      (./-relative)
+//   > $(echo foo).ts    (command substitution — opaque)
+//   > `cmd`.ts          (backtick — opaque)
 //
-// Limitation (documented per the spec brief): this naive regex won't catch
-// every exotic shell construct (subshells, dynamic redirections, eval'd
-// strings). It covers `> file`, `>> file`, `tee file`, `tee -a file`, and
-// `cat > file <<EOF`. That's the empirically-attested bypass surface.
+// Strategy: strip surrounding quotes, drop "./" prefix, and resolve to an
+// absolute path against the hook's cwd so isTestPath/match logic sees a
+// consistent shape. If the captured target contains an unresolved $(...)
+// or backticked region we treat it as opaque and return null (allow).
 
-const REDIRECT_PATTERNS: RegExp[] = [
-  // `> path`, `>> path` — append, truncate
-  /(?:^|[^>&\d])>>?\s*([^\s|;&<>()]+)/g,
-  // `tee path`, `tee -a path`, `tee --append path`
-  /\btee\b(?:\s+-{1,2}\w+)*\s+([^\s|;&<>()]+)/g,
-  // `cat > path <<EOF` — heredoc into file (also caught by the first
-  // pattern, but listed for documentation)
+function normalizeCapturedPath(raw: string): string | null {
+  let s = raw.trim();
+  if (!s) return null;
+  // Strip matching surrounding quotes (single or double).
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1).trim();
+    if (!s) return null;
+  }
+  // Opaque shell substitutions — allow rather than guess.
+  if (s.includes("$(") || s.includes("`")) return null;
+  if (s.startsWith("./")) s = s.slice(2);
+  if (s.startsWith("/dev/")) return null;
+  // Resolve to absolute against cwd so callers' `path.includes(absolute)`
+  // tests behave uniformly. Already-absolute paths pass through.
+  return isAbsolute(s) ? s : resolve(process.cwd(), s);
+}
+
+// ---- Bash short-circuit (F-DOC-5) --------------------------------------
+//
+// Cheap pre-filter: if the Bash command contains *none* of these tokens,
+// it cannot mutate source files in any way the hook understands, so we
+// skip workspace discovery entirely. Keep the list tight — false negatives
+// are denials we miss, false positives only add a discovery hop.
+
+const BASH_MUTATION_TOKENS = [
+  ">",          // redirect (also catches >>)
+  "tee",        // tee target
+  "cat",        // `cat > file <<EOF` heredoc
+  "mv",
+  "cp",
+  "rm",
+  "sed",
+  "git checkout",
+  "git restore",
+  "git stash",
+  "python -c",
+  "node -e",
 ];
 
-function extractRedirectTargets(command: string): string[] {
+function bashCommandCouldMutate(command: string): boolean {
+  for (const tok of BASH_MUTATION_TOKENS) {
+    if (command.includes(tok)) return true;
+  }
+  return false;
+}
+
+// ---- Bash effect-path classifier (F-HOOK-1, F-HOOK-4) ------------------
+//
+// Returns the list of source paths the command will mutate, or null if
+// none / opaque. We keep the parsing pragmatic — every classifier here is
+// a *known bypass surface*, not a general shell parser. Unknown commands
+// fall through to the redirect scan.
+//
+// Each classifier returns a flat list of normalized absolute paths, plus a
+// tag describing which command shape was matched (used in deny reasons).
+
+interface CommandEffect {
+  paths: string[];
+  shape: string;
+}
+
+// `git checkout [HEAD|HEAD~N|<sha>] -- <pathspec>...`
+const GIT_CHECKOUT_RE = /\bgit\s+checkout\s+(?:--\s+|[\w~^.@/-]+\s+--\s+)([^\n;|&]+)/g;
+// `git restore [--source <ref>] [--staged] -- <pathspec>...`
+//  Also matches `git restore <pathspec>` without the `--` separator.
+const GIT_RESTORE_RE = /\bgit\s+restore\s+(?:(?:--[\w-]+(?:[= ][^\s|;&]+)?\s+)*)(?:--\s+)?([^\n;|&]+)/g;
+// `git stash push [-- <pathspec>...]` — the stash itself can contain mutating
+// content via `git stash pop` (no pathspec to parse, but it's an effect).
+const GIT_STASH_RE = /\bgit\s+stash\s+(push|pop|apply)(?:\s+([^\n;|&]+))?/g;
+// `mv SRC DEST` / `cp SRC DEST` — DEST is the effect path.
+const MV_CP_RE = /\b(mv|cp)\b(?:\s+-[a-zA-Z]+)*\s+([^\s|;&<>()]+)\s+([^\s|;&<>()]+)/g;
+// `rm [-flags] <path>...` — every non-flag arg is an effect path.
+const RM_RE = /\brm\b((?:\s+-[a-zA-Z]+)*)\s+([^\n;|&]+)/g;
+// `sed -i ... <path>` — capture the trailing file argument(s).
+const SED_INPLACE_RE = /\bsed\s+-i(?:[a-zA-Z]*)?\b(?:\s+-e\s+\S+|\s+'[^']*'|\s+"[^"]*"|\s+\S+)*\s+([^\n;|&]+)/g;
+// `python -c "..."` / `node -e "..."` — opaque, but if it contains
+// `open(...).write` or `writeFileSync`/`writeFile(` we treat as mutating
+// without trying to extract the target. The conservative call is to deny
+// such commands during phase-restrictive states (return a sentinel path).
+const PY_NODE_INLINE_RE = /\b(python|python3)\s+-c\s+|node\s+-e\s+/;
+
+function splitArgs(s: string): string[] {
+  // Tiny tokenizer: splits on whitespace, respects matching quotes. Good
+  // enough for pathspec lists; not a full shell parser.
   const out: string[] = [];
-  for (const re of REDIRECT_PATTERNS) {
+  let buf = "";
+  let quote: string | null = null;
+  for (const ch of s.trim()) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else buf += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (buf) {
+        out.push(buf);
+        buf = "";
+      }
+      continue;
+    }
+    buf += ch;
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
+function extractCommandEffects(command: string): CommandEffect[] {
+  const effects: CommandEffect[] = [];
+
+  // 1. Shell redirects (>, >>, tee). The legacy heredoc-bypass surface.
+  const REDIRECT_PATTERNS: { re: RegExp; shape: string }[] = [
+    { re: /(?:^|[^>&\d])>>?\s*("[^"]+"|'[^']+'|[^\s|;&<>()]+)/g, shape: "redirect" },
+    { re: /\btee\b(?:\s+-{1,2}\w+)*\s+("[^"]+"|'[^']+'|[^\s|;&<>()]+)/g, shape: "tee" },
+  ];
+  for (const { re, shape } of REDIRECT_PATTERNS) {
     re.lastIndex = 0;
     for (const m of command.matchAll(re)) {
-      const target = m[1];
-      if (!target) continue;
-      // Skip /dev/* sinks — they're never source files.
-      if (target.startsWith("/dev/")) continue;
-      out.push(target);
+      const norm = normalizeCapturedPath(m[1] ?? "");
+      if (norm) effects.push({ paths: [norm], shape });
     }
   }
-  return out;
+
+  // 2. git checkout -- <pathspec>
+  GIT_CHECKOUT_RE.lastIndex = 0;
+  for (const m of command.matchAll(GIT_CHECKOUT_RE)) {
+    const args = splitArgs(m[1] ?? "");
+    const paths: string[] = [];
+    for (const a of args) {
+      const norm = normalizeCapturedPath(a);
+      if (norm) paths.push(norm);
+    }
+    if (paths.length) effects.push({ paths, shape: "git checkout" });
+  }
+
+  // 3. git restore [--] <pathspec>
+  GIT_RESTORE_RE.lastIndex = 0;
+  for (const m of command.matchAll(GIT_RESTORE_RE)) {
+    const args = splitArgs(m[1] ?? "");
+    const paths: string[] = [];
+    for (const a of args) {
+      if (a.startsWith("-")) continue;
+      const norm = normalizeCapturedPath(a);
+      if (norm) paths.push(norm);
+    }
+    if (paths.length) effects.push({ paths, shape: "git restore" });
+  }
+
+  // 4. git stash {push|pop|apply}
+  GIT_STASH_RE.lastIndex = 0;
+  for (const m of command.matchAll(GIT_STASH_RE)) {
+    const sub = m[1];
+    // For pop/apply we don't know which paths land — treat as "opaque
+    // mutating" by tagging with shape only and an empty path list. Phase
+    // gates decide based on shape (verifier carve-out applies).
+    effects.push({ paths: [], shape: `git stash ${sub}` });
+  }
+
+  // 5. mv / cp — DEST path is what gets created/overwritten.
+  MV_CP_RE.lastIndex = 0;
+  for (const m of command.matchAll(MV_CP_RE)) {
+    const dest = normalizeCapturedPath(m[3] ?? "");
+    if (dest) effects.push({ paths: [dest], shape: m[1]! });
+  }
+
+  // 6. rm — every non-flag arg.
+  RM_RE.lastIndex = 0;
+  for (const m of command.matchAll(RM_RE)) {
+    const args = splitArgs(m[2] ?? "");
+    const paths: string[] = [];
+    for (const a of args) {
+      if (a.startsWith("-")) continue;
+      const norm = normalizeCapturedPath(a);
+      if (norm) paths.push(norm);
+    }
+    if (paths.length) effects.push({ paths, shape: "rm" });
+  }
+
+  // 7. sed -i — trailing file arg(s).
+  SED_INPLACE_RE.lastIndex = 0;
+  for (const m of command.matchAll(SED_INPLACE_RE)) {
+    const args = splitArgs(m[1] ?? "");
+    const paths: string[] = [];
+    for (const a of args) {
+      if (a.startsWith("-")) continue;
+      // Heuristic: skip the script arg (looks like a sed expression).
+      if (/^['"]?s\//.test(a)) continue;
+      const norm = normalizeCapturedPath(a);
+      if (norm) paths.push(norm);
+    }
+    if (paths.length) effects.push({ paths, shape: "sed -i" });
+  }
+
+  // 8. python -c / node -e — opaque mutation if it mentions write APIs.
+  if (
+    PY_NODE_INLINE_RE.test(command) &&
+    (/\bopen\s*\([^)]*\)\s*\.\s*write\b/.test(command) ||
+      /\bwriteFileSync\b|\bwriteFile\b|\bappendFileSync\b/.test(command))
+  ) {
+    effects.push({ paths: [], shape: "inline interpreter write" });
+  }
+
+  return effects;
 }
 
 // ---- Workspace discovery ------------------------------------------------
@@ -172,59 +388,165 @@ function findWorkspaceDir(filePath: string): string | null {
   return null;
 }
 
-// ---- Refactor freshness check ------------------------------------------
+// ---- Refactor freshness check (F-HOOK-3, F-HOOK-5) ---------------------
 //
 // Refactor lets you edit anything iff the suite is green AND that knowledge
-// is "fresh." Fresh = (test run ts within 5 min) OR (no source-edit events
-// recorded since the test run).
+// is "fresh." Fresh = (test run ts within window) AND (no canonical
+// `kind: edit-applied` events have been logged since the run).
 //
-// "source-edit events" are events.jsonl entries whose kind looks like an
-// edit signal. The Director records `edit-applied` (or similar) per the
-// memo's events vocabulary; we accept any kind containing "edit" or
-// "write" as a conservative match. If the Director hasn't logged any such
-// events the freshness check falls through to the time window only.
+// Per F-HOOK-3 the Director is responsible for appending `kind: edit-applied`
+// after every successful tweaker submit. We treat that kind as canonical
+// and also accept legacy event shapes (kind containing edit/write/apply)
+// for back-compat.
+//
+// Per F-HOOK-5 the window is configurable via state.refactor_freshness_window_ms
+// (default 5 min). Stale-by-N-seconds is surfaced in the deny reason.
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
+const DEFAULT_FRESHNESS_WINDOW_MS = 5 * 60 * 1000;
 
-function isRefactorFresh(state: State, workspaceDir: string): boolean {
+interface FreshnessVerdict {
+  fresh: boolean;
+  /** ms by which the suite is past its freshness window (0 if fresh). */
+  staleByMs: number;
+  /** Reason fragment for the deny message. */
+  detail: string;
+}
+
+function checkRefactorFreshness(state: State, workspaceDir: string): FreshnessVerdict {
   const ltr = state.last_test_run;
-  if (!ltr) return false;
-  if (ltr.failed !== 0) return false;
+  if (!ltr) {
+    return { fresh: false, staleByMs: 0, detail: "no last_test_run on record" };
+  }
+  if (ltr.failed !== 0) {
+    return {
+      fresh: false,
+      staleByMs: 0,
+      detail: `last_test_run had ${ltr.failed} failure(s)`,
+    };
+  }
 
   const runTs = Date.parse(ltr.ts);
-  if (Number.isNaN(runTs)) return false;
+  if (Number.isNaN(runTs)) {
+    return { fresh: false, staleByMs: 0, detail: "last_test_run.ts unparseable" };
+  }
 
-  // Window check
-  if (Date.now() - runTs < FIVE_MINUTES_MS) return true;
+  const window = state.refactor_freshness_window_ms ?? DEFAULT_FRESHNESS_WINDOW_MS;
+  const age = Date.now() - runTs;
 
-  // Stale-by-time, but allow if no edit events have happened since.
+  // Canonical edit-applied scan first (F-HOOK-3): even if we're inside the
+  // window, any edit logged since the run invalidates freshness.
   let events: ReturnType<typeof readEvents>;
   try {
     events = readEvents(workspaceDir);
   } catch {
-    return false;
+    events = [];
   }
   for (const ev of events) {
     const evTs = Date.parse(ev.ts);
     if (Number.isNaN(evTs)) continue;
     if (evTs <= runTs) continue;
     const kind = String(ev.kind || "").toLowerCase();
-    if (kind.includes("edit") || kind.includes("write") || kind.includes("apply")) {
-      return false;
+    // Canonical: kind: edit-applied. Back-compat: anything containing
+    // edit/write/apply.
+    if (
+      kind === "edit-applied" ||
+      kind.includes("edit") ||
+      kind.includes("write") ||
+      kind.includes("apply")
+    ) {
+      return {
+        fresh: false,
+        staleByMs: age,
+        detail: `edit-applied event at ${ev.ts} invalidates freshness`,
+      };
     }
   }
-  return true;
+
+  if (age < window) {
+    return { fresh: true, staleByMs: 0, detail: "fresh" };
+  }
+  return {
+    fresh: false,
+    staleByMs: age - window,
+    detail: `stale by ${Math.round((age - window) / 1000)}s (window=${Math.round(window / 1000)}s)`,
+  };
+}
+
+// ---- Allowlist matching (F-HOOK-2) -------------------------------------
+//
+// pre-red and mutation-pass each carry an allowed_paths[] gate. We accept
+// equality, suffix, and prefix-of-suffix matches because state.json may
+// store either workspace-relative or repo-relative paths and the hook is
+// invoked with absolute paths. Conservative: a file_path matches if any
+// allowed path is found as a substring (with leading "/" alignment).
+
+function matchesAllowedPath(filePath: string, allowed: string[]): boolean {
+  const norm = filePath.replace(/\\/g, "/");
+  for (const a of allowed) {
+    const ax = a.replace(/\\/g, "/");
+    if (norm === ax) return true;
+    if (norm.endsWith("/" + ax)) return true;
+    if (norm.endsWith(ax) && !ax.startsWith("/")) return true;
+    if (ax.endsWith("/" + norm)) return true;
+  }
+  return false;
+}
+
+// ---- Verifier carve-out (F-HOOK-1) -------------------------------------
+//
+// The verifier sub-agent (Director-spawned with TDD_VERIFIER=1) needs to
+// run `git checkout HEAD -- <prod-file>` and `git stash push/pop` during
+// green to prove the suite breaks/heals as expected. Those specific Bash
+// shapes — and only those — are allowed when the env var is set, regardless
+// of phase. Other source-mutating Bash (e.g. raw heredoc into a prod file)
+// is still gated.
+
+const VERIFIER_ALLOWED_SHAPES = new Set([
+  "git checkout",
+  "git stash push",
+  "git stash pop",
+  "git stash apply",
+]);
+
+function isVerifierExempt(shape: string): boolean {
+  if (process.env.TDD_VERIFIER !== "1") return false;
+  return VERIFIER_ALLOWED_SHAPES.has(shape);
 }
 
 // ---- Phase decision -----------------------------------------------------
 
-function decide(
+function decideForPath(
   phase: Phase,
   filePath: string,
   state: State,
   workspaceDir: string,
 ): { allow: true } | { allow: false; reason: string } {
   switch (phase) {
+    case "pre-red": {
+      // Test-path edits flow through unchanged (red is implicit during
+      // pre-red — the outer test gets written here too in some plans).
+      if (isTestPath(filePath)) return { allow: true };
+      const allowed = state.pre_red?.allowed_paths ?? [];
+      if (allowed.length === 0) {
+        return {
+          allow: false,
+          reason:
+            `TDD: in PRE-RED phase, but state.json has no pre_red.allowed_paths[]. ` +
+            `Walking-skeleton scaffolding must enumerate its target files first. ` +
+            `Production-path edit attempted: ${filePath}`,
+        };
+      }
+      if (!matchesAllowedPath(filePath, allowed)) {
+        return {
+          allow: false,
+          reason:
+            `TDD: in PRE-RED phase. Edit not in pre_red.allowed_paths[]: ${filePath}. ` +
+            `Allowed: ${allowed.join(", ")}`,
+        };
+      }
+      return { allow: true };
+    }
+
     case "red":
       if (!isTestPath(filePath)) {
         return {
@@ -248,16 +570,48 @@ function decide(
       }
       return { allow: true };
 
-    case "refactor":
-      if (!isRefactorFresh(state, workspaceDir)) {
+    case "refactor": {
+      const f = checkRefactorFreshness(state, workspaceDir);
+      if (!f.fresh) {
         return {
           allow: false,
           reason:
-            `TDD: in REFACTOR phase, but tests aren't green-and-fresh. ` +
+            `TDD: in REFACTOR phase, but tests aren't green-and-fresh — ${f.detail}. ` +
             `Re-run the suite (bun test / uv run pytest) before editing.`,
         };
       }
       return { allow: true };
+    }
+
+    case "mutation-pass": {
+      if (isTestPath(filePath)) {
+        return {
+          allow: false,
+          reason:
+            `TDD: in MUTATION-PASS phase. Tests are locked; only production ` +
+            `files named in mutation_pass.allowed_paths[] may be edited. ` +
+            `Test-path edit attempted: ${filePath}`,
+        };
+      }
+      const allowed = state.mutation_pass?.allowed_paths ?? [];
+      if (allowed.length === 0) {
+        return {
+          allow: false,
+          reason:
+            `TDD: in MUTATION-PASS phase, but state.json has no mutation_pass.allowed_paths[]. ` +
+            `Director must populate it from mutations[*].target_file before applying.`,
+        };
+      }
+      if (!matchesAllowedPath(filePath, allowed)) {
+        return {
+          allow: false,
+          reason:
+            `TDD: in MUTATION-PASS phase. Edit not in mutation_pass.allowed_paths[]: ${filePath}. ` +
+            `Allowed: ${allowed.join(", ")}`,
+        };
+      }
+      return { allow: true };
+    }
 
     case "complete":
       return {
@@ -267,6 +621,58 @@ function decide(
           `Start a new slice or close out.`,
       };
   }
+}
+
+// ---- Bash decision wrapper ---------------------------------------------
+//
+// For Bash we may have multiple effect entries (one command can both
+// `cat > foo.ts` and `git checkout HEAD -- bar.ts`). We deny on the first
+// phase-illegal effect. Verifier-exempt shapes are skipped.
+//
+// Effects with empty paths (git stash pop, opaque inline interpreter writes)
+// can't be path-gated. Decision: outside the verifier carve-out, deny them
+// in phase-restrictive states (anything other than refactor-fresh, green
+// for production-side mutations, etc.). To stay conservative *and* avoid
+// nuisance denies, we punt: they're allowed unless TDD_VERIFIER is unset
+// AND phase ∈ {complete}. (red/green/pre-red/mutation-pass without a path
+// can't be classified, so we err toward allow — the hook's other matchers
+// catch the actual file write if it occurs via Edit/Write.)
+
+function decideForBashEffects(
+  effects: CommandEffect[],
+  phase: Phase,
+  state: State,
+  workspaceDir: string,
+): { allow: true } | { allow: false; reason: string } {
+  for (const eff of effects) {
+    if (isVerifierExempt(eff.shape)) continue;
+
+    if (eff.paths.length === 0) {
+      // Pathless mutating shape (git stash pop, inline interpreter write).
+      // Only deny in phase=complete; other phases would need path context
+      // to gate accurately.
+      if (phase === "complete") {
+        return {
+          allow: false,
+          reason:
+            `TDD: slice complete. Bash command (${eff.shape}) cannot mutate state. ` +
+            `Start a new slice or close out.`,
+        };
+      }
+      continue;
+    }
+
+    for (const p of eff.paths) {
+      const verdict = decideForPath(phase, p, state, workspaceDir);
+      if (!verdict.allow) {
+        return {
+          allow: false,
+          reason: `${verdict.reason} (via Bash ${eff.shape})`,
+        };
+      }
+    }
+  }
+  return { allow: true };
 }
 
 // ---- Main ---------------------------------------------------------------
@@ -290,35 +696,56 @@ async function main(): Promise<void> {
   const toolName = input!.tool_name;
   const toolInput = input!.tool_input || {};
 
-  // Determine the file path under contention.
-  let filePath: string | undefined;
+  // ---- Edit/Write/MultiEdit branch ---------------------------------
   if (toolName === "Write" || toolName === "Edit" || toolName === "MultiEdit") {
-    filePath = typeof toolInput.file_path === "string" ? toolInput.file_path : undefined;
-  } else if (toolName === "Bash") {
-    const cmd = typeof toolInput.command === "string" ? toolInput.command : "";
-    if (!cmd) allow();
-    const targets = extractRedirectTargets(cmd);
-    if (targets.length === 0) allow(); // No file write — Bash is fine.
-    filePath = targets[0]; // First match wins per the spec.
-  } else {
-    allow();
+    const filePath =
+      typeof toolInput.file_path === "string" ? toolInput.file_path : undefined;
+    if (!filePath) allow();
+
+    const workspaceDir = findWorkspaceDir(filePath!);
+    if (!workspaceDir) allow();
+
+    const state = readStateOrDeny(workspaceDir!);
+    const verdict = decideForPath(state.phase, filePath!, state, workspaceDir!);
+    if (verdict.allow) allow();
+    emitDeny(verdict.reason);
   }
 
-  if (!filePath) allow();
+  // ---- Bash branch (with F-DOC-5 short-circuit) --------------------
+  if (toolName === "Bash") {
+    const cmd = typeof toolInput.command === "string" ? toolInput.command : "";
+    if (!cmd) allow();
 
-  // Workspace discovery.
-  const workspaceDir = findWorkspaceDir(filePath!);
-  if (!workspaceDir) allow();
+    // Cheap short-circuit: no mutation tokens → no workspace climb.
+    if (!bashCommandCouldMutate(cmd)) allow();
 
-  // Read & validate state.
-  let state: State;
+    const effects = extractCommandEffects(cmd);
+    if (effects.length === 0) allow();
+
+    // Pick a discovery anchor: first concrete path we can find. If all
+    // effects are pathless we fall back on cwd (the verifier exemption
+    // and workspace climb both still work).
+    const firstPath =
+      effects.flatMap((e) => e.paths).find((p) => Boolean(p)) ??
+      process.cwd();
+
+    const workspaceDir = findWorkspaceDir(firstPath);
+    if (!workspaceDir) allow();
+
+    const state = readStateOrDeny(workspaceDir!);
+    const verdict = decideForBashEffects(effects, state.phase, state, workspaceDir!);
+    if (verdict.allow) allow();
+    emitDeny(verdict.reason);
+  }
+
+  allow();
+}
+
+function readStateOrDeny(workspaceDir: string): State {
   try {
-    state = readState(workspaceDir!);
+    return readState(workspaceDir);
   } catch {
-    // Either missing (shouldn't happen — climb said it exists) or schema-invalid.
-    // Surface the schema problem so the human fixes it rather than silently
-    // letting edits through under a broken state.
-    const stateRawPath = join(workspaceDir!, "state.json");
+    const stateRawPath = join(workspaceDir, "state.json");
     let detail = "";
     try {
       const raw = JSON.parse(readFileSync(stateRawPath, "utf-8"));
@@ -331,10 +758,6 @@ async function main(): Promise<void> {
     }
     emitDeny(`tdd-execute state.json invalid — fix before continuing.${detail}`);
   }
-
-  const verdict = decide(state!.phase, filePath!, state!, workspaceDir!);
-  if (verdict.allow) allow();
-  emitDeny(verdict.reason);
 }
 
 main().catch(() => {

@@ -28,8 +28,32 @@ import { dirname, join } from "path";
 
 // ---- Phase enums ---------------------------------------------------------
 
-/** tdd-execute phases per design memo §4c. */
-export type Phase = "red" | "green" | "refactor" | "complete";
+/**
+ * tdd-execute phases per design memo §4c, extended per dry-run F-HOOK-2 / F-MUT-2:
+ *
+ *   pre-red        → walking-skeleton scaffolding window. Production-path
+ *                    edits are gated by `pre_red.allowed_paths[]` in
+ *                    state.json. Used to land zero-logic exports / type
+ *                    signatures so the outer Red can fail for the right
+ *                    reason (assertion error, not import error). Director
+ *                    transitions out to `red` once the skeleton lands.
+ *   red            → only test-file edits allowed.
+ *   green          → only production-file edits allowed.
+ *   refactor       → either, but only when the suite is green-and-fresh.
+ *   mutation-pass  → mutation-pass epilogue. Production-path edits are
+ *                    gated by `mutation_pass.allowed_paths[]` in state.json
+ *                    (the files named in `mutations[*].target_file`). Used
+ *                    by the mutation-applier sub-agent to apply single-line
+ *                    breakages and verify they're caught by the suite.
+ *   complete       → no further edits allowed (slice locked).
+ */
+export type Phase =
+  | "pre-red"
+  | "red"
+  | "green"
+  | "refactor"
+  | "mutation-pass"
+  | "complete";
 
 /** Worker-reviewer phases per PROTOCOL.md. */
 export type WorkerReviewerPhase =
@@ -43,9 +67,11 @@ export type WorkerReviewerPhase =
 export type AnyPhase = Phase | WorkerReviewerPhase;
 
 const TDD_EXECUTE_PHASES: ReadonlySet<string> = new Set([
+  "pre-red",
   "red",
   "green",
   "refactor",
+  "mutation-pass",
   "complete",
 ]);
 
@@ -67,7 +93,7 @@ export function isWorkerReviewerPhase(s: unknown): s is WorkerReviewerPhase {
 
 // ---- State shapes --------------------------------------------------------
 
-/** tdd-execute state.json (design memo §4c). */
+/** tdd-execute state.json (design memo §4c, extended per dry-run §4 findings). */
 export interface State {
   plan: string;
   step_index: number;
@@ -82,6 +108,28 @@ export interface State {
   };
   cycle_attempts: number;
   cycle_index: number;
+  /**
+   * Per F-HOOK-2: paths the pre-red phase is allowed to mutate. The hook
+   * denies any production-path edit during pre-red unless file_path matches
+   * one of these (compared as a suffix / equality after normalization).
+   */
+  pre_red?: {
+    allowed_paths: string[];
+  };
+  /**
+   * Per F-MUT-2: paths the mutation-pass phase is allowed to mutate (the
+   * union of `mutations[*].target_file`). The hook denies any production-
+   * path edit during mutation-pass unless file_path matches.
+   */
+  mutation_pass?: {
+    allowed_paths: string[];
+    current_mutation_id?: string;
+  };
+  /**
+   * Per F-HOOK-5: refactor freshness window override (ms). When unset the
+   * hook uses the 5-minute default.
+   */
+  refactor_freshness_window_ms?: number;
 }
 
 /** Legacy worker-reviewer state.json (PROTOCOL.md §State Machine). */
@@ -216,6 +264,61 @@ export const StateSchema = {
       issues.push({
         path: "cycle_index",
         message: "must be a non-negative number",
+      });
+    }
+    if (raw.pre_red !== undefined) {
+      const pr = raw.pre_red;
+      if (!isObj(pr)) {
+        issues.push({
+          path: "pre_red",
+          message: "must be an object when present",
+        });
+      } else if (
+        !Array.isArray(pr.allowed_paths) ||
+        !pr.allowed_paths.every((x) => typeof x === "string")
+      ) {
+        issues.push({
+          path: "pre_red.allowed_paths",
+          message: "must be string[]",
+        });
+      }
+    }
+    if (raw.mutation_pass !== undefined) {
+      const mp = raw.mutation_pass;
+      if (!isObj(mp)) {
+        issues.push({
+          path: "mutation_pass",
+          message: "must be an object when present",
+        });
+      } else {
+        if (
+          !Array.isArray(mp.allowed_paths) ||
+          !mp.allowed_paths.every((x) => typeof x === "string")
+        ) {
+          issues.push({
+            path: "mutation_pass.allowed_paths",
+            message: "must be string[]",
+          });
+        }
+        if (
+          mp.current_mutation_id !== undefined &&
+          typeof mp.current_mutation_id !== "string"
+        ) {
+          issues.push({
+            path: "mutation_pass.current_mutation_id",
+            message: "must be a string when present",
+          });
+        }
+      }
+    }
+    if (
+      raw.refactor_freshness_window_ms !== undefined &&
+      (typeof raw.refactor_freshness_window_ms !== "number" ||
+        raw.refactor_freshness_window_ms <= 0)
+    ) {
+      issues.push({
+        path: "refactor_freshness_window_ms",
+        message: "must be a positive number when present",
       });
     }
     if (issues.length > 0) return fail(issues);

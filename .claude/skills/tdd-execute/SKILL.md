@@ -29,7 +29,7 @@ Walk an `impl-plan.md` one Red-Green-Refactor cycle at a time. You are the **Dir
 
 - One slice, one workspace at `.tdd-execute/<slice-id>/`. `state.json` is the cursor; `events.jsonl` is the audit log.
 - Director is **Opus**, no Edit/Write on source paths. Spawns three role-isolated, **stateless one-shot** sub-agents per cycle — `red-tweaker` (Haiku, test-globs only), `green-tweaker` (Haiku, non-test paths only), `discipline-reviewer` (Opus, read-only). Verifier (revert/restore) is a separate Opus invocation per `feedback_phase_separation`.
-- Phase enum is `red | green | refactor | complete`. The hook reads `state.json.phase` and denies phase-illegal edits — including yours. There is no override; route through a tweaker or update state.
+- Phase enum is `pre-red | red | green | refactor | mutation-pass | complete`. The hook reads `state.json.phase` and denies phase-illegal edits — including yours. There is no override; route through a tweaker or update state.
 - One commit per phase transition. `style:` commits land **before** Red (`feedback_format_before_tdd`). Subjects: `test:` for Red, `feat:` for Green, `refactor:` for Refactor.
 - Red review is mandatory (`feedback_red_reviews`). Green review includes a **revert/restore proof** (`feedback_green_right_reason`). Refactor review uses the same diff-erosion check as Green (`feedback_companion_session_findings`).
 - One reviewer pass per phase, fix every finding, move on (`feedback_single_iteration_review`, `feedback_liaison_fix_everything`). Reviewer briefs are **unseeded** — diff + step row + plan pointer, no "key questions" (`feedback_liaison_review_seeding`).
@@ -67,6 +67,8 @@ You are the Director. You think in phases, you orchestrate sub-agents, you commi
 | **GreenTweaker** | Haiku | Edit/Write on production paths (anything outside `**/*.test.*`, `**/test_*.py`); Read on the failing test + spec; Bash to run ONE test. | Sees `redLine`, `failureMessage`, line-budget. **Does not see other tests beyond the failing one.** | Stateless, one-shot per `inner-green` / `outer-green` step. (`inner-refactor` shares this agent type with relaxed test-glob, run only after the suite is green.) |
 | **DisciplineReviewer** | Opus | Read; Bash for `git diff`, full-suite runs. **No Edit.** | Sees `git diff` (full), test output, current step row, prior verdicts. **Unseeded** — no "key questions." | Stateless, one-shot per phase end (Red, Green, Refactor). |
 | **Verifier** (revert/restore) | Opus | Read; Bash. | Sees the Green commit and the failing-test commit. | Stateless, one-shot at Green-phase end, **separate** from DisciplineReviewer (`feedback_phase_separation`). |
+| **scaffolding-tweaker** | Haiku | Edit/Write on production paths, **only when `state.phase == "pre-red"`**. Read on outer test path. | Sees the walking-skeleton step description and the outer test row. **Brief: zero-logic scaffolding only — empty exports, stub returns, declared types. NO behaviour.** | Stateless, one-shot per `walking_skeleton.steps[]` entry. (Replaces "GreenTweaker scaffolding mode" referenced in older drafts.) |
+| **mutation-applier** | Haiku | Edit/Write on the mutation's `target_file`, **only when `state.phase == "mutation-pass"`** and inside the mutation worktree. | Sees the single mutation row (`target_file`, `target_function`, `mutation` description). | Stateless, one-shot per `mutation_pass.mutations[]` entry. |
 
 **Why Haiku for tweakers:** speed, cost, and Haiku is *less prone to over-engineering* — we want the obvious 3-line fix, not anticipation of future tests (07-enforcement §3.1).
 
@@ -78,7 +80,7 @@ You are the Director. You think in phases, you orchestrate sub-agents, you commi
 
 ## Phase state
 
-Workspace: `.tdd-execute/<slice-id>/`. Created lazily on slice start (memo §7 q1).
+Workspace: `.tdd-execute/<slice>/` where `<slice>` is `impl_plan.slice` (string, pattern `^ENG-\d+(-\d+)?$`, e.g. `ENG-9999-1`). Created lazily on slice start (memo §7 q1; F-COUPLE-4).
 
 `state.json`:
 
@@ -87,7 +89,7 @@ Workspace: `.tdd-execute/<slice-id>/`. Created lazily on slice start (memo §7 q
   "plan": "<path to impl-plan.md>",
   "test_plan": "<path to test-plan.md>",
   "step_index": 3,                    // current step in impl-plan.steps (0-indexed)
-  "phase": "green",                   // "red" | "green" | "refactor" | "complete"
+  "phase": "green",                   // "pre-red" | "red" | "green" | "refactor" | "mutation-pass" | "complete"
   "current_target_test_id": "T2",
   "red_commit": "abc123",             // SHA of failing-test commit (for revert/restore proof)
   "last_test_run": {
@@ -122,8 +124,17 @@ Workspace: `.tdd-execute/<slice-id>/`. Created lazily on slice start (memo §7 q
 ```
 loop:
   re-read state.json
-  if step_index >= plan.steps.length: state.phase = "complete"; break
+  if step_index >= plan.steps.length: break  # exit loop; mutation-pass + complete handled below
   step = plan.steps[step_index]
+
+  # Phase setup for outer-green entry (F-LOOP-2):
+  # The previous inner-refactor case advances state.phase to "red". The next step
+  # may be "outer-green", which expects phase=green (no Red phase — inner cycles
+  # already implemented the behaviour). Promote phase to green before dispatch.
+  if step.role == "outer-green" and state.phase == "red":
+    state.phase = "green"; persist_state()
+    append_event({kind:"phase-setup", from:"red", to:"green", reason:"outer-green entry"})
+
   switch step.role:
     case "outer-red" | "inner-red":
       assert state.phase == "red"
@@ -142,7 +153,7 @@ loop:
       state.phase = "green"; persist_state()
       append_event({kind:"advance", from:"red", to:"green"})
 
-    case "inner-green" | "outer-green":
+    case "inner-green":
       assert state.phase == "green"
       green = spawn(green-tweaker, {
         red_line: state.last_red_line,
@@ -174,9 +185,60 @@ loop:
       })
       append_event({kind:"review", actor:"discipline-reviewer", phase:"green", verdict})
       if verdict.fail: handle_green_review_fail(verdict); continue
+      # Regression check (F-DR-2): after reviewer's Green pass, run the slice's
+      # full test set. Any prior-cycle test that now fails is treated as a
+      # must_fix finding requiring re-Green (or escalation if the cap is hit).
+      regressions = run_slice_tests().regressions_against_priors
+      if regressions:
+        append_event({kind:"regression-detected", actor:"director", tests: regressions})
+        handle_green_review_fail({must_fix: ["regression in: " + regressions]})
+        continue
       git_commit("feat({scope}): green — {step.notes_oneline}")
       state.phase = "refactor"; persist_state()
       append_event({kind:"advance", from:"green", to:"refactor"})
+
+    case "outer-green":
+      # Outer-green is TERMINAL (F-LOOP-1). Inner cycles already implemented the
+      # behaviour; outer-green confirms wiring/glue. NO refactor phase, no further
+      # cycles after this dispatch.
+      assert state.phase == "green"
+      green = spawn(green-tweaker, {
+        red_line: outermost_test_ref,
+        failure_message: state.last_outer_failure_message,
+        line_budget: 50,
+        tpp_hint: step.transformation_hint,
+        mode: "outer-green"   # signals: zero new business logic; UI/glue only
+      })
+      append_event({kind:"submitted", actor:"green-tweaker", ...green})
+      if green.linesAdded > 50 or green.passed != true:
+        retry_green_or_escalate(green); continue
+      proof = spawn(verifier, {
+        green_files: green.editedFiles,
+        red_commit: state.red_commit,
+        outer_test: outermost_test_ref
+      })
+      append_event({kind:"revert-restore-proof", actor:"verifier", ...proof})
+      if not proof.tests_failed_after_revert:
+        reject_green_wrong_reason(proof); continue
+      verdict = spawn(discipline-reviewer-green, {
+        green_diff: git_diff_full,
+        test_diff: git_diff_tests,
+        test_output: test_run
+      })
+      append_event({kind:"review", actor:"discipline-reviewer", phase:"green", verdict})
+      if verdict.fail: handle_green_review_fail(verdict); continue
+      regressions = run_slice_tests().regressions_against_priors
+      if regressions:
+        append_event({kind:"regression-detected", actor:"director", tests: regressions})
+        handle_green_review_fail({must_fix: ["regression in: " + regressions]})
+        continue
+      git_commit("feat({scope}): green — {step.notes_oneline}")
+      # Outer-green is terminal. Advance step_index past the last step and break.
+      # Do NOT enter refactor; do NOT set phase=complete yet — mutation-pass (if
+      # required) runs first under phase=mutation-pass (F-MUT-2).
+      state.step_index += 1; persist_state()
+      append_event({kind:"advance", to_step:state.step_index, terminal:"outer-green"})
+      break
 
     case "inner-refactor":
       assert state.phase == "refactor"
@@ -197,32 +259,45 @@ loop:
       append_event({kind:"advance", to_step:state.step_index})
 
     case "scaffolding" | "verification-only":
-      # tdd:false allowed — write directly via green-tweaker, no Red-phase.
+      # tdd:false allowed — write directly via scaffolding-tweaker / green-tweaker.
+      # Hook permits prod-path edits in phase=pre-red for steps under
+      # walking_skeleton.steps[] or steps with tdd_or_verification.tdd == false.
       run_non_tdd_step(step)
       state.step_index += 1; persist_state()
 
-    case "contract-check":
-      # Treated as inner-red→inner-green per ENG-5023.
-      run_as_inner_cycle(step)
+    # NOTE (F-CC-1): there is NO `case "contract-check"` here. tdd-impl-plan
+    # expands every contract-shaped test-plan row into N (inner-red, inner-green)
+    # pairs at PLANNING time — one pair per write-site. tdd-execute therefore
+    # only ever sees inner-red / inner-green / inner-refactor / outer-* /
+    # scaffolding / verification-only. If a malformed plan reaches the loop
+    # with role="contract-check", reject at the setup gate (refuse to start).
 
 # After the loop: outer test must be green; test list drained.
 assert outermost_test.green
 assert state.step_index == plan.steps.length
 
-# Mutation pass (epilogue)
+# Mutation pass (epilogue) — runs UNDER phase=mutation-pass, not phase=complete.
+# (F-MUT-2: setting phase=complete before mutation-pass causes the hook to deny
+# every mutation edit; reorder so mutations run while edits are still permitted
+# inside the dedicated mutation-pass workspace.)
 if plan.mutation_pass.required:
+  state.phase = "mutation-pass"; persist_state()
+  append_event({kind:"advance", from:"green", to:"mutation-pass"})
   for m in plan.mutation_pass.mutations:
-    apply_mutation_in_throwaway_worktree(m)
+    apply_mutation_in_isolated_worktree(m)   # see "Mutation-pass epilogue" §
     run_suite()
     assert any(t.failed for t in m.expected_to_be_caught_by)
-    revert
+    revert_worktree(m)
   if any mutation uncaught: surface as follow-up Linear issue stub.
+  append_event({kind:"mutation-pass-complete"})
 
 state.phase = "complete"; persist_state()
 push origin main
 ```
 
 The pseudocode is the contract. Deviations require an explicit `events.jsonl` entry naming the deviation and the reason.
+
+**Director-composed commit subjects (F-DOC-6):** Director composes commit subject from `step.notes` (one-line) plus `target_test_id`. Director does not invent subject content from diff (Director cannot see full diff content — only `git diff --stat` summary).
 
 ## PreToolUse hook contract
 
@@ -234,9 +309,11 @@ The hook lives at `.claude/skills/tdd-execute/hooks/gate-edit-by-phase.ts` (buil
 
 | Phase | Test-glob path | Non-test path | Heredoc-bypass (`Bash` with `cat >`/`tee`/`>>` into source) |
 |-------|----------------|---------------|---------------------------------------------------------|
+| `pre-red` | allow | allow **only for paths declared in `walking_skeleton.steps[].predicted_seam_touchpoints` or steps with `tdd_or_verification.tdd == false`** ("In PRE-RED phase. Scaffolding-tweaker only.") | deny otherwise |
 | `red` | allow | **deny** ("In RED phase. Only test edits allowed. Spawn red-tweaker.") | deny if target is non-test path |
 | `green` | **deny** ("In GREEN phase. Failing test is locked.") | allow | deny if target is test-glob path |
 | `refactor` | allow iff `last_test_run.passed > 0 ∧ failed == 0 ∧ ts > all_edits_since_last_green` | allow under same fresh-green condition | deny if condition fails ("Re-run the suite first.") |
+| `mutation-pass` | **deny** | allow **only for `target_file` named in `mutation_pass.mutations[*]` AND only inside the mutation worktree** | deny otherwise |
 | `complete` | **deny** ("Slice complete. No more edits.") | **deny** | deny |
 
 **No-op outside tdd-execute workspaces:** if no `state.json` is found by climbing, hook exits 0. Critical for not breaking unrelated work in the same repo.
@@ -280,12 +357,13 @@ Push after every commit (per `feedback_always_push.md` and project CLAUDE.md "co
 ## Setup workflow (starting a slice)
 
 1. **Validate impl-plan.** Run schema check against `tdd-impl-plan/schema/impl-plan.schema.json`. Refuse to start on schema failure — bounce back to `tdd-impl-plan`.
-2. **Validate gates.** Confirm: (a) test-plan referenced exists and validates against test-architecture schema; (b) `outermost: true` test exists in test-plan; (c) step 1 is `outer-red` and references the outermost test; (d) last step is `outer-green` referencing the same `target_test_id` as step 1.
-3. **Create workspace.** `mkdir -p .tdd-execute/<slice-id>/`. Initialize `state.json` (`step_index: 0, phase: "red", cycle_index: 0`) and an empty `events.jsonl`. Lazy-create per memo §7 q1 — do not pre-create workspaces for sibling slices.
+2. **Validate gates.** Confirm: (a) test-plan referenced exists and validates against test-architecture schema; (b) `outermost: true` test exists in test-plan; (c) step 1 is `outer-red` and references the outermost test; (d) last step is `outer-green` referencing the same `target_test_id` as step 1; (e) **(F-COUPLE-2)** `impl_plan.test_plan` resolves to a readable file matching the test-plan schema — refuse to start with an explicit error otherwise (do not silently fail open); (f) no step has `role: contract-check` (per F-CC-1: contract-check is a planning hint, not an executable role; an unexpanded plan must be bounced back to `tdd-impl-plan`).
+3. **Derive slice id and create workspace.** Read `impl_plan.slice` (per F-COUPLE-4: schema field, pattern `^ENG-\d+(-\d+)?$` — e.g. `ENG-9999-1`). `mkdir -p .tdd-execute/<slice>/`. Initialize `state.json` (`step_index: 0, phase: "pre-red", cycle_index: 0`) and an empty `events.jsonl`. Lazy-create per memo §7 q1 — do not pre-create workspaces for sibling slices.
 4. **Land pre-Red style commits.** Walk `pre_red.formatter_commits[]` in order. One Bash call per entry, then `git commit -m "style(...): ..."`. Push. Append `events.jsonl` `kind:style-commit`.
-5. **Land walking-skeleton steps if any.** Walk `walking_skeleton.steps[]` via GreenTweaker scaffolding mode (`tdd: false`). Outer-red is still red after skeleton — but for the right reason (assertion failure, not import error).
-6. **Spawn first agent.** Step 1 is `outer-red` → spawn RedTweaker.
-7. **Enter the loop.**
+5. **Land walking-skeleton steps if any.** State stays at `phase: pre-red` so the hook permits prod-path edits scoped to `walking_skeleton.steps[].predicted_seam_touchpoints`. Walk `walking_skeleton.steps[]` via the **scaffolding-tweaker** sub-agent (Haiku; brief: zero-logic scaffolding only — empty exports, stub returns, declared types). Outer-red is still red after skeleton — but for the right reason (assertion failure, not import error). Append `events.jsonl` `kind:scaffolding-applied`.
+6. **Promote to red.** Set `state.phase = "red"; persist_state()`. Append `kind:advance, from:"pre-red", to:"red"`.
+7. **Spawn first agent.** Step 1 is `outer-red` → spawn RedTweaker.
+8. **Enter the loop.**
 
 ## Failure recovery
 
@@ -297,9 +375,24 @@ Push after every commit (per `feedback_always_push.md` and project CLAUDE.md "co
 | GreenTweaker returns `passed: true` but verifier's revert/restore proof fails (`tests_failed_after_revert` is false) | Test was passing before the change — Green didn't fail for the right reason (`feedback_green_right_reason`). Revert the Green, escalate to user. Do NOT accept xfail-flips-to-pass. |
 | DisciplineReviewer rejects (Red, Green, or Refactor) | Apply every finding (`feedback_liaison_fix_everything`). One re-spawn per finding type. After fixes, re-review is allowed **only if the fixes are architectural** (`feedback_single_iteration_review` exception); otherwise skip re-review and advance. |
 | Reviewer's findings conflict with prior reviewer findings (multi-reviewer convergence) | Per `feedback_multi_reviewer_convergence`: independent convergence promotes a potential-nit to real-information; treat in-scope. Apply both. |
-| `state.json` desynced from git (e.g. session resumed mid-cycle) | Re-orient from `events.jsonl` (most recent `kind:advance` is the last good state). Reconstruct `state.json`. Append `kind:reorient` event. |
+| `state.json` desynced from git (e.g. session resumed mid-cycle) | `events.jsonl` is per-slice (lives in `.tdd-execute/<slice>/`). Re-orient by `tail -n 100 events.jsonl` then grep `kind:advance`; the most recent advance is the last good state. If no advance events exist, slice is at `step_index: 0, phase: red`. Reconstruct `state.json`. Append `kind:reorient` event. |
 | Test-glob edit landed during `phase=green` (hook should have denied) | The hook is broken. Stop, `git revert` the offending commit, surface to user, do not continue. |
 | Hook fired zero times across the slice | Hook may not be wired (skill not active, or matcher mismatch). Surface to user before the slice's `complete` event — a slice with zero deny events is suspect. |
+
+## Scale-aware review schedule
+
+**Default:** Red review + Green review + Refactor review per cycle.
+
+**Relief path (F-FRICTION-4).** For slices with **all** of the following, reduce reviewer cadence to one mid-slice review + one final Green review:
+
+- ≤3 inner cycles, AND
+- single layer (every test row shares the same `layer`), AND
+- no `failure_mode_class: contract` or `race`, AND
+- no external dependencies (no `external_dependencies` block on any test).
+
+Cite `feedback_two_tier_discipline` in the events.jsonl `kind:relief-applied` entry. Do NOT skip the final Green review or the verifier's revert/restore proof — those remain mandatory regardless of scale. The relief is on intermediate Reds and Refactors only.
+
+Larger / multi-layer / contract-or-race slices keep the default full cadence — the trio's primary use case is sliced multi-layer specs, and relief is the exception, not the norm.
 
 ## Cycle budgets
 
@@ -311,15 +404,20 @@ Defaults (overridable per step via `impl-plan.transformation_hint` or top-level 
 
 ## Mutation-pass epilogue
 
-Per ENG-4934. Runs after `outer-green` lands, iff `impl_plan.mutation_pass.required: true`.
+Per ENG-4934. Runs after `outer-green` lands, iff `impl_plan.mutation_pass.required: true`. Director runs the pass under `state.phase = "mutation-pass"` (NOT `complete` — see F-MUT-2). The hook permits edits scoped to `mutation_pass.mutations[*].target_file` inside each mutation worktree only.
+
+**Per-worktree state (F-MUT-3).** Each mutation gets its own throwaway worktree at `.tdd-execute/<slice>/mutations/<id>/`. Each worktree contains its OWN `state.json` with `phase: mutation-pass` and a single permitted target file. The hook's workspace-discovery climb finds the worktree's local `state.json` first — NOT the parent slice's `state.json` (which is also at `phase: mutation-pass`, but its allow-list is empty for prod paths). Director sets the env override `TDD_WORKSPACE=<worktree-path>` when spawning sub-agents inside the worktree, so the hook resolves to the worktree's state even if the climb is ambiguous. **Document this in failure-recovery debug notes.**
+
+**Worktree branch (F-DOC-4).** Mutation-pass worktrees use detached HEAD (`git worktree add --detach <path>`). Never push from a mutation-pass worktree. Tear down (`git worktree remove`) after the pass.
 
 For each `mutations[]` entry:
-1. Create a throwaway working tree (`git worktree add .tdd-execute/<slice-id>/mutations/<id>`).
-2. Apply the mutation (single-line breakage in `target_file`/`target_function`).
-3. Run the test suite.
-4. Assert at least one of `expected_to_be_caught_by[]` failed. If yes → mutation caught → revert worktree.
-5. If no test caught the mutation → real test gap. Surface as a Linear follow-up issue stub. Append `events.jsonl` `kind:mutation-uncaught`.
-6. After all mutations: tear down worktrees, append `kind:mutation-pass-complete`, mark slice `complete`.
+1. `git worktree add --detach .tdd-execute/<slice>/mutations/<id>`.
+2. Initialize per-worktree `state.json` (`phase: mutation-pass`, `mutation_target_file: <m.target_file>`). Set `TDD_WORKSPACE` for child sub-agents.
+3. Spawn `mutation-applier` (Haiku, scoped Edit on `target_file`). Apply the single-line breakage described in `m.mutation`.
+4. Run the test suite.
+5. Assert at least one of `expected_to_be_caught_by[]` failed. If yes → mutation caught → tear down the worktree.
+6. If no test caught the mutation → real test gap. Surface as a Linear follow-up issue stub. Append `events.jsonl` `kind:mutation-uncaught` (in the parent slice's events.jsonl, not the worktree's).
+7. After all mutations: tear down worktrees, append `kind:mutation-pass-complete`, then set parent `state.phase = "complete"` and push.
 
 Mutation-pass is opt-in via `tdd-impl-plan.mutation_pass.required` (memo §7 q3). Default-off; encouraged for `failure_mode_class: contract` and `race`.
 

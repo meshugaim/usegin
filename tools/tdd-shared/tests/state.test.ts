@@ -85,6 +85,68 @@ describe("StateSchema", () => {
       r.issues.some((i) => i.path === "last_test_run.passed"),
     ).toBe(true);
   });
+
+  // ---- Extended phases (F-HOOK-2, F-MUT-2) -----------------------------
+
+  it("accepts the pre-red phase", () => {
+    const r = StateSchema.safeParse({
+      ...validState,
+      phase: "pre-red",
+      pre_red: { allowed_paths: ["nextjs-app/lib/foo/foo.ts"] },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts the mutation-pass phase with allowed_paths and current_mutation_id", () => {
+    const r = StateSchema.safeParse({
+      ...validState,
+      phase: "mutation-pass",
+      mutation_pass: {
+        allowed_paths: ["nextjs-app/lib/csv/parse.ts"],
+        current_mutation_id: "M1",
+      },
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects pre_red.allowed_paths that isn't a string[]", () => {
+    const r = StateSchema.safeParse({
+      ...validState,
+      phase: "pre-red",
+      pre_red: { allowed_paths: ["ok", 42] },
+    });
+    expect(r.ok).toBe(false);
+    expect(r.issues.some((i) => i.path === "pre_red.allowed_paths")).toBe(true);
+  });
+
+  it("rejects mutation_pass that isn't an object", () => {
+    const r = StateSchema.safeParse({
+      ...validState,
+      phase: "mutation-pass",
+      mutation_pass: "nope",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.issues.some((i) => i.path === "mutation_pass")).toBe(true);
+  });
+
+  it("accepts a positive refactor_freshness_window_ms override", () => {
+    const r = StateSchema.safeParse({
+      ...validState,
+      refactor_freshness_window_ms: 600_000,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects a non-positive refactor_freshness_window_ms", () => {
+    const r = StateSchema.safeParse({
+      ...validState,
+      refactor_freshness_window_ms: 0,
+    });
+    expect(r.ok).toBe(false);
+    expect(
+      r.issues.some((i) => i.path === "refactor_freshness_window_ms"),
+    ).toBe(true);
+  });
 });
 
 describe("WorkerReviewerStateSchema", () => {
