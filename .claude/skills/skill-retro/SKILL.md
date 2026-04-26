@@ -19,7 +19,7 @@ Cross-reference against available lab directories:
 ls .claude/skill-lab/
 ```
 
-Only skills with a lab directory (containing `lab.md`) can be retroed. If a skill was used but has no lab, note it in your summary — it may need one.
+Only skills with a lab directory can be retroed. A lab directory uses one of two layouts (see "Layouts" under Step 4). If a skill was used but has no lab, note it in your summary — it may need one.
 
 ## Step 2: Scope with User
 
@@ -47,10 +47,35 @@ Use `AskUserQuestion`. This determines whether you pause for discussion or run t
 
 ## Step 4: Evaluate
 
-For each scoped skill, read its lab file at `.claude/skill-lab/<skill-name>/lab.md`. The lab file contains:
-- **Intent** — what the skill is supposed to achieve
-- **Success Signals** — checklist of what a good session looks like
-- **Retro Guide** — specific evaluation steps for this skill
+For each scoped skill, locate its lab content using the resolution rule below.
+
+### Layouts
+
+A skill's lab uses one of two layouts. Resolve in this order:
+
+1. **New layout (preferred).** If both `.claude/skill-lab/<skill-name>/purpose.md` and `.claude/skill-lab/<skill-name>/retro-guide.md` exist, read both:
+   - `purpose.md` — intent, success signals, known limitations, ideas, changelog
+   - `retro-guide.md` — how to retro this skill (the evaluation process)
+2. **Legacy layout (fallback).** If only `.claude/skill-lab/<skill-name>/lab.md` exists, read it. The single `lab.md` combines intent + success signals + retro guide + ideas + changelog.
+3. **Neither.** Stop and surface the gap clearly: the skill needs a lab before it can be retroed. Don't fabricate criteria from the `SKILL.md` text.
+
+```
+.claude/skill-lab/test-architecture/   ← new layout
+  purpose.md
+  retro-guide.md
+  retros/
+
+.claude/skill-lab/slicing-specs/       ← legacy layout
+  lab.md
+  retros/
+```
+
+### What to read
+
+Whichever layout, the lab content gives you:
+- **Intent** — what the skill is supposed to achieve (from `purpose.md` or `lab.md`)
+- **Success Signals** — checklist of what a good session looks like (from `purpose.md` or `lab.md`)
+- **Retro Guide** — specific evaluation steps for this skill (from `retro-guide.md` or `lab.md`)
 
 Optionally, scan previous retros at `.claude/skill-lab/<skill-name>/retros/` to spot recurring patterns.
 
@@ -96,7 +121,7 @@ If a spec was implemented, ask the user via `AskUserQuestion`:
 > 3. **No** — skip the spec retro
 
 If yes (option 1 or 2):
-- Read the writing-specs lab at `.claude/skill-lab/writing-specs/lab.md` — use the **Implementer Perspective** section
+- Read the writing-specs lab — apply the layout resolution rule from Step 4. Use the **Implementer Perspective** section (currently in `lab.md`; if writing-specs migrates to the new layout, the implementer perspective lives in `purpose.md` and `retro-guide.md`).
 - Evaluate the spec against the implementer success signals and retro guide
 - Write findings to `.claude/skill-lab/writing-specs/retros/implementer/YYYY-MM-DD-<spec-slug>.md`
 - Use the same retro entry format (verdict, key observations, suggestions)
@@ -105,7 +130,7 @@ Even when the user says "do both," always complete and present the skill retro f
 
 ## Step 7: Surface Actionable Items
 
-If a finding is concrete enough to become a skill improvement, flag it in your summary. The user decides whether to create a Linear issue or let it ferment in the Ideas section of the lab's `lab.md`.
+If a finding is concrete enough to become a skill improvement, flag it in your summary. The user decides whether to create a Linear issue or let it ferment in the Ideas section (in `purpose.md` for new-layout skills, or `lab.md` for legacy ones).
 
 In **autonomous mode**, commit the retro file before presenting the summary.
 
@@ -126,7 +151,7 @@ If you don't have enough information to evaluate a signal, mark it as **"unable 
 
 ## Cross-Cutting Observations
 
-Sometimes you'll notice patterns that span multiple skills — e.g., "the auto-inject block worked well in both research and build-orchestrate." Write these as an Idea/Note in the `lab.md` of the primary skill, and reference the other skill.
+Sometimes you'll notice patterns that span multiple skills — e.g., "the auto-inject block worked well in both research and build-orchestrate." Write these as an Idea/Note in the primary skill's lab (Ideas section in `purpose.md` for new-layout skills, or `lab.md` for legacy), and reference the other skill.
 
 If the observation is truly cross-cutting (about the skill system itself, not any single skill), note it in your summary to the user. They'll decide where it belongs.
 
@@ -135,4 +160,4 @@ If the observation is truly cross-cutting (about the skill system itself, not an
 - **Don't evaluate work quality.** Whether the code works or the research answer is right is not your concern.
 - **Don't modify the skill.** You observe and record. Improvements to the skill text are a separate action.
 - **Don't create Linear issues.** Flag actionable items in your summary. The user decides what becomes work.
-- **Don't read the skill itself (SKILL.md) for evaluation criteria.** The `lab.md` has everything you need. The skill text is the "baked" instructions — you evaluate against the lab's Success Signals and Retro Guide.
+- **Don't read the skill itself (SKILL.md) for evaluation criteria.** The lab has everything you need: `purpose.md` (Success Signals) and `retro-guide.md` (Retro Guide) for new-layout skills, or `lab.md` for legacy. The skill text is the "baked" instructions — you evaluate against the lab's Success Signals and Retro Guide.
