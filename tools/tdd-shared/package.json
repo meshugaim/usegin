@@ -1,0 +1,24 @@
+{
+  "name": "tdd-shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared state, event, and validation utilities for TDD skills (worker-reviewer, tdd-execute)",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./state": "./src/state.ts",
+    "./events": "./src/events.ts",
+    "./test-globs": "./src/test-globs.ts",
+    "./frontmatter": "./src/frontmatter.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "yaml": "^2.7.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

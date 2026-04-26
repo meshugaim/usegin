@@ -10,11 +10,22 @@
  * Workspace is determined by:
  * 1. WR_WORKSPACE env var (if set)
  * 2. Inferred from file path (looks for parent dir with state.json)
+ *
+ * Shared utilities (frontmatter parsing, state IO, events.jsonl appender,
+ * workspace climb) are imported from `tools/tdd-shared/` so the
+ * planned `tdd-execute` skill can reuse the same primitives without
+ * duplicating logic. See tools/tdd-shared/src/index.ts.
  */
 
-import { parse as parseYaml } from "yaml";
-import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from "fs";
-import { dirname, basename, join } from "path";
+import { basename } from "path";
+import {
+  extractFrontmatter,
+  readStateRaw,
+  writeStateRaw,
+  appendEvent,
+  climbToStateJson,
+  type WorkerReviewerState,
+} from "tdd-shared";
 
 interface HookInput {
   tool_name: string;
@@ -31,13 +42,6 @@ interface ValidationError {
   expected?: string;
 }
 
-interface State {
-  phase: string;
-  currentTestIndex: number | null;
-  totalTests: number | null;
-  startedAt: string;
-}
-
 interface TestPlan {
   tests: Array<{
     index: number;
@@ -48,109 +52,27 @@ interface TestPlan {
 }
 
 // --- Workspace Discovery ---
+//
+// Worker-reviewer uses a looser convention than tdd-execute: any parent
+// directory containing a state.json is considered a workspace. Honour
+// WR_WORKSPACE env var first, then climb.
 
 function getWorkspaceDir(filePath: string): string | null {
-  // First, check env var
   if (process.env.WR_WORKSPACE) {
     return process.env.WR_WORKSPACE;
   }
-
-  // Infer from file path - look for a directory containing state.json
-  let dir = dirname(filePath);
-  for (let i = 0; i < 5; i++) {  // Look up to 5 levels
-    if (existsSync(join(dir, "state.json"))) {
-      return dir;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;  // Reached root
-    dir = parent;
-  }
-
-  return null;
+  return climbToStateJson(filePath);
 }
 
-// --- YAML Frontmatter Parsing ---
-
-function extractFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } | null {
-  if (!content.startsWith("---")) {
-    return null;
-  }
-
-  const lines = content.split("\n");
-  let closingIndex = -1;
-
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === "---") {
-      closingIndex = i;
-      break;
-    }
-  }
-
-  if (closingIndex === -1) {
-    return null;
-  }
-
-  const frontmatterText = lines.slice(1, closingIndex).join("\n");
-  const body = lines.slice(closingIndex + 1).join("\n");
-
-  try {
-    const frontmatter = parseYaml(frontmatterText) as Record<string, unknown>;
-    return { frontmatter, body };
-  } catch {
-    return null;
-  }
-}
-
-// --- State Management ---
-
-function getStatePath(workspaceDir: string): string {
-  return join(workspaceDir, "state.json");
-}
-
-function getEventsPath(workspaceDir: string): string {
-  return join(workspaceDir, "events.jsonl");
-}
-
-function getTestPlanPath(workspaceDir: string): string {
-  return join(workspaceDir, "test-plan.md");
-}
-
-function readState(workspaceDir: string): State | null {
-  const statePath = getStatePath(workspaceDir);
-  if (!existsSync(statePath)) {
-    return null;
-  }
-  try {
-    return JSON.parse(readFileSync(statePath, "utf-8"));
-  } catch {
-    return null;
-  }
-}
-
-function writeState(workspaceDir: string, state: State): void {
-  ensureWorkspaceExists(workspaceDir);
-  writeFileSync(getStatePath(workspaceDir), JSON.stringify(state, null, 2));
-}
-
-function appendEvent(workspaceDir: string, event: Record<string, unknown>): void {
-  ensureWorkspaceExists(workspaceDir);
-  const eventWithTs = { ts: new Date().toISOString(), ...event };
-  appendFileSync(getEventsPath(workspaceDir), JSON.stringify(eventWithTs) + "\n");
-}
-
-function ensureWorkspaceExists(workspaceDir: string): void {
-  if (!existsSync(workspaceDir)) {
-    mkdirSync(workspaceDir, { recursive: true });
-  }
-}
+// --- Test plan reader (worker-reviewer-specific) -------------------------
 
 function readTestPlan(workspaceDir: string): TestPlan | null {
-  const planPath = getTestPlanPath(workspaceDir);
-  if (!existsSync(planPath)) {
-    return null;
-  }
+  // test-plan.md lives in the workspace root for worker-reviewer.
+  const planPath = `${workspaceDir}/test-plan.md`;
   try {
-    const content = readFileSync(planPath, "utf-8");
+    const fs = require("fs") as typeof import("fs");
+    if (!fs.existsSync(planPath)) return null;
+    const content = fs.readFileSync(planPath, "utf-8");
     const parsed = extractFrontmatter(content);
     if (!parsed) return null;
     const fm = parsed.frontmatter as { testPlan?: TestPlan };
@@ -218,7 +140,7 @@ function validateTestPlanSubmission(frontmatter: Record<string, unknown>): Valid
   return errors;
 }
 
-function validateImplSubmission(frontmatter: Record<string, unknown>, state: State, testPlan: TestPlan): ValidationError[] {
+function validateImplSubmission(frontmatter: Record<string, unknown>, state: WorkerReviewerState, testPlan: TestPlan): ValidationError[] {
   const errors: ValidationError[] = [];
 
   // Required: phase
@@ -449,7 +371,9 @@ async function main() {
   }
 
   const { frontmatter } = parsed;
-  const state = readState(workspaceDir);
+  // Worker-reviewer uses its own (legacy) state shape; tdd-shared's
+  // typed `readState` would reject it, so we use readStateRaw and cast.
+  const state = readStateRaw(workspaceDir) as WorkerReviewerState | null;
   const testPlan = readTestPlan(workspaceDir);
 
   let errors: ValidationError[] = [];
@@ -508,19 +432,21 @@ async function main() {
   if (fileName === "submission.md") {
     if (phase === "plan") {
       // Plan submitted - update state to plan:review
-      const newState: State = {
+      const newState: WorkerReviewerState = {
         phase: "plan:review",
         currentTestIndex: null,
         totalTests: (frontmatter.testPlan as { tests: unknown[] })?.tests?.length || null,
         startedAt: state?.startedAt || new Date().toISOString()
       };
-      writeState(workspaceDir, newState);
+      writeStateRaw(workspaceDir, newState);
       appendEvent(workspaceDir, {
+        kind: "plan-submitted",
         actor: "worker",
         event: "plan-submitted",
         testCount: newState.totalTests
       });
       appendEvent(workspaceDir, {
+        kind: "validation-passed",
         actor: "hook",
         event: "validation-passed",
         file: "submission.md",
@@ -528,16 +454,17 @@ async function main() {
       });
     } else {
       // Impl submitted - update state to impl:review
-      const newState: State = {
-        ...state!,
+      const newState: WorkerReviewerState = {
+        ...(state as WorkerReviewerState),
         phase: "impl:review"
       };
-      writeState(workspaceDir, newState);
+      writeStateRaw(workspaceDir, newState);
 
       const testResults = frontmatter.testResults as Array<{ status: string }>;
       const passingCount = testResults.filter(r => r.status === "pass").length;
 
       appendEvent(workspaceDir, {
+        kind: "impl-submitted",
         actor: "worker",
         event: "impl-submitted",
         testIndex: (frontmatter.targetTest as { index: number }).index,
@@ -545,6 +472,7 @@ async function main() {
         totalTests: state!.totalTests
       });
       appendEvent(workspaceDir, {
+        kind: "validation-passed",
         actor: "hook",
         event: "validation-passed",
         file: "submission.md",
