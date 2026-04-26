@@ -292,6 +292,8 @@ If any answer is "no," add the missing detail before posting. Don't ship a spec 
 
 Most humans won't need to read the full spec. The ACs are already aligned, and the rest is trustworthy implementation guidance.
 
+When the spec is finished and accepted, the natural next step is `slicing-specs` → `test-architecture` → `tdd-impl-plan` → `tdd-execute` for implementation. For tiny specs (single AC, single layer), implementation may proceed directly without the trio.
+
 ## Test Levels Reference
 
 Each AC gets a level that tells downstream agents how to verify it:

@@ -92,6 +92,8 @@ Track progress in Linear via sub-issues and issue updates. See `plan align` for 
 
 ## Workflow
 
+When the spec has Verification Expectations and the slice is non-trivial (>1 test, multi-layer), delegate to the TDD trio: `test-architecture` produces test-plan.md (skipping the heuristic "decide which level of test"), `tdd-impl-plan` orders the cycles, `tdd-execute` walks them under hook-enforced TDD. For trivial slices (single config flag, single CSS rule), continue inline.
+
 Guidelines, not a strict process. Adapt to the situation.
 
 | Step                    | What                                                        | Notes                                                                  |

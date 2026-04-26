@@ -111,6 +111,10 @@ When a reviewer finds a **behavioral bug**, it goes through its own mini TDD cyc
 
 Red and green can be separate agents (one writes the failing test, the next makes it pass). Splitting is optional — use judgment based on task complexity.
 
+### When to delegate to TDD trio
+
+For TDD-heavy implementation phases, the liaison can delegate to the TDD trio (`test-architecture` → `tdd-impl-plan` → `tdd-execute`). Use it when the slice has explicit acceptance criteria + multi-cycle TDD. Skip for tiny single-line tweaks (just write the test directly) or for non-TDD work (config, docs, dependency bumps).
+
 ## Sequencing: Sequential by Default
 
 **Do NOT parallelize unless the user explicitly requests it.**

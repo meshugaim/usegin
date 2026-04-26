@@ -436,6 +436,10 @@ plan create "infra: shared types + test harness" --parent <spec-id> --label chor
 
 ---
 
+## After Slicing
+
+After slicing, if the spec has >3 slices or any slice with cross-service seams, run `test-architecture` next to design the test plan before any code is written.
+
 ## What This Skill Does NOT Do
 
 - **Write code** — that's `implementing-specs`

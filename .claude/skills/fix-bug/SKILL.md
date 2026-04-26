@@ -108,6 +108,8 @@ State what "fixed" means before spawning any implementation workers. This is the
 
 Delegate implementation to a worker sub-agent. The worker follows the TDD cycle:
 
+For multi-cycle bug fixes (the bug spans 2+ inner cycles, or the fix touches multiple layers), the fix-bug skill can delegate the Phase 3 TDD loop to the `tdd-execute` skill — pass it an impl-plan.md from `tdd-impl-plan` consuming a test-plan.md from `test-architecture`. For single-cycle fixes (one failing test, one minimal change), keep the existing inline TDD.
+
 ### Red
 
 Write the failing test first. The test should:
