@@ -1,4 +1,9 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, beforeAll } from "bun:test";
+
+// Force registry to use built-in fallback only, so invariant tests aren't
+// affected by whichever LiteLLM snapshot happens to be cached on the dev box.
+process.env.SESSION_MODEL_CACHE_PATH = "/dev/null/session-model-cache-disabled";
+
 import {
   getModelPricing,
   getContextWindowSize,
@@ -8,9 +13,15 @@ import {
   DEFAULT_CONTEXT_WINDOW,
   type ModelPricing,
 } from "./pricing";
+import { resetRegistryForTest } from "./model-registry";
 import type { TokenUsage } from "./types";
 
 describe("pricing", () => {
+  beforeAll(() => {
+    // Belt-and-suspenders: ensure the registry re-reads with the test path.
+    resetRegistryForTest();
+  });
+
   // ==========================================================================
   // MODEL PRICING LOOKUP
   // ==========================================================================

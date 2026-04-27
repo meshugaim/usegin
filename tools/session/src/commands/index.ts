@@ -10,3 +10,4 @@ export { runSearchIn } from "./search-in";
 export { runDocs } from "./docs";
 export { runParse } from "./parse";
 export { runCodeHistory } from "./code-history";
+export { runRefreshModels } from "./refresh-models";

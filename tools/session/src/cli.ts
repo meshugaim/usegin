@@ -30,6 +30,7 @@ import {
   runDocs,
   runParse,
   runCodeHistory,
+  runRefreshModels,
 } from "./commands";
 
 function printHelp() {
@@ -51,6 +52,7 @@ USAGE:
   session search-in <id> <query>  Search within a session's turns
   session code-history <file>:<line>  Show commit context for a line
   session docs [list|show]  Browse embedded documentation
+  session refresh-models    Refresh the LiteLLM-sourced model registry cache
 
 SESSION IDENTIFIERS:
   You can specify sessions by:
@@ -256,6 +258,12 @@ async function main() {
   if (rawArgs[0] === "docs") {
     runDocs(rawArgs.slice(1));
     process.exit(0);
+  }
+
+  // Check for 'refresh-models' subcommand
+  if (rawArgs[0] === "refresh-models") {
+    await runRefreshModels(rawArgs.slice(1));
+    return;
   }
 
   const args = parseMainArgs(rawArgs);
