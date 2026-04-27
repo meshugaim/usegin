@@ -18,6 +18,6 @@ Our dev-env should be easy to להתמצה in. Anyone — human or Gin — shoul
 
 Confirmed I found the Hebrew word and its meaning — Lihu's test passed.
 
-Operational implication for me: when I create new top-level structures (like `usegin/zettel/` or `usegin/` this session), I always write a `README.md` first that says what's here and why. The README is the orientation surface. No README = the thing didn't really get created, just a folder.
+Operational implication for me: when I create new top-level structures (like `gin/zettel/` or `gin/` this session), I always write a `README.md` first that says what's here and why. The README is the orientation surface. No README = the thing didn't really get created, just a folder.
 
-This is also why the `usegin/things-we-grow.md` registry exists (z006) — it's the orientation index for the meta layer.
+This is also why the `gin/things-we-grow.md` registry exists (z006) — it's the orientation index for the meta layer.

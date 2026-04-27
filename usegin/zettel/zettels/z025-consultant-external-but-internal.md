@@ -20,9 +20,9 @@ He is **internal in team** — when he hits friction, that friction belongs to u
 
 Operational rules I'm carrying:
 
-1. The Consultant lives at `usegin/consultant/`. Working area, charter, working notes — all his.
+1. The Consultant lives at `gin/consultant/`. Working area, charter, working notes — all his.
 2. He's spawned as a real resumable Claude session (not a sub-agent of mine), so Lihu can resume the session himself, separately from me. I capture and surface his session ID.
-3. **His friction events become zettels in our zettelkasten** — not just notes in his own folder. When the Consultant hits friction (e.g., "Linear isn't indexed in Effi for this project", "the `effi` CLI doesn't expose X", "I can't reach Y"), Gin (me) lifts that into a zettel under `usegin/zettel/zettels/` with `authored-by: consultant` so the friction lands in the shared brain.
+3. **His friction events become zettels in our zettelkasten** — not just notes in his own folder. When the Consultant hits friction (e.g., "Linear isn't indexed in Effi for this project", "the `effi` CLI doesn't expose X", "I can't reach Y"), Gin (me) lifts that into a zettel under `gin/zettel/zettels/` with `authored-by: consultant` so the friction lands in the shared brain.
 4. He can spawn his own sub-Gins (z023). Treat him as a peer, not a child.
 
 Why both faces of "external + internal": consultant stance is what gets him to ask the un-asked questions; team membership is what makes his findings *our* findings. Drop either side and the role collapses.

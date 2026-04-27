@@ -15,13 +15,13 @@ Linear is where shipped product work lives. The whole company runs on it. That s
 
 But for **Gin's own work** — DX, sub-apps, conventions, internal feature design, agent orchestration — Linear is the wrong shape. It's heavyweight, it lives at the company level, and the friction of opening an issue for every cross-cutting thought kills the discipline.
 
-Gin needs its own documentation surface. We don't know what it should be yet — that's research-pending (see `usegin/research/documentation-method/`). We've been running this product for ~a year; how the team has *actually* documented things is in the codebase, in agent records, in Effi. A research team should investigate the existing patterns before we propose a new one.
+Gin needs its own documentation surface. We don't know what it should be yet — that's research-pending (see `gin/research/documentation-method/`). We've been running this product for ~a year; how the team has *actually* documented things is in the codebase, in agent records, in Effi. A research team should investigate the existing patterns before we propose a new one.
 
 ## Gin side
 
 Until the documentation method lands, Gin defaults to:
 
-- **Zettels** (`usegin/zettel/zettels/`) for cross-cutting / methodological / meta thoughts. Atomic, threaded, two-sided.
+- **Zettels** (`gin/zettel/zettels/`) for cross-cutting / methodological / meta thoughts. Atomic, threaded, two-sided.
 - **In-place READMEs** in each sub-app for orientation (z010 — easy to להתמצה).
 - **Linear** *only* for things that ship to humans (real product features, real bugs). Not for Gin-internal R&D.
 - **Memory entries** for behavior rules I need across sessions.

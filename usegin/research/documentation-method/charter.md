@@ -1,6 +1,6 @@
 # Research: How should Gin document its own work?
 
-A research-pending question raised in zettel `usegin/zettel/zettels/z024`: Linear is the right home for product-shipping work, but Gin's own internal R&D / convention / sub-app design needs a lighter, code-adjacent documentation surface. We don't know what.
+A research-pending question raised in zettel `gin/zettel/zettels/z024`: Linear is the right home for product-shipping work, but Gin's own internal R&D / convention / sub-app design needs a lighter, code-adjacent documentation surface. We don't know what.
 
 ## Approach
 
@@ -21,6 +21,6 @@ A research-pending question raised in zettel `usegin/zettel/zettels/z024`: Linea
 
 ## Deliverable
 
-`usegin/research/documentation-method/findings.md` — what *forms* have actually worked for us, ranked, with examples. Then `usegin/research/documentation-method/recommendation.md` — one opinionated recommendation with options + lean + manager-relevant considerations (z026 shape).
+`gin/research/documentation-method/findings.md` — what *forms* have actually worked for us, ranked, with examples. Then `gin/research/documentation-method/recommendation.md` — one opinionated recommendation with options + lean + manager-relevant considerations (z026 shape).
 
 This is a research charter, not an instantiation. A separate session may be spawned to run it; for now the address exists (z003) and the work waits its turn.

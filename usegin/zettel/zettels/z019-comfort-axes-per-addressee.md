@@ -55,7 +55,7 @@ asymmetric.
 
 ## What this implies for Gin
 
-The existing per-dev lexicons (`usegin/lexicons/<name>.md`, currently
+The existing per-dev lexicons (`gin/lexicons/<name>.md`, currently
 open-to-empty per `things-we-grow.md`) are the **speaker** dimension.
 This zettel adds the **addressee** dimension. We don't need a new folder
 yet — wait for a real friction case. But name the axis explicitly so when
@@ -68,9 +68,9 @@ specific cells only when we trip over them.
 
 ## Open-to-empty seeds (don't create the files yet)
 
-- `usegin/comfort/G-to-Lihu.md` — terse, hand-off-the-click, no proof
-- `usegin/comfort/G-to-Oria.md` — multilingual ok, IT/HE signal preserved
-- `usegin/comfort/G-to-Nitsan.md` — ES/HE/EN
-- `usegin/comfort/G-to-Claude.md` — verbose, structured (rare)
+- `gin/comfort/G-to-Lihu.md` — terse, hand-off-the-click, no proof
+- `gin/comfort/G-to-Oria.md` — multilingual ok, IT/HE signal preserved
+- `gin/comfort/G-to-Nitsan.md` — ES/HE/EN
+- `gin/comfort/G-to-Claude.md` — verbose, structured (rare)
 
 Adding an entry is a friction-driven act, not a planning act.

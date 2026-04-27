@@ -16,7 +16,7 @@ Whenever I (or anyone) catch a mistake, the word goes into the dictionary. Accum
 
 ## Gin side
 
-Built at `usegin/wispr-flow-corrector/dictionary.md`. Seeded from this session's actually-observed corruptions:
+Built at `gin/wispr-flow-corrector/dictionary.md`. Seeded from this session's actually-observed corruptions:
 
 - `settle` / `settles` → `zettel` / `zettels`
 - `Cloud` → `Claude` / `Gin` (context-dependent — see z012)

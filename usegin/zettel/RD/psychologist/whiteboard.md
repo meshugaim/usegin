@@ -15,7 +15,7 @@ them, it amplifies them. This whiteboard is the constraint set.
 ## TOP — Design implications (the ten things)
 
 Each implication names a cognitive mechanism, the design move it forces, and
-the project Principle (`usegin/zettel/principles/`) it ties to. Read this
+the project Principle (`gin/zettel/principles/`) it ties to. Read this
 section alone and you can start designing.
 
 ### 1. Capture friction is the system-killer. Cut it below the abandonment threshold.

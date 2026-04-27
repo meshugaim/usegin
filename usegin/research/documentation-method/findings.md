@@ -7,7 +7,7 @@ re-read *and* updated when reality moved.
 **Method.** Walked the file tree, counted forms, measured git churn per
 artifact, sampled 20+ documents across every form, cross-checked against
 memory entries, Linear (`plan` CLI), and the prior R&D whiteboards
-(`usegin/zettel/RD/effi-historian/whiteboard.md` already digested the Effi
+(`gin/zettel/RD/effi-historian/whiteboard.md` already digested the Effi
 corpus — re-using rather than re-querying, since `effi ask` timed out
 during this session and the historian's coverage already answers the
 team-doc-pattern question).
@@ -34,8 +34,8 @@ should be spawned in a session that exposes `Task`.
 | `docs/decisions/0NNN-*.md` (ADRs) | 17 | **1 commit each** in 14/17 cases — write-once form |
 | `docs/*.spec.md` + `docs/*.impl-status.md` (paired) | 41 + 22 | 60/85 last touched Jan 2026 (3+ months stale); 2-of-2 pair pattern is deliberate; mostly post-implementation graveyard |
 | `docs/research/<topic>/NN-*.md` (numbered research bundle) | 12 (tdd-skills) | Used heavily during build, then frozen; `SHIPPED.md` is the survivor |
-| `usegin/zettel/zettels/zNNN-*.md` | 27 | New form (1 week old); already cross-referenced by 30+ memory entries and 3 CLAUDE.md sections |
-| `usegin/zettel/RD/<professor>/whiteboard.md` | 8 (3,481 lines) | One-shot R&D dossiers; cross-cutting synthesis lives in Linear comment, not in any file |
+| `gin/zettel/zettels/zNNN-*.md` | 27 | New form (1 week old); already cross-referenced by 30+ memory entries and 3 CLAUDE.md sections |
+| `gin/zettel/RD/<professor>/whiteboard.md` | 8 (3,481 lines) | One-shot R&D dossiers; cross-cutting synthesis lives in Linear comment, not in any file |
 | Linear issue *description* | (per issue) | Lives if structured + sub-issued; e.g. ENG-5379 carries 3KB scoped description |
 | Linear issue *comment thread* | (per issue) | The richest single living-doc form for active R&D — see ENG-5379 comment as evidence |
 
@@ -104,7 +104,7 @@ id (`9e966133:L544`), or a memory entry name
 **Limits:**
 - Only fits things that are *triggerable workflows*. Cross-cutting
   insight ("we keep getting hit by Wispr mishearings") doesn't fit the
-  SKILL.md shape — that's why `usegin/wispr-flow-corrector/dictionary.md`
+  SKILL.md shape — that's why `gin/wispr-flow-corrector/dictionary.md`
   exists separately.
 
 #### 3. **CLAUDE.md** (root + sub-app)
@@ -128,7 +128,7 @@ conventions; root carries cross-cutting workflow rules.
 - Cross-app insights have no home — neither nextjs nor python owns the
   rule, so it goes to root, which is already long.
 
-#### 4. **Zettels** (`usegin/zettel/zettels/zNNN-*.md`)
+#### 4. **Zettels** (`gin/zettel/zettels/zNNN-*.md`)
 
 New form, ~1 week old, 27 entries. Already cited by 30+ memory entries
 and the consultant charter. Two-faced (Human + Gin), threaded via
@@ -153,7 +153,7 @@ front-matter (`threads: [↑placement, ~xref]`), append-mostly.
 
 ### Tier 2 — useful for a specific phase, then frozen
 
-#### 5. **R&D whiteboards** (`usegin/zettel/RD/<professor>/whiteboard.md`)
+#### 5. **R&D whiteboards** (`gin/zettel/RD/<professor>/whiteboard.md`)
 
 8 files, 3,481 lines. Each a one-shot deep-dive by a spawned sub-agent.
 Load-bearing during the R&D phase, then immediately archival. Their
@@ -232,7 +232,7 @@ freezes on day-1 and the impl-status reaches "shipped" then dies.
 both at every iteration didn't survive contact with shipping pressure.
 Linear sub-issues are now where most spec-tracking happens.
 
-#### 10. **`usegin/things-we-grow.md`** — accumulate-as-we-go registry
+#### 10. **`gin/things-we-grow.md`** — accumulate-as-we-go registry
 
 Useful pattern (a *table* of artifacts that grow), but only 2 active
 rows + 3 open-to-empty. Too early to call.
@@ -242,7 +242,7 @@ rows + 3 open-to-empty. Too early to call.
 ## Effi-side patterns (one-paragraph cite, not re-derived)
 
 The Effi Historian whiteboard
-(`usegin/zettel/RD/effi-historian/whiteboard.md` lines 1–80) already
+(`gin/zettel/RD/effi-historian/whiteboard.md` lines 1–80) already
 digested how the team documents in emails / Drive / meetings. The
 finding that matters here: **Drive has only 2 active doc files**;
 **meeting recaps via Fathom emails are the dominant durable form**;
@@ -284,17 +284,17 @@ The new doc form has to clear all five.
 
 ## Citations
 
-- Charter: `usegin/research/documentation-method/charter.md`
-- Z024 (the trip-wire): `usegin/zettel/zettels/z024-not-everything-in-linear.md`
-- Z023 (spawn-as-instantiation): `usegin/zettel/zettels/z023-spawn-as-instantiation.md`
-- Z022 (two-faces): `usegin/zettel/zettels/z022-two-faces-when-suitable.md`
-- Z003 (open-to-empty): `usegin/zettel/zettels/z003-open-to-empty.md`
+- Charter: `gin/research/documentation-method/charter.md`
+- Z024 (the trip-wire): `gin/zettel/zettels/z024-not-everything-in-linear.md`
+- Z023 (spawn-as-instantiation): `gin/zettel/zettels/z023-spawn-as-instantiation.md`
+- Z022 (two-faces): `gin/zettel/zettels/z022-two-faces-when-suitable.md`
+- Z003 (open-to-empty): `gin/zettel/zettels/z003-open-to-empty.md`
 - Memory MEMORY.md: `~/.claude/projects/-workspaces-test-mvp/memory/MEMORY.md`
 - Skill-lab exemplar: `.claude/skill-lab/tdd-execute/purpose.md`
 - Skill-lab retro-guide exemplar: `.claude/skill-lab/tdd-execute/retro-guide.md`
 - Recent dense ADRs: `docs/decisions/0012-sharepoint-scopes-are-user-intent-only.md`,
   `docs/decisions/0015-fathom-per-recorder-scoping.md`
 - Linear-as-living-doc canonical: `plan show ENG-5379 --comments`
-- Effi corpus digest: `usegin/zettel/RD/effi-historian/whiteboard.md` §1.1–1.3
-- Researcher-missing failure modes: `usegin/zettel/RD/researcher-missing/whiteboard.md`
+- Effi corpus digest: `gin/zettel/RD/effi-historian/whiteboard.md` §1.1–1.3
+- Researcher-missing failure modes: `gin/zettel/RD/researcher-missing/whiteboard.md`
 - Cross-cutting synthesis on ENG-5379 (the Nitsan comment 2026-04-27)

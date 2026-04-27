@@ -20,7 +20,7 @@ This is a harness-level rule fighting a charter-level instruction. The charter (
 
 Possible fixes (open-to-empty — pick when this recurs):
 
-1. **Charters declare allowed-write paths** — the kickoff prompt includes `ALLOWED_WRITES: usegin/research/<topic>/{findings,recommendation}.md` and the harness uses that as override. Heaviest to wire.
+1. **Charters declare allowed-write paths** — the kickoff prompt includes `ALLOWED_WRITES: gin/research/<topic>/{findings,recommendation}.md` and the harness uses that as override. Heaviest to wire.
 2. **Convention is "no spec/plan/summary files unless explicitly directed"** — the rule already has the escape hatch ("unless explicitly directed"); the issue is the heuristic that flags `findings.md` as a "report" without checking the charter context. Lighter — adjust the heuristic.
 3. **Live with the heredoc workaround** — the spawned Gin worked around it correctly (named the fork, didn't silently bypass). Acceptable but adds friction every time.
 

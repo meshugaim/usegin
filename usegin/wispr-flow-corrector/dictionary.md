@@ -2,7 +2,7 @@
 
 Word-level corrections. When Wispr Flow mishears a word the same way repeatedly, it goes here. Gin uses this as the first reach when something looks weird in Wispr-dictated input.
 
-This is a **corrector**, not a translator (`usegin/zettel/zettels/z007`).
+This is a **corrector**, not a translator (`gin/zettel/zettels/z007`).
 
 ## Format
 
@@ -14,13 +14,10 @@ This is a **corrector**, not a translator (`usegin/zettel/zettels/z007`).
 |---|---|---|
 | `settle`, `settles` | `zettel`, `zettels` | Always. |
 | `settled` | `zettel'd` / `make a zettel of it` | Past-tense form of the same mishearing — common in "let's get this settled" / "write it settled" contexts. |
-| `Cloud` | `Claude` *or* `UseGin` | Context-dependent: agent identity in this repo = UseGin (z033); the underlying Anthropic model = Claude. |
-| `GynLab`, `GymLab`, `Gym-Lab`, `Gin-Lab`, `gin-lab`, `Gin lab` | `UseGin` (the umbrella; rename trail: Claude-lab → Gin-lab → Gin → UseGin) | |
-| `Gynn`, `Ginn`, `Eun`, `Gain`, `Gain's`, `Gim`, `Gin`, `Gin's` (in this repo's context) | `UseGin`, `UseGin's` | per z033 rename. The Anthropic model "Claude" is unchanged. |
-| `Usegin`, `Use-Gin`, `Use Gin` | `UseGin` | canonical capitalization. |
-| `usejin`, `use-jin` | `usegin` (folder) | |
-| `askf`, `ask f`, `Ask F` | `AskEffi` | the product — never confuse with `usegin` the workspace. |
-| `gains`, `wins` (when context is agents/sub-agents) | `usegins` (or `UseGins`) | Lihu's term for spawnable UseGin instances. (z023) |
+| `Cloud` | `Claude` *or* `Gin` | Context-dependent: agent identity in this repo = Gin; the underlying model / non-repo references = Claude. |
+| `GynLab`, `GymLab`, `Gym-Lab` | `Gin` (the umbrella; "Gin-Lab" the separate name was retired in z021) | |
+| `Gynn`, `Ginn`, `Eun`, `Gain`, `Gain's`, `Gim` | `Gin`, `Gin's` | "Gain" and "Gim" especially common. |
+| `gains`, `wins` (when context is agents/sub-agents) | `gins` | Lihu uses "gins" for spawnable Gin instances. (z023) |
 | `cell`, `cells` (when context is notes) | `zettel`, `zettels` | Heard once; watch for recurrence. |
 | `Zetel`, `Zetels` | `Zettel`, `Zettels` | Domain-name spelling. |
 | `Lina Arishiu` | `Linear` | The issue tracker. |

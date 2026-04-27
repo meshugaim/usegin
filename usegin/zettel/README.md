@@ -41,13 +41,6 @@ Effi gets an interface to manage *her own* 2nd brain, the same way.
 ## What lives here
 
 - `principles/` — load-bearing principles for this work, written manually.
-- `zettels/` — the atomic notes themselves. See `zettels/README.md` for
-  threading conventions (placement vs cross-reference).
-- `organizing-process.md` — the v0 manual loop UseGin runs to keep the
-  graph tight. Forward-only; never delete; bump `version:` to distill
-  (z039); clusters emerge, never imposed (z040).
-- `gaps.md` — append-only log of things spotted during organizing that
-  don't fit cleanly yet. Logging is the act; resolution is later.
 - `RD/<manager>/whiteboard.md` — each R&D manager's working space. They are
   free to write anything else they want under their folder.
 
