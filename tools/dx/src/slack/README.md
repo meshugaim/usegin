@@ -6,10 +6,16 @@ payload (`*[via Lihu]*`). See
 `usegin/research/slack-integration/usegin-slack-team/whiteboard.md` for the
 full design.
 
-## Slice 1 (this slice — ENG-5408)
+## Slices landed
 
-`dx slack whoami` — calls Slack `auth.test` and prints workspace, bot user,
-app id, granted scopes. Stateless, smallest unit that proves the spine.
+- **Slice 1 — ENG-5408 — `dx slack whoami`**: calls `auth.test`, prints
+  workspace, bot user, app id, granted scopes. Stateless, proves the spine.
+- **Slice 2 — ENG-5412 — `dx slack send` + `dx slack read`**: post via
+  `chat.postMessage`, read via `conversations.history`. Reuses
+  `config.ts` + `client.ts` from slice 1. Channel input accepts `#name` or
+  raw `Cxxxxx` id. `--thread <ts>` for thread replies on send. `--since
+  1h|1d|7d|2w` and `--limit N` (default 50, max 1000) on read. 429 rate-limit
+  surfaces as `error: ratelimited` with `retry_after`.
 
 ## Setup — what Lihu does once (human-only steps)
 
@@ -87,15 +93,12 @@ doppler run -- dx slack whoami --json
 If `auth.test` fails, the CLI exits with code 1 and a hint pointing at
 the env var.
 
-## What's next (after Lihu's setup steps land)
+## What's next
 
-- `dx slack send <channel> "<msg>"` — proves write path (`chat.postMessage`).
-- `dx slack read <channel> [--since 1d]` — proves read path (`conversations.history`).
 - `dx slack inbox` — pulls `@usegin` mentions on demand (no Events API yet).
 - `dx slack react`, `dx slack thread`, `dx slack channels`, `dx slack search`, `dx slack docs`.
+- `#usegin` channel convention (default outbox target).
 - Cross-surface ENG-id auto-link on read; Linear permalinks on write.
-
-These are deliberately out of scope for ENG-5408 — `whoami` is the spine.
 
 ## Architecture
 
