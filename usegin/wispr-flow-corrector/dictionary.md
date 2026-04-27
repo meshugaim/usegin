@@ -28,7 +28,11 @@ This is a **corrector**, not a translator (`usegin/zettel/zettels/z007`).
 | `FECLI`, `FE CLI`, `Session CLI` (when context is Effi-querying) | `effi CLI` | The `effi` command. Distinct from the actual `session` CLI. |
 | `record-base` | `codebase` | Lihu has self-corrected this in dictation. |
 | `UX app` (when context is Gin / DX) | `DX app` / `Gin app` | Wispr drift between "UX" and "DX" mid-conversation. |
-| `Settlecast`, `Zetelcast`, `Settle-cast` | `Zettelkasten` (the concept) | |
+| `Settlecast`, `Zetelcast`, `Settle-cast` | `Zettelkasten` (the concept) |
+| `again`, `Again` (when context is the agent / the app — "let's send X again", "tell again to do Y") | `Gin` | Confirmed by Lihu 2026-04-27 — "wherever I said 'again' I meant Gin." Wispr collapses /dʒɪn/ → "again" frequently. Disambiguate from the genuine adverb by context: agent/app/tool/dev-loop = Gin; repetition/temporal = the actual word. |
+| `Game Giant`, `Game-Giant`, `game giant` | `Gin` | Same root — Wispr's other rendering of /dʒɪn/. Confirmed by Lihu 2026-04-27. |
+| `settle it`, `settle-it`, `Settle it` | `zettleit` | The dx zettel-capture trigger / `tools/bin/zettleit` / `dx zettel it`. Distinct from the older `settle → zettel` rule: this one is a verb-shaped command, not the noun. |
+| `zettle it`, `zettle-it`, `zettle custom`, `zettle command` | `zettleit` | Same trigger; "custom" / "command" are Wispr's tail-noise renderings of "-it". Confirmed by Lihu 2026-04-27. | |
 
 ## People
 
