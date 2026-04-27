@@ -3,6 +3,7 @@
 **From:** Lihu's session — Claude session id `c2f48116-8355-4edf-969f-e9e85239cc46`
 **Date:** 2026-04-27 → 2026-04-28 (Lihu went on vacation — this Gin ran autonomous-vibe per z091; closed at honest stopping point per Yohai-5)
 **Closing zettel:** `usegin/zettel/zettels/z099-autonomous-run-protocol-what-worked.md` — what the protocol that emerged tonight looks like.
+**👉 CLOSE doc (read this first if Lihu's coming back):** `usegin/research/slack-integration/CLOSE.md` — six management-language decisions in z026 shape (what / why / lean+cost+risk), plus the next-action sequence. Cold-reader entry point.
 
 ## The goal — please remind this Gin if it drifts
 

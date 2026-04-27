@@ -1,5 +1,7 @@
 # Slack integration — end-to-end demo recipe
 
+> **Coming back from vacation? Read `CLOSE.md` first** — six management-shape decisions waiting for you (~5 min). Then come back here.
+
 **Audience:** Lihu (returning from vacation), Tom, anyone who wants to see Slack work end-to-end on their own machine.
 
 **Goal:** prove both surfaces work — UseGin-Slack (`dx slack send #usegin "hi"` lands in our team Slack) and AskEffi-Slack (a customer admin connects their Slack workspace, picks a channel, the binding shows in their project Integrations tab).
