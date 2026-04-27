@@ -52,6 +52,28 @@ After invoking Yohai, log a retro in this file (append-only):
 
 **Lab note:** Yohai earned its keep on the first invocation. The cost of the audit (~4min wall-clock, 1 sub-agent fire) was paid for several times over by catching the C3 hole — the orchestrator would have moved to the next batch with a "C3 ✓" mental checkbox. **The Comptroller pattern works for autonomous-vibe (z091).** Promote to skill if it holds for one more round.
 
+### 2026-04-27-2230 — C3 single-agent restoration
+
+- **Verdict:** GREEN
+- **What landed:** modal + card + wiring + 9 tests, all 5 audit-1 recommendations addressed; rec #4 exceeded (z097 named shared `.git/index` as root cause + proposed per-session worktrees).
+- **Yohai caught:** that the single-agent posture *contained* the autosync fight (zero reset-wipes/attribution swaps across 5 commits). Distinct from "fixed the autosync issue" — surfaced the workaround vs structural-fix split clearly.
+- **Yohai missed:** nothing material.
+- **Did orchestrator change course?** No — confirmed direction (continue single-agent on z089-impl).
+- **Pattern emerging?** Single-agent mode contains the fight even when the structural issue persists. Suggests the parallel-batches-paused recommendation can stay for some time without blocking work.
+- **Verdict-correlated outcome?** GREEN was correct: subsequent z089-impl phase landed clean.
+
+### 2026-04-27-2330 — z089-impl decrypt-on-read
+
+- **Verdict:** GREEN
+- **What landed:** decryptSlackInstallToken helper extracted to `nextjs-app/lib/slack-token-decrypt.ts`; action calls helper; 5 tests on the helper cover all branches (round-trip, legacy raw, AAD mismatch, tampered ciphertext, missing env).
+- **Yohai caught:** the inline-test attempt's mock-leak failure was caught BEFORE push and resolved structurally (lib-extract), not via workaround. Distinguished good handling from routing-around. Recommended z098 to capture the pattern.
+- **Yohai missed:** nothing material.
+- **Did orchestrator change course?** Yes (slightly): added z098 (mock-leak pattern, third recurrence) before next slice; deferred C4 (Events ingestion) per Yohai's read that single-agent + autosync fight makes a big nextjs-app/ slice unwise; picked D4 (`#usegin` outbox + ENG-ID auto-link in tools/dx/) instead.
+- **Pattern emerging?** The mock-leak pattern is now a known recurring trap with a known structural fix (extract pure logic to lib/); promoted to z098. Ready for repo-doc update if it bites a fourth time.
+- **Verdict-correlated outcome?** TBD (next phase = D4).
+
+**Cumulative lab note after 3 audits:** Yohai is paying for itself. False-greens have been zero, false-yellows have been zero. Decisions changed in 2 of 3 audits (audit-1 produced the most action; audit-2 confirmed direction; audit-3 added z098 + slice re-prioritization). Charter is correctly calibrated. **Promoting from lab to skill candidate** — keep the lab open for one more round to validate the verdict-correlation tracking.
+
 ## Ideas
 
 - **Meta-audit trigger:** if 3 consecutive audits flag the same fight signal, auto-promote to a structural finding zettel for Lihu.
