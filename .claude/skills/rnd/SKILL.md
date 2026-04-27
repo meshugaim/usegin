@@ -22,6 +22,20 @@ team file owns *what a Poll is and what Sam does*.
 
 Each spawned agent is a Gin (z023 — spawn-as-instantiation; the charter prompt *is* the professor). The team is one-shot — professors are instantiated for this question, not kept on a roster. Per z027, the budget is open: spend tokens on depth and parallelism, economize prose to Lihu.
 
+## Doctrine — what every R&D round must carry
+
+These rules are load-bearing for *every* round. Adopted from war research (`usegin/zettel/principles/05-the-twelve-from-war-research.md`).
+
+**Charters use the canonical shape.** Invoke the `charter` skill before authoring each Poll's prompt. The seven blocks (purpose / key tasks / end state / doctrinal pointers / Selbständigkeit / decision rights / fresh-Haiku) are non-negotiable. A charter without doctrinal pointers produces *divergent* action across professors, not coherent action — Truppenführung is the substrate, not a nice-to-have (principle 4).
+
+**Aharai (אחריי) for model selection.** Strongest-agent-first into the unknown (principle 10). When an angle is *load-bearing* (its conclusion changes downstream decisions) or *novel* (we haven't mapped this terrain before), spawn the Poll as Opus. When the angle is *clear-cut routine* (well-trodden synthesis, formatter-grade work), Haiku is fine. Don't send Haiku to scout a load-bearing angle and "promote" later — by then the terrain is already mis-mapped.
+
+**Hold the dialectic in synthesis.** Sam preserves disagreements between Polls; he does not average them. Two professors looking at the same evidence and arriving at different prescriptions is *signal*, not error (principle 7). If Sam's synthesis collapses to a single voice, he missed the load-bearing tension.
+
+**Friction is a deliverable.** Each Poll's whiteboard ends with a friction list — what got in the way, what was missing, what should not exist. Per Clausewitz R10 / principle 9, the friction count *is* the round's real cost; don't hide it.
+
+**Cluster-aware synthesis.** Sam runs the `cluster-search` skill (or its inline shape) when a finding rhymes with prior friction zettels. 3+ touches on the same area = the cluster *is* the finding, and the synthesis names the cluster level, not the per-Poll observations.
+
 ## When to invoke
 
 Reach for this skill — don't wait to be asked — when any of these fire:
