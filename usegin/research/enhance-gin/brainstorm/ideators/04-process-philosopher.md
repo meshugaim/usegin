@@ -1,0 +1,40 @@
+# Ideator 04 — process-over-outcome philosopher
+
+The friction is a missing convention, not a missing recovery routine. The right
+protocol expressed clearly + tooling that gently enforces it beats clever
+recovery code. Each idea below names a *protocol* and the smallest hook/CLI
+that makes it the default.
+
+## Ideas
+
+- **Codify the "agent claim": one agent owns one path-prefix at a time.** `dx claim nextjs-app/components/slack/` writes a short-lived lockfile under `.gin/claims/`; pre-push refuses to push when an unclaimed agent has touched a claimed prefix. Convention: agents claim before editing.
+- **Push-as-protocol, not push-as-action.** Replace `git push` in agent muscle memory with `dx ship`, which is the *only* sanctioned way Gin commits-and-publishes. `dx ship` encodes the whole convention; bare `git push` becomes a smell.
+- **"Touch only what you commit" as a stated rule, then enforce it.** Pre-commit hook diffs working-tree-modified vs staged: if an agent's session has touched files it isn't committing, it must explicitly `dx leave-dirty <reason>` to record consent. Default: no untracked drift survives a session.
+- **Protocol: pushes lint/test the commit range, not the working tree.** Make this the *agreed model* and have `dx ship` honor it; the working-tree-mode hook becomes the human-only tool. The convention is "your push is judged on your diff" — we just have to make it true.
+- **A written multi-agent etiquette doc at `usegin/etiquette.md`.** Five rules every Gin agrees to before pushing — "I don't reset commits I didn't author", "I declare my path-prefix", "I never autosync untracked files I haven't seen", etc. Loaded into every agent's CLAUDE.md.
+- **The "quiet hour" convention.** When `dx storm-level` reports >2 active agents, push windows are queued by the dispatcher; agents that would push within 30s of each other get serialized. Convention: nobody races — Gin yields to Gin.
+- **Make autosync ask for forgiveness, not permission — but only for *its own* commits.** Convention: an autosync may only `reset` a commit whose author-trailer matches its session-id. Cross-agent reset is forbidden by the tool, not by trust.
+- **Side-branch-by-default for storms.** When `dx storm-level >= 2`, `dx ship` auto-pushes to `gin/<session-id>/<topic>` and opens a PR-into-main; main only receives integrated work. Convention: in a storm, main is read-mostly.
+- **The "consent ledger" — every cross-agent action leaves a receipt.** `.gin/ledger.jsonl` records "session A reset commit B authored by session C" with reason. No repair, just observability that turns silent failures into legible ones; convention is "if you couldn't write a ledger entry, don't do it."
+- **Protocol: untracked-file = unborn.** No autosync ever touches an untracked file unless the session that created it has written `.gin/intents/<file>`. Convention: birthing a file is a deliberate act, not a side effect of saving.
+- **Pre-push runs in a *clone*, not the working tree.** `dx ship` clones the repo into `/tmp/ship-<sha>`, checks out the commit range, runs lint/test there, then pushes. Convention: your shipment is verified in isolation, the way prod CI sees it.
+- **A "session boundary" is a protocol object, not vibes.** `dx session start/finish` brackets work; finish auto-stashes-or-commits everything the session touched, with the session-id as author trailer. Convention: no work survives a session ambiguously.
+- **Make storm-mode a first-class state, not an emergency.** `dx storm enter` switches the whole repo's pre-push hook to commit-range mode, autosync to side-branch mode, and posts a banner. Convention: storms are normal weather; we have storm gear.
+- **The "pour queue" as multi-agent primitive.** Every agent's pending pours land in `.gin/pours/<session>.jsonl`; before pushing, an agent runs `dx pour-check` to see if a sibling's pour superseded its own work. Convention: read the room before shipping.
+- **Codify "Gin doesn't reset Gin."** A hook on `git reset HEAD~` checks last-commit author trailer; if it's a different session-id, blocks with a message: "this commit is sibling-owned; use `dx amnesty <reason>` if you really mean it." Convention encoded in muscle memory.
+- **Reframe pre-push as a *politeness* gate, not a *correctness* gate.** The convention: lint-on-the-tree is checking whether *I'm a good neighbor*, not whether *my code is correct*. Two separate hooks; politeness is allowed to defer (`dx ship --rude` for doc-only emergencies).
+- **The one-line working-agreement at the top of every agent's session.** First system-reminder injects: "You are agent N of M today. Your prefix is X. You may push to side-branches freely; main pushes go through `dx ship`." Convention is loaded, not learned.
+- **Promote `dx wait-for-clean-tree` to a first-class primitive (z095 option c).** And wire it into `dx ship` automatically when storm-level > 1. Convention: in a storm, you wait your turn — politely, automatically.
+- **Pre-push only blocks on files in your commit range.** Even if the broader convention isn't ready, this single change resolves z095. The protocol statement: "your push is judged on your diff." Everything else follows.
+- **Session-scoped autosync.** Each agent runs its *own* autosync daemon scoped to its claimed prefix. Convention: agents don't sync each other's files. The shared autosync becomes a fallback for unclaimed paths only.
+- **Three-mode autosync: paranoid / normal / yolo.** Storm-level picks the mode; paranoid never resets, never sweeps untracked, side-branches by default. Convention: the *mode* is the contract, not the daemon's heuristics.
+- **A protocol-level "blame-free reset".** When autosync needs to back out, it writes the commit to `refs/gin/abandoned/<sha>` first, *then* resets. Convention: nothing is ever lost, just relocated. `dx revive <sha>` brings it back.
+- **The "agent census" as a tool primitive.** `dx agents` lists active sessions, their claimed prefixes, last commit, last push attempt. Convention: visibility before action — every agent runs `dx agents` before a push.
+- **A monorepo-wide convention: pushes are *proposals*, not commands.** Even on `main`, `dx ship` opens a 30-second cancellation window where any sibling agent can `dx contest` if their work would conflict. Convention: pushing is consent-seeking in a multi-agent regime.
+- **Codify the asymmetry: humans push commands, Gins push proposals.** A human's `git push` is direct; a Gin's `dx ship` is mediated. Convention recognizes that *agents in plurality need different rules than the single human at the keyboard*.
+- **The "one bad neighbor" antidote: per-prefix CI.** Pre-push lints only the working-tree files within the pushing agent's claimed prefix. Convention: my prefix, my politeness; your prefix, your problem.
+- **Protocol-level commit-message authorship.** Every `dx ship` commit has `Agent-Session: <id>` trailer. No exceptions. Convention: untraceable commits are forbidden, period — Mode-1 collisions become forensically obvious.
+- **The "recovery is the same shape as the bug" principle.** If autosync can silently `reset HEAD~1`, the inverse `dx unreset` should be a single command with no flags. Convention: every destructive action has a one-keystroke undo, surfaced in the same place the action lives.
+- **A "zettel-on-storm-friction" hook.** Every time `dx ship` is blocked by sibling dirt, auto-capture a one-line zettel. Convention: friction with the storm is itself process data — the corpus learns from each storm.
+- **Make the storm itself a pour.** `dx storm-pour` creates a session-scoped channel where agents post "I'm about to touch X, ETA 10min" — laconic, structured. Convention: agents narrate before they act, just enough for siblings to plan around. Pour-and-process (z087/z088) generalized to Gin↔Gin.
+- **The convention nobody wrote down: re-read the working tree before every commit.** Bake it in: `dx ship` shows a diff of "files I touched but am not committing" with three options — stage, stash, leave. Convention: no agent commits without consciously deciding what it's leaving behind.
