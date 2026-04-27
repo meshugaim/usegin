@@ -38,12 +38,25 @@ async function actionHookStop() {
     return;
   }
 
-  const allAspects = listAspects().map((a) => a.key);
+  // Keep the block reason short and high-signal. Listing every aspect (~25)
+  // turns the message into wallpaper. Pick the load-bearing ones; point to
+  // `dx his aspects` for the rest.
+  const headlineAspects = [
+    "vibe",
+    "friction_human_claude",
+    "friction_running_tests",
+    "gap_intent_vs_outcome",
+    "tool_thrashing",
+    "understood_human",
+    "talked_too_much",
+    "accuracy",
+  ];
   const reason =
-    `Before ending the session, file a final how-is-session reading. Run:\n\n` +
-    `  dx his rate --as=claude --note "<honest read on this session — vibe, friction, what felt off, what worked>" \\\n` +
-    allAspects.map((k) => `    ${k}=<1..100>`).join(" \\\n") +
-    `\n\nAll aspects required. Score 1..100. Note must be substantive (>= 30 chars). After it lands, call Stop again.`;
+    `Before stopping, file your final how-is-session reading. Honest, short, concrete:\n\n` +
+    `  dx his rate --as=claude --trigger=stop-hook \\\n` +
+    `    --note "<one or two sentences: what worked, what felt off, the most useful thing for next-Gin to know>" \\\n` +
+    headlineAspects.map((k) => `    ${k}=<1..100>`).join(" \\\n") +
+    `\n\nAdd any other aspects that felt salient (run \`dx his aspects\` for the full list — anger, frustration, friction_claude_devenv, gap_app_vs_code, gap_code_vs_spec, self_doubt, etc.). Skip the ones that don't fit. Score 1..100. The note matters more than the scores.`;
 
   process.stdout.write(
     JSON.stringify({

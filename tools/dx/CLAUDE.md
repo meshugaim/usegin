@@ -73,8 +73,20 @@ A vibe-rated session telemetry feature lives inside the dx app. Both human and C
 | `dx his trend <aspect> [--last N]` | Time-series for one aspect across sessions (with sparkline). |
 | `dx his search <query>` | Substring search across notes. |
 | `dx his export [--session-id X]` | Dump submissions as JSONL (pipe-safe). |
-| `dx his digest [--days N --prev-days N]` | Periodic digest: hot (high-friction) sessions + aspect drift vs prior window. |
+| `dx his digest [--days N --markdown --since-last]` | Periodic digest: hot sessions + aspect drift. `--markdown` renders for paste/Slack/issues. `--since-last` reads from a marker so cron sees only new data. |
+| `dx his prune --older-than 90d [--keep-friction --dry-run]` | Delete old submissions; `--keep-friction` preserves high-signal rows (friction_*/gap_*/anger/frustration ≥ 70). |
+| `dx his self-test` | End-to-end smoke test: rate, end, hook-stop blocks, hook-stop unblocks, arm-on-wrapup detects sentinel. Isolated temp DB. |
 | `dx his hook-stop` / `dx his hook-session-end` | Hook handlers (configured in `.claude/settings.json`). |
+
+### Scheduling the digest
+
+Use the `schedule` skill or any cron with:
+
+```bash
+dx his digest --since-last --markdown
+```
+
+The `--since-last` flag reads the marker at `~/.claude/dx-his/digest-last-seen` and updates it on success, so each run shows only what's new since the last delivery. Pipe into Slack / a GitHub issue / email as you like.
 
 **Auto-arm on wrap-up phrases**: a `UserPromptSubmit` hook (`bun .claude/hooks/dx-his-arm-on-wrapup.ts`) detects sentinel phrases — "that's a wrap", "we're done", "let's call it", "wrap it up", "ship it and stop" — in the human's message and auto-arms `force_rate=true`. Saves the human from typing `/end`.
 
