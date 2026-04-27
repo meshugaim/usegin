@@ -101,3 +101,40 @@ zettel with the operational-shape one.
 Until then: the rule is "in a shared checkout, expect attribution drift,
 verify with `git log -- <path>` not `git log --grep`, and add `git notes`
 post-hoc when a commit's message and payload diverge."
+
+## 2026-04-28 update — tikur on the cluster
+
+Lihu prompted `/tikur` on this cluster the day after this zettel landed. Full
+record at `.claude/tikur-records/2026-04-28-multi-gin-checkout-collisions.md`.
+Three findings worth pulling back into this zettel:
+
+1. **The cluster is bigger than it looked from inside z097.** The cluster
+   contains *9 distinct touches*, not 4 — z038 (the earliest, slice-1 era
+   `dx zettel add` race), z081, z085 (ghost regressions), z094, z095, z096,
+   z097, z099 §1 (autonomous-protocol postmortem on parallel-vs-serial), and
+   the 2026-04-27 commit-scope-collision tikur. The mechanism has been
+   visible since slice-1; what changed today is that we recognized it as a
+   cluster instead of treating each occurrence as a one-off.
+
+2. **The 2026-04-27 tikur identified the right fix and it never landed.**
+   Both the loose tripwire (pre-commit diff-name check) and the strict fix
+   (worktree-per-session) were specced "this turn." Neither was committed.
+   The autonomous-vibe go-signal arrived next and the discipline was
+   bypassed. *That bypass* is the meta-finding — the tikur skill names
+   "land system change same turn" but doesn't enforce it. The 2026-04-28
+   tikur edits the skill to require a commit SHA in every record's `System:`
+   field (or an explicit `system-fix-deferred` status). Without that
+   self-tripwire, paper tikkurs are the default.
+
+3. **Categorical reading: error per-incident, negligence at the system
+   level.** Each individual collision was good-faith inside the shared-index
+   procedure (error). The system-level negligence is that a safeguard
+   *existed* (the prior tikur's tripwire spec) and got bypassed by the next
+   prompt. Per the tikur skill's error-vs-negligence bright line, the system
+   change is "land the fix" *plus* a hook/lint/CI assertion that makes the
+   bypass impossible — applied here to the tikur procedure itself, not to
+   git.
+
+The decision to build `dx session-wt` is now distilled to Lihu in
+`usegin/research/slack-integration/CLOSE.md` § D5. Posture call belongs to
+him because it interacts with how Oria works in this repo.

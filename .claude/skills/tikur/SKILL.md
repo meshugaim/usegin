@@ -155,12 +155,31 @@ One sentence, systemic. At cluster level if cluster found.
 
 ## Fixes
 - **Immediate:** what was done, commit SHA.
-- **System:** what landed, commit SHA.
+- **System:** what landed, commit SHA.   ← MUST be a real SHA OR Status flips to system-fix-deferred (see self-tripwire below).
 - **Tripwire:** how recurrence is detected.
 
 ## Zettel
 zNNN — title
 ```
+
+## Self-tripwire — every record's `System:` field carries a commit SHA, or `Status: system-fix-deferred` with the named gap
+
+Added 2026-04-28 after the multi-Gin-checkout-collisions tikur (see record of that date) found that the prior 2026-04-27 tikur identified the right fixes and *neither landed* before recurrence. Six follow-on incidents in 24h. The lesson: the tikur skill names same-turn propagation (rule 5 / step 6) but does not enforce it; the next prompt arrives, the discipline gets bypassed, the lekach dies in the room.
+
+Enforcement lives in the record format itself. Two valid shapes only:
+
+1. **`Status: fixed`** — the `System:` field cites a real commit SHA (`git rev-parse HEAD`-shaped). Future readers can verify the fix actually landed by `git show <sha>`.
+2. **`Status: system-fix-deferred`** — the `System:` field names the gap explicitly: *what would have landed, what blocks it, who owns the unblock*. This is the honest alternative when the system fix is bigger than this turn (Lihu posture call, architectural decision, ≥ half-day work). It is **not** "I'll do it later" (z002 violation); it is "this is open, and here is the tracking artifact."
+
+The status `open` is reserved for tikkurs still being authored *in this turn*. Any record left at `open` after the turn ends is itself a tikur trigger — the skill's failure mode being the next failure.
+
+When you write a tikur:
+
+- If you can land the system fix this turn, do it; cite the SHA.
+- If you can't, name the gap and route to a distilled-question in the relevant CLOSE.md / Linear ticket / charter; cite that route in the `System:` line.
+- Do not leave the `System:` field empty or hand-waved. Past tikurs that did this produced cluster recurrence; the cluster is the finding (rule 4.5).
+
+The self-tripwire is verifiable manually today (read the record's `System:` line; check the SHA exists); a `dx tikur verify` primitive is a candidate skill-lab follow-up if recurrence persists.
 
 ## Anti-patterns
 
@@ -172,6 +191,7 @@ zNNN — title
 - *Treating one tikur as standalone when 3+ neighbors exist.* The cluster is the finding. (Step 4.5.)
 - *Running a tikur with the senior voice framing first.* Anchoring kills the data. (See "Ranks" below.)
 - *Routing around a harness denial instead of fixing it.* Per principle 12 — that's the institutional Befehlstaktik you came to fix. Tikur the denial; don't sneak past it.
+- *Tikur whose system fix never lands becomes the next tikur's root cause.* Observed 2026-04-28 — six follow-on incidents inside 24h after a tikkur whose `System:` field said "lands this turn" and didn't. The fix is the self-tripwire above, not "be more disciplined."
 
 ## Ranks — equal in evidence, ordered in speech
 

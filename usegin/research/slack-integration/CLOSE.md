@@ -2,7 +2,7 @@
 
 **Run:** ship a functional Slack integration — UseGin (team-internal, Gin-mediated) and AskEffi-Slack (customer-facing, 1 channel ↔ 1 project).
 **Closed at:** 2026-04-28 by Gin session `c2f48116-8355-4edf-969f-e9e85239cc46` running autonomous-vibe (z091).
-**Status:** **Code done up to the encryption gate. Five of six decisions resolved 2026-04-28; D5 (multi-Gin checkout fight) running through `/tikur`. Demo recipe ready in `DEMO.md`.**
+**Status:** **Code done up to the encryption gate. Five of six decisions resolved 2026-04-28; D5 tikur landed (record + skill self-tripwire + drift script + zettel update); D5 follow-up questions D5.1–D5.3 distilled below. Demo recipe ready in `DEMO.md`.**
 
 ## Decisions resolved (2026-04-28 by Lihu)
 
@@ -12,7 +12,7 @@
 | **D2** | Customer Slack: read-only at MVP | **DECIDED: yes, read-only.** Team gets bidirectional via UseGin first; customer surface graduates only on competitive pressure. |
 | **D3** | Marketplace listing timing | **DECIDED: start now.** Linear ENG-5417 created with the full prep list + Zisser-mediated reminder for next work session. |
 | **D4** | Channel-binding cardinality positioning | **DECIDED: 1:1 in customer help, N:1 in schema (already shipped).** Flip help when ≥30% of pilots ask. |
-| **D5** | Multi-Gin checkout structural fight | **IN FLIGHT: tikur running** on z094/z095/z096/z097. Distilled questions for Lihu surface mid-tikur if any genuine input is needed. |
+| **D5** | Multi-Gin checkout structural fight | **TIKUR DONE.** Record: `.claude/tikur-records/2026-04-28-multi-gin-checkout-collisions.md`. Cluster = 9 touches; root cause = shared `.git/index` (content) + tikur skill not enforcing same-turn propagation (process). Lekach = build `dx session-wt`; secondary = land staging-drift tripwire. Three D5 follow-up questions below (D5.1–D5.3). |
 | **D6** | Cadence | **DECIDED: interactive next session.** Run the demo (Phases 0/1/2 of `DEMO.md`) live with Lihu, react to what we see. Handoff comment + resume prompt below. |
 
 ## What landed
@@ -83,17 +83,108 @@ Six decisions. All in management language; pick a lean, override a lean, or ask 
 
 ### D5 — Multi-Gin checkout: pick a fix, or accept the friction?
 
-**What:** Three structural autosync collisions hit during the run (zettels z094, z095, z096, z097). Multiple Gins on one repo + autosync companion = occasional reset-wipes, attribution swaps, cross-agent push blocks. We worked around it by going single-agent, but if we want parallel batches again, we need a fix.
+**Status update 2026-04-28:** Tikur run. Record at
+`.claude/tikur-records/2026-04-28-multi-gin-checkout-collisions.md`. Cluster
+turned out to be 9 touches (z038→z097), not 4. **The 2026-04-27 tikur on the
+same cluster identified the right fixes; neither landed.** That meta-finding
+is now embedded as a self-tripwire in the tikur skill — every record's
+`System:` field must cite a commit SHA or be flagged `system-fix-deferred`.
 
-**Why:** Single-agent is slower. The autonomous-vibe protocol becomes 2-3x more productive when parallel batches are safe. The fight is unfixed today.
+The original recommendation stands: **build `dx session-wt`** (per-session git
+worktrees). Three follow-up questions need your input.
 
-**Recommendation:** Run a tikur (post-mortem) on the three modes (z094/z095/z096/z097 captured the data). Tikur points at three candidate fixes in z095 — you pick one. The cleanest is per-session worktrees so each Gin has its own `.git/index` (z097's lean).
+#### D5.1 — Confirm the lekach: build `dx session-wt`?
 
-**Cost:** Tikur takes ~30 min of a session. The fix itself: per-session worktrees is ~2 hours of tooling work.
+**What:** Each autonomous Claude session, on SessionStart, allocates
+`.worktrees/<session-id>/` and operates entirely there. Pushes `HEAD:main` from
+the worktree. Shared root `/workspaces/test-mvp/` becomes the human's lane,
+never an agent's. Eliminates the shared-`.git/index` race that produced 6
+incidents in 24h.
 
-**Risk:** Picking the wrong fix and finding a fourth failure mode in the next parallel batch.
+**Why:** It's the only fix that closes the cluster. Tripwires (the ones I
+specced in 04-27 and partially landed today) detect Mode 1 attribution swaps
+but don't prevent reset-wipes (z094) or cross-agent pre-push blocks (z095).
+Worktree-per-session prevents all three because each session gets its own
+working tree and its own index.
 
-**What to worry about:** Anyone running a 4-Gin parallel batch today is going to lose work. Until this is fixed, hold the parallel runs.
+**Recommendation:** Build it. Eight tailwinds say it's ready (hooks already
+worktree-aware; `scripts/autosync.ts` already detects worktrees;
+`feedback_main_wt_stay_on_main` already says use them; `.worktrees/eng-1039`
+and `eng-1041` already exist; `EnterWorktree`/`ExitWorktree` SDK tools exist;
+z099 §1 named "parallel-with-shared-checkout is *slower* than serial" — the
+blocker for autonomous-vibe-as-the-default).
+
+**Cost:** ~half a day to spec + build + smoke. Per-session disk ~50–100MB
+linked. SessionStart hook to call `dx session-wt enter`. Teardown step to
+rebase commits onto main and remove the worktree.
+
+**Risk:** Agents producing absolute-path artifacts that don't transplant
+between worktrees (mitigation: existing CLAUDE.md repo-relative-path
+conventions). And: does Oria want this on his sessions too? If yes, defaults
+on; if no, opt-in for autonomous-vibe sessions only.
+
+**What to worry about:** Until this lands, hold parallel autonomous batches.
+Single-agent autonomous-vibe is fine and was the protocol that made tonight's
+Slack run productive (z099 §1).
+
+#### D5.2 — Is the staging-drift tripwire OK to wire into `.husky/pre-commit`?
+
+**What:** I wrote the tripwire script
+(`scripts/hooks/check-staging-drift.sh`) but the Edit on `.husky/pre-commit`
+was harness-denied. The script is committed but not invoked. It's a no-op
+until invoked, so harmless to land standalone — but it doesn't fire without
+the pre-commit hookup.
+
+**Why:** Two reasons the denial might be intentional: (a) hook fires on Oria's
+commits too, and the snapshot file (`.git/last-staging-snapshot`) is only
+written by `dx commit` / Gin sessions, so it's a no-op for him by design;
+(b) you may want to gate this through the `update-config` skill rather than
+direct edit.
+
+**Recommendation:** Approve adding the one-line hook invocation. The hook is
+strictly additive and bypassable with `--no-verify`. Prevents Mode 1
+attribution swaps (one of the three failure modes) until `session-wt` lands.
+
+**Cost:** Three lines in `.husky/pre-commit`.
+
+**Risk:** Tiny — false-positive only fires if a snapshot file exists, which
+only Gin-mediated commits write.
+
+**What to worry about:** Nothing if you're OK with the principle. If you'd
+rather not touch `.husky/` at all and wait for `session-wt`, the script sits
+unused until then — no harm.
+
+#### D5.3 — Posture: build `session-wt` now, or accept the single-agent
+constraint until customer-pressure?
+
+**What:** The autonomous-vibe protocol works fine in single-agent mode (z099 —
+"the autonomous run that shipped Slack last night was single-agent after
+Yohai-1 RED-flagged the parallel batch"). `session-wt` is what *unblocks*
+parallel; single-agent doesn't need it.
+
+**Why:** ~half a day of tooling work has an opportunity cost. If the next
+~2 weeks of autonomous runs are all bounded scopes that fit single-agent, the
+fix can wait. If you want to fan out parallel R&D again (the way the first
+slice of the Slack night was structured), `session-wt` is the unblock.
+
+**Recommendation:** Build it. Even if the next 2 weeks are single-agent, the
+fix is reusable infrastructure (worktree-per-Linear-issue is the same pattern
+humans already use). And the cost-of-not-having-it is paid every time we
+*want* to go parallel and can't.
+
+**Cost:** ~half a day of a session — a vertical slice.
+
+**Risk:** Something in the cluster turns out to have a fourth distinct
+mechanism that worktrees don't fix. Mitigation: write the smoke test as
+"4 concurrent autonomous Gins each in their own worktree, all editing
+overlapping zettels, push to main without collision" — if that passes, the
+cluster is closed.
+
+**What to worry about:** The decision rights envelope. Building `session-wt`
+affects how Oria's sessions behave if they share this repo (z101). You said
+he uses Codespaces; this should be transparent to him (his Codespace stays
+on the shared root by default; only Gin-mediated sessions opt in via the
+SessionStart hook). Confirm that read.
 
 ### D6 — When does Lihu come back into the loop?
 
