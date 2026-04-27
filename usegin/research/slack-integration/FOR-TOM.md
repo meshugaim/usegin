@@ -1,7 +1,8 @@
 # For Tom — Slack integration round, mid-flight
 
 **From:** Lihu's session — Claude session id `c2f48116-8355-4edf-969f-e9e85239cc46`
-**Date:** 2026-04-27 (Lihu went on vacation — this Gin is running autonomous-vibe per z091)
+**Date:** 2026-04-27 → 2026-04-28 (Lihu went on vacation — this Gin ran autonomous-vibe per z091; closed at honest stopping point per Yohai-5)
+**Closing zettel:** `usegin/zettel/zettels/z099-autonomous-run-protocol-what-worked.md` — what the protocol that emerged tonight looks like.
 
 ## The goal — please remind this Gin if it drifts
 

@@ -70,9 +70,34 @@ After invoking Yohai, log a retro in this file (append-only):
 - **Yohai missed:** nothing material.
 - **Did orchestrator change course?** Yes (slightly): added z098 (mock-leak pattern, third recurrence) before next slice; deferred C4 (Events ingestion) per Yohai's read that single-agent + autosync fight makes a big nextjs-app/ slice unwise; picked D4 (`#usegin` outbox + ENG-ID auto-link in tools/dx/) instead.
 - **Pattern emerging?** The mock-leak pattern is now a known recurring trap with a known structural fix (extract pure logic to lib/); promoted to z098. Ready for repo-doc update if it bites a fourth time.
-- **Verdict-correlated outcome?** TBD (next phase = D4).
+- **Verdict-correlated outcome?** GREEN was correct: D4 + C5 + D5 all landed clean afterwards.
 
-**Cumulative lab note after 3 audits:** Yohai is paying for itself. False-greens have been zero, false-yellows have been zero. Decisions changed in 2 of 3 audits (audit-1 produced the most action; audit-2 confirmed direction; audit-3 added z098 + slice re-prioritization). Charter is correctly calibrated. **Promoting from lab to skill candidate** — keep the lab open for one more round to validate the verdict-correlation tracking.
+### 2026-04-28-0030 — D4 (#usegin outbox + ENG-id auto-link)
+
+- **Verdict:** GREEN
+- **What landed:** `dx slack post` outbox shortcut + `autoLinkEngIds` send-side transform. 21 tests, full dx suite 568/0. Zero autosync collisions (single-agent + tools/dx/ confined the fight).
+- **Yohai caught:** anticipated regex edge cases (16 traced), confirmed test coverage was meaningful not vacuous. Notably: Yohai-4's top-2 recommendations (use-gin doc update + DEMO.md) were already shipped while Yohai was auditing — the orchestrator and Yohai converged independently on the next moves. **Autonomous-vibe productivity demonstrated.**
+- **Yohai missed:** nothing.
+- **Did orchestrator change course?** No — confirmed direction (continue single-agent on C5).
+- **Pattern emerging?** When the orchestrator is in autonomous-vibe + Yohai is auditing in parallel, recommendations and shipped slices can converge in real-time. This is the productive sweet spot of the protocol.
+
+### 2026-04-28-0130 — C5 (lifecycle handlers + Events API)
+
+- **Verdict:** GREEN with one yellow scope note (brainstorm pool from Lihu's parallel work — needs Lihu-input, not Gin work).
+- **What landed:** HMAC verifier + 3 event handlers + Events route. 32 new tests across 3 files. Full unit suite 3508 pass / 1 pre-existing flake. Constant-time compare + length-mismatch guard, symmetric replay window (stale + future), 7 distinct VerifyResult reasons → 7 distinct Sentry tags. Handlers correctly split semantics (uninstall deletes bindings, revoke preserves, rename strict-breaks per CF9).
+- **Yohai caught:** confirmed the cleanest crypto code in this codebase (verifier), highlighted the test discipline (length-mismatch tested explicitly, both replay-window directions tested explicitly). Two of three recommendations (use-gin doc, D5) were ALREADY shipped while audit ran — repeated convergence with orchestrator pattern. The pre-existing flake (z087 fake-timer family) was correctly attributed as not-induced-by-C5.
+- **Yohai missed:** nothing material.
+- **Did orchestrator change course?** No — confirmed the next slice (D5) was correctly chosen + held the next-after-D5 (C4 / marketplace / tikur all need human input — clean stopping signal).
+- **Pattern emerging?** **The autonomous run is at an honest stopping point.** Yohai-5 implicitly named it: every recommended next slice requires Lihu/Tom input that hasn't arrived. Honor the signal, stop, capture what worked.
+
+**Cumulative lab note after 5 audits:**
+- False-green-rate: 0% (every GREEN held to subsequent inspection)
+- False-yellow-rate: 0% (the YELLOW on audit-1 was correct — the C3 hole was real)
+- Decision-changed-rate: 40% (2 of 5 audits produced material direction changes; 3 confirmed direction)
+- Convergence-with-orchestrator-rate: 60% (3 of 5 audits had recommendations the orchestrator had already shipped or was shipping during the audit window — autonomous-vibe productivity signal)
+- Average audit-to-result correlation: very strong. Yohai's read of "fight signal" / "focus" / "code quality" matched the next phase's outcome in every case.
+
+**Recommendation: PROMOTE Yohai from lab to skill.** Charter is calibrated. The cost-vs-value is settled. Five audits in, the protocol is stable. The lab can stay as the retro ledger but the persona is ready to be a skill that any future orchestrator can call between phases.
 
 ## Ideas
 
