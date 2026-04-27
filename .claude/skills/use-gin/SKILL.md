@@ -78,3 +78,21 @@ Cross-surface ENG-id awareness is symmetric:
 - **Read-side** (D5): `dx slack read` and `dx slack inbox` annotate each message's header line with `(refs: ENG-X, ENG-Y)` when the body references Linear issues — even if the references arrived already-wrapped in Slack mrkdwn.
 
 See `tools/dx/src/slack/README.md` for setup recipe and `usegin/research/slack-integration/DEMO.md` for the end-to-end demo (UseGin + customer-facing AskEffi-Slack on the same page).
+
+### Commit safely under multi-Gin pressure
+
+When two or more Gins share `/workspaces/test-mvp/`, the shared `.git/index` lets a sibling's `git add` slip into your commit between message-formation and `git commit` — the Mode-1 attribution swap (z081 / z096 / z097, tikur 2026-04-28). Until per-session worktrees ship (CLOSE.md § D5.1), use the snapshot tripwire:
+
+```bash
+# 1. Stage your files; draft your commit message based on:
+git diff --cached --name-only
+
+# 2. Snapshot the staged set (records `.git/last-staging-snapshot`):
+bash scripts/hooks/snapshot-staged.sh
+
+# 3. Commit — `.husky/pre-commit` now runs `check-staging-drift.sh`,
+#    which aborts loudly if a sibling staged anything between (1) and (3).
+git commit -m "..."
+```
+
+The hook is a no-op if no snapshot was recorded (interactive humans, recovery flows). For autonomous runs, treat the snapshot step as mandatory before every commit. See `.claude/tikur-records/2026-04-28-multi-gin-checkout-collisions.md` for the full mechanism and the structural fix that supersedes this.
