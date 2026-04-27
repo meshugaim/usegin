@@ -23,16 +23,16 @@ For each path × surface, R&D the tradeoffs, lock-in, time-to-MVP, risks, and br
 
 ## Round structure (8 angles)
 
-| # | Folder | Charter focus |
-|---|---|---|
-| A | `unified-platform/` | What "Unified 2" is in our code; how existing integrations (Fathom etc.) flow through Unified.to; Slack-via-Unified path |
-| B | `slack-direct-platform/` | Slack APIs deep-dive: Bolt, Web API, Events API, Socket Mode, OAuth, scopes, rate limits, signing |
-| C | `customer-channel-binding/` | UX + data model for 1 channel ↔ 1 project; ingestion, backfill, RLS, lifecycle (rename/archive/delete) |
-| D | `usegin-slack-team/` | UseGin-Slack as Gin-mediated team R/W surface, Linear-shape (we don't click Slack — Gin does) |
-| E | `askeffi-slack-team-relation/` | Is "AskEffi-Slack for the team" a separate build or just C dogfooded on our tenant? |
-| F | `comparative-paths/` | Direct cross-cut: Unified vs direct — build matrix, divergence, lock-in, escape hatch, what build-twice buys |
-| G | `risks-failure-modes/` | Slack-platform risks (rate limits, retention, perm creep, app review) + integration-shape risks |
-| H | `auth-identity-cardinality/` | Slack-workspace ↔ AskEffi-workspace mapping; per-user OAuth vs bot token; org→workspace migration; Fathom per-recorder analog |
+| # | Folder | Linear | Charter focus |
+|---|---|---|---|
+| A | `unified-platform/` | ENG-5401 | What "Unified 2" is in our code; how existing integrations (Fathom etc.) flow through Unified.to; Slack-via-Unified path |
+| B | `slack-direct-platform/` | ENG-5406 | Slack APIs deep-dive: Bolt, Web API, Events API, Socket Mode, OAuth, scopes, rate limits, signing |
+| C | `customer-channel-binding/` | ENG-5404 | UX + data model for 1 channel ↔ 1 project; ingestion, backfill, RLS, lifecycle (rename/archive/delete) |
+| D | `usegin-slack-team/` | ENG-5407 | UseGin-Slack as Gin-mediated team R/W surface, Linear-shape (we don't click Slack — Gin does) |
+| E | `askeffi-slack-team-relation/` | ENG-5403 | Is "AskEffi-Slack for the team" a separate build or just C dogfooded on our tenant? |
+| F | `comparative-paths/` | ENG-5402 | Direct cross-cut: Unified vs direct — build matrix, divergence, lock-in, escape hatch, what build-twice buys |
+| G | `risks-failure-modes/` | ENG-5405 | Slack-platform risks (rate limits, retention, perm creep, app review) + integration-shape risks |
+| H | `auth-identity-cardinality/` | ENG-5400 | Slack-workspace ↔ AskEffi-workspace mapping; per-user OAuth vs bot token; org→workspace migration; Fathom per-recorder analog (NB: H sub-issue title says "multi-workspace" — folder renamed because `*-workspace/` is gitignored) |
 
 ## Resume guide (if power dies / new agent picks up)
 
