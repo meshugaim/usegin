@@ -2,7 +2,18 @@
 
 **Run:** ship a functional Slack integration — UseGin (team-internal, Gin-mediated) and AskEffi-Slack (customer-facing, 1 channel ↔ 1 project).
 **Closed at:** 2026-04-28 by Gin session `c2f48116-8355-4edf-969f-e9e85239cc46` running autonomous-vibe (z091).
-**Status:** **Code done up to the encryption gate. Blocked on six decisions only Lihu owns. Single-line `openssl` + two app registrations away from a working demo.**
+**Status:** **Code done up to the encryption gate. Five of six decisions resolved 2026-04-28; D5 (multi-Gin checkout fight) running through `/tikur`. Demo recipe ready in `DEMO.md`.**
+
+## Decisions resolved (2026-04-28 by Lihu)
+
+| # | Topic | Resolution |
+|---|---|---|
+| **D1** | Pilot trust posture (encryption strength) | **DECIDED: ship pilot on current AES-GCM**; KMS upgrade triggers only on a Fortune-500 questionnaire that demands HSM-rooted custody. Lihu acknowledged the explanation; lean stands. |
+| **D2** | Customer Slack: read-only at MVP | **DECIDED: yes, read-only.** Team gets bidirectional via UseGin first; customer surface graduates only on competitive pressure. |
+| **D3** | Marketplace listing timing | **DECIDED: start now.** Linear ENG-5417 created with the full prep list + Zisser-mediated reminder for next work session. |
+| **D4** | Channel-binding cardinality positioning | **DECIDED: 1:1 in customer help, N:1 in schema (already shipped).** Flip help when ≥30% of pilots ask. |
+| **D5** | Multi-Gin checkout structural fight | **IN FLIGHT: tikur running** on z094/z095/z096/z097. Distilled questions for Lihu surface mid-tikur if any genuine input is needed. |
+| **D6** | Cadence | **DECIDED: interactive next session.** Run the demo (Phases 0/1/2 of `DEMO.md`) live with Lihu, react to what we see. Handoff comment + resume prompt below. |
 
 ## What landed
 
@@ -130,6 +141,33 @@ The next session, in order:
 - **Yohai (Comptroller) audit ledger:** `usegin/comptroller/audits/` — five between-phases audits, all verdict-correlated.
 - **Closing zettels from the run:** z091 (autonomous-vibe protocol), z098 (mock-leak structural pattern), z099 (what made this run productive).
 - **Resume the same Gin:** `claude --resume c2f48116-8355-4edf-969f-e9e85239cc46`.
+
+## Resume prompt for next session
+
+Paste the block below into a fresh Claude Code session (or as the first message after `claude --resume c2f48116-8355-4edf-969f-e9e85239cc46`). It tells the next Gin everything it needs to know to start the interactive demo without re-deriving context.
+
+```text
+We're picking up the Slack integration where last session left off — autonomous-vibe run closed clean.
+Read in this order before doing anything:
+  1. usegin/research/slack-integration/CLOSE.md   (the six decisions, five resolved + D5 tikur status)
+  2. usegin/research/slack-integration/DEMO.md    (the recipe we're about to run live together)
+  3. ENG-5399 latest comment                       (the run summary)
+
+We're in interactive mode (D6 decision). Cadence: I drive, you keep me out of trouble. Don't fan
+out parallel sub-Gins until /tikur lands the structural fix on the multi-Gin checkout fight (D5).
+
+First action: walk me through DEMO.md Phase 0 (TOKEN_ENCRYPTION_KEY setup). I'll generate the key
+and set Doppler/Railway. You verify, then we go to Phase 1 (UseGin app registration + smoke). Then
+Phase 2 (AskEffi-Slack app + customer flow demo). React live to anything that surprises us.
+
+If /tikur (background from the previous session) surfaced distilled questions in CLOSE.md § D5
+follow-up questions, ack them at the start. If the tikur landed a fix that needs my action, say so
+before the demo.
+
+I'm Lihu. Session id of the prior run: c2f48116-8355-4edf-969f-e9e85239cc46.
+```
+
+That prompt + reading the three pointers gets the next Gin to "ready to demo with Lihu" in ~5 minutes of cold-context absorption.
 
 ## A note on language
 
