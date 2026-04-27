@@ -82,7 +82,7 @@ A vibe-rated session telemetry feature lives inside the dx app. Both human and C
 
 ### Mid-session nudge
 
-The Stop hook soft-nudges Claude every `DX_HIS_NUDGE_INTERVAL` turns (default 10) when `force_rate` isn't set. Non-blocking — emitted via `additionalContext`. Disable with `DX_HIS_NUDGE_DISABLED=1`.
+The Stop hook soft-nudges Claude every `DX_HIS_NUDGE_INTERVAL` turns (default 10) when `force_rate` isn't set. Non-blocking — emitted via top-level `systemMessage` (Stop hooks don't allow `additionalContext`). Gated on the `his.nudge` dx toggle (default `false`); enable with `dx enable his.nudge` or set per-user in `.dx/config.json`.
 
 ### Auto-rate from Bash failures
 

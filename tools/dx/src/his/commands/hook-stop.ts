@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { readState, updateState } from "../state";
 import { listAspects } from "../aspects";
+import dx from "../../../sdk";
 
 export function buildHisHookStopCommand(): Command {
   return new Command("hook-stop")
@@ -34,8 +35,8 @@ async function actionHookStop() {
   if (!state.force_rate) {
     // No force pending. Soft-nudge Claude to file a self-rating if it's been
     // quiet on telemetry for a while — keeps the autonomous-rating loop honest
-    // without blocking. Skip if disabled via DX_HIS_NUDGE_DISABLED=1.
-    if (process.env.DX_HIS_NUDGE_DISABLED !== "1") {
+    // without blocking. Gated on the `his.nudge` dx toggle (off by default).
+    if (dx.isEnabled("his.nudge")) {
       const NUDGE_INTERVAL = parseInt(process.env.DX_HIS_NUDGE_INTERVAL ?? "10", 10);
       const turnsSinceClaude = state.last_claude_rating_turn === null
         ? state.turn_count
@@ -45,17 +46,16 @@ async function actionHookStop() {
         turnsSinceClaude >= NUDGE_INTERVAL &&
         turnsSinceClaude % NUDGE_INTERVAL === 0;
       if (shouldNudge) {
+        // Stop hooks don't allow `hookSpecificOutput.additionalContext` —
+        // surface the nudge via top-level `systemMessage` instead.
         process.stdout.write(
           JSON.stringify({
             continue: true,
-            hookSpecificOutput: {
-              hookEventName: "Stop",
-              additionalContext:
-                `[his nudge] You haven't filed a self-rating in ${turnsSinceClaude} turn${turnsSinceClaude === 1 ? "" : "s"}. ` +
-                `If you noticed friction, gaps, or vibe shifts since your last reading, drop a quick row: ` +
-                `\`dx his rate --as=claude vibe=<n> [aspect=n] --note "..."\` or just \`dx his note --as=claude "..."\`. ` +
-                `Skip if nothing notable happened.`,
-            },
+            systemMessage:
+              `[his nudge] You haven't filed a self-rating in ${turnsSinceClaude} turn${turnsSinceClaude === 1 ? "" : "s"}. ` +
+              `If you noticed friction, gaps, or vibe shifts since your last reading, drop a quick row: ` +
+              `\`dx his rate --as=claude vibe=<n> [aspect=n] --note "..."\` or just \`dx his note --as=claude "..."\`. ` +
+              `Skip if nothing notable happened.`,
           }) + "\n",
         );
         return;
