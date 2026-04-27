@@ -34,6 +34,18 @@ See `tools/session/CLAUDE.md` and `session --help`.
 
 `session code-history <file>:<line>` — surfaces the authoring commit plus the Claude session's intent/trigger/outcome and any linked Linear issue. `git blame` says who; this says why.
 
+### Pull a meeting transcript directly (when `effi ask` loops)
+
+When you already know the meeting entity id (often surfaced by Effi's own first search), skip `effi ask` and go direct:
+
+```bash
+effi --profile <you>:prod meetings show <meetingId> --transcript > /tmp/meeting.json
+jq -r '.meeting.transcript' /tmp/meeting.json > /tmp/transcript.txt
+grep -nE 'מחר|priorit|tomorrow|<keyword>' /tmp/transcript.txt
+```
+
+Why this beats `ask`: Hebrew-heavy transcripts make semantic search miss paraphrased English queries; intermediate result files exceed Effi's per-tool token budget and get saved to local paths Effi can't read back. The CLI direct path returns the whole transcript as one JSON blob, then `jq | grep` does the real search. Use when Effi loops 5+ times on the same query.
+
 ### Browse / search past sessions
 
 - `session find` — interactive fzf browse
