@@ -22,6 +22,7 @@ This is a **corrector**, not a translator (`usegin/zettel/zettels/z007`).
 | `askf`, `ask f`, `Ask F` | `AskEffi` | the product — never confuse with `usegin` the workspace. |
 | `gains`, `wins` (when context is agents/sub-agents) | `usegins` (or `UseGins`) | Lihu's term for spawnable UseGin instances. (z023) |
 | `cell`, `cells` (when context is notes) | `zettel`, `zettels` | Heard once; watch for recurrence. |
+| `the cell`, `cell` (when context is an agent / "my friend who walks beside me" / orchestrator / "ziser.md") | `Zisser` | Confirmed by Lihu 2026-04-27 — the chief-of-staff agent at `zisser/`. Wispr drops the leading /z/ on Zisser → "the cell". Disambiguate from the notes-context rule above. |
 | `Zetel`, `Zetels` | `Zettel`, `Zettels` | Domain-name spelling. |
 | `Lina Arishiu` | `Linear` | The issue tracker. |
 | `Trig him`, `Trig` (as verb) | `Trigger him`, `Trigger` | Wispr cuts "Trigger" mid-word. |
