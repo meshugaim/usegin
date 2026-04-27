@@ -66,8 +66,8 @@ This list grows as Gin finds things only humans can do:
 9. **Tikur recommended.** Three failure modes in one batch is the criterion. Run it once Lihu/Tom is back.
 
 10. **Until a fix lands**, Gin-orchestrator runs slices **single-agent** (this Gin does the work directly, no parallel sub-Gins) for:
-   - C3 UI restoration (in flight as of this update — Gin-D3's UI files were the casualty of the z094 reset-wipe).
-   - Any future slice that touches `nextjs-app/` (most-collision-prone area).
+   - ✅ ~~C3 UI restoration~~ — DONE (single-agent, ENG-5416 closed). Card + modal + tests + wiring landed in 74b56a2b6..57040a9b4.
+   - Any future slice that touches `nextjs-app/` (most-collision-prone area) until autosync structural fix lands.
 
 ## How to talk to this Gin
 
