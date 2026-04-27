@@ -1,6 +1,14 @@
 # Slack Integration R&D — Resume Pointer
 
-**Status:** in flight as of 2026-04-27
+**Status:** **CLOSED 2026-04-27.** All 8 whiteboards landed; cross-cutting synthesis + Lihu-facing recommendations complete. Angle E collapsed into C mid-round.
+
+**Deliverables:**
+- `SYNTHESIS.md` — load-bearing finding (May-2025 ToS cliff), 10 convergent findings, 6 divergent points, per-surface path map.
+- `recommendation.md` — 5 z026-shape decisions for Lihu + default sequence.
+- 8 whiteboards under `<angle>/whiteboard.md` (A–H).
+
+**Cold-reader entry point:** read `SYNTHESIS.md` first (≤5min), then `recommendation.md` (≤5min). Drill into individual whiteboards only when a specific dilemma needs deeper context — pointers in SYNTHESIS.md.
+
 **Skill:** rnd (`.claude/skills/rnd/SKILL.md`)
 **Linear parent:** ENG-5399
 
