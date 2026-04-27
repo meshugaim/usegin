@@ -22,12 +22,28 @@ A Gin run ends in one of three shapes: it's done, it's blocked-on-human, or some
 
 ## What close produces
 
-Two artifacts:
+**Three** artifacts. The third is the load-bearing one. Without it the close is invisible to anyone who isn't already inside the in-repo file tree.
 
 1. **A close doc** — `<work-folder>/CLOSE.md` (e.g. `usegin/research/<topic>/CLOSE.md`). The single page the next Gin/human reads to know exactly where they are.
 2. **An updated front-door doc** — point the existing FOR-X / DEMO / RESUME / handoff at CLOSE.md so cold readers don't miss it.
+3. **A surface-write to the team's working-board for this feature** — see "Where to surface" below. **The close is not done until any agent who picks up the feature, from any starting point, sees the open decisions.**
 
-Both committed + pushed before the run truly ends.
+All three committed + pushed before the run truly ends.
+
+## Where to surface (priority order)
+
+The close doc is in the repo. That's not enough — the next agent might not start from the repo. They might start from Linear, from a Slack message, from a teammate's "can you pick up X." Pick the highest-priority surface that exists for the work, write the open decisions there, and link to CLOSE.md.
+
+| Priority | Surface | Use when |
+|---|---|---|
+| 1 | **Linear comment on the parent issue** | The work has a Linear issue (most shipped product work). `plan show <id>` is what any agent runs first when picking up a Linear-tracked feature. |
+| 2 | **Whiteboard / `<topic>/whiteboard.md`** | The work is `usegin/research/<topic>/` shaped (R&D rounds, internal sub-app design). The whiteboard is the canonical home. |
+| 3 | **Sub-app README append** | The work is for an internal sub-app (`usegin/<sub>/`) that doesn't have a research folder. Append a "Currently in flight" section. |
+| 4 | **A new doc + link from `usegin/README.md`** | None of the above fits. Create the right home. Document why this surface didn't exist already. |
+
+**The default is Linear.** Most product work has an issue; comment on it. The other surfaces are fallbacks for when there's no issue (R&D rounds, internal-tooling work, meta-work on Gin itself).
+
+**Never close without writing to a surface.** A close that only updates `CLOSE.md` is invisible to anyone who picks up the work from outside the repo file tree. That defeats the point of closing.
 
 ## CLOSE.md shape
 
@@ -108,7 +124,8 @@ When in doubt: ask whether the human's read of the decision changes if you swap 
 7. **Pointers.** Front-door, resume, Linear, zettels, audits — every cold-reader-relevant path linked once at the bottom.
 8. **Update the front door.** Add a one-line link from FOR-TOM / DEMO / RESUME to CLOSE.md. The cold reader follows ONE link, not three.
 9. **Commit + push.** Both the CLOSE doc and the front-door update in one commit. Reference the run's parent issue.
-10. **Final report in chat.** ≤8 lines: link to CLOSE.md, list the D-X count + topics, name what fires when greenlit. Stop.
+10. **Surface-write.** Per "Where to surface" — write the open decisions (compact form: title + lean per D-X) to the team's working-board for the feature. Default = Linear comment on the parent issue. Without this step the close is invisible.
+11. **Final report in chat.** ≤8 lines: link to CLOSE.md, name the surface where the open decisions live, list the D-X count + topics, name what fires when greenlit. Stop.
 
 ## Working rules
 
