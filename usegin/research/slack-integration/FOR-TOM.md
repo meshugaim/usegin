@@ -13,7 +13,7 @@ That's the one goal. Marketplace listing, encryption, channel pickers — all su
 
 ## Where things live
 
-- **Round entry:** `usegin/research/slack-integration/RESUME.md` — round is CLOSED. Read SYNTHESIS.md + recommendation.md.
+- **Round entry:** `usegin/research/slack-integration/RESUME.md` — round is CLOSED. Read **DEMO.md first** (end-to-end recipe), then SYNTHESIS.md + recommendation.md.
 - **Linear parent:** ENG-5399 (sub-issues ENG-5400..5407 are R&D whiteboards; ENG-5408..5416 are slices in progress).
 - **Active slices** as of this handoff:
   - ENG-5408 D1 ✅, ENG-5412 D2 ✅, ENG-5415 D3 just landed (push blocked — see below)
