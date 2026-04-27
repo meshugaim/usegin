@@ -1,0 +1,193 @@
+[AskEffi App (really) · fd5b4ef8 · turn 1 · 0/2 toggles]
+[10:22:19]
+## 1. "Distillation" — Explicitly Named as a Product Feature Concept
+
+**Source:** Team meeting notes (Fathom, shared internally, ~early April 2026 — the same email appears in at least 4 threads)
+
+The concept was explicitly labeled **"Distilled Context Feature Concept"** in team meeting summaries:
+
+> **"Inspiration:** A user's Claude workflow for synthesizing career history."
+>
+> **Workflow:**
+> 1. **Raw Input:** Uploaded unedited, stream-of-consciousness notes.
+> 2. **AI Synthesis:** Claude, with human guidance, **distilled the raw data into structured markdown documents.**
+> 3. **Application:** These distilled documents were then used as the core context for new tasks (e.g., analyzing job descriptions), leading to more consistent and accurate results.
+>
+> **Potential for Effie:**
+> - **Benefit:** Using distilled context could **significantly improve AI efficiency and consistency** compared to processing raw data for every query.
+> - **Mechanism:** Effie could **proactively ask clarifying questions** to help users create these distilled summaries, which would then become part of the **project's persistent context.**
+
+The same meeting lists it as priority item #3 after SharePoint integration and latency reduction. Guy's action item: *"Refine the proactive features concept into a detailed spec."*
+
+---
+
+## 2. "Distill" in the Technical/Competitive Reading Material
+
+**Source:** Attachment — *Agentify* book (chapter "Dream, Distill, Differentiate: Your Agent's Data Moat"), circulating internally
+
+> "Competitive AI agents will need an engineered analog: a background phase for **offline knowledge refinement** ... It **compresses memories, refines skills**, seeks knowledge, and can explore counterfactuals without interrupting service."
+
+> "Teams should consider which inputs are genuinely informative for learning. Likely candidates include **transcripts, tool traces, retrieval logs, error and outcome summaries, and explicit user feedback.** ... Outputs worth reviewing include **refined memories, new experimental tools, skill adjustments** that pass tests."
+
+This was clearly circulating internally as reference material on how agents should handle knowledge over time.
+
+---
+
+## 3. Post-Mortems / Retrospectives — Customer Pain Point
+
+**Source:** Meeting transcript — Manoj Swaminathan (SAP), Guy Levit, Noela Nakos — Mar 24, 2026
+
+> **[00:11:00] Manoj Swaminathan:** "100% of them. The times that I have been part of this, Guy, it's exactly as how your website says — we had to go and **relive the part to get that data** so that we can, it's **almost like a postmortem** of what had happened so that we can actually move forward, right?"
+
+**Source:** Multiple Fathom meeting summaries (different meetings, same pattern)
+
+> "Function: These teams perform **'postmortems' to reconstruct project history during escalations**, highlighting the need for a proactive tool."
+
+> "The 'Forensic Tax': The initial 2–3 days spent just understanding the situation (digging through emails, documents, meetings) is an **unbillable cost.** For IT consultancies, this can cost **$500k–$1M annually.**"
+> — Fathom meeting summary, internal team discussion
+
+---
+
+## 4. Capturing the WHY Behind Decisions — Core Product Thesis
+
+**Source:** Meeting transcript — AskEffi / IAS meeting, Jan 21, 2026 (Guy Levit, Robert Janecek, et al.)
+
+> **[00:13:20] Guy Levit:** "We're interested in the layer above, which is the context."
+>
+> **[00:13:23] Robert Janecek:** "Why was this decision made?"
+>
+> **[00:13:24] Guy Levit:** "Like somebody opens a ticket and is like, **why are we doing it this way?** It's like, oh, there was like a 30-minute conversation about why we're doing it this way versus the other and all the options we considered. And again, maybe you learn something new. Maybe actually the other option is a good option. But all this stuff **never make it to a ticket or to an approval request.** And you later revisit, like, hey, why did we do it? Should we actually flip our decision? **All this stuff is lost currently**, and we want to kind of [add] a [context] layer and augment you."
+
+**Source:** Attachment — "Systemic Inefficiency" analysis document (internal)
+
+> "Task trackers capture 'what' but not **'why'**; when consultants rotate off or PMs change, **institutional knowledge evaporates.**"
+>
+> "The 'why' behind decisions is lost, **forcing teams to reconstruct history from memory.**"
+
+**Source:** Fathom meeting summary — Stephen (contract negotiation use case)
+
+> "Negotiations are iterative, with redlines often traded for concessions in other sections. **The rationale for these trades is rarely documented in the contract itself.** The agent can preserve this history, **explaining why a term was redlined or traded.**"
+
+---
+
+## 5. Decision Documentation as Organizational Memory — "The New Physics" Document
+
+**Source:** Attachment — *"The New Physics of Project Intelligence"* (author unnamed, circulating internally)
+
+This is the richest single source on capturing decisions AND the WHY. Verbatim:
+
+> **"Use Case 6: Decision Documentation — Collecting Memo as Memory"**
+>
+> "The old physics: Decisions are made in meetings. Rationale is partially captured in notes, partially lost. **When stakeholders rotate, context is lost and decisions get relitigated.**
+>
+> The new physics: After any significant decision, the system prompts key participants (in parallel): **'What was your understanding of why we made this decision? What tradeoffs did we accept?'** Synthesizes into a **'decision record' that captures multiple perspectives on the rationale — not a sanitized single narrative.**
+>
+> Snowden connection: This directly addresses capability atrophy risk. Instead of the system 'carrying context' in a way that lets humans forget, it captures **human sense-making at the moment of decision — preserving the reasoning rather than just the outcome. It's spaced repetition for organizational memory.**"
+
+> **"Use Case 5: Cross-Project Weak Signal Detection"**
+>
+> "The most valuable patterns are often emergent across projects but **not named by anyone, present in the negative space** (what's conspicuously absent across multiple contexts), or **contradictions between what different teams believe to be true.**"
+>
+> "The meeting notes say 'alignment reached.' But the system notices: **two participants' typed contributions during the meeting expressed reservations they never vocalized** ... The system surfaces: 'The meeting concluded with stated alignment on X, but contribution patterns suggest this alignment may be **shallow.**'"
+
+---
+
+## 6. Associative / "Pull a Wire" Retrieval — The Zettelkasten Concept
+
+The exact phrase "pull a wire" wasn't found verbatim, but the concept was extensively discussed under the **Zettelkasten** label — multiple team meetings.
+
+**Source:** Multiple Fathom meeting summaries referencing a team discussion (shared in several email threads, consistent content)
+
+> **"Solution: 'Zettelkasten' Context Graph"**
+>
+> - **Concept:** An **emergent knowledge graph that connects ideas based on their content, not a pre-defined structure.**
+> - **Process:**
+>   1. Ingest data (e.g., email, transcript).
+>   2. **Extract its essence (summarize, tag).**
+>   3. **Map it to the existing graph, connecting to related nodes.**
+> - **Key Feature: Time-Awareness** — The graph **tracks how ideas and policies evolve over time.**
+> - **Example Query:** "How did our policy on X change from Q3 to Q4?"
+> - **Value:** Enables proactive guidance by detecting **shifts in team sentiment** (e.g., from 80/20 confidence in option A to 51/49 against it) before a hard pivot is necessary.
+
+**Source:** Meeting transcript — MoVi Check-in: Pablo & Guy, Dec 5, 2025
+
+> **[00:06:00] Collective Team:** "It's like, what are those decision points, inflection points that happen in a company and **why they happen? What were the conditions that they happened under?**"
+>
+> **[00:06:45] Collective Team:** "We were more sort of **knowledge graph obsessed.** So, our mission was to build, like, an intuitive knowledge management solution that was, like, knowledge graph-based, where... you could **semantically search across** ... **building like a genetic memory of a team or an institution** and be able to like query across that."
+>
+> **[00:07:54] Collective Team:** "We sort of built this like knowledge graph software where users can build out topic-specific context windows, essentially using embeddings. And like it **automatically builds out the edges between those nodes** that you upload."
+
+---
+
+## 7. Tacit / Tribal Knowledge — What's Not Written Down
+
+**Source:** Guy Levit email — AlignOrg design partner notes, Dec 12, 2025
+
+> "Difficulty getting team members up to speed on project details, history, decisions, and issues — **the 'tribal knowledge' that isn't always well documented.**"
+
+**Source:** Fathom summary — AlignOrg meeting (AskEffi demo with Ken, Leah, Brock)
+
+> **Leah:** "Much of what matters — stakeholder styles, tensions, preferences — is **tribal knowledge. People don't always document it.**"
+>
+> **Ken:** "If it ingests note-taker output from stakeholder meetings, that knowledge often does exist — **it's just fragmented.**"
+>
+> **Guy:** "Exactly. AskEffi doesn't invent context — **it surfaces what's already there, including patterns and dynamics no one would write in a formal doc.**"
+
+**Source:** Meeting transcript — Dorina Buehrle & Guy Levit, Dec 3, 2025
+
+> **[00:23:31] Dorina Buehrle:** "The thing is that we faced is that **the really, really valuable stuff is the implicit knowledge that is not written down**, that is not in emails, that is, that's — it's basically the experience."
+>
+> **[00:24:00] Guy Levit:** "Knowing what **wasn't said**, for example."
+
+---
+
+## 8. Effi's "Mental Model" — Making Distilled Knowledge Visible
+
+**Source:** Fathom meeting summary — UX wireframe review (team internal meeting)
+
+> **"Effi's 'Mental Model' & Transparency"**
+>
+> - **Concept:** Make Effi's **internal understanding of a project visible** to the owner.
+> - **Rationale:** Builds trust and allows users to **correct Effi's knowledge**, ensuring accuracy.
+> - **Initial Implementation:** Text-based summaries and questions in the chat.
+> - **Future Possibility:** A **visual diagram of Effi's knowledge graph.**
+> - **Decision:** Punt on visual diagrams for now. Text is simpler to build and iterate on.
+> - **Conflict Resolution:** Effi will **flag conflicting facts** from different sources and explain its resolution logic for user validation.
+> - **Future Vision — Project Health Scorecard:** Effi could run a **"self-evaluation" on a project's data to identify knowledge gaps.**
+
+---
+
+## 9. Snowden / Complexity Framework — Narrative as Sensor
+
+**Source:** Email thread — Guy Levit to Dave Snowden (Dave.Snowden@cognitive-edge.com), Dec 12, 2025, plus extensive response quoted in thread
+
+> **Guy Levit's framing to Snowden:** "I'm working on an early-stage product called Effi — an AI assistant that sits above project tools and documents in client-facing work ... The narrow starting point is simple: **help executives, SMEs, and clients re-enter a project by answering contextual questions without forcing the project team to restate the narrative each time.**"
+
+The response (likely from an AI analysis of Snowden's work, shared in thread):
+
+> "Snowden's work on *narrative* ... He means: **Human stories as distributed sensors of system state.** People tell stories when: Formal reporting fails / Risk is hard to articulate / Politics makes truth unsafe. By capturing *micro-narratives at scale*, you can: **Detect weak signals / See pattern shifts early / Understand how people are actually making sense of work.**"
+
+> "AskEffi, whether you intend it or not, is: A **constraint-shifting mechanism** / A **narrative amplifier** / A **sense-making intervention.**"
+
+The research doc prepared for the Snowden conversation:
+
+**Source:** Attachment — "Research & Questions for Conversation with Dave Snowden" (internal prep document)
+
+> **"Finding 4: 'Enabling Constraints' Is His Framework for Good Tool Design"**
+>
+> "askeffi.ai should be designed as an **'enabling constraint'** — a system that **carries context and creates connections without dictating behavior or replacing judgment.**"
+
+> **"Finding 5: His AI Critique Directly Applies to askeffi.ai"**
+>
+> "**Dependency risk:** 'Human beings like magical reasoning ... it doesn't take long for humans to lose capability.' ... **askeffi.ai should position itself as augmenting stakeholder sense-making rather than replacing it.**"
+
+> **"Finding 7: Expertise Creates Coupling"**
+>
+> "The more valuable someone's knowledge, the more projects want a piece of them, and the more their **cognitive capacity becomes the binding constraint.**"
+
+---
+
+## Summary
+
+The "pull a wire" phrase never appeared verbatim — that framing may be yours rather than theirs. But the underlying concept is extensively documented under **Zettelkasten**, **knowledge graph**, **genetic memory**, and **emergent connections**. The distillation idea has both a product feature name ("Distilled Context Feature Concept") and a deeper theoretical grounding in the Snowden/Cynefin correspondence and "The New Physics" document, which is the most philosophically developed treatment of why capturing the WHY behind decisions matters. Want me to pull the full text of "The New Physics" attachment or the Snowden email thread?
+[10:23:50] (86s)

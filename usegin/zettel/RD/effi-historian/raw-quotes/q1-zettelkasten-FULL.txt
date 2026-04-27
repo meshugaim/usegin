@@ -1,0 +1,57 @@
+[AskEffi App (really) · 35ec7b03 · turn 2 · 0/2 toggles]
+[10:22:51]
+## Zettelkasten Search Results
+
+### No misspelling variants found
+
+Keyword searches for `zettlekasten`, `zetlekasten`, `zettle`, and `settle` returned **zero results** across all content types. Every hit uses the correct spelling: **Zettelkasten**.
+
+---
+
+### Hit 1 (×4 identical copies) — Fathom Meeting Recap
+
+**Source:** Fathom <no-reply@fathom.video> — *"Recap of your meeting with askeffi.ai"*
+**Date:** January 29, 2026
+**Email IDs:** `11a36f84`, `38211683`, `40581fd4`, `65a26c84` (four copies of the same recap, sent to different recipients; content is identical)
+**Meeting duration:** 54 mins. Recording linked as a Fathom share.
+
+---
+
+**Verbatim — Key Takeaways section:**
+
+> **"Mental Model" Strategy:** The team will build a "Zettelkasten"-style knowledge graph. This will move beyond simple RAG by pre-processing data and tracking how ideas evolve over time, enabling queries like "How did our policy on X change?"
+
+---
+
+**Verbatim — "Mental Model" for Knowledge section (full block):**
+
+> **Problem:** The current RAG-only approach is slow, expensive, and non-deterministic, providing inconsistent answers.
+>
+> **Solution: "Zettelkasten" Context Graph**
+> - **Concept:** An emergent knowledge graph that connects ideas based on their content, not a pre-defined structure.
+> - **Process:**
+>   1. Ingest data (e.g., email, transcript).
+>   2. Extract its essence (summarize, tag).
+>   3. Map it to the existing graph, connecting to related nodes.
+> - **Key Feature: Time-Awareness**
+>   - The graph tracks how ideas and policies evolve over time.
+>   - **Example Query:** "How did our policy on X change from Q3 to Q4?"
+>   - **Value:** Enables proactive guidance by detecting shifts in team sentiment (e.g., from 80/20 confidence in option A to 51/49 against it) before a hard pivot is necessary.
+
+---
+
+### No other hits anywhere
+
+| Source type | Searched | Zettelkasten hits |
+|---|---|---|
+| Emails (body keyword) | All 3,956 | 4 (same meeting, above) |
+| Email attachments | All 182 | 0 |
+| Drive files | Both | 0 |
+| Meeting transcripts | All | 0 |
+| Linear | N/A | Not indexed |
+| Spelling variants | All | 0 |
+
+**Note:** The "New Physics of Project Intelligence" attachment (Chris Baum, Jan 7, 2026) and several meeting transcripts discuss related concepts — knowledge graphs, emergent memory, organizational context — but do not use the word Zettelkasten.
+
+The term appears **only once** in the project record: this Jan 29, 2026 internal team meeting recap, as the named architecture for replacing the RAG-only approach.
+[10:23:04] (8.9s)

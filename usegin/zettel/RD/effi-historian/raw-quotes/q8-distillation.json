@@ -1,0 +1,200 @@
+    "content": "\n> - **Rationale:** Builds trust and allows users to **correct Effi's knowledge"
+  },
+  {
+    "type": "content",
+    "content": "**, ensuring accuracy.\n> - **Initial Implementation:** Text"
+  },
+  {
+    "type": "content",
+    "content": "-based summaries and questions in the chat.\n>"
+  },
+  {
+    "type": "content",
+    "content": " - **Future Possibility:** A **visual diagram of Effi's knowledge graph.**\n> - **Decision:** Punt on"
+  },
+  {
+    "type": "content",
+    "content": " visual diagrams for now. Text is simpler to build and iterate"
+  },
+  {
+    "type": "content",
+    "content": " on.\n> - **Conflict Resolution:** Effi will **flag conflicting facts"
+  },
+  {
+    "type": "content",
+    "content": "** from different sources and explain its resolution logic for"
+  },
+  {
+    "type": "content",
+    "content": " user validation.\n> - **Future Vision — Project"
+  },
+  {
+    "type": "content",
+    "content": " Health Scorecard:** Effi could run a **\"self-evaluation"
+  },
+  {
+    "type": "content",
+    "content": "\" on a project's data to identify knowledge gaps.**"
+  },
+  {
+    "type": "content",
+    "content": "\n\n---\n\n## 9. Snowden / Complexity Framework — Narrative as Sensor\n\n**Source:** Email thread"
+  },
+  {
+    "type": "content",
+    "content": " — Guy Levit to Dave Snowden (Dec 12, 2025) + extensive"
+  },
+  {
+    "type": "content",
+    "content": " response quoted in thread\n\n> **Guy Levit's framing to"
+  },
+  {
+    "type": "content",
+    "content": " Snowden:** \"I'm working on an early-stage product called"
+  },
+  {
+    "type": "content",
+    "content": " Effi — an AI assistant that sits above project"
+  },
+  {
+    "type": "content",
+    "content": " tools and documents in client-facing work ... The"
+  },
+  {
+    "type": "content",
+    "content": " narrow starting point is simple: **help executives, SMEs"
+  },
+  {
+    "type": "content",
+    "content": ", and clients re-enter a project by answering contextual questions without"
+  },
+  {
+    "type": "content",
+    "content": " forcing the project team to restate the narrative each"
+  },
+  {
+    "type": "content",
+    "content": " time.**\"\n\nThe response (likely from an AI analysis of"
+  },
+  {
+    "type": "content",
+    "content": " Snowden's work, shared in thread):\n\n> \"Snowden's work on *"
+  },
+  {
+    "type": "content",
+    "content": "narrative* ... He means: **Human stories as"
+  },
+  {
+    "type": "content",
+    "content": " distributed sensors of system state.** People tell stories when"
+  },
+  {
+    "type": "content",
+    "content": ": Formal reporting fails / Risk is hard to articulate / Politics"
+  },
+  {
+    "type": "content",
+    "content": " makes truth unsafe. By capturing *micro-narratives at scale"
+  },
+  {
+    "type": "content",
+    "content": "*, you can: **Detect weak signals / See pattern shifts"
+  },
+  {
+    "type": "content",
+    "content": " early / Understand how people are actually making sense of work"
+  },
+  {
+    "type": "content",
+    "content": ".**\"\n\n> \"AskEffi, whether you intend it or not, is: A **constraint-shifting mechanism** / A **narrative amplifier** /"
+  },
+  {
+    "type": "content",
+    "content": " A **sense-making intervention.**\"\n\nThe research doc prepared for the Snowden conversation:\n\n> **"
+  },
+  {
+    "type": "content",
+    "content": "\"Finding 4: 'Enabling Constraints' Is His Framework"
+  },
+  {
+    "type": "content",
+    "content": " for Good Tool Design\"**\n>\n> \"askeffi.ai should be"
+  },
+  {
+    "type": "content",
+    "content": " designed as an **'enabling constraint'** — a system that **carries"
+  },
+  {
+    "type": "content",
+    "content": " context and creates connections without dictating behavior or replacing"
+  },
+  {
+    "type": "content",
+    "content": " judgment.**\"\n\n> **\"Finding 5: His AI Critique Directly Applies"
+  },
+  {
+    "type": "content",
+    "content": " to askeffi.ai\"**\n>\n> \"**Dependency risk:** 'Human beings"
+  },
+  {
+    "type": "content",
+    "content": " like magical reasoning ... it doesn't take long"
+  },
+  {
+    "type": "content",
+    "content": " for humans to lose capability.' ... **askeffi.ai should position itself as aug"
+  },
+  {
+    "type": "content",
+    "content": "menting stakeholder sense-making rather than replacing it.**\"\n\n---\n\n## Summary\n\nThe \"pull a wire\" style"
+  },
+  {
+    "type": "content",
+    "content": " of associative discovery never appeared verbatim — that framing may be"
+  },
+  {
+    "type": "content",
+    "content": " yours rather than theirs. But the underlying concept is extensively documented under"
+  },
+  {
+    "type": "content",
+    "content": " **Zettelkasten**, **knowledge graph**, **genetic memory**, and **emergent connections**"
+  },
+  {
+    "type": "content",
+    "content": ". The distillation idea has both a product feature name (\"Distilled Context Feature Concept"
+  },
+  {
+    "type": "content",
+    "content": "\") and a deeper theoretical grounding in the Snowden/Cynefin correspondence and \"The"
+  },
+  {
+    "type": "content",
+    "content": " New Physics\" document, which is the most philosophically developed treatment of why capturing the WHY behind decisions matters."
+  },
+  {
+    "type": "content",
+    "content": " Want me to pull the full text of \"The New Physics\" attachment or"
+  },
+  {
+    "type": "content",
+    "content": " the Snowden email thread?"
+  },
+  {
+    "type": "result",
+    "session_id": "fd5b4ef8-4d9a-4921-8cb9-73c961b75905",
+    "usage": {
+      "input_tokens": 8,
+      "output_tokens": 4842,
+      "cache_read_input_tokens": 109868,
+      "cache_creation_input_tokens": 109804
+    },
+    "cost_usd": 0.5178984,
+    "duration_ms": 121605,
+    "num_turns": 11,
+    "auth_mode": "api_key"
+  },
+  {
+    "type": "done"
+  }
+]

@@ -1,0 +1,200 @@
+    "content": " the day. Claude is writing, even like our linear, the only seat we have on linear, it's Claude is the seat owner.\"*\n>\n> **[00:08:45] Guy"
+  },
+  {
+    "type": "content",
+    "content": " Levit:** *\"Claude will, like, they need Claude,"
+  },
+  {
+    "type": "content",
+    "content": " Claude, they even want Claude to sit on top of our software. So Claude can ask, okay, what did the customer want again?"
+  },
+  {
+    "type": "content",
+    "content": " Like, what happened?\"*\n>\n> **[00:10:41–10:52"
+  },
+  {
+    "type": "content",
+    "content": "] Guy Levit:** *\"But then let's have Claude, the only, the interface to it can be Claude. Claude reads into"
+  },
+  {
+    "type": "content",
+    "content": " it and Claude writes, writes out of it. I can"
+  },
+  {
+    "type": "content",
+    "content": " ask Claude, what are the tasks? it will"
+  },
+  {
+    "type": "content",
+    "content": " tell me.\"*\n\n**Meeting transcript: Chandra and Guy | Apr 17, 2026**\n\n> **[00:"
+  },
+  {
+    "type": "content",
+    "content": "32:12–32:27] Guy Levit:** *\"The thing that"
+  },
+  {
+    "type": "content",
+    "content": " I can see happening, and frankly, our team is already"
+  },
+  {
+    "type": "content",
+    "content": " using it this way, is that people will not use the"
+  },
+  {
+    "type": "content",
+    "content": " interface. They will connect, they will ask to connect Claude to E"
+  },
+  {
+    "type": "content",
+    "content": "FI… my interface is Claude for my work. It's great that you can give me all the context from the engagement, but let me talk with you through Claude,"
+  },
+  {
+    "type": "content",
+    "content": " which is fine.\"*\n\n**Meeting transcript: Elsante and AskEff"
+  },
+  {
+    "type": "content",
+    "content": "i | Apr 24, 2026**\n\n> **[00:33:06] Guy Levit (describing engineers):** *\"he"
+  },
+  {
+    "type": "content",
+    "content": " doesn't even ask Effie, Nitsan asks"
+  },
+  {
+    "type": "content",
+    "content": " Claude, when he's writing features, like, hey, Claude"
+  },
+  {
+    "type": "content",
+    "content": ", so Claude is, our Claude, Claude is plug"
+  },
+  {
+    "type": "content",
+    "content": "ged into Effie through a command line interface, of course, he"
+  },
+  {
+    "type": "content",
+    "content": " can, so he just asked… hey, I"
+  },
+  {
+    "type": "content",
+    "content": "'m working on this feature, the scheduled update, like"
+  },
+  {
+    "type": "content",
+    "content": ", Claude, what did the customer ask for, and"
+  },
+  {
+    "type": "content",
+    "content": " Claude goes to Effie, ask Effie, what…\"*\n\n---\n\n## 9. Session history added to the"
+  },
+  {
+    "type": "content",
+    "content": " product roadmap\n\n**Fathom meeting summary email | Feature prioritization | Apr 23, 2026**\n\n>"
+  },
+  {
+    "type": "content",
+    "content": " *\"Session History — Problem: User chats are lost on page refresh or deployment, preventing continuation. — Solution: Implement session history, allowing users to resume past conversations."
+  },
+  {
+    "type": "content",
+    "content": " — Technical Path: The CLI already supports this via Profiles"
+  },
+  {
+    "type": "content",
+    "content": " and Session IDs. The UI's Share Chat"
+  },
+  {
+    "type": "content",
+    "content": " feature also renders full conversations from a JSON"
+  },
+  {
+    "type": "content",
+    "content": " log. — Action: Unify rendering logic to use the JSON log as the single source of truth for"
+  },
+  {
+    "type": "content",
+    "content": " both features.\"*\n\n---\n\n## 10. Customer frustration — Chandra vents about"
+  },
+  {
+    "type": "content",
+    "content": " token waste\n\n**Meeting transcript: Chandra and Guy | Apr 17, 2026**\n\n> **[00:02:26–"
+  },
+  {
+    "type": "content",
+    "content": "00:02:40] Chandra CR:** *\"You know what, I literally was so p"
+  },
+  {
+    "type": "content",
+    "content": "issed off on this and I literally typed in this morning, dude, you are just worried about your job security because you screwed up so badly and now you blow up"
+  },
+  {
+    "type": "content",
+    "content": " my entire morning's day of tokens trying to debug it, right?\"*\n\n---\n\n### Summary of threads and dates"
+  },
+  {
+    "type": "content",
+    "content": "\n\n| Quote / moment | Source | Date |\n|---|---|---|\n| \"Lack of persistent understanding is glaringly missing\" ("
+  },
+  {
+    "type": "content",
+    "content": "Chris Baum) | Email: \"Keep an eye on?\" | Jan 7–8, 2026 |\n| \"Effi is the"
+  },
+  {
+    "type": "content",
+    "content": " memory for everyone in the org\" (Chris Baum) | Email: \"This is cool: Feedback mechanism\" | Jan 7, 2026 |\n| Effi herself acknowled"
+  },
+  {
+    "type": "content",
+    "content": "ges no cross-session visibility | Email: \"This is cool: Feedback mechanism\" | Dec 13, 2025 |\n| \"Cross-session memory,"
+  },
+  {
+    "type": "content",
+    "content": " which we should fix\" (Guy) | Meeting: Joshua & Guy | Jan 21, 2026 |\n|"
+  },
+  {
+    "type": "content",
+    "content": " Stateless agent = root cause of latency | Fathom meeting summary (internal"
+  },
+  {
+    "type": "content",
+    "content": ") | Multiple (March–April 2026) |\n| \"Keep context in working memory\" — manual wor"
+  },
+  {
+    "type": "content",
+    "content": "karound | Email: \"Quick helpful fix\" | Feb 3, 2026 |\n| Context compression breaks mid-session tasks | Email"
+  },
+  {
+    "type": "content",
+    "content": ": \"Testing Effi with a large project\" | Apr 12, 2026 |\n| \"Claude to sit on top of our software\" | Meeting: Omer & Guy | Mar 2, 2"
+  },
+  {
+    "type": "content",
+    "content": "026 |\n| Claude as the interface / \"my interface is Claude\" | Meeting: Chandra & Guy | Apr 17, 2026 |\n| Session"
+  },
+  {
+    "type": "content",
+    "content": " history added to roadmap | Fathom summary: Feature prioritization | Apr 23, 2026 |\n\nWant"
+  },
+  {
+    "type": "content",
+    "content": " me to drill into any specific thread or source?"
+  },
+  {
+    "type": "result",
+    "session_id": "e60956a5-eda3-42bd-982d-5c5332e53420",
+    "usage": {
+      "input_tokens": 8,
+      "output_tokens": 5537,
+      "cache_read_input_tokens": 96505,
+      "cache_creation_input_tokens": 88316
+    },
+    "cost_usd": 0.44369749999999997,
+    "duration_ms": 116653,
+    "num_turns": 11,
+    "auth_mode": "api_key"
+  },
+  {
+    "type": "done"
+  }
+]

@@ -1,0 +1,132 @@
+[AskEffi App (really) · fd5b4ef8 · turn 1 · 0/2 toggles]
+[10:22:19]
+## All hits on "second brain / team memory / capture ideas on the go"
+
+---
+
+### HIT 1 — Literal "second brain" — Email
+
+**Source:** Email thread "Re: A few contacts"
+**Date:** Feb 3, 2026
+**Author:** Guy Levit → Chris Baum
+
+> "Will be interesting to add you if you are up for it - I would appreciate a **second brain** digesting the feedback with me (+you asked to get more client exposure)"
+
+---
+
+### HIT 2 — Richest discussion — Internal email thread (THE most relevant)
+
+**Source:** Email thread "Re: Effi made its first feature request :-)"
+**Date:** Apr 16–17, 2026
+**Authors:** Guy Levit, oria Meses, Lihu Berman (CC: Nitsan Avni, Chris Baum)
+
+**Guy (Apr 16):**
+> "She also suggested updating her record, which she currently cannot do. But it suggests that she expects the user to find it valuable - **imagine that I can tell her what happened** (less relevant for Fathom, more relevant for **corridor conversations, phone calls and whatsapp**)"
+
+**Oria (Apr 16):**
+> "It makes me think of Effi as an **'informal, non mandatory channel to catch 'off the record' decisions/actions/changes'**"
+>
+> "Meaning: We will *not* tell the user to 'feed Effi' with such inputs / Create any dedicated UX / Think of that channel as *covering* all the 'off the record'. But we *will* make Effi *aware* of the possibility of the user telling her things she should remember (and give her an easy way to stream it into the project's data)"
+>
+> "Second - **we had some debate in the dev team, about us missing a place/platform to record all the 'softer' parts of the work process - independent decisions, insights, lessons learned, watchouts, things we want 'the project to remember' but don't deserve spec or a meeting**. I imagined telling Effi **'remember it for me'**, Nitsan argued (rightly) that this is not Effi's official use case/story. But in light of what you sent I do think it worth a discussion if we want Effi to be 'part of that loop', and how strongly/officially do we bind it to the main course UX"
+
+**Lihu (Apr 17), responding to both:**
+> "I completely agree with the points you both wrote - concerning ways in which Effi gets to know about things that DID NOT appear in her data sources. @Chris Baum, I'd be happy to hear your thoughts on the matter. How do you think it should work, UX-wise?"
+
+---
+
+### HIT 3 — "Direct Input / Note / Decision" feature discussion — Email (Fathom summary)
+
+**Source:** Email — Fathom meeting summary (internal team meeting, "Recap of your meeting with AskEffi")
+**Date:** Apr 23, 2026
+
+> "**Need:** Users require a way to write *to* Effi to log decisions, save chats, and provide direct inputs, making it a more active project manager."
+>
+> "**Proposed Features:**
+> - **Save Chat:** An opt-in button to save a chat as project data, with visibility controls (internal/external).
+> - **Direct Input:** A new data type (e.g., 'Note,' 'Decision') for logging information directly.
+> - **Long-term Vision:** A chat-first UX for all actions, with the current UI becoming a 'power user' alternative."
+
+---
+
+### HIT 4 — "Genetic memory of a team" — Meeting transcript
+
+**Source:** Meeting Transcript: MoVi Check-in: Pablo <> Guy
+**Date:** Dec 5, 2025
+**Speaker:** Collective Team (Pablo)
+
+> "our mission was to build, like, an **intuitive knowledge management solution** that was, like, knowledge graph-based, where... You could semantically search across sort of the building like a **genetic memory of a team or an institution** and be able to like query across that."
+>
+> "we want to build **the first social knowledge exchange platform**. And so essentially, like the same way Meta has algorithms suggesting people for you to connect with based on the content that they create... I'm building out a knowledge graph and I have a sort of heat map in this area... And it would be able to sort of identify people who are building in similar adjacent or complementary spaces."
+
+---
+
+### HIT 5 — "Notebook LM on steroids, but shared" — Meeting transcript
+
+**Source:** Meeting Transcript: Jonathan - Guy
+**Date:** Mar 5, 2026
+**Speaker:** Jonathan Wu
+
+> "I can see, kind of, like, it's like **Notebook LM on steroids, right, but shared**. I think of... I don't know... The first thing that I'm just trying to... I'm just thinking of, like, product parallels for us to think about, right? So, Notebook LM is one."
+
+**Guy's reply:**
+> "It's like notebook LLM that **you can share across a group, including people outside your company**."
+
+---
+
+### HIT 6 — Adding to the knowledge graph via conversation — Meeting transcript
+
+**Source:** Meeting Transcript: Impromptu Google Meet Meeting
+**Date:** Feb 9, 2026
+**Speaker:** Chris Baum
+
+> "I'm actually doing work in the project by talking to Effie that needs to actually be **part of that knowledge graph**. It's not creepy at all. It's just adding to the progress."
+
+**Guy's reply:**
+> "Maybe then it should be opt-in. It shouldn't be, she's doing it by default. It's like, oh, these are good points. Do you mind if I share them? And then maybe you can just tell them at which level. It's like, hey, with my company or with everybody."
+
+---
+
+### HIT 7 — Shared, referenceable mental model — Email
+
+**Source:** Email thread "Re: Keep an eye on?"
+**Date:** Jan 7, 2026
+**Author:** Chris Baum → Guy Levit
+
+> "I'm SO GLAD that this is a thing. The lack of persistent understanding is just glaringly missing from AI systems... Can you imagine what it looks like when there is an actual **shared, referenceable mental model for both people and machines**???"
+>
+> "the provocation was to let the agents create the context graph 'of record'. They aren't 'choosing' that mental model or making different ones for the same context, they are **emergently building the context graph for everyone**. It's not just for themselves, but for all of the AI and for the people."
+
+---
+
+### HIT 8 — Voice notes / on-the-go capture — Email
+
+**Source:** Email "Re: Pain points for Ask Effi"
+**Date:** Dec 3, 2025
+**Author:** Andrea Jones → Guy Levit
+
+> "I could see **voice notes being a huge component**. That way instead of a bunch of typing or even opening apps, people could **record a voice note and have it saved in their phones or even email it to each other** and without the recipient even having to open it, if you could read it and provide the information when needed."
+
+---
+
+### HIT 9 — "Spaced repetition for organizational memory" — Attachment
+
+**Source:** Attachment — "The New Physics of Project Intelligence" (email attachment)
+**Author:** Unknown (research/analysis document)
+
+> "After any significant decision, the system prompts key participants (in parallel): 'What was your understanding of why we made this decision? What tradeoffs did we accept?' Synthesizes into a **'decision record' that captures multiple perspectives on the rationale** — not a sanitized single narrative... It's **spaced repetition for organizational memory**."
+
+---
+
+### HIT 10 — Carrying context / "distributed cognition" — Attachment
+
+**Source:** Attachment — "Research & Questions for Conversation with Dave Snowden"
+
+> "SenseMaker®... was explicitly designed to **capture organizational patterns without requiring centralized interpretation** — a direct parallel to askeffi.ai's goal of **'carrying context so stakeholders don't have to.'**"
+>
+> "Snowden draws on distributed cognition theory to argue that most organizational failures occur 'not because individuals don't know things, but because the system fails to **maintain shared context across roles**.'"
+
+---
+
+**Bottom line:** The most developed internal discussion of this concept lives in the Apr 16–17 "Effi made its first feature request" email thread — Oria's "remember it for me" / "off the record decisions" framing, Nitsan's pushback that it's outside scope, and Lihu's open question about UX. That's where the team debate is most explicit and unresolved. Want me to pull the full thread?
+[10:23:11] (49s)

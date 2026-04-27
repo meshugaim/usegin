@@ -1,0 +1,144 @@
+[AskEffi App (really) · fd5b4ef8 · turn 1 · 0/2 toggles]
+[10:22:18]
+## 1. "The lack of persistent understanding is glaringly missing"
+
+**Chris Baum → Guy + team | Email thread "Keep an eye on?" | Jan 7–8, 2026**
+
+> *"I'm SO GLAD that this is a thing. The lack of persistent understanding is just glaringly missing from AI systems. I don't get why they are so obsessed in the video with the agents using the context graph, tho. It'll be just as important (maybe more?) for humans. It's a feature we've been missing since, well, forever. Can you imagine what it looks like when there is an actual shared, referenceable mental model for both people and machines???"*
+
+Guy's reply (Jan 8):
+> *"Rather than architecting a mental model for the agent we can let the agent choose a mental model / context graph. They will make something that is richer and works better for them."*
+
+Chris's follow-up (Jan 8):
+> *"One clarification: the provocation was to let the agents create the context graph 'of record'. They aren't 'choosing' that mental model or making different ones for the same context, they are emergently building the context graph for everyone. It's not just for themselves, but for all of the AI and for the people. Having ways for humans to contribute data elements (e.g. confirm decisions, etc.) would speed up the process, but the humans should not be crafting a schema manually. That schema should be 'discovered' by the agents."*
+
+---
+
+## 2. Mind-blown moment — and the "Effi as org memory" vision
+
+**Chris Baum → Guy + team | Email thread "This is cool: Feedback mechanism" | Jan 7, 2026**
+
+> *"The memory is critical. I've had my mind blown by Claude using memory in Projects."*
+
+Chris shares his personal Claude experience:
+> *"I took a quote out of a podcast and pasted it into my project with 4 other draft chats… Claude's response: 'That comes directly from your own work and insights that I've learned from our conversations.' I was speechless. I've already been excited about AI's ability to synthesize, but when it can build on our ideas and help us maintain the connections between our thoughts, things start to get REALLY interesting."*
+
+Then directly connecting it to the product:
+> *"Now take that and add what happens when Effi is the memory for everyone in the org."*
+
+---
+
+## 3. Guy discovers Effi's cross-session blindness — Effi herself flags it
+
+**Guy Levit → team | Email thread "This is cool: Feedback mechanism" | Dec 13, 2025**
+
+*(Guy ran an experiment asking Effi to evaluate herself and alter her behavior)*
+
+> *"She then asked if I wanted her to alter her behavior. I guess self learning is built in. Mind blowing. (she did acknowledge that she can only react to my session with her and currently does not have visibility across session, but that it could be a good feature to build)"*
+
+---
+
+## 4. Cross-session memory — named directly as a bug/missing feature
+
+**Meeting transcript: Joshua Mindel and Guy Levit | Jan 21, 2026**
+
+> **[00:30:33] Guy Levit:** *"doesn't have cross-session memory, which is, again, we should fix, but imagine over time if she can start saying, like, okay, I have an idea of who you are."*
+>
+> **[00:30:41] Joshua Mindel:** *"Oh, yeah, the cross-session memory would be awesome."*
+>
+> **[00:30:43] Joshua Mindel:** *"I mean, I know all these, not this, but the public AI chatbots, they always say they don't, but... Well, Claude claims it doesn't, Gemini claims it doesn't, chatgbt actually does, which is super helpful."*
+
+---
+
+## 5. The stateless agent as a diagnosed production problem
+
+**Fathom meeting summary (multiple email copies, teams internal meeting)** — appears in emails from multiple dates, consistent across copies:
+
+> **Root Cause:** *"The production agent is stateless, rebuilding from scratch for every query. This includes re-reading all files, which is inefficient and slow."*
+>
+> **Solution:** *"Implement stateful agents that maintain context across a session."*
+
+---
+
+## 6. Guy's workaround — manually baking in "keep context in working memory"
+
+**Guy Levit → team | Email "Quick helpful fix: augmenting system prompt" | Feb 3, 2026**
+
+Guy found he got "MUCH BETTER answers" by starting every session with a manual prompt. He asked Lihu to bake it in immediately:
+
+> *"Keep the context you gained in your working memory. If the user is asking a follow up question on the same topic answer from memory — it reduces latency"*
+>
+> *"I am tempted to ask any test user to just start the session this way, suggesting we should really quickly fix it."*
+
+He also noted future personalization possibilities:
+> *"In one session I told Effi that I am a client, and she should be factual… In another I told her that I am internal and she should alert me to things that may take the project sideways. It made a difference (but requires Effi to know who is internal vs. external)"*
+
+**Lihu's reply:** *"Sure thing! We'll update tomorrow."*
+
+---
+
+## 7. Context compression hitting mid-session — Guy documents it in real time
+
+**Guy Levit → team | Email thread "Testing Effi with a large project" | Apr 12, 2026**
+
+Guy shared a live Effi session excerpt where the context limit visibly broke things. The session itself explained what happened:
+
+> *"Rather than hard-failing, the system compresses prior messages into a summary (like the one at the top of this session). That summary is lossy — exact transcript text, specific quotes, and intermediate tool results don't survive it. That's why some tasks (Andrea's summary, the customer segmentation) were 'completed' in tool calls but the actual response never landed — the context filled up before I could write it."*
+>
+> *"Session breaks between heavy tasks — starting a fresh session for each major analysis keeps the buffer clean."*
+>
+> *"The 208-meeting corpus is genuinely large. The tools are working, but the session needs to be managed like a resource."*
+
+---
+
+## 8. "Claude to sit on top of our software" — the "pull Claude into our world" vision
+
+**Meeting transcript: Omer Khalid and Guy Levit | Mar 2, 2026**
+
+> **[00:08:32] Guy Levit:** *"They're like, because for them, it's like, it's all Claude in the end of the day. Claude is writing, even like our linear, the only seat we have on linear, it's Claude is the seat owner."*
+>
+> **[00:08:45] Guy Levit:** *"Claude will, like, they need Claude, Claude, they even want Claude to sit on top of our software. So Claude can ask, okay, what did the customer want again? Like, what happened?"*
+>
+> **[00:10:41–10:52] Guy Levit:** *"But then let's have Claude, the only, the interface to it can be Claude. Claude reads into it and Claude writes, writes out of it. I can ask Claude, what are the tasks? it will tell me."*
+
+**Meeting transcript: Chandra and Guy | Apr 17, 2026**
+
+> **[00:32:12–32:27] Guy Levit:** *"The thing that I can see happening, and frankly, our team is already using it this way, is that people will not use the interface. They will connect, they will ask to connect Claude to EFI… my interface is Claude for my work. It's great that you can give me all the context from the engagement, but let me talk with you through Claude, which is fine."*
+
+**Meeting transcript: Elsante and AskEffi | Apr 24, 2026**
+
+> **[00:33:06] Guy Levit (describing engineers):** *"he doesn't even ask Effie, Nitsan asks Claude, when he's writing features, like, hey, Claude, so Claude is, our Claude, Claude is plugged into Effie through a command line interface, of course, he can, so he just asked… hey, I'm working on this feature, the scheduled update, like, Claude, what did the customer ask for, and Claude goes to Effie, ask Effie, what…"*
+
+---
+
+## 9. Session history added to the product roadmap
+
+**Fathom meeting summary email | Feature prioritization | Apr 23, 2026**
+
+> *"Session History — Problem: User chats are lost on page refresh or deployment, preventing continuation. — Solution: Implement session history, allowing users to resume past conversations. — Technical Path: The CLI already supports this via Profiles and Session IDs. The UI's Share Chat feature also renders full conversations from a JSON log. — Action: Unify rendering logic to use the JSON log as the single source of truth for both features."*
+
+---
+
+## 10. Customer frustration — Chandra vents about token waste
+
+**Meeting transcript: Chandra and Guy | Apr 17, 2026**
+
+> **[00:02:26–00:02:40] Chandra CR:** *"You know what, I literally was so pissed off on this and I literally typed in this morning, dude, you are just worried about your job security because you screwed up so badly and now you blow up my entire morning's day of tokens trying to debug it, right?"*
+
+---
+
+### Summary of threads and dates
+
+| Quote / moment | Source | Date |
+|---|---|---|
+| "Lack of persistent understanding is glaringly missing" (Chris Baum) | Email: "Keep an eye on?" | Jan 7–8, 2026 |
+| "Effi is the memory for everyone in the org" (Chris Baum) | Email: "This is cool: Feedback mechanism" | Jan 7, 2026 |
+| Effi herself acknowledges no cross-session visibility | Email: "This is cool: Feedback mechanism" | Dec 13, 2025 |
+| "Cross-session memory, which we should fix" (Guy) | Meeting: Joshua & Guy | Jan 21, 2026 |
+| Stateless agent = root cause of latency | Fathom meeting summary (internal) | Multiple (March–April 2026) |
+| "Keep context in working memory" — manual workaround | Email: "Quick helpful fix" | Feb 3, 2026 |
+| Context compression breaks mid-session tasks | Email: "Testing Effi with a large project" | Apr 12, 2026 |
+| "Claude to sit on top of our software" | Meeting: Omer & Guy | Mar 2, 2026 |
+| Claude as the interface / "my interface is Claude" | Meeting: Chandra & Guy | Apr 17, 2026 |
+| Session history added to roadmap | Fathom summary: Feature prioritization | Apr 23, 2026 |
+[10:23:18] (56s)

@@ -1,0 +1,200 @@
+    "content": " aren't 'choosing' that mental model or making different ones for the same context, they are emergently building the context graph for everyone. It's not just for themselves, but for all of the AI and for the people.\"\n\n>"
+  },
+  {
+    "type": "content",
+    "content": " \"Having ways for humans to contribute data elements (e.g. confirm decisions, etc.) would speed up the process, but the humans should not be crafting a schema manually. That schema should be 'discovered' by the agents.\"\n\n**"
+  },
+  {
+    "type": "content",
+    "content": "Message 6 — Chris Baum (Jan 8, PS follow-up):**\n> \"PS. Even originally, I wasn't advocating for us to have a mental model set for the projects"
+  },
+  {
+    "type": "content",
+    "content": ". I wanted that mental model to emerge from the uploaded content and interactions with Effi. Hope that was clear.\"\n\n---\n\n## Hit 4 — Fathom Recap Emails:"
+  },
+  {
+    "type": "content",
+    "content": " Weekly Team Meeting — \"Mental Model\" for Knowledge\n**Source:** Emails"
+  },
+  {
+    "type": "content",
+    "content": " `11a36f84`, `40581fd4`, `38211683`, `65a26c84` (Fathom → team members) and `cd1d8bb9"
+  },
+  {
+    "type": "content",
+    "content": "` (Fathom → Guy, Lihu's recap) | **Date:** Jan 29"
+  },
+  {
+    "type": "content",
+    "content": ", 2026 | **Meeting duration:** 54 min\n\n> **Meeting Purpose:** \"Review product progress and align on the long-term knowledge"
+  },
+  {
+    "type": "content",
+    "content": " model.\"\n\n> **Key Takeaway:** \"'Mental Model' Strategy: The team will build a 'Zettelkasten'-style"
+  },
+  {
+    "type": "content",
+    "content": " knowledge graph. This will move beyond simple RAG by pre-processing data and tracking how ideas evolve over time, enabling queries like 'How did our policy on X change?'\"\n\n> **\"'Mental Model' for"
+  },
+  {
+    "type": "content",
+    "content": " Knowledge — Problem:** The current RAG-only approach is slow, expensive, and non-deterministic, providing inconsistent answers.\"\n\n> **\"Solution"
+  },
+  {
+    "type": "content",
+    "content": ": 'Zettelkasten' Context Graph — Concept:** An emergent knowledge graph that connects ideas based on their content, not a pre-defined structure.\"\n\n> **\"Process:**"
+  },
+  {
+    "type": "content",
+    "content": " 1. Ingest data (e.g., email, transcript). 2. Extract its essence (summarize, tag). 3. Map it to the existing graph, connecting to related nodes.\"\n\n> **\"Key Feature:"
+  },
+  {
+    "type": "content",
+    "content": " Time-Awareness:** The graph tracks how ideas and policies evolve over time. Example Query: 'How did our policy on X change from Q3 to Q4?' Value: Enables proactive guidance by detecting shifts in team sentiment (e.g"
+  },
+  {
+    "type": "content",
+    "content": "., from 80/20 confidence in option A to 51/49 against it) before a hard pivot is necessary.\"\n\n**Lihu's version of"
+  },
+  {
+    "type": "content",
+    "content": " the same meeting (`cd1d8bb9`), at timestamp 23"
+  },
+  {
+    "type": "content",
+    "content": ":55:**\n> \"The team had an in-depth discussion about the importance of developing a robust mental model for Effie, the AI assistant. They explored ideas around automatically extracting insights and context"
+  },
+  {
+    "type": "content",
+    "content": " from data, building a knowledge graph to connect disparate information, and tracking the evolution of the team's thinking over time. The group agreed that this is a complex challenge that will require an iterative, experimental approach.\"\n\n---\n\n## Hit 5 — Email"
+  },
+  {
+    "type": "content",
+    "content": " Thread: \"Small change to drop latency to 12 seconds.\" (5 messages)\n**Source:** Thread `CAH"
+  },
+  {
+    "type": "content",
+    "content": "3vFdA...` | **Participants:** Guy,"
+  },
+  {
+    "type": "content",
+    "content": " Nitsan, Oria, Lihu, Chris Baum | **Dates:** Mar 23–24, 2026\n\n**Message 2 — Nitsan"
+  },
+  {
+    "type": "content",
+    "content": " Avni (Mar 24):**\n> \"A tool that can create a view of a project's raw data (**and later including Effi's mental model of"
+  },
+  {
+    "type": "content",
+    "content": " the project**) with a token budget; if ALL data fits in the budget, just"
+  },
+  {
+    "type": "content",
+    "content": " dump it all in, if budget is tight in relation to size"
+  },
+  {
+    "type": "content",
+    "content": " of data start compressing — only file names"
+  },
+  {
+    "type": "content",
+    "content": ", section names, the start of files/sections etc. This tool"
+  },
+  {
+    "type": "content",
+    "content": " can then be used by the system or by Effi herself.\""
+  },
+  {
+    "type": "content",
+    "content": "\n\n**Message 4 — Chris Baum (Mar 24):**\n> \"This all sounds great, and also it seems to be an opportunity to **start to create the context graph a little bit**"
+  },
+  {
+    "type": "content",
+    "content": ". Why not run an occasional agent (daily if someone has looked at the project in the last 24 hours) that creates a markdown summary of the project? I've done this"
+  },
+  {
+    "type": "content",
+    "content": " a ton with Claude as I was starting"
+  },
+  {
+    "type": "content",
+    "content": " to reflect on my career. I have four or"
+  },
+  {
+    "type": "content",
+    "content": " five really awesome markdown documents that are analyses of what I've been doing. I did"
+  },
+  {
+    "type": "content",
+    "content": " the same thing for my job search with a"
+  },
+  {
+    "type": "content",
+    "content": " company that I've been talking to. And it worked out"
+  },
+  {
+    "type": "content",
+    "content": " friggin awesome. Happy to show you what I did on"
+  },
+  {
+    "type": "content",
+    "content": " Thursday morning.\"\n\n**Message 5 — Guy Levit (Mar 24):**\n> \"I think we are getting there incrementally. It came up in the context of Fathom —"
+  },
+  {
+    "type": "content",
+    "content": " where we want to build two rules: 1. Include meetings with the following people... 2. Include meetings about a specific subject... For #2 we can ask the user to fill something in, but they will likely not know how to answer an open"
+  },
+  {
+    "type": "content",
+    "content": "-ended question (e.g., 'Urban Insight'?). A better experience would be if **"
+  },
+  {
+    "type": "content",
+    "content": "Effi had her own two-line project summary that she could submit as a recommendation. This will be the first time a graph is *needed* for a feature to work well. Lihu is on it.**\"\n\n---"
+  },
+  {
+    "type": "content",
+    "content": "\n\n## Coverage gaps\n\n- **Linear:** No connection — Linear tasks"
+  },
+  {
+    "type": "content",
+    "content": " are not accessible for this project.\n- **Drive files:** Two Drive files exist (`"
+  },
+  {
+    "type": "content",
+    "content": "Data Model` and `Effi for multiple parties`,"
+  },
+  {
+    "type": "content",
+    "content": " both Apr 12, 2026) — semantic search returned no hits for"
+  },
+  {
+    "type": "content",
+    "content": " these terms against those files. They may warrant a direct read"
+  },
+  {
+    "type": "content",
+    "content": " if you want to verify.\n- **\"Atomic notes,\" \"threaded notes,\" \"associ"
+  },
+  {
+    "type": "content",
+    "content": "ative notes,\" \"note-linking\":** Zero hits across all sources. These exact terms do not appear anywhere in the project data."
+  },
+  {
+    "type": "result",
+    "session_id": "c2c5f779-cef7-4257-a9a3-290918831447",
+    "usage": {
+      "input_tokens": 9,
+      "output_tokens": 6664,
+      "cache_read_input_tokens": 219495,
+      "cache_creation_input_tokens": 145509
+    },
+    "cost_usd": 0.7119872500000001,
+    "duration_ms": 143593,
+    "num_turns": 21,
+    "auth_mode": "api_key"
+  },
+  {
+    "type": "done"
+  }
+]

@@ -1,0 +1,107 @@
+[AskEffi App (really) · fd5b4ef8 · turn 1 · 0/2 toggles]
+[10:22:20]
+## Capture / Capturing
+
+**Meeting Transcript: Elaine – Guy (AskEffi), Apr 16, 2026**
+> *Elaine Edmiston:* "It's not like structured to **capture** all of this information on top of an email, you know, sitting on an email, tracking all of this communications, right?"
+>
+> *Guy Levit:* "And is it fair to assume that between documents and emails, a lot of the information is **captured**? I don't know if you're using note takers, but I assume at least somebody sends notes after the fact."
+
+**Meeting Transcript: Maggie – Guy (Intro from Dan), Feb 25, 2026**
+> *Guy Levit:* "But the process of taking meeting notes into a JIRA ticket or your tracker, you lose fidelity of information. So, again, you don't **capture** the whole thing."
+
+**Meeting Transcript: Guy – Stephen, Dec 3, 2025**
+> *Guy Levit:* "It's all the stuff that doesn't make it to the end. Somebody filled a Jira ticket. They don't say everything that happened in a meeting that resulted in creating the Jira ticket."
+
+**Email attachment (investor/design doc, undated in chunk)**
+> "After any significant decision, the system prompts key participants (in parallel): 'What was your understanding of why we made this decision? What tradeoffs did we accept?' Synthesizes into a 'decision record' that **captures** multiple perspectives on the rationale — not a sanitized single narrative."
+>
+> "It **captures** human sense-making at the moment of decision — preserving the reasoning rather than just the outcome."
+
+**Fathom meeting summary email (re: Cognitive Edge meeting)**
+> "**Method:** **Captures** tacit knowledge and weak signals using non-attributable, high-abstraction semiotics (e.g., symbols, shapes) instead of text."
+>
+> "**Synergy:** Combine AskEffi's explicit document analysis with Cognitive Edge's **tacit knowledge capture**."
+
+---
+
+## Voice Notes / Voice Input
+
+**Email: Andrea Jones → Guy Levit, Dec 3, 2025** *(external customer suggestion)*
+> "I could see **voice notes** being a huge component. That way instead of a bunch of typing or even opening apps, people could record a **voice note** and have it saved in their phones or even email it to each other and without the recipient even having to open it, if you could read it and provide the information when needed."
+
+> *Guy's reply:* "I was not sure if conversations on site are even recorded. I guess I have more to learn. And yes — **recordings** can help."
+
+**Email: Chris Baum → team, ~Jan 7, 2026**
+> "Have y'all tried **Whispr Flow**? I really like how it VERY fluidly takes your **voice input**. I made the bold statements in it; took about 5 seconds, with 15 seconds to review and edit. This sentence took about 70 seconds to write and edit. Just a thought..."
+>
+> *(Context: Chris was pushing for encouraging users to talk to Effi and add documents to increase AI efficacy.)*
+
+---
+
+## Note-Taking / Note Takers
+
+**Email: Guy → Ricky Green (Epsilon), Mar 18, 2026**
+> "Coming out within a few days: Fathom. First of many **note takers**. If you tell us which **note takers** you use we can prioritize it next (easy replication)"
+
+**Meeting Transcript: Elaine – Guy, Apr 16, 2026**
+> *Guy Levit:* "And currently from **note-taking** we're using Fathom, but Microsoft Teams **note-taker** is on our list."
+
+**Email: Chris Baum → team, Apr 8, 2026**
+> "One quick question re **note taking** (Fathom, etc): Are you synching just the transcript, or more than that?"
+
+**Fathom Demo transcript (Richard White, Sep 16, 2021)** *(referenced as product research)*
+> *Richard White:* "I think when I'm collecting accents on call, I might write a one word note just so if I need to refer back to within the call, but our best path just don't write any notes... Just focus on the conversation."
+
+**Feature prioritization meeting, Apr 23, 2026** (Fathom summary email, entity 7aa1c1a1)
+> **"New feature: Effi as a writing agent:** Users need to write to Effi (e.g., to **log decisions, save chats**) to make it a true project manager."
+>
+> **"Direct Input:** A new data type (e.g., **'Note,' 'Decision'**) for logging information directly."
+>
+> **"Save Chat:** An opt-in button to save a chat as project data, with visibility controls (internal/external)."
+>
+> *Action item assigned to Oria:* "**Design Notes/Decisions/Action Items data type; implement CLI; add UI**"
+>
+> *Action item assigned to Nitsan:* "Develop a **'save chat'** feature, starting with an opt-in model."
+
+**Feature prioritization meeting transcript, Apr 23, 2026** *(Hebrew exchange, transcript entity c6bbd156)*
+> *Guy Levit:* "Sometimes [Effi] asks, I give some feedback, and says, 'Oh, do you want me to **take a note** for it for last time?'"
+>
+> *oria Meses:* "Sure, can you **take a note**?"
+>
+> *Guy Levit:* "Actually I can't, **take a note** for it for last time."
+>
+> *oria Meses:* "Yeah, so that's actually a very natural expectation... it's not exactly Effi's job, to write things down, to be that recorder — what decisions we received."
+
+---
+
+## Inbox (as a capture concept)
+
+**Email: Guy → team (Email Integration progress), Feb 2, 2026**
+> "Starting point: email per project. Easy to build, no rules... a bit annoying... Some **sandbox** that lets the user see which emails are covered by each rule."
+>
+> "Security Requirement: The email **inbox** must be empty after processing. Files must be moved to a secure location, ensuring no data remains in the **inbox** if it were to be compromised."
+
+---
+
+## "Write to Effi" / Low-Friction Direct Input
+
+**Feature prioritization meeting summary, Apr 23, 2026** *(most authoritative — from the team itself):*
+> "**Need:** Users require a way to **write to Effi** to log decisions, save chats, and provide direct inputs, making it a more active project manager."
+>
+> "**Long-term Vision:** A chat-first UX for all actions, with the current UI becoming a 'power user' alternative."
+
+**Email: Chris Baum → team, ~Jan 7, 2026**
+> "Right now, the Effi chat box is really small. But I think we want to really **encourage people to talk to Effi, to add documents**. Like, really amp that aspect of it up because that will increase the amount of content we have, which increases the efficacy of the AI."
+
+---
+
+## No hits found for:
+- **"whiteboard"** — zero results across all content types
+- **"scratchpad"** — zero results
+- **"voice memos"** (exact term) — zero results (voice notes appeared, but not this phrasing)
+
+---
+
+**Summary of signal density:** The richest cluster by far is the **Feature Prioritization meeting (Apr 23, 2026)** — that's where "write to Effi," "Note/Decision" as a data type, and "save chat" all surface together as explicit, decided-on feature requirements. The **voice notes** idea came from an external customer (Andrea Jones, Dec 2025) and was acknowledged but not acted on. Chris Baum's **Whispr Flow** mention is the only internal voice-input prompt, and it was a parenthetical aside, not a formal proposal. Want me to dig deeper into any of these threads?
+[10:23:04] (40s)

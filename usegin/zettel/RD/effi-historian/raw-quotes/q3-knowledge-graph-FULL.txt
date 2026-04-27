@@ -1,0 +1,98 @@
+[AskEffi App (really) · fd5b4ef8 · turn 1 · 0/2 toggles]
+[10:22:19]
+Here is every meaningful hit across all sources, in chronological order. No hits found for "atomic notes," "threaded notes," "associative notes," or "note-linking" as distinct terms — those exact phrasings do not appear. What does appear is a rich, ongoing conversation about knowledge graphs and context graphs. Linear has no connection. Here is everything:
+
+---
+
+## Hit 1 — Meeting Transcript: MoVi Check-in (Pablo / Guy / Collective Team)
+**Source:** Meeting transcript `fad4633c` | **Date:** Dec 5, 2025
+
+> **[00:06:45] Collective Team:** "But we were more sort of knowledge graph obsessed. So, our mission was to build, like, an intuitive knowledge management solution that was, like, knowledge graph-based, where... You could semantically search across sort of the building like a genetic memory of a team or an institution and be able to like query across that."
+
+> **[00:07:37] Collective Team:** "So we sort of built this like knowledge graph software that you where users can build out topic specific context windows, essentially using embeddings. And like it automatically builds out the edges between those nodes that you upload."
+
+> **[00:33:00] Collective Team:** "And just my general obsession with knowledge graphs, like I initially set out to build this for MoVi."
+
+> **[00:27:15–00:28:25] Guy Levit:** "I started the opposite way from you. You thought knowledge graph. I said, I don't care. I'm licensing. There's a bunch of knowledge graphs. It's not exactly knowledge graph because they have documents in it. It's not organized. We will do some preprocessing for performance standpoint. But yeah, at least initially we were not concerned about Fathom doesn't necessarily have a mental model of, okay, this is the project."
+
+---
+
+## Hit 2 — Fathom Recap Email: Meeting with MoVi Partners
+**Source:** Email `d83674ec` (Fathom → Guy) | **Date:** Dec 5, 2025
+
+> **Meeting Purpose:** "To align on knowledge management strategies and explore potential collaboration."
+
+> **Key Takeaways:** "Maverick's Challenge: A powerful knowledge graph MVP lacks a defined problem, causing VCs to question its business model and traction."
+
+> **"Contrasting Approaches:** AskEffi is problem-first, licensing existing tools (Jira, Asana) for task management. Maverick is solution-first, building a proprietary knowledge graph."
+
+> **"Maverick's Challenge: A Solution Seeking a Problem:** Maverick, a knowledge graph MVP, was built without a defined problem, leading to a lack of user traction. VC Feedback: The tech is strong, but the business model is unclear. Inspiration: A nonprofit's knowledge graph mapping cultural evolution. Google's internal org chart tool, 'Atlas.' Palantir's data ontologies."
+
+---
+
+## Hit 3 — Email Thread: "Keep an eye on?" (6 messages)
+**Source:** Thread `CADgsaBJ...` | **Participants:** Chris Baum → Guy Levit, Nitsan Avni, Lihu Berman, Courtney McKlveen, Oria Meses | **Dates:** Jan 7–8, 2026
+
+**Message 1 — Chris Baum (Jan 7):** Sends a Substack article ("the missing layer isn't data, it's judgment"). No knowledge graph language yet.
+
+**Message 2 — Guy Levit (Jan 7):**
+> "Adding the crew, so we develop thought leadership together. This relates to the video Nitsan shared: [youtube link]. There's something there. Practical point: Should keep the balance between what our customers would buy ('accelerate revenue, reduce risk') vs. what we allow them to build over time ('smarter organization'). The latter is likely more powerful and will command a higher price point, later. But it is not a budget line they can buy against now."
+
+**Message 3 — Chris Baum (Jan 8):**
+> "re video: I'm SO GLAD that this is a thing. The lack of persistent understanding is just glaringly missing from AI systems. I don't get why they are so obsessed in the video with the agents using the context graph, tho. It'll be just as important (maybe more?) for humans. It's a feature we've been missing since, well, forever. Can you imagine what it looks like when there is an actual shared, referenceable mental model for both people and machines???"
+
+> "re Practical point: I hear you and agree. We'll get the 'right' to build the context graph for the org by being useful in the project. I think that sets us apart from the article, as they seem to be using a 'boil the ocean' approach."
+
+**Message 4 — Guy Levit (Jan 8):**
+> "Rather than architecting a mental model for the agent we can let the agent choose a mental model / context graph. They will make something that is richer and works better for them. My instincts were leading in that direction so reassuring to hear that others think the same."
+
+**Message 5 — Chris Baum (Jan 8):**
+> "One clarification: the provocation was to let the agents create the context graph 'of record'. They aren't 'choosing' that mental model or making different ones for the same context, they are emergently building the context graph for everyone. It's not just for themselves, but for all of the AI and for the people."
+
+> "Having ways for humans to contribute data elements (e.g. confirm decisions, etc.) would speed up the process, but the humans should not be crafting a schema manually. That schema should be 'discovered' by the agents."
+
+**Message 6 — Chris Baum (Jan 8, PS follow-up):**
+> "PS. Even originally, I wasn't advocating for us to have a mental model set for the projects. I wanted that mental model to emerge from the uploaded content and interactions with Effi. Hope that was clear."
+
+---
+
+## Hit 4 — Fathom Recap Emails: Weekly Team Meeting — "Mental Model" for Knowledge
+**Source:** Emails `11a36f84`, `40581fd4`, `38211683`, `65a26c84` (Fathom → team members) and `cd1d8bb9` (Fathom → Guy, Lihu's recap) | **Date:** Jan 29, 2026 | **Meeting duration:** 54 min
+
+> **Meeting Purpose:** "Review product progress and align on the long-term knowledge model."
+
+> **Key Takeaway:** "'Mental Model' Strategy: The team will build a 'Zettelkasten'-style knowledge graph. This will move beyond simple RAG by pre-processing data and tracking how ideas evolve over time, enabling queries like 'How did our policy on X change?'"
+
+> **"'Mental Model' for Knowledge — Problem:** The current RAG-only approach is slow, expensive, and non-deterministic, providing inconsistent answers."
+
+> **"Solution: 'Zettelkasten' Context Graph — Concept:** An emergent knowledge graph that connects ideas based on their content, not a pre-defined structure."
+
+> **"Process:** 1. Ingest data (e.g., email, transcript). 2. Extract its essence (summarize, tag). 3. Map it to the existing graph, connecting to related nodes."
+
+> **"Key Feature: Time-Awareness:** The graph tracks how ideas and policies evolve over time. Example Query: 'How did our policy on X change from Q3 to Q4?' Value: Enables proactive guidance by detecting shifts in team sentiment (e.g., from 80/20 confidence in option A to 51/49 against it) before a hard pivot is necessary."
+
+**Lihu's version of the same meeting (`cd1d8bb9`), at timestamp 23:55:**
+> "The team had an in-depth discussion about the importance of developing a robust mental model for Effie, the AI assistant. They explored ideas around automatically extracting insights and context from data, building a knowledge graph to connect disparate information, and tracking the evolution of the team's thinking over time. The group agreed that this is a complex challenge that will require an iterative, experimental approach."
+
+---
+
+## Hit 5 — Email Thread: "Small change to drop latency to 12 seconds." (5 messages)
+**Source:** Thread `CAH3vFdA...` | **Participants:** Guy, Nitsan, Oria, Lihu, Chris Baum | **Dates:** Mar 23–24, 2026
+
+**Message 2 — Nitsan Avni (Mar 24):**
+> "A tool that can create a view of a project's raw data (and later including Effi's mental model of the project) with a token budget; if ALL data fits in the budget, just dump it all in, if budget is tight in relation to size of data start compressing — only file names, section names, the start of files/sections etc. This tool can then be used by the system or by Effi herself."
+
+**Message 4 — Chris Baum (Mar 24):**
+> "This all sounds great, and also it seems to be an opportunity to start to create the context graph a little bit. Why not run an occasional agent (daily if someone has looked at the project in the last 24 hours) that creates a markdown summary of the project? I've done this a ton with Claude as I was starting to reflect on my career. I have four or five really awesome markdown documents that are analyses of what I've been doing. I did the same thing for my job search with a company that I've been talking to. And it worked out friggin awesome. Happy to show you what I did on Thursday morning."
+
+**Message 5 — Guy Levit (Mar 24):**
+> "I think we are getting there incrementally. It came up in the context of Fathom — where we want to build two rules: 1. Include meetings with the following people... 2. Include meetings about a specific subject... For #2 we can ask the user to fill something in, but they will likely not know how to answer an open-ended question (e.g., 'Urban Insight'?). A better experience would be if Effi had her own two-line project summary that she could submit as a recommendation. This will be the first time a graph is *needed* for a feature to work well. Lihu is on it."
+
+---
+
+## Coverage gaps
+
+- **Linear:** No connection — Linear tasks are not accessible for this project.
+- **Drive files:** Two Drive files exist (`Data Model` and `Effi for multiple parties`, both Apr 12, 2026) — semantic search returned no hits for these terms against those files. They may warrant a direct read if you want to verify.
+- **"Atomic notes," "threaded notes," "associative notes," "note-linking":** Zero hits across all sources. These exact terms do not appear anywhere in the project data.
+[10:23:19] (57s)

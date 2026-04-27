@@ -1,0 +1,164 @@
+---
+
+## 1. The Core Problem: "Why" Gets Lost (Decisions Without Rationale)
+
+This is the most consistently recurring thread across meetings and documents.
+
+**Guy Levit to Lorne Novolker** — *Meeting transcript, Feb 4, 2026*
+> "Many times we take a note of the decision we made, but not of the options we considered. And then you run into, oh, why did we decide this thing again? I remember that there was a debate. Or maybe, you know, the option we didn't take, we learned something new later that actually made this option more compelling. And you want to revisit it and like, let's rerun the calculus of the decision because maybe now we would actually choose differently."
+
+Lorne Novolker:
+> "Or it can validate that we still made the best decision at the time with the data that we had and not to second guess the decision either."
+
+---
+
+**Guy Levit to Maggie Copeland & Lopamudra Shah** — *Meeting transcript, Feb 25, 2026*
+> "You did. Sometimes the context, again, you mentioned like five meetings to arrive at a decision, you know, you can write a one-liner in a decision that we decided X, but the reason, you at some point somebody goes to implement it, or you learn something new, and somebody's asking like, why did we decide it again? And you remember like, oh, I remember there was a lot of discussion, I don't remember why."
+
+Lopamudra Shah:
+> "Even if like I have notes from five different meetings, it's, these tools are not evolved in a way that they can synthesize and understand that this one topic was discussed on four different meetings, and this is the decision that was taken."
+
+---
+
+**Jason T. to Guy Levit** — *Meeting transcript, Mar 9, 2026*
+> "And in particular, the leaders either don't remember what was agreed to, or they are not able to stay on top of like what the progress is."
+
+Guy:
+> "The people who are not living in the meeting, like in the project, they show up every now and then... they can be randomizing because they come in with unfresh information, know, blur the decision. And then the team is like left with, okay, but the VP said."
+
+---
+
+**Guy Levit to Andrea Jones** — *Meeting transcript, Nov 20, 2025*
+> "There's only all these insights coming in the meeting, and nobody remembers them. And I was sitting in meetings, you know, like large meetings at Meta, and I see a bunch of smart people talking, and I'm quite sure that everything they said in the meeting, they already said before, and they will need to say it again if they want it to make an impact... Nobody ever listens to the recording."
+
+---
+
+**Pain point document (attachment, entity `560e52be`):**
+> "**8. Decision Re-Litigation Loop** — The problem: Past decisions get re-opened because no one captured the 'why,' the alternatives considered, or the tradeoffs discussed. The reality: Three months later, someone questions a decision, and the team must reconstruct the rationale or worse — revisit it from scratch."
+
+> "**10. The 'Knowledge Lives in People's Heads' Problem** — The problem: Critical project context — decision rationale, assumptions, client preferences, risks — exists only in emails, documents, and people's memories. The reality: Task trackers capture 'what' but not 'why'; when consultants rotate off or PMs change, institutional knowledge evaporates."
+
+---
+
+## 2. Claude/Agent Context Loss — Effi's Own Session Breaking
+
+**Effi's self-description of context overflow, shared by Guy to team** — *Email chain "Re: Testing Effi with a large project," Apr 12, 2026*
+
+Guy forwarded Effi's own explanation of what happens when a session runs out:
+> "That summary is lossy — exact transcript text, specific quotes, and intermediate tool results don't survive it. That's why some tasks (Andrea's summary, the customer segmentation) were 'completed' in tool calls but the actual response never landed — the context filled up before I could write it."
+
+And Effi's advice to Guy:
+> "Session breaks between heavy tasks — starting a fresh session for each major analysis keeps the buffer clean... The 208-meeting corpus is genuinely large. The tools are working, but the session needs to be managed like a resource. Want me to flag when a task is likely to be context-heavy before starting it?"
+
+This is Effi running into her own context-loss problem and diagnosing it in real-time — an internal dogfooding incident Guy explicitly flagged to the team.
+
+---
+
+**From a reading the team has been doing — "AGENTIFY" book (attachment, entity `5d6af7dd`):**
+> "A user might spend hours working alongside an agent on a research task or customer problem, only to discover the agent forgot key details from earlier in the session. Worse, today's agents confidently misremember things. Noted LLM skeptic Gary Marcus deserves credit for labeling this effect a cognitive 'Groundhog Day,' where the agent re-learns the same information over and over, without any accumulation of context or expertise."
+
+---
+
+## 3. Session History — Chats Lost on Refresh/Deployment
+
+**Phil Lau (design partner) to Guy** — *Email, Mar 24, 2026*
+> "Minor feedback, and it might b/c my Chrome updated, but I lost my chat history within a specific project. I did the test last week Thursday or so, and then went back in on Sunday to send you feedback, but my Effi chat was a clean slate."
+
+---
+
+**Feature prioritization meeting (Lihu, Guy, Nitsan, Oria)** — *Apr 23, 2026*
+
+From the Fathom recap (email `7aa1c1a1`):
+> "**Feature Path: Session History — Problem:** User chats are lost on page refresh or deployment, preventing continuation. **Solution:** Implement session history, allowing users to resume past conversations."
+
+In the meeting transcript itself (in Hebrew), Guy says:
+> "I need to refresh, I'm saying, don't refresh the page, don't start a new chat... like, I have an answer I love, it stays on the screen. I can't go back to it. The moment I do a refresh, I start a new chat..."
+> *(Translated from the Hebrew transcript, entity `c6bbd156`)*
+
+Oria's response: "Yes, chat history." — and this triggered a technical discussion about using the JSON log as a single source of truth.
+
+**Action items assigned at that meeting:**
+- Oria: "Investigate the existing metadata table for session history data. Build a CLI prototype for session history."
+- Nitsan: "Develop a 'save chat' feature, starting with an opt-in model."
+
+---
+
+## 4. "Write to Effi" — Capturing Small Things on the Go
+
+**From the same Apr 23, 2026 feature prioritization meeting recap (email `7aa1c1a1`):**
+> "**Need:** Users require a way to write *to* Effi to log decisions, save chats, and provide direct inputs, making it a more active project manager.
+> **Proposed Features:**
+> - **Save Chat:** An opt-in button to save a chat as project data, with visibility controls (internal/external).
+> - **Direct Input:** A new data type (e.g., 'Note,' 'Decision') for logging information directly.
+> - **Long-term Vision:** A chat-first UX for all actions, with the current UI becoming a 'power user' alternative."
+
+And the action item assigned:
+> "Design Notes/Decisions/Action Items data type; implement CLI; add UI" — *assigned to Oria*
+
+---
+
+## 5. Tribal Knowledge and "What Wasn't Said"
+
+**Dorina Buehrle to Guy** — *Meeting transcript, Dec 3, 2025*
+> "The thing is that we faced is that the really, really valuable stuff is the implicit knowledge that is not written down, that is not in emails, that is, that's, it's basically the experience."
+
+Guy:
+> "Knowing what wasn't said, for example."
+
+---
+
+**AlignOrg design partner conversation** — *Meeting recap email, Dec 12–13, 2025*
+> "**Tribal Knowledge** — Much of what matters — stakeholder styles, tensions, preferences — is tribal knowledge. People don't always document it."
+> (Leah, AlignOrg)
+
+Ken:
+> "If it ingests note-taker output from stakeholder meetings, that knowledge often does exist — it's just fragmented."
+
+Guy:
+> "Exactly. AskEffi doesn't invent context — it surfaces what's already there, including patterns and dynamics no one would write in a formal doc."
+
+---
+
+## 6. Cross-Project Pattern Capture and "False Alignment"
+
+**"New Physics of Project Intelligence" document (entity `838b8826`, January 2026):**
+> "**The old physics:** Decisions are made in meetings. Rationale is partially captured in notes, partially lost. When stakeholders rotate, context is lost and decisions get relitigated.
+> **The new physics:** After any significant decision, the system prompts key participants (in parallel): 'What was your understanding of why we made this decision? What tradeoffs did we accept?' Synthesizes into a 'decision record' that captures multiple perspectives on the rationale — not a sanitized single narrative."
+
+On false alignment:
+> "The meeting notes say 'alignment reached.' But the system notices: two participants' typed contributions during the meeting expressed reservations they never vocalized... The system surfaces: 'The meeting concluded with stated alignment on X, but contribution patterns suggest this alignment may be shallow.'"
+
+---
+
+## 7. Guy Discovering Effi Knows Him — Weekly Status Update
+
+**Guy Levit to team (Nitsan, Oria, Lihu, Chris)** — *Weekly status update email, Apr 24, 2026*
+> "I didn't know I could ask Effi 'who am I' and she would actually know the answer. It also led me to ask, 'What do I care about, what's my working style and what are my blind spots as a CEO'."
+
+Effi's self-generated assessment included this about Guy:
+> "Your pitch has been remarkably consistent across hundreds of conversations: you believe the biggest drag on organizations is the cost of reconstructing shared context — and you experienced this personally at Google, Yahoo, and Meta (you've cited spending ~40% of your time just explaining things and having things explained to you). This isn't just a market hypothesis for you; it's autobiographical."
+
+---
+
+## 8. The MoVi/Collective Team — Knowledge Graph as Memory
+
+**Collective Team to Guy** — *Meeting transcript, Dec 5, 2025*
+> "We were more sort of knowledge graph obsessed. So, our mission was to build, like, an intuitive knowledge management solution that was knowledge graph-based, where... you could semantically search across sort of the building like a genetic memory of a team or an institution and be able to query across that... people working across multiple different projects. And having sort of to context switch a lot and orient themselves rapidly in different projects and context windows."
+
+---
+
+## Summary of Patterns
+
+| Theme | Sources | Signal Strength |
+|---|---|---|
+| "Why" behind decisions gets lost | Guy-Lorne (Feb 4), Guy-Maggie/Lopa (Feb 25), Guy-Jason (Mar 9), pain point doc | 🔴 Core/repeated |
+| Chats/session context lost | Phil Lau email (Mar 24), Feature meeting (Apr 23), Guy email (Apr 23) | 🟡 Active problem being worked |
+| "Write to Effi" / Notes data type | Feature meeting (Apr 23) — assigned to Oria | 🟡 In-sprint |
+| Agent context overflow (Effi's own) | Guy→team email (Apr 12) | 🟡 Dogfooding friction |
+| Tribal knowledge / implicit knowledge | Dorina (Dec 3), AlignOrg (Dec 12–13) | 🟠 Customer validation |
+| Cross-project pattern/false alignment | "New Physics" doc (Jan 2026) | 🟠 Strategic framing |
+| AI agent memory problems generally | AGENTIFY book excerpts | 🟠 Research context |
+
+The deepest recurring thread is the **"why behind decisions"** — Guy has articulated this in essentially the same words across 6+ separate customer and advisor conversations spanning Nov 2025–Mar 2026. The most recent *internal* friction is the **session history / chats lost on refresh** issue, which is now assigned work. The newest wrinkle is the **"write to Effi"** concept — letting users push small captures in, not just pull answers out.
+
+Want me to drill into any specific thread — e.g., who exactly raised the "write to Effi" direction, or what the exact scope Oria was assigned?

@@ -1,0 +1,200 @@
+    "content": " on X, but contribution patterns suggest this alignment may"
+  },
+  {
+    "type": "content",
+    "content": " be shallow.'\"\n\n---\n\n## 7. Guy Discovering Effi Knows"
+  },
+  {
+    "type": "content",
+    "content": " Him — Weekly Status Update\n\n**Guy Levit to team (Nitsan, Oria, Lihu,"
+  },
+  {
+    "type": "content",
+    "content": " Chris)** — *Weekly status update email, Apr 24, 2026*\n> \"I didn't know I could ask"
+  },
+  {
+    "type": "content",
+    "content": " Effi 'who am I' and she would actually know the"
+  },
+  {
+    "type": "content",
+    "content": " answer. It also led me to ask, 'What do"
+  },
+  {
+    "type": "content",
+    "content": " I care about, what's my working style and what are"
+  },
+  {
+    "type": "content",
+    "content": " my blind spots as a CEO'.\"\n\nEffi's self-generated"
+  },
+  {
+    "type": "content",
+    "content": " assessment included this about Guy:\n> \"Your pitch has"
+  },
+  {
+    "type": "content",
+    "content": " been remarkably consistent across hundreds of conversations: you believe"
+  },
+  {
+    "type": "content",
+    "content": " the biggest drag on organizations is the cost of reconstructing shared context —"
+  },
+  {
+    "type": "content",
+    "content": " and you experienced this personally at Google, Yahoo, and Meta (you"
+  },
+  {
+    "type": "content",
+    "content": "'ve cited spending ~40% of your time just explaining things"
+  },
+  {
+    "type": "content",
+    "content": " and having things explained to you). This isn't just a"
+  },
+  {
+    "type": "content",
+    "content": " market hypothesis for you; it's autobiographical.\"\n\n---\n\n## 8. The"
+  },
+  {
+    "type": "content",
+    "content": " MoVi/Collective Team —"
+  },
+  {
+    "type": "content",
+    "content": " Knowledge Graph as Memory\n\n**Collective Team to Guy** — *Meeting transcript,"
+  },
+  {
+    "type": "content",
+    "content": " Dec 5, 2025*\n> \"We were more sort of knowledge"
+  },
+  {
+    "type": "content",
+    "content": " graph obsessed. So, our mission was to build,"
+  },
+  {
+    "type": "content",
+    "content": " like, an intuitive knowledge management solution that was knowledge graph-"
+  },
+  {
+    "type": "content",
+    "content": "based, where... you could semantically search across sort of the building"
+  },
+  {
+    "type": "content",
+    "content": " like a genetic memory of a team or"
+  },
+  {
+    "type": "content",
+    "content": " an institution and be able to query across that..."
+  },
+  {
+    "type": "content",
+    "content": " people working across multiple different projects. And"
+  },
+  {
+    "type": "content",
+    "content": " having sort of to context switch a lot and"
+  },
+  {
+    "type": "content",
+    "content": " orient themselves rapidly in different projects and context windows"
+  },
+  {
+    "type": "content",
+    "content": ".\"\n\n---\n\n## Summary of Patterns\n\n| Theme | Sources | Signal Strength |\n|---|"
+  },
+  {
+    "type": "content",
+    "content": "---|---|\n| \"Why\" behind decisions gets lost | Guy-Lorne (Feb"
+  },
+  {
+    "type": "content",
+    "content": " 4), Guy-Maggie/Lopa (Feb 25), Guy-Jason (Mar 9), pain"
+  },
+  {
+    "type": "content",
+    "content": " point doc | 🔴 Core/repeated |\n| Chats/session context"
+  },
+  {
+    "type": "content",
+    "content": " lost | Phil Lau email (Mar 24), Feature meeting (Apr 23), Guy email (Apr 23) | 🟡 Active problem"
+  },
+  {
+    "type": "content",
+    "content": " being worked |\n| \"Write to Effi\" / Notes data type | Feature"
+  },
+  {
+    "type": "content",
+    "content": " meeting (Apr 23) — assigned to Oria | 🟡 In-sprint |\n| Agent context overflow"
+  },
+  {
+    "type": "content",
+    "content": " (Effi's own) | Guy→team email (Apr 12) | 🟡 Dogfooding friction"
+  },
+  {
+    "type": "content",
+    "content": " |\n| Tribal knowledge / implicit knowledge | Dorina (Dec 3), AlignOrg (Dec 12–13) | 🟠 Customer"
+  },
+  {
+    "type": "content",
+    "content": " validation |\n| Cross-project pattern/false alignment | \"New Physics\" doc (Jan 2026) | 🟠 Strategic"
+  },
+  {
+    "type": "content",
+    "content": " framing |\n| AI agent memory problems generally | AGENTIFY book excerpts | 🟠 "
+  },
+  {
+    "type": "content",
+    "content": "Research context |\n\nThe deepest recurring thread is the"
+  },
+  {
+    "type": "content",
+    "content": " **\"why behind decisions\"** — Guy has articulated this in essentially"
+  },
+  {
+    "type": "content",
+    "content": " the same words across 6+ separate customer and advisor conversations"
+  },
+  {
+    "type": "content",
+    "content": " spanning Nov 2025–Mar 2026. The most recent *internal"
+  },
+  {
+    "type": "content",
+    "content": "* friction is the **session history / chats lost on refresh** issue, which is now assigned"
+  },
+  {
+    "type": "content",
+    "content": " work. The newest wrinkle is the **\"write to Effi\"** concept — letting users push"
+  },
+  {
+    "type": "content",
+    "content": " small captures in, not just pull answers out.\n\nWant"
+  },
+  {
+    "type": "content",
+    "content": " me to drill into any specific thread — e.g., who exactly raised the \"write"
+  },
+  {
+    "type": "content",
+    "content": " to Effi\" direction, or what the exact scope Oria was assigned?"
+  },
+  {
+    "type": "result",
+    "session_id": "2f45270d-1e27-4788-9e2a-35ab23761d7f",
+    "usage": {
+      "input_tokens": 11,
+      "output_tokens": 4894,
+      "cache_read_input_tokens": 206406,
+      "cache_creation_input_tokens": 98637
+    },
+    "cost_usd": 0.5057385499999999,
+    "duration_ms": 121121,
+    "num_turns": 17,
+    "auth_mode": "api_key"
+  },
+  {
+    "type": "done"
+  }
+]

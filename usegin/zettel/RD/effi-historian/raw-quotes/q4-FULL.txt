@@ -1,0 +1,87 @@
+## Obsidian, Logseq, Roam Research
+
+**Zero mentions found.** Email body searches returned nothing. Semantic searches found no relevant excerpts. These tools do not appear anywhere in the project data.
+
+---
+
+## Andrej Karpathy
+
+**Zero mentions found.** No results across emails, meeting transcripts, attachments, or Drive files.
+
+---
+
+## Wispr Flow
+
+This is where the action is. Multiple distinct sources:
+
+---
+
+**Source 1 — Email from Wispr Flow to guy@askeffi.ai, Nov 19, 2025**
+Subject: *"You're invited to Effi's team plan 🚀"*
+
+> "Welcome to Wispr Flow! Nitsan (nitsanav@gmail.com) has invited you to their team on Flow Pro. Download Wispr Flow and use this email to get automatically added during signup... Wispr Flow is an AI voice-to-text tool that turns your speech into clear, polished writing. 4× faster than typing and in every app on your iPhone or computer."
+
+---
+
+**Source 2 — Chris Baum, email "Re: UX iterations", Jan 7, 2026**
+(To: Guy Levit, Lihu Berman, Nitsan Avni, oria Meses, Courtney McKlveen)
+
+> "(Have y'all tried Whispr Flow? I really like how it VERY fluidly takes your voice input. I made the bold statements in it; took about 5 seconds, with 15 seconds to review and edit. This sentence took about 70 seconds to write and edit. Just a thought...)"
+
+Context: Chris was advocating for encouraging users to put more content into Effi, and flagged Wispr Flow as a model for frictionless voice input.
+
+---
+
+**Source 3 — Lihu Berman, email "Re: UX iterations", Jan 10, 2026**
+(Reply to Chris Baum's Wispr Flow message above)
+
+> "Yup, Nitsan introduced me to Wispr a while ago, and now we're telling Claude what to code without even writing it.., living in the future :)"
+
+---
+
+**Source 4 — Fwd: "You're in. Ready to Flow?" (forwarded by oria@askeffi.ai), Jan 12, 2026**
+Original from Tanay (Wispr co-founder), Dec 30, 2025:
+
+> "Work at the speed *you think*. From voice to text. Instantly... We built Flow because keyboards couldn't keep up with our thoughts... a tool that turns your voice into beautifully formatted, ready-to-send text in real time."
+
+oria forwarded this onboarding email to the project inbox.
+
+---
+
+**Source 5 — Meeting Transcript: Will - Guy - Uri (Apr 16, 2026)**
+Guy Levit during a demo:
+
+> "[00:18:00] Guy Levit: So I'm going to do it with the Whisperflow, but tell me who is involved in the project, their role, and RACI, and tell me what I need to do as the executive sponsor to get this project back on track."
+
+---
+
+**Source 6 — Meeting Transcript: Guy <> Caro (Mar 10, 2026)**
+
+> "[00:24:27] Guy Levit: I'll use the Whisperflow. So just ask."
+> (Caro then asks in Spanish; Wispr doesn't work with Guy's headset so he types instead.)
+
+---
+
+**Subscription records:** Three renewal emails from Wispr Flow `<upcoming-invoice@wispr.ai>` confirm an active Flow Pro team subscription billing Jan → Feb → Mar → Apr 2026.
+
+---
+
+## Adjacent: Notion mentioned as a note-taking tool (not PKM-specific)
+
+**Source — Fathom meeting summary, Guy Levit & David (date ~Feb 2026)**:
+
+> "Notetaking tools and preferences @ 0:00 Guy and David discuss their experiences with notetaking tools like Teams and Notion. David prefers Notion as it runs invisibly in the background during meetings, while Guy has rotated through several notetakers. They acknowledge that notetaking is ubiquitous in tech these days."
+
+---
+
+## Adjacent: "Zettelkasten" concept (not a tool discussion)
+
+**Source — Fathom recap email (entity `11a36f84`, date unclear from metadata)**:
+
+> "**Solution: 'Zettelkasten' Context Graph** — An emergent knowledge graph that connects ideas based on their content, not a pre-defined structure... 1. Ingest data (e.g., email, transcript). 2. Extract its essence (summarize, tag). 3. Map it to the existing graph, connecting to related nodes."
+
+This was framed as AskEffi's own proposed architecture, not a discussion of Zettelkasten-based note-taking apps like Obsidian or Roam.
+
+---
+
+**Bottom line:** No Obsidian, Logseq, Roam, or Karpathy anywhere. Wispr Flow is the only note/thought-capture tool with real team engagement — Nitsan introduced it, the whole team is on a paid plan, Chris Baum explicitly recommended it as a UX reference, and Guy uses it live in demos as his voice input method.
