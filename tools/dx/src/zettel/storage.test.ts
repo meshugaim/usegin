@@ -108,6 +108,26 @@ describe("parseZettel", () => {
 });
 
 describe("serializeZettel", () => {
+  test("preserves the blank line between frontmatter and body (z058 regression)", () => {
+    const z = parseZettel(SAMPLE);
+    const text = serializeZettel(z);
+    // The exact textual shape we promise: ---\n\n<body>
+    expect(text).toContain("---\n\n## Human side");
+    expect(text).not.toMatch(/---\n##/);
+  });
+
+  test("round-trip is byte-stable across multiple passes", () => {
+    let text = SAMPLE;
+    for (let i = 0; i < 3; i++) {
+      const z = parseZettel(text);
+      text = serializeZettel(z);
+    }
+    const z = parseZettel(text);
+    // Body keeps its sections and its blank-line spacing.
+    expect(z.body).toContain("\n## Human side");
+    expect(z.body).toContain("\n## UseGin side");
+  });
+
   test("round-trip parse → serialize → parse is stable", () => {
     const z = parseZettel(SAMPLE);
     const text = serializeZettel(z);

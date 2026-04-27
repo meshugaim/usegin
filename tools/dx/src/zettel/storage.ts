@@ -115,9 +115,12 @@ export function serializeZettel(z: Zettel): string {
     `created: ${z.created}`,
     `session: ${z.session}`,
     "---",
-    "",
   ];
-  return fmLines.join("\n") + z.body.replace(/^\n+/, "");
+  // Always emit one blank line between frontmatter and body.
+  // (Without the explicit "\n", round-tripping a body that starts on
+  // its own line would collapse to "---\n## Heading" — bug fixed per
+  // zettel z058.)
+  return fmLines.join("\n") + "\n\n" + z.body.replace(/^\n+/, "");
 }
 
 export function listZettelFiles(dir: string = zettelsDir()): string[] {
