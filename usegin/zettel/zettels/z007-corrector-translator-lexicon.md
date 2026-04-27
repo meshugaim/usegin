@@ -14,12 +14,12 @@ session: 5d7f3c80
 
 ## Gin side
 
-To keep the language clean, three distinct artifact types in `gin/`:
+To keep the language clean, three distinct artifact types in `usegin/`:
 
 | Type | Purpose | Example | Lives in |
 |---|---|---|---|
-| **Corrector** | Word-level error → canonical form. Same semantic field. | Wispr Flow corrector | `gin/wispr-flow-corrector/` |
-| **Translator** | Term in semantic field A → meaning in semantic field B. Cross-domain. | Physics→Dev (z008) | `gin/translators/` |
-| **Lexicon** | Per-team / per-person vocabulary that needs to be *learned*, not corrected. | Future: per-dev jargon, project-specific terms | `gin/lexicons/` (open-to-empty) |
+| **Corrector** | Word-level error → canonical form. Same semantic field. | Wispr Flow corrector | `usegin/wispr-flow-corrector/` |
+| **Translator** | Term in semantic field A → meaning in semantic field B. Cross-domain. | Physics→Dev (z008) | `usegin/translators/` |
+| **Lexicon** | Per-team / per-person vocabulary that needs to be *learned*, not corrected. | Future: per-dev jargon, project-specific terms | `usegin/lexicons/` (open-to-empty) |
 
 The user used "translator" for both corrector and translator senses in dictation; I'm separating them so we don't grow them in the wrong place.

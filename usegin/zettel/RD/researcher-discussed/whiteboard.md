@@ -48,7 +48,7 @@ exact triad the current `principles/` re-discovers:
 Current README: "Each zettel is **atomic** ... distilled in light of
 its threaded neighbors." Current principle 02: "zettels are
 append-mostly." If you read ENG-1727 cold and then read
-`gin/zettel/principles/`, they sound like the same author writing
+`usegin/zettel/principles/`, they sound like the same author writing
 six months apart — because they are. The R&D effort should treat
 ENG-1727 as a load-bearing precursor, not as background.
 

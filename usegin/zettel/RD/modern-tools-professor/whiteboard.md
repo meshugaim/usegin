@@ -28,7 +28,7 @@ Five candidates that map best to *our* requirements. Ranked.
 
 ### #1 — Plain markdown in git + Claude Code skills, Karpathy-style. **(Recommended starting point.)**
 
-This is what we are *already* doing in `gin/zettel/`. The Karpathy LLM Wiki pattern (§2) is the closest ideological match to our principles, and the only configuration where every filter above is satisfiable today:
+This is what we are *already* doing in `usegin/zettel/`. The Karpathy LLM Wiki pattern (§2) is the closest ideological match to our principles, and the only configuration where every filter above is satisfiable today:
 
 - Files are plain markdown → file-over-app, lives in *our* repo, auditable in PRs, no vendor.
 - Capture is whatever-is-already-open: a CLI command, a Claude session, a `git commit`, an editor, eventually a slash command from Effi.
@@ -241,7 +241,7 @@ These are not user-facing PKMs — they're libraries you'd embed *into* a brain.
 
 Drawing #1–#5 of the shortlist together:
 
-**Substrate.** `gin/zettel/` directory of plain markdown, in this repo, in git. Schema in `gin/zettel/CLAUDE.md` (Karpathy-style constitution, but ours).
+**Substrate.** `usegin/zettel/` directory of plain markdown, in this repo, in git. Schema in `usegin/zettel/CLAUDE.md` (Karpathy-style constitution, but ours).
 
 **Skills.** Claude Code skills for the operations:
 - `/zettel-capture <text>` — emit a zettel. Auto-classifies type (`#decision`, `#frustration`, `#id`, `#good`, `#bad`, `#lesson`, `#idea`).
@@ -251,7 +251,7 @@ Drawing #1–#5 of the shortlist together:
 - `/zettel-thread <wire>` — pull a wire, return the rope (associative).
 
 **Capture pipelines.**
-- Granola Spaces → markdown into `gin/zettel/inbox/meetings/`.
+- Granola Spaces → markdown into `usegin/zettel/inbox/meetings/`.
 - Linear comments → `inbox/linear/`.
 - Sentry incidents → `inbox/sentry/`.
 - Voice via Superwhisper or VoiceInk into whatever editor is open.
@@ -262,9 +262,9 @@ Drawing #1–#5 of the shortlist together:
 
 **Trajectory layer.** Borrow Zep/Graphiti's validity-window model — every zettel has `created_at`, `superseded_by`, `superseded_at`. Never delete; the `superseded_by` field threads the trajectory.
 
-**Human IDE (optional).** Anyone who wants Obsidian over the same `gin/zettel/` directory installs Obsidian + Obsidian Git + `obsidian-claude-code-mcp`. The substrate doesn't care.
+**Human IDE (optional).** Anyone who wants Obsidian over the same `usegin/zettel/` directory installs Obsidian + Obsidian Git + `obsidian-claude-code-mcp`. The substrate doesn't care.
 
-**Effi self-management.** The day we want it: point Effi at `gin/zettel/`, give her the same skills. She uses the same MCP retrieval layer. Same brain.
+**Effi self-management.** The day we want it: point Effi at `usegin/zettel/`, give her the same skills. She uses the same MCP retrieval layer. Same brain.
 
 **What we *don't* build.** We don't pick Tana / Mem / Reflect / Notion / Heptabase / Anytype as the substrate. Their formats can't be the long-term home of our brain. We can borrow ideas (Supertags especially) into the markdown layout.
 

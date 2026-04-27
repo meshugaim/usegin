@@ -21,4 +21,4 @@ Concrete cue from this session:
 
 Reading: the underscore-brackets are a *signal* from Lihu that "this is a name for something in the system we are building; don't take the literal word as canonical." For now `_zettel_custom_` ≈ "the forthcoming zettel-creation interface" (matches the Apr 23 2026 meeting commitment to Notes/Decisions/Action-Items + CLI + UI from ENG-5387).
 
-Saved to `gin/wispr-flow-corrector/dictionary.md` as a syntax convention, not a word substitution.
+Saved to `usegin/wispr-flow-corrector/dictionary.md` as a syntax convention, not a word substitution.

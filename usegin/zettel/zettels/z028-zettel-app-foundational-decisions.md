@@ -31,6 +31,6 @@ This applies to the dev-team Zettel sub-app. The end-user Notes feature in AskEf
 Operational consequences of these two decisions, taken together:
 
 1. **Substrate is settled** — Postgres + pgvector + recursive CTEs in our existing Supabase. (R&D convergence + D2 default once D1 = build-from-scratch.) No RLS for the dev-team Zettel; one team-wide schema.
-2. **Inventory before code.** The first slice's first task is *not* writing code, it's auditing what already exists and deciding per-piece. The Consultant (`gin/consultant/`) is well-placed to do this audit — already chartered to talk to codebase, Linear, Effi, sessions.
+2. **Inventory before code.** The first slice's first task is *not* writing code, it's auditing what already exists and deciding per-piece. The Consultant (`usegin/consultant/`) is well-placed to do this audit — already chartered to talk to codebase, Linear, Effi, sessions.
 3. **The 27 manual zettels are the seed corpus.** Lift them into the substrate as the first content. They earned their place by being written before the tool existed (z015 — pre-game manual).
-4. **No code that exists today is sacred.** Anything that doesn't earn its keep in the new design gets removed in the same change. (See `gin/decisions-pending/cleanup-codebase.md` for the broader cleanup-agent z028b spawned from this decision.)
+4. **No code that exists today is sacred.** Anything that doesn't earn its keep in the new design gets removed in the same change. (See `usegin/decisions-pending/cleanup-codebase.md` for the broader cleanup-agent z028b spawned from this decision.)

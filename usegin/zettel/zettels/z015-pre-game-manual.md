@@ -16,7 +16,7 @@ Pre-game = the manual phase before the system exists. We do it by hand to make i
 
 ## Gin side
 
-The four manually-written principles in `gin/zettel/principles/` are pre-game artifacts. The 4 zettels seeded by hand in this session are pre-game artifacts. The Wispr corrector dictionary seeded with this session's actual corruptions is pre-game.
+The four manually-written principles in `usegin/zettel/principles/` are pre-game artifacts. The 4 zettels seeded by hand in this session are pre-game artifacts. The Wispr corrector dictionary seeded with this session's actual corruptions is pre-game.
 
 The discipline: **only systematize what we've actually done by hand at least once.** Don't pre-build affordances for behaviors we haven't tried. Pre-built affordances pretending to be use-grown ones are a known failure mode in PKM (Anthropologist whiteboard, P-DESTINATION pattern).
 
