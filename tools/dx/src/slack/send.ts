@@ -16,6 +16,7 @@ import {
   resolveChannel,
   type SlackResolverClient,
 } from "./channel";
+import { autoLinkEngIdsFromEnv } from "./links";
 
 /**
  * Structural subset of `WebClient` we depend on. Lets tests pass a hand-rolled
@@ -57,6 +58,12 @@ export interface SendResult {
 
 export interface SendOptions {
   threadTs?: string;
+  /**
+   * Cross-surface link enrichment (ENG-id → Slack mrkdwn link, etc.).
+   * Default `true` — set to `false` for tests that want to assert raw text
+   * round-trips without transformation.
+   */
+  enrichLinks?: boolean;
 }
 
 /**
@@ -85,13 +92,18 @@ export async function sendMessage(
     };
   }
 
+  // Cross-surface enrichment: ENG-ids → Slack mrkdwn links (D4). Idempotent;
+  // off by `enrichLinks=false` for tests asserting raw round-trips.
+  const enriched =
+    opts.enrichLinks === false ? text : autoLinkEngIdsFromEnv(text);
+
   // Channel resolution. Errors here are transport/lookup-shaped, not
   // Slack-reported message-post failures, so they propagate.
   const channel = await resolveChannel(client, channelInput, config);
 
   const resp = await client.chat.postMessage({
     channel,
-    text,
+    text: enriched,
     thread_ts: opts.threadTs,
   });
 
@@ -101,7 +113,7 @@ export async function sendMessage(
     channelInput,
     ts: resp.ts ?? resp.message?.ts,
     threadTs: resp.message?.thread_ts ?? opts.threadTs,
-    text: resp.message?.text ?? text,
+    text: resp.message?.text ?? enriched,
     error: resp.error,
     tokenMask,
   };
