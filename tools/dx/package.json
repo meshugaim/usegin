@@ -8,8 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "commander": "^14.0.3",
-    "@clack/prompts": "^1.0.1"
+    "@clack/prompts": "^1.0.1",
+    "@slack/web-api": "^7.15.1",
+    "commander": "^14.0.3"
   },
   "devDependencies": {
     "@types/bun": "latest"
