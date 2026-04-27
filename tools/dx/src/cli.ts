@@ -20,6 +20,7 @@ import { buildIdentifyCommand } from "./commands/identify";
 import { buildListCommand } from "./commands/list";
 import { buildDocsCommand } from "./commands/docs";
 import { buildHisCommand } from "./his";
+import { buildZettelCommand } from "./zettel";
 import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
 import { dxShouldOutputJson } from "./output";
@@ -65,6 +66,7 @@ program.addCommand(buildIdentifyCommand());
 program.addCommand(buildListCommand());
 program.addCommand(buildDocsCommand());
 program.addCommand(buildHisCommand());
+program.addCommand(buildZettelCommand());
 
 applyStandardAliases(program);
 enablePrefixMatching(program);

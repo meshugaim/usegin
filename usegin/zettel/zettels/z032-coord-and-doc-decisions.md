@@ -18,15 +18,15 @@ Two decisions taken in z020 shape:
 > Risk: arriving with a working prototype could feel like an end-run on their in-progress design. Lihu owns timing the convergence conversation; Gin must surface a "ready to converge" trigger when the slice is demoable.
 > Alternatives rejected: A (message now) — premature, costs alignment-capital before we have anything to show. C (never converge) — violates z028 one-shared-brain.
 
-> **D-doc: We decided to DEFER the doc-method recommendation (option A — `gin/lab/<topic>/`) until ENG-5381's pgvector zettel substrate is dry-runnable.**
-> Because: if zettels become queryable as a graph in 1-2 months, multi-zettel "z-clusters" likely absorb `gin/lab/`'s use case. Adding a folder now and removing it later is the move we explicitly want to avoid (z028 — no dead code, no old code).
+> **D-doc: We decided to DEFER the doc-method recommendation (option A — `usegin/lab/<topic>/`) until ENG-5381's pgvector zettel substrate is dry-runnable.**
+> Because: if zettels become queryable as a graph in 1-2 months, multi-zettel "z-clusters" likely absorb `usegin/lab/`'s use case. Adding a folder now and removing it later is the move we explicitly want to avoid (z028 — no dead code, no old code).
 > Price: cross-session Gin-internal docs continue to land in mixed places (zettels for atomic, R&D whiteboards for big topics) until the deferral resolves.
 > Risk: "defer" → "forget". Mitigation: D-doc revisit is bound to ENG-5381's first dry-run milestone — see "Trigger to revisit" below.
 > Alternatives rejected: A (adopt now) — premature folder cost; B (keep R&D-whiteboard shape) — works but ignores the doc-team's evidence that skill-lab is the only Tier-1 form.
 
 ## Trigger to revisit D-doc
 
-When ENG-5381 has its first end-to-end dry-run of zettel-as-graph-query (vector top-k → recursive walk → result list), Gin re-opens this dilemma. By then we'll know whether multi-zettel z-clusters absorb the workshop use case or whether `gin/lab/` is still needed as a separate sub-app.
+When ENG-5381 has its first end-to-end dry-run of zettel-as-graph-query (vector top-k → recursive walk → result list), Gin re-opens this dilemma. By then we'll know whether multi-zettel z-clusters absorb the workshop use case or whether `usegin/lab/` is still needed as a separate sub-app.
 
 Concrete trip-wire: **add a `revisit-d-doc-when-eng5381-dryrun` thread to ENG-5381 itself** so the trigger lives where the work is, not in a forgotten zettel.
 

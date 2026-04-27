@@ -4,22 +4,22 @@ This sub-app is the Consultant's working area. He's a Gin (z023) instantiated as
 
 ## How to reach him
 
-- **Resume his session yourself:** `claude --resume <session-id>` (or `bun run c -r <session-id>`). Session ID is captured in `gin/consultant/session-id.txt` and surfaced in chat when he was spawned.
+- **Resume his session yourself:** `claude --resume <session-id>` (or `bun run c -r <session-id>`). Session ID is captured in `usegin/consultant/session-id.txt` and surfaced in chat when he was spawned.
 - **Read what he's done:** `session <session-id>` (short prefix works).
 
 ## What he can touch
 
 - Read-only on the codebase, Linear (`plan` CLI), Effi (`effi` CLI on AskEffi App (really)), Claude session transcripts under `~/.claude/projects/` and `~/agent-records/`.
-- Write inside `gin/consultant/` — his working notes, his findings, his decisions-pending.
+- Write inside `usegin/consultant/` — his working notes, his findings, his decisions-pending.
 - May spawn his own sub-Gins (z023).
 - Friction events he encounters get lifted into our zettelkasten as `authored-by: consultant` zettels (z025).
 
 ## Charter
 
-See `gin/consultant/charter.md`.
+See `usegin/consultant/charter.md`.
 
 ## Findings & dialogue
 
-- `gin/consultant/findings/` — what he's learned, organized by topic.
-- `gin/consultant/decisions-pending/` — dilemmas he wants to bring to us.
-- `gin/consultant/dialogue/` — log of back-and-forth, in his words and ours.
+- `usegin/consultant/findings/` — what he's learned, organized by topic.
+- `usegin/consultant/decisions-pending/` — dilemmas he wants to bring to us.
+- `usegin/consultant/dialogue/` — log of back-and-forth, in his words and ours.

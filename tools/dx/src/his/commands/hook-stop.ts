@@ -32,8 +32,35 @@ async function actionHookStop() {
   }
 
   if (!state.force_rate) {
-    // No force pending — Claude either hasn't been asked to wrap up, or has
-    // already filed a rating which cleared the flag. Either way, allow stop.
+    // No force pending. Soft-nudge Claude to file a self-rating if it's been
+    // quiet on telemetry for a while — keeps the autonomous-rating loop honest
+    // without blocking. Skip if disabled via DX_HIS_NUDGE_DISABLED=1.
+    if (process.env.DX_HIS_NUDGE_DISABLED !== "1") {
+      const NUDGE_INTERVAL = parseInt(process.env.DX_HIS_NUDGE_INTERVAL ?? "10", 10);
+      const turnsSinceClaude = state.last_claude_rating_turn === null
+        ? state.turn_count
+        : state.turn_count - state.last_claude_rating_turn;
+      const shouldNudge =
+        NUDGE_INTERVAL > 0 &&
+        turnsSinceClaude >= NUDGE_INTERVAL &&
+        turnsSinceClaude % NUDGE_INTERVAL === 0;
+      if (shouldNudge) {
+        process.stdout.write(
+          JSON.stringify({
+            continue: true,
+            hookSpecificOutput: {
+              hookEventName: "Stop",
+              additionalContext:
+                `[his nudge] You haven't filed a self-rating in ${turnsSinceClaude} turn${turnsSinceClaude === 1 ? "" : "s"}. ` +
+                `If you noticed friction, gaps, or vibe shifts since your last reading, drop a quick row: ` +
+                `\`dx his rate --as=claude vibe=<n> [aspect=n] --note "..."\` or just \`dx his note --as=claude "..."\`. ` +
+                `Skip if nothing notable happened.`,
+            },
+          }) + "\n",
+        );
+        return;
+      }
+    }
     process.stdout.write(JSON.stringify({ continue: true }) + "\n");
     return;
   }

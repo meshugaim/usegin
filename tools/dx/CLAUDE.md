@@ -76,7 +76,38 @@ A vibe-rated session telemetry feature lives inside the dx app. Both human and C
 | `dx his digest [--days N --markdown --since-last]` | Periodic digest: hot sessions + aspect drift. `--markdown` renders for paste/Slack/issues. `--since-last` reads from a marker so cron sees only new data. |
 | `dx his prune --older-than 90d [--keep-friction --dry-run]` | Delete old submissions; `--keep-friction` preserves high-signal rows (friction_*/gap_*/anger/frustration ≥ 70). |
 | `dx his self-test` | End-to-end smoke test: rate, end, hook-stop blocks, hook-stop unblocks, arm-on-wrapup detects sentinel. Isolated temp DB. |
+| `dx his sync export [path]` | Export new submissions (since last sync marker) as JSONL. `--all` ignores marker. |
+| `dx his sync import <paths...>` | Import JSONL produced by `sync export` from another machine. Dedupes on (session_id, ts, actor). |
 | `dx his hook-stop` / `dx his hook-session-end` | Hook handlers (configured in `.claude/settings.json`). |
+
+### Mid-session nudge
+
+The Stop hook soft-nudges Claude every `DX_HIS_NUDGE_INTERVAL` turns (default 10) when `force_rate` isn't set. Non-blocking — emitted via `additionalContext`. Disable with `DX_HIS_NUDGE_DISABLED=1`.
+
+### Auto-rate from Bash failures
+
+`.claude/hooks/dx-his-auto-from-bash.ts` is a PostToolUse hook on Bash that detects:
+- test runner failure (`bun test`/`pytest`/`playwright`/`jest`/etc.) → `friction_running_tests=75`
+- `git push` rejected → `friction_claude_devenv=65`
+- "command not found" → `friction_claude_devenv=70`
+- timeout → `friction_claude_infra=60`
+- slow tests (>30s) → `friction_running_tests=60`
+
+Files via `dx his rate --as=claude --trigger=auto` so the *machine's* friction signal is captured alongside the human/Claude self-reports. Best-effort, async, never blocks tool result.
+
+### Team aggregation (cross-machine sync)
+
+Per-laptop SQLite stores stay local; team-level signal comes from periodic JSONL handoff. Recommended cron pattern:
+
+```bash
+# On each dev machine — push new rows to a shared location.
+dx his sync export /shared/his-$(hostname)-$(date +%Y%m%d).jsonl
+
+# On the aggregator (one machine, or a CI job) — pull everything in.
+dx his sync import /shared/his-*.jsonl
+```
+
+Dedup is on `(session_id, ts, actor)`, so re-import is safe. Imported sessions tag `cwd` with `imported:<origin_host>` so downstream queries can tell where they came from.
 
 ### Scheduling the digest
 
