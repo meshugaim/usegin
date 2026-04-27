@@ -32,7 +32,7 @@ For each path × surface, R&D the tradeoffs, lock-in, time-to-MVP, risks, and br
 | E | `askeffi-slack-team-relation/` | Is "AskEffi-Slack for the team" a separate build or just C dogfooded on our tenant? |
 | F | `comparative-paths/` | Direct cross-cut: Unified vs direct — build matrix, divergence, lock-in, escape hatch, what build-twice buys |
 | G | `risks-failure-modes/` | Slack-platform risks (rate limits, retention, perm creep, app review) + integration-shape risks |
-| H | `auth-identity-multi-workspace/` | Slack-workspace ↔ AskEffi-workspace mapping; per-user OAuth vs bot token; org→workspace migration; Fathom per-recorder analog |
+| H | `auth-identity-cardinality/` | Slack-workspace ↔ AskEffi-workspace mapping; per-user OAuth vs bot token; org→workspace migration; Fathom per-recorder analog |
 
 ## Resume guide (if power dies / new agent picks up)
 
