@@ -22,7 +22,14 @@ Engineering team members each have a `<name>@askeffi.ai` email — Nitsan, Lihu,
 
 You inherit the human's `~/.effi` profile, so the profile already exists. Run `effi auth status` to discover the email (output looks like `Profile: <name>@askeffi.ai:prod`), then use that as your `--profile` value. Examples below use `<your-email>` as a placeholder.
 
-If the token is expired: `effi auth refresh` first.
+If the token is expired: `effi auth refresh` first. If no `:prod` profile exists yet (only a dev/test profile is set up), bootstrap it non-interactively — the human will fetch the OTP from their inbox:
+
+```bash
+# Derive <name> from `git config user.name` (lowercased first name) — don't ask.
+effi auth login --env production --email <name>@askeffi.ai
+# human pastes the code, then:
+effi auth verify --env production --email <name>@askeffi.ai --code <code>
+```
 
 ## Orienting
 
