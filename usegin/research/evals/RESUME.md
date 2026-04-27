@@ -1,6 +1,18 @@
 # Evals R&D — Resume Pointer
 
-**Status:** **OPEN — round started 2026-04-27.** Scaffolds in place; charters written; professors firing.
+**Status:** **CLOSED 2026-04-27.** All 6 whiteboards landed; SYNTHESIS + recommendation complete; closing zettel z108 written.
+
+**Cold-reader entry point:** read `SYNTHESIS.md` first (≤5min), then `recommendation.md` (≤5min). Drill into individual whiteboards only when a specific dilemma needs deeper context — pointers in SYNTHESIS.md.
+
+**Deliverables:**
+- `SYNTHESIS.md` — load-bearing finding (the corpus already exists, only the runner is missing), 12 convergent findings, 8 divergent points (5 lean-collapsed, 3 promoted to recommendation).
+- `recommendation.md` — three z026 calls for Lihu (R1 sequencing, R2 auto-promote line, R3 judge cost mix) + R4 default sequence (~42h to "evals are real," v0 demo-able tomorrow).
+- 6 whiteboards under `<angle>/whiteboard.md` (A–F).
+- Closing zettel: `usegin/zettel/zettels/z108-evals-rd-round-1-closed.md`.
+
+---
+
+
 
 **Trigger:** Today's "Feature prioritization" meeting (2026-04-27 14:32 UTC). At [00:17:24] Guy: "we'll never prioritize the whole evals story — and now we have to." At [00:18:30] Oria: "I can have a v0 of an eval [framework] for us by tomorrow, like, just, with something." Topic = **evals for our prompts/agents**, surfaced as "never-prioritized but doable-tomorrow."
 
