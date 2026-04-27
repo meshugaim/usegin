@@ -1,8 +1,8 @@
 # Tikur: multi-Gin checkout collisions — six incidents in 24h, same root cause as the prior tikur, prior lekach never landed
 
 **Date:** 2026-04-28
-**Severity:** high (recurrence × blast-radius — six incidents in ~24h, repeatedly attributing one Gin's work to another, blocking unrelated pushes, and silently destroying untracked files)
-**Status:** open (immediate fixes done; structural fix is a posture decision distilled to Lihu)
+**Severity:** high (recurrence × blast-radius — six incidents in ~24h, plus a 7th demonstration on this record's own commit, repeatedly attributing one Gin's work to another, blocking unrelated pushes, and silently destroying untracked files)
+**Status:** system-fix-deferred (immediate tripwire script committed; structural fix `dx session-wt` distilled to Lihu in CLOSE.md § D5.1; tikur skill self-tripwire landed; staging-drift hook hookup pending Lihu D5.2)
 **Category:** error at the per-incident level; **negligence at the system level** — the 2026-04-27 tikur identified both an immediate tripwire and a structural worktree fix; neither landed; recurrence was guaranteed. The negligence is not human — it is the absence of a "system-change-landed-same-turn" tripwire on the tikur skill itself.
 
 ## Cluster
@@ -124,3 +124,18 @@ Threads ↑2026-04-27-commit-scope-collision · ↑z081 · ↑z094 · ↑z095 ·
 - If `dx session-wt` ships and one autonomous run completes without a collision, write a successor zettel + this record's `Status: fixed` line. Don't edit this record (append-only per skill rule).
 - If `dx session-wt` does not ship within one week and another collision incident lands, that becomes a third-order tikur about *why the second tikur's lekach didn't land* — the same meta-failure recurring is itself a finding.
 - The pre-commit drift tripwire's hit-rate is the test of the diagnosis: if it fires often during multi-Gin runs, the structural fix is justified beyond doubt; if it never fires, either the parallel-runs paused (z099 §1) or the diagnosis was wrong.
+
+## Coda — the cluster fired on this tikur's own commit
+
+The commit that landed all five tikur artifacts (`0198b9a2c`) bears the message
+`memory: auto-update` from session `1bd3d9e0-b247-48a0-bca4-6de62a9b69e8`, not
+the tikur message I formed. **Mode 1 attribution swap on the very commit
+that documents the cluster.** Verified per `reference_autosync_concurrent_collisions`:
+`git show --stat 0198b9a2c` confirms the five tikur files landed in the
+correct payload; only the message is wrong. This 7th incident isn't
+re-tikkured separately — it *is* the demonstration that the system change
+named above (build `dx session-wt`) is the only fix that closes the cluster.
+A tripwire would have detected the swap; only worktree-isolation prevents it.
+
+This `Status: open` flips to `system-fix-deferred` per the new self-tripwire
+rule until D5.1 (build `session-wt`) lands.
