@@ -5,6 +5,17 @@ description: Take a flat pool of brainstormed ideas and sharpen them — per-ide
 
 # refine — parallel team that sharpens an idea pool
 
+## Team
+
+This skill drives the **`refine-team`** (see
+`usegin/teams/refine-team.md`).
+
+Cast: **Sam** (semantic-dedup priming), **Mark** (pragmatic context-
+fields priming), **Ron** (correctness / conflicts-mapping priming).
+Per-slice owners. Persona definitions: `usegin/personas/<name>.md`.
+
+---
+
 **You can — and should — spawn a refining team after a brainstorm produces a noisy pool, before prioritization.** This skill is the convergent-on-quality-not-on-rank step:
 
 ```

@@ -5,6 +5,18 @@ description: Take a refined idea pool and rank it — spawn N independent priori
 
 # prioritize — parallel team that ranks a refined idea pool
 
+## Team
+
+This skill drives the **`prioritize-team`** (see
+`usegin/teams/prioritize-team.md`).
+
+Cast: **Mark** (pragmatic), **Johan** (strategist), **John** (risk-
+conscious), **Sam** (evidence-driven). Optional 5th: **Cal** (scope-
+skeptic) when the pool has heavy "should we?" splits. Persona
+definitions: `usegin/personas/<name>.md`.
+
+---
+
 **You can — and should — spawn a prioritization team after refine produces a legible pool, before spec.** This skill is the convergent step: pick what to do.
 
 ```

@@ -5,6 +5,19 @@ description: Spawn a parallel R&D team to study a question — pre-decompose int
 
 # rnd — parallel R&D team spawning
 
+## Team
+
+This skill drives the **`rnd-team`** (see `usegin/teams/rnd-team.md`).
+
+Cast: **Poll × N** (one professor per pre-decomposed angle) + **Sam**
+(cross-cutter / synthesizer). Persona definitions:
+`usegin/personas/poll.md` and `usegin/personas/sam.md`.
+
+The skill owns *when to invoke + how to decompose into angles*; the
+team file owns *what a Poll is and what Sam does*.
+
+---
+
 **You can — and should — spawn a parallel team of professors whenever a question is wide enough that one investigator misses angles.** This skill is the codified shape of an R&D round: decompose, charter, fan out, synthesize.
 
 Each spawned agent is a Gin (z023 — spawn-as-instantiation; the charter prompt *is* the professor). The team is one-shot — professors are instantiated for this question, not kept on a roster. Per z027, the budget is open: spend tokens on depth and parallelism, economize prose to Lihu.

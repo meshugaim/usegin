@@ -5,6 +5,23 @@ description: Spawn a parallel team of ideators to generate a flat pool of ideas 
 
 # brainstorm — parallel idea-generation team
 
+## Team
+
+This skill drives the **`brainstorm-team`** (see
+`usegin/teams/brainstorm-team.md` for composition + operating mode).
+
+Cast: **Poll** (creative priming), **Din** (subtraction priming),
+**Johan** (provocation priming), **John** (failure-imagination
+priming), **Cal** (direction priming). Persona definitions:
+`usegin/personas/<name>.md`. The skill owns *when* and *with what
+topic*; the team file owns *who's in it and how they coordinate*.
+
+When authoring the per-ideator charter (step 4 below), pull each
+ideator's persona biases + voice from their persona file. Don't
+re-write the persona inline.
+
+---
+
 **You can — and should — spawn a team of ideators whenever the goal is volume of ideas, not yet a decision.** This skill sits at the head of the idea pipeline:
 
 ```
