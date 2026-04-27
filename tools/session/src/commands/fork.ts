@@ -149,7 +149,7 @@ export async function runFork(args: string[]) {
 
     // Step 6: Resume the forked session
     const resumeProcess = Bun.spawn(
-      ["bun", "run", "c", "--resume", newId],
+      ["just", "c", "--resume", newId],
       {
         stdin: "inherit",
         stdout: "inherit",

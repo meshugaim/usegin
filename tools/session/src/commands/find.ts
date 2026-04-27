@@ -158,7 +158,7 @@ export async function runFind(args: string[]) {
           console.log(formatFetchResult(fetchResult));
         }
         // Use the fetched session ID for resume
-        const resumeProcess = Bun.spawn(["bun", "run", "c", "--resume", fetchResult.sessionId], {
+        const resumeProcess = Bun.spawn(["just", "c", "--resume", fetchResult.sessionId], {
           stdin: "inherit",
           stdout: "inherit",
           stderr: "inherit",
@@ -179,8 +179,8 @@ export async function runFind(args: string[]) {
     const sessionId = path.replace(/.*\//, "").replace(/\.jsonl$/, "");
 
     // Spawn claude --resume, inheriting stdio for interactive use
-    // Use "bun run c" which runs claude with --dangerously-skip-permissions
-    const resumeProcess = Bun.spawn(["bun", "run", "c", "--resume", sessionId], {
+    // Use "just c" which runs claude-canonical (--dangerously-skip-permissions etc.)
+    const resumeProcess = Bun.spawn(["just", "c", "--resume", sessionId], {
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",

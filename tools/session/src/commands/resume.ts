@@ -41,9 +41,9 @@ export async function runResume(args: string[]) {
     }
 
     // Step 2: Spawn claude --resume with interactive stdio
-    // Use "bun run c" which runs claude with --dangerously-skip-permissions
+    // Use "just c" which runs claude-canonical (--dangerously-skip-permissions etc.)
     const resumeProcess = Bun.spawn(
-      ["bun", "run", "c", "--resume", result.sessionId],
+      ["just", "c", "--resume", result.sessionId],
       {
         stdin: "inherit",
         stdout: "inherit",
