@@ -70,3 +70,31 @@ export function autoLinkEngIdsFromEnv(
 ): string {
 	return autoLinkEngIds(body, { orgUrl: getLinearOrgUrl(env) });
 }
+
+/**
+ * Find every ENG-id mentioned in a body, deduplicated and in first-occurrence
+ * order. Used by the read/inbox formatters to surface a `(refs: ENG-…)` line
+ * next to each message so a human scanning the inbox can see at a glance
+ * which Linear issues a thread is about.
+ *
+ * Symmetric to `autoLinkEngIds` — uses the same boundary heuristics:
+ *   - skips longer alpha prefixes (ENGRAM-1)
+ *   - skips alphanumeric suffixes (ENG-12abc)
+ *   - DOES catch IDs already-wrapped in Slack mrkdwn — `<url|ENG-1>` is still
+ *     "this message refs ENG-1" even though we wouldn't double-link.
+ */
+const ENG_ID_REF_PATTERN = /\bENG-(\d+)(?!\w)/g;
+
+export function extractEngIds(body: string): string[] {
+	if (!body) return [];
+	const seen = new Set<string>();
+	const out: string[] = [];
+	for (const match of body.matchAll(ENG_ID_REF_PATTERN)) {
+		const id = `ENG-${match[1]}`;
+		if (!seen.has(id)) {
+			seen.add(id);
+			out.push(id);
+		}
+	}
+	return out;
+}

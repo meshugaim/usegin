@@ -7,6 +7,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import {
 	autoLinkEngIds,
 	autoLinkEngIdsFromEnv,
+	extractEngIds,
 	getLinearOrgUrl,
 } from "./links";
 
@@ -73,6 +74,48 @@ describe("autoLinkEngIds", () => {
 
 	test("returns empty string for empty input", () => {
 		expect(autoLinkEngIds("")).toBe("");
+	});
+});
+
+describe("extractEngIds", () => {
+	test("returns empty array for body with no IDs", () => {
+		expect(extractEngIds("nothing here")).toEqual([]);
+	});
+
+	test("returns empty array for empty input", () => {
+		expect(extractEngIds("")).toEqual([]);
+	});
+
+	test("extracts a single ID", () => {
+		expect(extractEngIds("see ENG-1234")).toEqual(["ENG-1234"]);
+	});
+
+	test("dedupes repeated IDs", () => {
+		expect(extractEngIds("ENG-1 then ENG-1 again")).toEqual(["ENG-1"]);
+	});
+
+	test("preserves first-occurrence order", () => {
+		expect(extractEngIds("ENG-3 ENG-1 ENG-2 ENG-1")).toEqual([
+			"ENG-3",
+			"ENG-1",
+			"ENG-2",
+		]);
+	});
+
+	test("catches IDs already inside Slack mrkdwn link wrappers", () => {
+		expect(
+			extractEngIds(
+				"see <https://linear.app/askeffi/issue/ENG-99|ENG-99> for more",
+			),
+		).toEqual(["ENG-99"]);
+	});
+
+	test("skips longer alpha prefix (ENGRAM-1)", () => {
+		expect(extractEngIds("ENGRAM-1 isn't ours")).toEqual([]);
+	});
+
+	test("skips alphanumeric suffix (ENG-12abc)", () => {
+		expect(extractEngIds("ENG-12abc shouldn't match")).toEqual([]);
 	});
 });
 

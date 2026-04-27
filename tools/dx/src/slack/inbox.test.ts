@@ -461,6 +461,37 @@ describe("formatInboxHuman", () => {
     };
     expect(formatInboxHuman(r)).not.toContain("1234-5678");
   });
+
+  it("annotates mentions with referenced ENG-ids on the header line (D5)", () => {
+    const r: InboxResult = {
+      ok: true,
+      mentions: [
+        {
+          channelId: "C1",
+          channelName: "engineering",
+          ts: "1700000001.000000",
+          user: "U1",
+          text: "<@UBOT> please look at ENG-5399",
+        },
+        {
+          channelId: "C1",
+          channelName: "engineering",
+          ts: "1700000002.000000",
+          user: "U2",
+          text: "<@UBOT> just a hi, no IDs",
+        },
+      ],
+      channelsSearched: 1,
+      truncated: false,
+      botUserId: "UBOT",
+      tokenMask: "xoxb…CdEf",
+    };
+    const out = formatInboxHuman(r);
+    expect(out).toContain("(refs: ENG-5399)");
+    const lines = out.split("\n");
+    const line2 = lines.find((l) => l.includes("1700000002.000000")) ?? "";
+    expect(line2).not.toContain("(refs:");
+  });
 });
 
 describe("formatInboxJson", () => {

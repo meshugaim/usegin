@@ -21,6 +21,7 @@
  */
 
 import { maskToken, type SlackConfig } from "./config";
+import { extractEngIds } from "./links";
 import { parseSince } from "./read";
 
 /** Structural subset of `WebClient.auth.test` we depend on. */
@@ -463,7 +464,9 @@ export function formatInboxHuman(result: InboxResult): string {
   const body = result.mentions
     .map((m) => {
       const where = m.channelName ? `#${m.channelName}` : m.channelId;
-      const head = `[${m.ts}] ${where}${m.user ? ` <${m.user}>` : ""}${m.threadTs && m.threadTs !== m.ts ? ` (thread ${m.threadTs})` : ""}${m.replyCount && m.replyCount > 0 ? ` (${m.replyCount} replies)` : ""}`;
+      const refs = extractEngIds(m.text);
+      const refsStr = refs.length > 0 ? ` (refs: ${refs.join(", ")})` : "";
+      const head = `[${m.ts}] ${where}${m.user ? ` <${m.user}>` : ""}${m.threadTs && m.threadTs !== m.ts ? ` (thread ${m.threadTs})` : ""}${m.replyCount && m.replyCount > 0 ? ` (${m.replyCount} replies)` : ""}${refsStr}`;
       const text = m.text.replace(/\r?\n/g, "\n    ");
       return `${head}\n    ${text}`;
     })

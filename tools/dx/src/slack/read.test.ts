@@ -294,6 +294,34 @@ describe("formatReadHuman", () => {
     const out = formatReadHuman(r);
     expect(out).not.toContain("1234-5678");
   });
+
+  it("annotates messages with referenced ENG-ids on the header line (D5)", () => {
+    const r: ReadResult = {
+      ok: true,
+      channel: "C111",
+      channelInput: "#engineering",
+      messages: [
+        {
+          ts: "1700000001.000000",
+          user: "U1",
+          text: "see ENG-5399 + ENG-5413 for context",
+        },
+        {
+          ts: "1700000002.000000",
+          user: "U2",
+          text: "no refs here",
+        },
+      ],
+      truncated: false,
+      tokenMask: "xoxb…CdEf",
+    };
+    const out = formatReadHuman(r);
+    expect(out).toContain("(refs: ENG-5399, ENG-5413)");
+    // Second message has no refs annotation
+    const lines = out.split("\n");
+    const line2 = lines.find((l) => l.includes("1700000002.000000")) ?? "";
+    expect(line2).not.toContain("(refs:");
+  });
 });
 
 describe("formatReadJson", () => {

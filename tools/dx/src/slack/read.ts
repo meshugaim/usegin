@@ -20,6 +20,7 @@ import {
   resolveChannel,
   type SlackResolverClient,
 } from "./channel";
+import { extractEngIds } from "./links";
 
 export interface ReadMessage {
   ts: string;
@@ -251,7 +252,9 @@ export function formatReadHuman(result: ReadResult): string {
 
   const body = result.messages
     .map((m) => {
-      const head = `[${m.ts}]${m.user ? ` <${m.user}>` : ""}${m.threadTs && m.threadTs !== m.ts ? ` (thread ${m.threadTs})` : ""}${m.replyCount && m.replyCount > 0 ? ` (${m.replyCount} replies)` : ""}`;
+      const refs = extractEngIds(m.text);
+      const refsStr = refs.length > 0 ? ` (refs: ${refs.join(", ")})` : "";
+      const head = `[${m.ts}]${m.user ? ` <${m.user}>` : ""}${m.threadTs && m.threadTs !== m.ts ? ` (thread ${m.threadTs})` : ""}${m.replyCount && m.replyCount > 0 ? ` (${m.replyCount} replies)` : ""}${refsStr}`;
       const text = m.text.replace(/\r?\n/g, "\n    ");
       return `${head}\n    ${text}`;
     })
