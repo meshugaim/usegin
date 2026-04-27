@@ -16,7 +16,18 @@ there.
 ## Two-sided design
 
 **Producing.** As we work — humans and Claude — we should be able to drop a
-*zettel* with very low friction. A zettel can be:
+*zettel* with very low friction. The lowest-friction entry point:
+
+```bash
+zettleit "<the thought>"     # = dx zettel it "<the thought>"
+```
+
+The active Claude session sees the trigger and runs the *zettleread → wire →
+add → verify* loop (see `.claude/skills/zettel-capture/SKILL.md`). v0 wires
+autonomously; v1 will gate the wiring on human approval. The CLI primitive
+is `dx zettel add`; everything else is convenience around it.
+
+A zettel can be:
 
 - an ID
 - a lesson (good or bad)

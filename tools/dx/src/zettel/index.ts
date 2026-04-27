@@ -3,6 +3,7 @@ import { buildZettelAddCommand } from "./commands/add";
 import { buildZettelShowCommand } from "./commands/show";
 import { buildZettelListCommand } from "./commands/list";
 import { buildZettelLinkCommand } from "./commands/link";
+import { buildZettelItCommand } from "./commands/it";
 
 /**
  * `dx zettel` — UseGin's shared 2nd brain CLI (slice 1).
@@ -22,5 +23,6 @@ export function buildZettelCommand(): Command {
   cmd.addCommand(buildZettelShowCommand());
   cmd.addCommand(buildZettelListCommand());
   cmd.addCommand(buildZettelLinkCommand());
+  cmd.addCommand(buildZettelItCommand());
   return cmd;
 }

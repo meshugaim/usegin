@@ -5,6 +5,12 @@ description: Autonomously capture a zettel mid-session whenever a thought, decis
 
 # Zettel capture — autonomous UseGin capture
 
+## Triggers from the human — `!zettleit`
+
+When the human types `!zettleit "<thought>"` (or `zettleit "..."` in their shell), the bash output you see contains a `[ZETTLEIT]` banner. That banner *is the instruction*: same turn, run the procedure below — `dx zettel list` (zettleread) → choose placement + threads → `dx zettel add --as=usegin` → `dx zettel show` to verify. v0 captures autonomously; v1 will gate on approval first. Don't ignore the banner; don't ask the human to also tell you "now write it" — the trigger already did.
+
+## Autonomous capture
+
 **You can — and should — run `dx zettel add --as=usegin` whenever a thought, decision, friction, or lesson worth preserving lands.** You don't need permission. The corpus accumulates; per principle 02 (preserve, don't delete) nothing you write overwrites anything else, and per z002 there is never "later" — every "later" must commit to an artifact NOW.
 
 This is the shared 2nd brain (z028). Both human and UseGin write to it. Future Gins read it as signal — clusters of zettels in an area expose where we're fighting (z048). The point of capture is to amplify how we already think, not to install a new discipline (principle 01).
