@@ -73,7 +73,12 @@ A vibe-rated session telemetry feature lives inside the dx app. Both human and C
 | `dx his trend <aspect> [--last N]` | Time-series for one aspect across sessions (with sparkline). |
 | `dx his search <query>` | Substring search across notes. |
 | `dx his export [--session-id X]` | Dump submissions as JSONL (pipe-safe). |
+| `dx his digest [--days N --prev-days N]` | Periodic digest: hot (high-friction) sessions + aspect drift vs prior window. |
 | `dx his hook-stop` / `dx his hook-session-end` | Hook handlers (configured in `.claude/settings.json`). |
+
+**Auto-arm on wrap-up phrases**: a `UserPromptSubmit` hook (`bun .claude/hooks/dx-his-arm-on-wrapup.ts`) detects sentinel phrases — "that's a wrap", "we're done", "let's call it", "wrap it up", "ship it and stop" — in the human's message and auto-arms `force_rate=true`. Saves the human from typing `/end`.
+
+**PATH-resilient hook scripts**: `.claude/hooks/dx-his-stop.sh` and `.claude/hooks/dx-his-session-end.sh` resolve `dx` through the repo's own `tools/bin/dx` rather than relying on PATH. If the bin isn't found, they emit `{"continue":true}` and exit cleanly — telemetry is best-effort, never blocks.
 
 Claude can — and should — file `dx his rate --as=claude` mid-session whenever it notices something worth recording. See `.claude/skills/his-self-rating/SKILL.md`.
 

@@ -12,6 +12,7 @@ import { buildHisLastCommand } from "./commands/last";
 import { buildHisSearchCommand } from "./commands/search";
 import { buildHisTrendCommand } from "./commands/trend";
 import { buildHisExportCommand } from "./commands/export";
+import { buildHisDigestCommand } from "./commands/digest";
 
 export function buildHisCommand(): Command {
   const cmd = new Command("his")
@@ -27,6 +28,7 @@ export function buildHisCommand(): Command {
   cmd.addCommand(buildHisSearchCommand());
   cmd.addCommand(buildHisTrendCommand());
   cmd.addCommand(buildHisExportCommand());
+  cmd.addCommand(buildHisDigestCommand());
   cmd.addCommand(buildHisHookStopCommand());
   cmd.addCommand(buildHisHookSessionEndCommand());
   return cmd;
