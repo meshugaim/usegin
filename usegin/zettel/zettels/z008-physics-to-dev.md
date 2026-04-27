@@ -16,6 +16,6 @@ This is a real translator (z007), not a corrector (z005). The word is right — 
 
 ## Gin side
 
-Lives at `gin/translators/physics-to-dev.md`. Empty for now (open-to-empty, z003) — we grow it as Lihu actually uses physics terms in sessions and I have to ask "what does X mean here?". Each ask = new entry.
+Lives at `usegin/translators/physics-to-dev.md`. Empty for now (open-to-empty, z003) — we grow it as Lihu actually uses physics terms in sessions and I have to ask "what does X mean here?". Each ask = new entry.
 
 Specific accumulation rule for this one: when I encounter a Lihu-used term I think might be physics-domain, I (a) attempt my best guess, (b) flag it inline ("[physics?]") so Lihu can confirm, (c) when confirmed, add the entry myself. No round-trip needed for accumulation.

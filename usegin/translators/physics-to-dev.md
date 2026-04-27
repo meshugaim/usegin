@@ -1,6 +1,6 @@
 # Physics → Dev Translator
 
-Maps physics-domain terms Lihu uses to their dev-domain meaning. See `gin/zettel/zettels/z008`.
+Maps physics-domain terms Lihu uses to their dev-domain meaning. See `usegin/zettel/zettels/z008`.
 
 This is **open-to-empty** right now — Lihu's said he'll start dropping physics terms when they're more intuitive than the dev term, and we'll grow this file from real usage. No pre-seeded guesses; pre-seeded entries pretending to be use-grown ones is exactly the failure mode the Anthropologist whiteboard called P-DESTINATION.
 

@@ -10,7 +10,7 @@ session: 5d7f3c80
 
 ## Human side
 
-The doc-method team needed to query Effi about how the team has historically documented things in emails/Drive/meetings. `effi ask` timed out. They substituted by citing the existing Effi Historian whiteboard (`gin/zettel/RD/effi-historian/whiteboard.md`) — which already covers the team's email/Drive/meeting doc patterns.
+The doc-method team needed to query Effi about how the team has historically documented things in emails/Drive/meetings. `effi ask` timed out. They substituted by citing the existing Effi Historian whiteboard (`usegin/zettel/RD/effi-historian/whiteboard.md`) — which already covers the team's email/Drive/meeting doc patterns.
 
 The substitution worked. But "use the existing whiteboard" only worked because we *had* one from the prior R&D round. A cold sub-Gin with no prior digest would be blocked.
 

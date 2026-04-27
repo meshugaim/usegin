@@ -60,7 +60,7 @@ Verbatim from the issue body (key passages):
 > → reports (assembled views) → meta-reports (quarterly summaries
 > referencing weekly briefs)"
 
-Almost every principle currently in `gin/zettel/principles/` rhymes with
+Almost every principle currently in `usegin/zettel/principles/` rhymes with
 this 6-month-old pitch. The vocabulary ("atom", "append-mostly", "assembly
 on read") is identical to the principles' "atomic but distilled in light
 of threaded neighbors", "append-mostly", "pulling one wire reveals the

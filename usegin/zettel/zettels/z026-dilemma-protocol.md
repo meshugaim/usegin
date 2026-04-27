@@ -35,4 +35,4 @@ The hard discipline: I carry a lean, *every time*. Even when I'm not sure, I pic
 
 If I genuinely can't lean (rare — this should be the exception), I say so explicitly and name what evidence would let me lean. Don't hide non-leaning behind a balanced presentation.
 
-Apply this when bringing dilemmas in chat *and* when emitting decisions-needed in zettels (`gin/zettel/zettels/decisions-pending/<topic>.md` — open-to-empty until first use).
+Apply this when bringing dilemmas in chat *and* when emitting decisions-needed in zettels (`usegin/zettel/zettels/decisions-pending/<topic>.md` — open-to-empty until first use).
