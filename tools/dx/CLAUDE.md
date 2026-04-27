@@ -66,9 +66,16 @@ A vibe-rated session telemetry feature lives inside the dx app. Both human and C
 | `dx his note "<text>"` | Note-only submission (no aspect scores). |
 | `dx his end` | Mark session as wrapping up — sets the force-rate flag. |
 | `dx his show` | Show all submissions for the current session. |
+| `dx his last [--actor X]` | Most recent submission only. |
 | `dx his sessions` | List recently rated sessions. |
 | `dx his aspects [--bucket human\|claude\|shared]` | List registered aspects. |
+| `dx his stats [--aspect X --actor Y --last-days N]` | Aggregate avg/min/max per aspect. |
+| `dx his trend <aspect> [--last N]` | Time-series for one aspect across sessions (with sparkline). |
+| `dx his search <query>` | Substring search across notes. |
+| `dx his export [--session-id X]` | Dump submissions as JSONL (pipe-safe). |
 | `dx his hook-stop` / `dx his hook-session-end` | Hook handlers (configured in `.claude/settings.json`). |
+
+Claude can — and should — file `dx his rate --as=claude` mid-session whenever it notices something worth recording. See `.claude/skills/his-self-rating/SKILL.md`.
 
 **Aspects** are an editable registry at `src/his/aspects.json`. Three buckets: `human` (anger, frustration, understood_claude…), `claude` (talked_too_much, tool_thrashing, self_doubt…), `shared` (vibe, friction_*, gap_*, accuracy, focus…). Adding an aspect = one entry in the JSON; no schema or code change. Unknown keys submitted via the CLI still pass through (lean).
 

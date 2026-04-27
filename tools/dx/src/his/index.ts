@@ -7,6 +7,11 @@ import { buildHisSessionsCommand } from "./commands/sessions";
 import { buildHisAspectsCommand } from "./commands/aspects";
 import { buildHisHookStopCommand } from "./commands/hook-stop";
 import { buildHisHookSessionEndCommand } from "./commands/hook-session-end";
+import { buildHisStatsCommand } from "./commands/stats";
+import { buildHisLastCommand } from "./commands/last";
+import { buildHisSearchCommand } from "./commands/search";
+import { buildHisTrendCommand } from "./commands/trend";
+import { buildHisExportCommand } from "./commands/export";
 
 export function buildHisCommand(): Command {
   const cmd = new Command("his")
@@ -17,6 +22,11 @@ export function buildHisCommand(): Command {
   cmd.addCommand(buildHisShowCommand());
   cmd.addCommand(buildHisSessionsCommand());
   cmd.addCommand(buildHisAspectsCommand());
+  cmd.addCommand(buildHisStatsCommand());
+  cmd.addCommand(buildHisLastCommand());
+  cmd.addCommand(buildHisSearchCommand());
+  cmd.addCommand(buildHisTrendCommand());
+  cmd.addCommand(buildHisExportCommand());
   cmd.addCommand(buildHisHookStopCommand());
   cmd.addCommand(buildHisHookSessionEndCommand());
   return cmd;
