@@ -61,4 +61,8 @@ All commands honor the dx output convention (human → stderr, JSON → stdout, 
 
 Outbox channel is `#usegin` by default; override with `USEGIN_OUTBOX_CHANNEL`. Linear org URL for ENG-ID auto-link is `https://linear.app/askeffi` by default; override with `LINEAR_ORG_URL`.
 
+Cross-surface ENG-id awareness is symmetric:
+- **Send-side** (D4): outbound messages auto-link `ENG-\d+` tokens to Slack mrkdwn pointing at the Linear issue.
+- **Read-side** (D5): `dx slack read` and `dx slack inbox` annotate each message's header line with `(refs: ENG-X, ENG-Y)` when the body references Linear issues — even if the references arrived already-wrapped in Slack mrkdwn.
+
 See `tools/dx/src/slack/README.md` for setup recipe and `usegin/research/slack-integration/DEMO.md` for the end-to-end demo (UseGin + customer-facing AskEffi-Slack on the same page).
