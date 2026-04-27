@@ -85,21 +85,17 @@ posture in writing if reviewer pushes.]
 **Q: How do you verify Slack-signed requests?**
 
 Slack signing-secret verification per Slack's documented HMAC-SHA256 scheme.
-Per SYNTHESIS CF8, ingress lands at Next.js
-(`/api/slack/events`, ENG-5415 — not yet implemented at this writing) which
-verifies the `X-Slack-Signature` header against `SLACK_SIGNING_SECRET` and
-the raw body, with a 5-minute timestamp window. On verify failure the
-request is rejected with 401.
+Per SYNTHESIS CF8, ingress lands at Next.js (`/api/slack/events`, shipped
+under ENG-5409 — commit `833f0e159`, see
+`nextjs-app/app/api/slack/events/route.ts`) which verifies the
+`X-Slack-Signature` header against `SLACK_SIGNING_SECRET` and the raw body,
+with a 5-minute timestamp window. On verify failure the request is rejected
+with 401.
 
 This pattern mirrors `nextjs-app/app/api/webhooks/unified/` and
 `nextjs-app/app/api/webhooks/mailgun/inbound/` — both fail-closed on missing
 secret (post-hardening §2 "Webhook fail-closed: Implemented"). The Slack
-endpoint will follow the same shape.
-
-> **Honest gap:** ENG-5415 (Events receiver) is not yet in main; the answer
-> above describes the intended architecture per the SYNTHESIS recommendation.
-> Lihu: confirm ENG-5415 has shipped before submitting this answer
-> verbatim.
+endpoint follows the same shape.
 
 **Q: Verification tokens or signed secrets?**
 
@@ -214,20 +210,23 @@ program. Sentry alerting is live across all layers, and the team has an
 informal escalation flow (engineering on-call → Lihu), but a formal IR
 document is not yet published.
 
-[LIHU UNKNOWN] If Slack reviewer requires a written IR plan for
-Marketplace approval, this is a gap that needs filling before submission.
-Recommended action: short IR runbook (1–2 pages, ~half-day Lihu work) that
-describes detect → triage → contain → notify steps, named on-call,
-breach-notification SLAs (see §8). Captured in
-`submission-checklist.md` as a pre-submit item.
+**[ORIA] hole.** A formal IR runbook is tracked as ENG-4241 (Backlog as of
+2026-04-28). If Slack reviewer requires a written IR plan for Marketplace
+approval, ENG-4241 needs to ship before submission. Recommended scope:
+short IR runbook (1–2 pages, ~half-day) that describes detect → triage →
+contain → notify steps, named on-call, breach-notification SLAs (see §8).
+Captured in `submission-checklist.md` as a pre-submit item.
 
 **Q: Breach-notification SLA?**
 
 Per the customer DPA (Attachment 3): we commit to notifying customers of a
 confirmed personal-data breach without undue delay and within the timelines
 required by applicable Data Protection Law (e.g., 72 hours under GDPR
-Article 33). [LIHU UNKNOWN] Confirm the exact SLA stated in the customer
-DPA before submitting.
+Article 33).
+
+**[ORIA] hole.** Confirm the exact SLA wording stated in the live customer
+DPA before pasting this answer (likely "without undue delay, and where
+feasible no later than 72 hours" — but verify against the executed DPA).
 
 **Q: Have you had a breach?**
 
@@ -282,17 +281,30 @@ typically read but rarely deeply probe these:
 
 ## 10. Vulnerability management
 
-Per audit-DPA Commitment 4 (rated **Non-Compliant** as of 2026-03-29): no
-automated dependency scanning, SAST, or formal patch management is in
-place yet. Remediation tracked as ENG-3960 follow-ups.
+Phase-3 hardening (ENG-4217, see
+`docs/security/reports/2026-04-02-phase3-hardening-implementation-report.md`)
+landed automated scanning in CI:
 
-> **Honest gap.** This is the most likely Slack-reviewer point of friction.
-> Mitigation:
-> - Phase 3 hardening (`2026-04-02-phase3-hardening-implementation-report.md`)
->   added some controls; confirm current state with Lihu before submitting.
-> - If Slack pushes back, the answer is: "We are actively remediating;
->   gitleaks / Dependabot / `bun audit` / `pip-audit` are scheduled in
->   ENG-XXXX"  — [LIHU UNKNOWN] insert real Linear ID + ETA before sending.
+- **Dependabot** (`.github/dependabot.yml`): weekly scans of npm (root +
+  `nextjs-app/`), pip (`python-services/`), and GitHub Actions; grouped PRs
+  for related packages (react, supabase, etc.).
+- **`bun audit`** in `.github/workflows/security-audit.yml`: runs on every
+  push and PR to `main`/`staging`/`production`; **fails CI on
+  high/critical** vulnerabilities. Low/moderate transitive dev-dep
+  vulnerabilities are temporarily excluded via `--audit-level high`
+  (tracked in the workflow's TODO comment to tighten once dev-dep vulns
+  are resolved).
+- **`pip-audit`** in the same workflow for the Python services tree.
+
+The audit-DPA Commitment 4 ("Non-Compliant" as of 2026-03-29) predates this
+hardening; for Slack submission, the honest current state is **automated
+scanning in CI, gated at high/critical severity**, with formal patch-SLAs
+still informal (humans review Dependabot PRs as they land).
+
+> **[ORIA] hole.** If a Slack reviewer asks for a written patch-management
+> SLA (e.g. "critical vulns patched within X days"), we don't have one.
+> Either commit a number you can defend or note "informal review-on-arrival,
+> formal SLA on roadmap."
 
 ---
 
@@ -324,13 +336,18 @@ place yet. Remediation tracked as ENG-3960 follow-ups.
 
 For Lihu's pre-submit pass:
 
-1. **§3** — confirm ENG-5415 (Events receiver) has shipped or amend the
-   answer to describe the planned architecture honestly.
+1. **§3** — ✓ resolved 2026-04-28: Events receiver shipped under ENG-5409
+   (commit `833f0e159`); answer text updated to cite the shipped file.
+   The original question conflated ENG-5415 (inbox, in progress) with
+   ENG-5409 (Events receiver + lifecycle handlers, shipped).
 2. **§7** — does a written incident response runbook exist now? If no,
    draft one before submitting (half-day).
 3. **§7** — exact breach-notification SLA wording from customer DPA.
-4. **§10** — current state of dependency scanning post-Phase-3, with
-   Linear ticket + ETA if still not in place.
+4. **§10** — ✓ resolved 2026-04-28: dependency scanning IS in place
+   (Dependabot weekly + `bun audit` / `pip-audit` gating CI on
+   high/critical). Section text rewritten. Remaining `[ORIA]` hole:
+   written patch-management SLA — either pick a number or declare
+   "informal, on roadmap."
 5. **§2** — Railway internal-transport encryption posture (in writing) if
    reviewer asks.
 6. **§5 D1 carve-out** — confirm Slack data is NOT in a Storage bucket
