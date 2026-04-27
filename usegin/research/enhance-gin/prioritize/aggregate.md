@@ -1,5 +1,7 @@
 # Prioritize aggregate — enhance-gin pool
 
+> **🚪 Run is closed-pending-decisions.** Read [`../CLOSE.md`](../CLOSE.md) first — 5 product-shape decisions waiting on Lihu before round 2 can shape itself. This doc is the technical front-door (Borda + convergence + dilemma details); CLOSE.md is the management-language summary.
+
 > Prioritize round 1, 2026-04-27. 5 prioritizers (Mark, Johan, John, Sam, Cal), 50 active ideas (i46 merged into i45).
 >
 > Two views below: Borda (positional sum, top-25 truncation) + Convergence buckets (top-13 ≈ ⌈50/3⌉ membership counted across prioritizers).
