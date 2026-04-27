@@ -1,8 +1,8 @@
-# Gin — the DX app
+# UseGin — our DX app and our dev agent
 
-**Gin** is the agent that works in this repo (memory: `project_gin_naming.md`, ENG-5378). Gin is also the **umbrella DX app** — the place where everything related to our development experience lives. Tools, conventions, sub-features, sub-apps. Gin owns its own house.
+**UseGin** is the agent that works in this repo and the umbrella DX app — the workspace where everything related to our development experience lives. Tools, conventions, sub-features, sub-apps. UseGin owns its own house.
 
-The earlier `gin-lab/` folder was absorbed: its meta surface (correctors, translators, registries) sits at this top level. There is no separate "lab" anymore — the umbrella IS the lab plus the sub-apps. (See `zettel/zettels/z021`.)
+UseGin is the new name. Earlier names this absorbed (in supersession order): "Claude lab" → "Gin lab" → "gin-lab/" → "gin/" → **`usegin/`**. Each rename was preserved in git history per principle 02. Reasoning trail: zettels `z021` (gin became umbrella) and `z033` (gin became usegin); memory entry `project_usegin_naming.md`. The agent inside the umbrella is also called UseGin — the name unifies workspace and identity.
 
 ## Sub-apps
 
@@ -13,18 +13,26 @@ The earlier `gin-lab/` folder was absorbed: its meta surface (correctors, transl
 ## Cross-cutting tools (accumulate-as-we-go)
 
 - **`things-we-grow.md`** — the master registry for accumulate-by-use artifacts. Add a row when you notice friction caused by a missing one.
-- **`wispr-flow-corrector/dictionary.md`** — word-level corrections for Wispr Flow misheardings. Gin manages it.
+- **`wispr-flow-corrector/dictionary.md`** — word-level corrections for Wispr Flow misheardings. UseGin manages it.
 - **`translators/`** — cross-domain term maps. `physics-to-dev.md` is open-to-empty; per-language translators ditto until friction appears.
+
+## Runtime surface
+
+`tools/dx/` is the executable side of UseGin — the `dx` CLI you actually run. New surface this slice: `dx zettel` (see `usegin/zettel/SLICE-1.md`). Existing: `dx his`, the dx feature toggles. UseGin (the markdown workspace) and `tools/dx/` (the executable) together = the full DX app.
+
+## Capabilities handbook
+
+`.claude/skills/use-gin/SKILL.md` is the agent-facing first-stop for "can UseGin do X?" — session resume across envs, code-history, vibe telemetry, and so on. When a capability is missed and the answer turns out to exist in our tooling, the entry lands in that file the same turn (see memory: `feedback_first_place_we_looked.md`).
 
 ## Conventions
 
-- **Two faces when suitable** (`zettel/zettels/z022`): anything in Gin can have two faces — human-facing and Gin-facing — wherever the artifact is consumed by both. Don't force two faces where one suffices.
+- **Two faces when suitable** (`zettel/zettels/z022`): anything in UseGin can have two faces — human-facing and UseGin-facing — wherever the artifact is consumed by both. Don't force two faces where one suffices.
 - **Open-to-empty** (`zettel/zettels/z003`): an empty file at a real address is a valid artifact. Create the address before you have the content.
 - **Accumulate-as-we-go**: nothing is built once and shipped. Use grows the artifact.
-- **Gin owns the "how"** (`zettel/zettels/z014`): folder location, naming, structure are Gin's calls; semantics are Lihu's.
+- **UseGin owns the "how"** (`zettel/zettels/z014`): folder location, naming, structure are UseGin's calls; semantics are Lihu's.
 - **Pre-game manual** (`zettel/zettels/z015`): only systematize what we've done by hand at least once.
-- **Decision shape** (`zettel/zettels/z020`): "We decided X because Y. Price is Z. Risk W. Alternatives rejected: …" — emitted by Gin without being asked.
+- **Decision shape** (`zettel/zettels/z020`): "We decided X because Y. Price is Z. Risk W. Alternatives rejected: …" — emitted by UseGin without being asked.
 
 ## Tracking
 
-We do **not** Linear-everything for Gin (`zettel/zettels/z024`). Linear is the spine for shipped product. Gin's own work uses lighter, code-adjacent forms. The exact form is being researched — see `research/documentation-method/`.
+We do **not** Linear-everything for UseGin (`zettel/zettels/z024`). Linear is the spine for shipped product. UseGin's own work uses lighter, code-adjacent forms. The exact form is being researched — see `research/documentation-method/` (decision deferred per `zettel/zettels/z032` until ENG-5381's pgvector substrate dry-runs).
