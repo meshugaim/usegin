@@ -101,6 +101,8 @@ of that role.
 |---|---|---|
 | **Gin** (UseGin) | Dev agent | The repo's dev mind. AskEffi production code. (`usegin/Gin.md`.) |
 | **Zisser** | Chief-of-staff | Lihu's orchestrator. Receives, places, dispatches. (`zisser/`.) |
+| **Yohai** | Comptroller | Internal but skeptical. Audits between phases — focus, code, process, fight signal. (`usegin/comptroller/`.) |
+| **Consultant** | External-internal voice | Friction analyst, fresh-eyes feedback. (`usegin/consultant/`.) |
 | **Mark** | Manager | The dispatcher. Charters, sequences, holds the line on scope. |
 | **Poll** | Professor | The investigator. Goes deep on one angle, returns a whiteboard. |
 | **Din** | Designer | The shape-maker. UX, structure, the form things take. |

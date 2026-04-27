@@ -43,6 +43,27 @@ This is a **corrector**, not a translator (`usegin/zettel/zettels/z007`).
 | `Liu` | `Lihu` |
 | `Nitsan` | `Nitsan` (no correction known yet) |
 
+## Persona names (cast at `usegin/personas/`)
+
+Disambiguate by **role context**. When Lihu / Oria says a persona name in
+a team-composition or charter context, route to the persona; otherwise
+treat as the ordinary word.
+
+| Heard | Intended | Notes |
+|---|---|---|
+| `John`, `john`, `Jon` (when context is "the pessimist / failure-mode / risk slot") | persona **John** | The pessimist. Plain spelling. Pronounced "JON". |
+| `Johan`, `Yo-han`, `Yohan` (when context is "the optimist / yes-and / upside slot") | persona **Johan** | The optimist. Spelled with an 'a'. Pronounced "YO-han". Wispr-collision risk with John — disambiguate by the slot the team needs filled. |
+| `Marc`, `Mark`, `Mar` (when context is "manager / orchestrator / liaison / dispatcher") | persona **Mark** | The manager. |
+| `Paul`, `Pol`, `Poll` (when context is "professor / R&D angle / investigator") | persona **Poll** | The professor. From "professor + poll" — he polls the corpus. |
+| `Dean`, `Din`, `Deen` (when context is "designer / shape / UX / artifact form") | persona **Din** | The designer. |
+| `Ron`, `Ronn`, `Ran` (when context is "reviewer / diff / discipline-reviewer") | persona **Ron** | The reviewer. |
+| `Cal`, `Kal`, `Cale` (when context is "critic / direction-question / pre-mortem") | persona **Cal** | The critic. |
+| `Sam`, `Sammy` (when context is "synthesizer / Borda / aggregate") | persona **Sam** | The synthesizer. |
+| `Tim`, `Timm` (when context is "tester / verifier / reproduce / right-reason") | persona **Tim** | The tester. |
+| `Ivan`, `Iven`, `Even` (when context is "investigator / bug-hunt / root-cause / sentry / session-audit") | persona **Ivan** | The investigator. |
+| `Wes`, `Wess`, `West` (when context is "worker / implementer / hands / red-tweaker / green-tweaker") | persona **Wes** | The worker. |
+| `Yohai`, `Yoh-eye`, `Yo-hai`, `Yoh-haye` | persona **Yohai** (Comptroller / mevaker) | Hebrew name. The audit voice at `usegin/comptroller/`. |
+
 ## Syntax conventions (NOT word substitutions)
 
 These are signals from Lihu that Gin should interpret semantically — see zettel `z004`.

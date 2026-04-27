@@ -60,18 +60,20 @@ deliverable shape. Often shared across members; sometimes per-variant.>
 The teams below are *named extractions* of compositions already implicit
 in our skills. Each will be authored as we go (open-to-empty z003).
 
-| Team | Personas | Mode | Driven by |
-|---|---|---|---|
-| `brainstorm-team` | Poll, Din, Johan, John, Cal (variants) | parallel-independent | `brainstorm` skill |
-| `refine-team` | Sam, Mark, Ron (per-slice owners) | parallel-edit-in-place | `refine` skill |
-| `prioritize-team` | Mark (pragmatic), Cal (risk), Johan (strategic), Sam (evidence) | parallel-rank + Borda merge | `prioritize` skill |
-| `rnd-team` | Poll × N (one per angle) + Sam (synthesizer) | parallel-independent + cross-cut | `rnd` skill |
-| `cell-team` | Mark (spawner), Wes × N (workers), Ron (reviewer) | spawner-led + sequential | `cell` skill |
-| `tdd-team` | Mark (director), Wes (red), Wes (green), Ron (discipline) | strict-sequential, hook-gated | `tdd-execute` skill |
-| `post-mortem-team` | Ivan (investigator), Cal (critic), Sam (synthesis) | sequential-with-Q&A | `tikur` skill |
-| `consult-team` | Consultant (single-agent) | single-voice | `consult` skill |
-| `pair-team` | Gin + human | tight-loop | `interactive-dev` skill |
-| `red-blue-team` | John (red), Johan (blue), Sam (purple/synthesis) | adversarial-with-synthesis | `security-review`, `ultrareview` |
+| Team | File | Personas | Mode | Driven by |
+|---|---|---|---|---|
+| `brainstorm-team` | brainstorm-team.md | Poll, Din, Johan, John, Cal (variants) | parallel-independent | `brainstorm` skill |
+| `refine-team` | refine-team.md | Sam, Mark, Ron (per-slice owners) | parallel-edit-in-place | `refine` skill |
+| `prioritize-team` | prioritize-team.md | Mark, Johan, John, Sam (+optional Cal) | parallel-rank + Borda merge | `prioritize` skill |
+| `rnd-team` | rnd-team.md | Poll × N + Sam | parallel-independent + cross-cut | `rnd` skill |
+| `cell-team` | cell-team.md | Mark + Wes × N + Ron (+optional Tim, Yohai) | spawner-led + sequential | `cell` skill |
+| `red-blue-purple` | red-blue-purple.md | John+Cal (red), Johan (blue), Sam (purple) | sequential / parallel-then-debate | `security-review`, `ultrareview` |
+| `pre-mortem-team` | pre-mortem-team.md | Cal + John × 2-3 + Sam | parallel-imagination + synthesis | pre-commitment risk |
+| `debate-team` | debate-team.md | Mark + Johan + John + Cal (+ optional Poll) | dialogic — N rounds revise-after-reading | direction debates |
+| `andon-team` | andon-team.md | Wes + Yohai + Mark | live observer with halt-permission | `companion` skill |
+| `tikur-team` | tikur-team.md | Ivan, Cal, John, Sam, Mark | sequential-with-Q&A | `tikur` skill |
+| `consult-team` | consult-team.md | Consultant solo | single-voice | `consult` skill |
+| `six-hats-team` | six-hats-team.md | one persona per hat | sequential | open-to-empty |
 
 The shape can grow. New teams earn their place by being instantiated by
 hand at least once first (z015 — pre-game manual).
