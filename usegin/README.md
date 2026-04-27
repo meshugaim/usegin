@@ -16,6 +16,18 @@ UseGin is the new name. Earlier names this absorbed (in supersession order): "Cl
 - **`wispr-flow-corrector/dictionary.md`** — word-level corrections for Wispr Flow misheardings. UseGin manages it.
 - **`translators/`** — cross-domain term maps. `physics-to-dev.md` is open-to-empty; per-language translators ditto until friction appears.
 
+## Peer agent: Zisser
+
+`zisser/` (repo root, peer to `usegin/`) is **Lihu's chief-of-staff agent** —
+the orchestrator he tells everything to. Zisser is for Lihu's whole life;
+UseGin is the dev agent for AskEffi. They are peers and call each other:
+
+- Lihu → Zisser → UseGin when Lihu wants a dev change.
+- UseGin → Zisser when UseGin needs Lihu's life-context or wants to surface
+  something into the broader thread.
+
+Spawnable as a sub-agent via `.claude/agents/zisser.md`. See `zisser/README.md`.
+
 ## Runtime surface
 
 `tools/dx/` is the executable side of UseGin — the `dx` CLI you actually run. New surface this slice: `dx zettel` (see `usegin/zettel/SLICE-1.md`). Existing: `dx his`, the dx feature toggles. UseGin (the markdown workspace) and `tools/dx/` (the executable) together = the full DX app.
