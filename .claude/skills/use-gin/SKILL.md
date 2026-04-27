@@ -43,3 +43,22 @@ See `tools/session/CLAUDE.md` and `session --help`.
 ### Rate session vibe mid-session
 
 `dx his rate --as=claude` / `dx his note --as=claude` — file telemetry without waiting for `/end`. See `.claude/skills/his-self-rating/SKILL.md`.
+
+### Read / write the team Slack via Gin
+
+**Yes.** UseGin-Slack is the team's Gin-mediated Slack surface. Same shape as `plan` (Linear-via-Gin): one shared bot token in `USEGIN_SLACK_BOT_TOKEN`, attribution in the message via `*[via <human>]*` prefix, NOT per-user OAuth. ENG-ids in outbound messages auto-link to Linear.
+
+```bash
+dx slack whoami                          # bot identity, workspace, scopes
+dx slack post "<msg>"                    # post to #usegin outbox (ENG-IDs auto-linked)
+dx slack send <#channel> "<msg>"         # post to a specific channel
+dx slack send <#ch> --thread <ts> "msg"  # thread reply
+dx slack read <#channel> [--since 1d]    # recent messages
+dx slack inbox [--unread] [--since 1d]   # @usegin mentions queue (poll-on-invoke)
+```
+
+All commands honor the dx output convention (human → stderr, JSON → stdout, `--json` flag, `DX_OUTPUT=json` env). Token is masked in every error path.
+
+Outbox channel is `#usegin` by default; override with `USEGIN_OUTBOX_CHANNEL`. Linear org URL for ENG-ID auto-link is `https://linear.app/askeffi` by default; override with `LINEAR_ORG_URL`.
+
+See `tools/dx/src/slack/README.md` for setup recipe and `usegin/research/slack-integration/DEMO.md` for the end-to-end demo (UseGin + customer-facing AskEffi-Slack on the same page).
