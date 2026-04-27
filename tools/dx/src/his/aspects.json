@@ -1,0 +1,35 @@
+{
+  "_doc": "How-Is-Session aspects. Edit freely — adding an aspect requires zero schema or code change. Each aspect: { aliases?: string[], hint?: string }. Buckets are organizational only; ratings store the canonical key as a string. Unknown keys submitted via the CLI still pass through (lean).",
+  "_scale": "1..100 (warned, not enforced)",
+  "human": {
+    "anger":             { "aliases": ["ang"],            "hint": "human anger level" },
+    "frustration":       { "aliases": ["fru", "frus"],    "hint": "human frustration level" },
+    "understood_claude": { "aliases": ["und_c", "uc"],    "hint": "did the human understand claude's plan/output" },
+    "patience":          { "aliases": ["pat"],            "hint": "human patience" }
+  },
+  "claude": {
+    "talked_too_much":   { "aliases": ["ttm"],            "hint": "claude verbosity (high = too verbose)" },
+    "understood_human":  { "aliases": ["und_h", "uh"],    "hint": "did claude understand the human's intent" },
+    "claude_efficiency": { "aliases": ["c_eff", "ce"],    "hint": "claude's own efficiency" },
+    "self_doubt":        { "aliases": ["sd"],             "hint": "uncertainty / second-guessing" },
+    "tool_thrashing":    { "aliases": ["thrash", "tt"],   "hint": "wasted tool calls / dead-end exploration" }
+  },
+  "shared": {
+    "general":                  { "aliases": ["g"] },
+    "conciseness":              { "aliases": ["co"] },
+    "accuracy":                 { "aliases": ["a"] },
+    "efficiency":               { "aliases": ["e"] },
+    "clearness":                { "aliases": ["cl"] },
+    "focus":                    { "aliases": ["f"] },
+    "thoroughness":             { "aliases": ["t"] },
+    "friction_human_claude":    { "aliases": ["f_hc", "fhc"], "hint": "friction between human and claude" },
+    "friction_claude_infra":    { "aliases": ["f_ci", "fci"], "hint": "friction between claude and infrastructure (db, services, network)" },
+    "friction_claude_devenv":   { "aliases": ["f_cd", "fcd"], "hint": "friction between claude and dev env (tooling, shell, CLIs)" },
+    "friction_running_tests":   { "aliases": ["f_rt", "frt"], "hint": "friction with running / interpreting tests" },
+    "friction_human_app":       { "aliases": ["f_ha", "fha"], "hint": "friction between the human and the app being built" },
+    "gap_app_vs_code":          { "aliases": ["g_ac", "gac"], "hint": "gap between app behavior and the code reality" },
+    "gap_code_vs_spec":         { "aliases": ["g_cs", "gcs"], "hint": "gap between code reality and spec" },
+    "gap_intent_vs_outcome":    { "aliases": ["g_io", "gio"], "hint": "gap between what was asked and what shipped" },
+    "vibe":                     { "aliases": ["v"],            "hint": "overall session vibe — high-signal subjective read" }
+  }
+}

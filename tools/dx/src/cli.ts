@@ -19,6 +19,7 @@ import { buildResetCommand } from "./commands/reset";
 import { buildIdentifyCommand } from "./commands/identify";
 import { buildListCommand } from "./commands/list";
 import { buildDocsCommand } from "./commands/docs";
+import { buildHisCommand } from "./his";
 import { applyStandardAliases } from "../../lib/standard-aliases";
 import { enablePrefixMatching } from "../../lib/commander-prefix";
 import { dxShouldOutputJson } from "./output";
@@ -63,6 +64,7 @@ program.addCommand(buildResetCommand());
 program.addCommand(buildIdentifyCommand());
 program.addCommand(buildListCommand());
 program.addCommand(buildDocsCommand());
+program.addCommand(buildHisCommand());
 
 applyStandardAliases(program);
 enablePrefixMatching(program);

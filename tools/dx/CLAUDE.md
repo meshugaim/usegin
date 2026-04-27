@@ -56,6 +56,28 @@ Prefix matching is enabled: `dx st` = `dx status`, `dx r` = `dx resolve`, etc.
 
 **Bare `dx` behavior:** In headless mode (non-TTY / `CLAUDECODE=1`), bare `dx` outputs JSON status. In TTY mode, bare `dx` launches an interactive feature toggle picker.
 
+## How-Is-Session (HIS) — `dx his`
+
+A vibe-rated session telemetry feature lives inside the dx app. Both human and Claude rate the session on extensible aspects (1..100), submissions accumulate per turn (never overwrite), and a Stop hook physically forces Claude to file a final reading when the session is wrapping up.
+
+| Command | Description |
+|---------|-------------|
+| `dx his rate <key=val>...` | Append a rating submission. `--as=human` (default) or `--as=claude`. Trailing free-text becomes the note. |
+| `dx his note "<text>"` | Note-only submission (no aspect scores). |
+| `dx his end` | Mark session as wrapping up — sets the force-rate flag. |
+| `dx his show` | Show all submissions for the current session. |
+| `dx his sessions` | List recently rated sessions. |
+| `dx his aspects [--bucket human\|claude\|shared]` | List registered aspects. |
+| `dx his hook-stop` / `dx his hook-session-end` | Hook handlers (configured in `.claude/settings.json`). |
+
+**Aspects** are an editable registry at `src/his/aspects.json`. Three buckets: `human` (anger, frustration, understood_claude…), `claude` (talked_too_much, tool_thrashing, self_doubt…), `shared` (vibe, friction_*, gap_*, accuracy, focus…). Adding an aspect = one entry in the JSON; no schema or code change. Unknown keys submitted via the CLI still pass through (lean).
+
+**Storage**: SQLite at `~/.claude/dx-his/his.db` via `bun:sqlite` (zero new deps). Three tables: `sessions`, `submissions`, `aspect_scores` — schemaless for aspects.
+
+**Slash commands**: `/rate` wraps `dx his rate --as=human`; `/end` triggers wrap-up with a forced Claude reading.
+
+**Why it exists**: the session *vibe* — friction, gaps, talking-past-each-other — tells a lot about the quality of the session, the code, the spec, the dev env. We want both faces of the conversation reading their own pulse, accumulating signal we can mine later.
+
 ## Architecture
 
 Three-layer command design (same as effi-cli):
