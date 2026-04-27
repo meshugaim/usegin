@@ -40,11 +40,12 @@ This list grows as Gin finds things only humans can do:
 
 1. **Register the two Slack apps** at api.slack.com:
    - **UseGin** app — bot scopes: `chat:write`, `channels:read|history`, `groups:read|history`, `im:history`, `mpim:history`, `app_mentions:read`, `reactions:write`, `users:read`. Install on AskEffi workspace. Copy `xoxb-…` token.
-   - **AskEffi-Slack** app — DISTINCT from UseGin. Bot scopes: `channels:read|history`, `groups:read|history`, `users:read`, `team:read`. NO DM scopes. NO `commands` (R2 lean: read-only at MVP). OAuth redirect: `${NEXT_PUBLIC_SITE_URL}/api/slack/callback`.
+   - **AskEffi-Slack** app — DISTINCT from UseGin. Bot scopes: `channels:read|history`, `groups:read|history`, `users:read`, `team:read`. NO DM scopes (G's RLS-leak posture). OAuth redirect: `${NEXT_PUBLIC_SITE_URL}/api/slack/callback`. **Plus Event Subscriptions:** turn on, set Request URL to `${NEXT_PUBLIC_SITE_URL}/api/slack/events`, subscribe to bot events `app_uninstalled`, `tokens_revoked`, `channel_rename` (per C5).
 2. **Set Doppler secrets:**
    - `USEGIN_SLACK_BOT_TOKEN=xoxb-…` (UseGin app's token)
    - `SLACK_CLIENT_ID=…`, `SLACK_CLIENT_SECRET=…` (AskEffi-Slack app's OAuth credentials)
-3. **Generate `TOKEN_ENCRYPTION_KEY`:** `openssl rand -base64 32` → set in Doppler + Railway sealed vars. ENG-5413 (token-crypto helper) is in flight; until the key is real, the helper fails loud per its quality gate.
+   - `SLACK_SIGNING_SECRET=…` (AskEffi-Slack "Basic Information → Signing Secret" — required for Events route)
+3. **Generate `TOKEN_ENCRYPTION_KEY`:** `openssl rand -base64 32` → set in Doppler + Railway sealed vars. The Slack callback fails loud without it (z091 quality gate).
 4. **Confirm rotation cadence** for the encryption key — proposed default: on suspected compromise + annually.
 
 ### Medium priority (Marketplace track)

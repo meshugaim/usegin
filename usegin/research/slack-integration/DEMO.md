@@ -136,7 +136,18 @@ At https://api.slack.com/apps → "Create New App" → "From scratch":
   - **NOT** `im:*` / `mpim:*` (G's RLS-leak posture)
   - `commands` is optional (we're not using slash commands at MVP, but cheap to add)
 
-Copy the `Client ID` and `Client Secret` from "Basic Information" → "App Credentials".
+**Event Subscriptions** (per C5 — required for lifecycle handling):
+
+- Turn on Event Subscriptions.
+- **Request URL:** `${NEXT_PUBLIC_SITE_URL}/api/slack/events` — Slack will ping it once with a `url_verification` challenge; our route returns the challenge in plain text so it should verify on save.
+- **Subscribe to bot events:**
+  - `app_uninstalled` — admin removed the app → we mark install revoked + delete bindings.
+  - `tokens_revoked` — tokens invalidated → we mark install revoked, preserve bindings (so customer can reconnect without losing config).
+  - `channel_rename` — STRICT-BREAK per CF9 (RLS-leak vector if we silently followed the id) → we delete bindings for the renamed channel id.
+
+From "Basic Information → App Credentials" copy:
+- `Client ID` and `Client Secret` (for OAuth callback).
+- `Signing Secret` (for Events route signature verification).
 
 - [ ] App registered
 - [ ] Distinct from UseGin (different `app_id`)
@@ -150,6 +161,7 @@ Copy the `Client ID` and `Client Secret` from "Basic Information" → "App Crede
 ```bash
 doppler secrets set SLACK_CLIENT_ID="…"
 doppler secrets set SLACK_CLIENT_SECRET="…"
+doppler secrets set SLACK_SIGNING_SECRET="…"   # required by Events route
 
 # Optional but recommended — strict-app filter for cross-app installs:
 doppler secrets set SLACK_CLIENT_APP_ID="A0XXXXXXX"   # AskEffi-Slack's app_id
@@ -159,6 +171,7 @@ doppler secrets set SLACK_CLIENT_APP_ID="A0XXXXXXX"   # AskEffi-Slack's app_id
 
 - [ ] `SLACK_CLIENT_ID` set
 - [ ] `SLACK_CLIENT_SECRET` set
+- [ ] `SLACK_SIGNING_SECRET` set
 - [ ] `SLACK_CLIENT_APP_ID` set (optional)
 
 ### 2c. Run the dev server (or open staging)
@@ -235,7 +248,7 @@ cd nextjs-app && bun scripts/backfill-slack-token-encryption.ts --dry-run
 - **Effi answering questions about Slack messages.** That's C4 (Events API ingestion + sync worker → data items). Future slice.
 - **Slack-to-Effi bidirectional / `@Effi mention`.** R2 lean is read-only at MVP.
 - **Marketplace listing.** Required for >5 customer workspaces (May-2025 ToS); see `usegin/research/slack-marketplace/submission-checklist.md`.
-- **Lifecycle: channel rename / archive / `tokens_revoked` / `app_uninstalled`.** C5 — webhook event types not yet wired.
+- ~~**Lifecycle: channel rename / archive / `tokens_revoked` / `app_uninstalled`.**~~ ✓ C5 wired (commit `833f0e159`): `channel_rename` strict-breaks bindings, `app_uninstalled` revokes + deletes, `tokens_revoked` revokes + preserves bindings. `channel_archive` / `channel_deleted` still deferred (soft-deactivate vs hard-delete dilemma — defer until a customer hits it).
 - **Encryption key rotation.** Recommended cadence proposed in `usegin/research/token-encryption/recommendation.md`; not automated yet.
 
 ---
