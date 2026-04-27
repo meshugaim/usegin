@@ -53,12 +53,21 @@ This list grows as Gin finds things only humans can do:
 6. Read `usegin/research/slack-marketplace/submission-checklist.md` — 7 phased blockers; submission itself is Lihu-only.
 7. Privacy policy + terms of service need Slack-specific clauses.
 
-### Cross-agent friction — Tom watch this
+### Cross-agent friction — STRUCTURAL, escalated by Yohai audit 1
 
-8. Pre-push hook tests run against the full working tree, not just commits in scope. If one Gin's commit fails tests in another Gin's in-flight code, push gets blocked for everyone. See zettel z095. Lihu should decide whether to:
-   - Tighten pre-push to only the scope of the commit
-   - Accept this and let Gins coordinate via "wait for the parallel batch to fully land before push"
-   - Allow `--no-verify` for Gin-orchestrator pushes (NOT for slice commits)
+**This is now the dominant time-sink for parallel-Gin batches. Yohai audit 1 (`usegin/comptroller/audits/2026-04-27-2130-slack-batch-2.md`) flagged it RED. Parallel batches are PAUSED until Lihu/Tom pick a fix.**
+
+8. **Three autosync collision modes have fired in single batches.** Captured in z094, z095, z096. Pick one fix:
+   - **(a) Stash-before-reset.** `git stash --include-untracked` before any autosync `git reset --hard`. Cheap. Doesn't fix attribution swap.
+   - **(b) Range-scoped pre-push.** Pre-push lint/typecheck only against the diff of commits being pushed, not the full working tree. Removes cross-agent block. Doesn't fix reset-wipe.
+   - **(c) `dx wait-for-clean-tree` + commit-serialization.** Agents acquire a lock before `git add`+`git commit`+`git push`. Fixes attribution swap. Adds latency.
+   - **Combined:** (a)+(b)+(c) is the principled answer. Probably worth a tikur (`.claude/skills/tikur/`).
+
+9. **Tikur recommended.** Three failure modes in one batch is the criterion. Run it once Lihu/Tom is back.
+
+10. **Until a fix lands**, Gin-orchestrator runs slices **single-agent** (this Gin does the work directly, no parallel sub-Gins) for:
+   - C3 UI restoration (in flight as of this update — Gin-D3's UI files were the casualty of the z094 reset-wipe).
+   - Any future slice that touches `nextjs-app/` (most-collision-prone area).
 
 ## How to talk to this Gin
 

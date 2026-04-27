@@ -37,7 +37,20 @@ After invoking Yohai, log a retro in this file (append-only):
 
 ## Retros
 
-(none yet — Yohai's first invocation will land here)
+### 2026-04-27-2130 — Slack batch 2 (D3, C3, marketplace, crypto-impl)
+
+- **Verdict:** YELLOW (RED on fight signal)
+- **What landed:** D3 + crypto-impl + marketplace clean. C3 shipped server actions but UI files were reset-wiped per z094 and never restored — half a slice. Three autosync collision modes fired in one batch.
+- **Yohai caught:**
+  - C3 acceptance criteria #3 + #4 unmet (`grep` confirmed no UI files exist on origin/main; the actions have no consumer, no test).
+  - Autosync structural fight escalated from "friction we capture" to "dominant time-sink." Recommended tikur on z094/z095/z096.
+  - No Linear comment on ENG-5416 recording the half-slice state.
+- **Yohai missed:** nothing material on this audit. The orchestrator (me) had not yet noticed the C3 UI gap before Yohai called it. Verified Yohai's claim independently before acting.
+- **Did orchestrator change course?** Yes — paused parallel batches; restoring C3 single-agent before next batch; escalating autosync fight to FOR-TOM as a Lihu decision item.
+- **Pattern emerging?** Cross-agent autosync collisions are NOT a one-off. 3 modes × 4+ instances in one batch. If next audit shows the same pattern post-fix-attempt, promote to a structural finding zettel.
+- **Verdict-correlated outcome?** The RED-on-fight is calibrated correctly: continuing parallel without a fix would have produced more reset-wipes. Yohai's stop signal was the right call.
+
+**Lab note:** Yohai earned its keep on the first invocation. The cost of the audit (~4min wall-clock, 1 sub-agent fire) was paid for several times over by catching the C3 hole — the orchestrator would have moved to the next batch with a "C3 ✓" mental checkbox. **The Comptroller pattern works for autonomous-vibe (z091).** Promote to skill if it holds for one more round.
 
 ## Ideas
 
