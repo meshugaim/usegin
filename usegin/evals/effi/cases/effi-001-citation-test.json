@@ -1,0 +1,69 @@
+{
+  "_comment_top": "First Effi case (S2). Tests citation-faithful DoG against a real-shaped transcript pointer. The conversations bucket path follows the production pattern documented in python-services/agent_api/chat/conversation_service.py (supabase.storage.from_('conversations').download(storage_path)). The session_id below is plausible-but-not-fetched at S2; S3 (runner) will resolve and validate it. Replace with a real session_id once Lihu (or the harvester) lifts a confirmed session into the corpus.",
+
+  "id": "effi-001-citation-test",
+  "title": "Effi must cite the actual Drive doc when answering 'who decided to remove org tier'",
+  "origin": "hand-curated",
+  "_comment_origin": "hand-curated for S2 (no harvester yet); will become 'harvest' once dx evals harvest lands per BUILD-PLAN S? (out of v0 scope)",
+  "threads": ["~z078", "~z033"],
+  "_comment_threads": "z078 is workspace-migration-zettel (project context the case depends on); z033 is the usegin-naming zettel (touches the same workspace cutover); both anchor the mental_model description",
+  "created": "2026-04-28",
+  "authored-by": "gin",
+  "status": "active",
+
+  "source": {
+    "_comment_source": "kind: transcript = Effi corpus (trace-replay at v0 per effi/README.md). The runner reads the JSONL from the conversations Supabase bucket via the storage_path; this case fixes a turn_range so the assertions only apply to the Q&A exchange, not setup chatter.",
+    "kind": "transcript",
+    "uri": "conversations/oria-askeffi-ai/dogfooding/2026-04-22/sess_a3f0c1b2-9e4d-4f17-b3e8-d2c9f5a18b04.jsonl.gz",
+    "session_id": "a3f0c1b2-9e4d-4f17-b3e8-d2c9f5a18b04",
+    "captured_at": "2026-04-22T14:31:08Z",
+    "turn_range": [0, 4],
+    "_comment_turn_range": "Turns 0-3 inclusive: user question + agent's tool-search + agent's read of the Drive doc + agent's final answer. Excludes follow-up clarification turn that introduces a different intent.",
+    "redactions": [
+      { "field": "user_email", "replacement": "<redacted-internal-team>" }
+    ]
+  },
+
+  "mental_model": {
+    "_comment_mental_model": "The world Effi was in when this session was recorded: dogfooding project on prod AskEffi, Drive index up to 2026-04-22, email index same date, Linear synced, Fathom synced. The dataset_uri points at the canonical knowledge snapshot for this session; absence is acceptable at v0 (trace-replay doesn't re-hydrate state) but the description must remain load-bearing.",
+    "description": "AskEffi prod, dogfooding project owned by oria@askeffi.ai. Drive corpus indexed through 2026-04-22T12:00Z including the Workspace migration plan doc (the load-bearing source for the answer). Email and Fathom indexed same date. The user is an internal team member asking a project-history question; tier is internal so PII filtering is permissive (still: no leaks of unrelated docs).",
+    "dataset_uri": "snapshot://conversations/a3f0c1b2/knowledge-state-2026-04-22.json",
+    "fixtures": {
+      "tools_available": [
+        "mcp__file_search__semantic_search",
+        "mcp__data_browse__browse_files",
+        "mcp__data_browse__get_file",
+        "mcp__data_browse__browse_emails",
+        "mcp__data_browse__get_email"
+      ],
+      "context": {
+        "user_role": "internal_team_member",
+        "project": "dogfooding",
+        "tier": "internal"
+      },
+      "time": "2026-04-22T14:31:08Z"
+    }
+  },
+
+  "dog_ref": "../dogs/citation-faithful.md",
+
+  "expected": {
+    "_comment_expected": "Structural assertion targets — the case names what to check; the DoG names how to grade. tool_calls_must_include is the load-bearing structural assertion: if the agent never called semantic_search, it cannot have grounded its answer in retrieved Drive content, regardless of citation tagging. citations_required mirrors DoG dim 1 at the case level. shape_hints carry plain-English hints the judge reads.",
+    "tool_calls_must_include": ["mcp__file_search__semantic_search"],
+    "tool_calls_must_not_include": [],
+    "citations_required": true,
+    "no_pii": true,
+    "shape_hints": [
+      "answers the user's literal question (who + when), not a hedge",
+      "names Lihu Berman as the decision-maker",
+      "names a date in early April 2026",
+      "cites the Workspace migration plan Drive doc inline",
+      "does not cite documents that were not in the retrieval result set"
+    ]
+  },
+
+  "baseline_run_id": null,
+  "_comment_baseline": "null at first authoring; the runner will fall back to 'most recent committed run for this case in the same suite'. Once a canonical baseline run lands in effi/baselines/default.json, replace with that run id and commit.",
+
+  "tags": ["citations", "internal-tier", "drive-doc-source", "v0-cold-start"]
+}
