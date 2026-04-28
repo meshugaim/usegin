@@ -93,7 +93,7 @@ universe is covered.
 |---|---|---|---|
 | 4.1 | Open `security-questionnaire.md` side-by-side with the Slack form. | this folder | ☐ |
 | 4.2 | For each Slack-form question, paste the matching answer. | security-questionnaire.md | ☐ |
-| 4.3 | For every `[LIHU UNKNOWN]` flagged in the questionnaire appendix, fill in the live answer **before** pasting. Do **not** ship raw `[LIHU UNKNOWN]` to Slack. | security-questionnaire.md §Appendix | ☐ |
+| 4.3 | For every `[ORIA]` flagged in the questionnaire appendix, fill in the live answer **before** pasting. Do **not** ship raw `[ORIA]` to Slack. | security-questionnaire.md §Appendix | ☐ |
 | 4.4 | If the form asks anything not covered, do **not** invent an answer. Stop, ping Gin to research, then resume. | — | ☐ |
 
 ---
@@ -118,7 +118,7 @@ Slack reviewers test installation. Make sure it works.
 
 | # | Step | Done |
 |---|---|---|
-| 6.1 | Final scan of the entire form for `[LIHU UNKNOWN]` / placeholder text. | ☐ |
+| 6.1 | Final scan of the entire form for `[ORIA]` / placeholder text. | ☐ |
 | 6.2 | Submit. | ☐ |
 | 6.3 | Note submission timestamp + reviewer ticket ID into ENG-5414 comment. | ☐ |
 

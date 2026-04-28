@@ -50,7 +50,7 @@ before submit.
 **Trigger:** Marketplace requires demonstrated production use — ≥5
 workspaces installed and active in the past 28 days.
 
-**Our state:** [LIHU UNKNOWN] At submission time, will the team's dogfood
+**Our state:** [ORIA] At submission time, will the team's dogfood
 workspace + N pilot customers add up to ≥5? If not, this is a hard block.
 
 **Response:** Track install count week-over-week ahead of submission. If
@@ -78,7 +78,7 @@ anything other than a clean "Add to Slack" → consent modal → success
 redirect = rejection.
 
 **Our state:** ENG-5411 owns the install button UI; landing page
-`/integrations/slack` is [LIHU UNKNOWN] yet to confirm exists.
+`/integrations/slack` is [ORIA] yet to confirm exists.
 
 **Response:** Phase 5.6 of the checklist verifies this end-to-end. Don't
 submit until the smoke test is green.
@@ -113,7 +113,7 @@ landed some controls; current state needs a Lihu lookup (P7).
 > Claude code review with security as an explicit criterion — provide
 > defense-in-depth in the meantime."
 
-[LIHU UNKNOWN] fill in [TOOL]/[PROCESS]/[DATE]/[ENG-XXXX] before sending.
+[ORIA] fill in [TOOL]/[PROCESS]/[DATE]/[ENG-XXXX] before sending.
 
 ### B2 — No SOC 2 certification
 
@@ -220,7 +220,7 @@ renamed-into-`#exec` follow-the-id leak vector."
 
 **Trigger:** Slack rejects private-beta or untested submissions.
 
-**Our state:** [LIHU UNKNOWN] At submission, are we in pilot? The pilot
+**Our state:** [ORIA] At submission, are we in pilot? The pilot
 counts as "tested" if there's real install activity (≥5 workspaces, A3).
 
 **Response:** Frame as "production-pilot" not "beta" in any narrative.
@@ -317,7 +317,7 @@ user tokens. Read-only at MVP per R2.
 
 1. Capture the reviewer's exact wording in an ENG-5414 sub-issue.
 2. Find the matching response template above.
-3. If `[LIHU UNKNOWN]` placeholders exist in the template, fill them.
+3. If `[ORIA]` placeholders exist in the template, fill them.
 4. If no template fits, **don't fabricate** — surface the question to Gin
    for research before responding.
 5. Update this doc append-only with whatever new blocker class we

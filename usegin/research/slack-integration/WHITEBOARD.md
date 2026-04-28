@@ -10,6 +10,49 @@ deleted, only struck-through.
 
 ---
 
+## Lihu's punch list (when you wake up)
+
+Total reading time: ~20 minutes. Total decision count: 9 charter questions
+plus a few marketplace `[ORIA]` flags.
+
+### Charters waiting on you (read in this order)
+
+1. **`D5.1-charter-session-wt.md`** — 5 questions (~5 min). Q1-Q5 are the
+   posture call on per-session worktrees. Once answered, an autonomous Gin
+   builds it in a half-day; that unblocks parallel autonomous-vibe forever.
+   *Lean:* Q1=(c) opt-in autonomous-only · Q2=(a) `.worktrees/<id>/`
+   · Q3=(b) auto-rebase + manual gc · Q4=(a) gradual ramp · Q5=(a) build now.
+
+2. **`c4-spec.md`** — 4 questions (~5 min). Q1-Q4 are about Slack message
+   ingestion (the next big slice). *Lean:* Q1=(b) bounded backfill at install
+   · Q2=(a) capture reactions in `raw` · Q3=(c) defer UI to C7 · Q4=(b) ship
+   C4 after the demo.
+
+### Marketplace `[ORIA]` items (3 unresolved)
+
+In `usegin/research/slack-marketplace/security-questionnaire.md`:
+
+- **§7 IR runbook** — ENG-4241 is Backlog. Either ship a 1-2 page runbook
+  before submission, or pick the "informal escalation, runbook on roadmap"
+  framing for the questionnaire.
+- **§7 breach SLA** — confirm exact wording in the live customer DPA.
+- **§2 Railway transport** — Railway internal-network encryption posture
+  needs verification at the infra layer if a reviewer asks.
+- **§5 D1 orphan-blob** — verify Slack data path isn't covered by the D1
+  finding before submission.
+
+(All renamed from `[LIHU UNKNOWN]` to `[ORIA]` for consistency this turn.)
+
+### Marketplace patch SLA
+
+In §10 of the same file: if a reviewer asks for a written patch-SLA, we don't
+have one. Either commit a number ("critical patched within 7 days") or
+declare informal-on-roadmap.
+
+---
+
+---
+
 ## Status legend
 
 - `[ ]` queued

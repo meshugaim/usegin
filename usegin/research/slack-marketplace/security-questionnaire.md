@@ -4,7 +4,7 @@
 `docs/security/reports/`. Where the existing posture has a known gap, the
 answer says so honestly and links to the gap. **Nothing in this doc is
 fabricated** — when an answer is genuinely unknown to the author, it's
-flagged `[LIHU UNKNOWN]` for Lihu to fill before submitting.
+flagged `[ORIA]` for Lihu to fill before submitting.
 
 Slack's questionnaire fields evolve; this doc covers the topic universe per
 the Marketplace requirements page (fetched 2026-04-27): OAuth handling, TLS,
@@ -332,7 +332,7 @@ still informal (humans review Dependabot PRs as they land).
 
 ---
 
-## Appendix: items genuinely unknown to this draft (`[LIHU UNKNOWN]` consolidated)
+## Appendix: items genuinely unknown to this draft (`[ORIA]` consolidated)
 
 For Lihu's pre-submit pass:
 
