@@ -164,11 +164,13 @@ export function writeRunResults(
   dryRun: boolean,
   /** When --case <id> restricts to a single case, pass it here to include in runId */
   filteredCaseId?: string,
+  /** Override the output directory (used by matrix-runner to point at cell dirs) */
+  outputDirOverride?: string,
 ): { runDir: string; runId: string; summary: RunSummary } {
   const git = gitInfo();
   const slug = suite.replace(/[^a-z0-9-]/g, "-").slice(0, 20);
   const runId = makeRunId(slug, git, startedAt, filteredCaseId);
-  const runDir = join(runsDir(corpus), runId);
+  const runDir = outputDirOverride ?? join(runsDir(corpus), runId);
 
   mkdirSync(runDir, { recursive: true });
 

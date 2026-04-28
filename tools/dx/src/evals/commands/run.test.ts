@@ -18,6 +18,10 @@ import { parseDog } from "../lib/dog-loader";
 import { runCase } from "../lib/runner";
 import { evaluateDimensions } from "../lib/judge";
 import type { RunSummary } from "../lib/writer";
+import { parseMatrixFlags, cartesian, cellSlug } from "../lib/matrix";
+import { resolvePrompt } from "../lib/prompt-resolver";
+import { runMatrix } from "../lib/matrix-runner";
+import { buildEvalsRunCommand } from "./run";
 
 // Resolve repo root (this file: tools/dx/src/evals/commands/run.test.ts → 5 up)
 function repoRoot(): string {
@@ -85,7 +89,7 @@ describe("dx evals run --dry-run (effi-001-citation-test)", () => {
       CORPUS,
       "default",
       "claude-sonnet-4-6",
-      "python-services/agent_api/agent/effi_system_prompt.py",
+      "baseline",
       "claude-opus-4-7",
       cases,
       [result],
@@ -132,7 +136,7 @@ describe("dx evals run --dry-run (effi-001-citation-test)", () => {
       CORPUS,
       "default",
       "claude-sonnet-4-6",
-      "python-services/agent_api/agent/effi_system_prompt.py",
+      "baseline",
       "claude-opus-4-7",
       cases,
       [result],
@@ -165,7 +169,7 @@ describe("dx evals run --dry-run (effi-001-citation-test)", () => {
       CORPUS,
       "default",
       "claude-sonnet-4-6",
-      "python-services/agent_api/agent/effi_system_prompt.py",
+      "baseline",
       "claude-opus-4-7",
       cases,
       results,
@@ -280,5 +284,238 @@ describe("dx evals run --dry-run (prompt-kind fixture)", () => {
     // pass_count matches
     expect(summary.pass_count).toBe(1);
     expect(summary.error_count).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S4 — Matrix mode tests
+// ---------------------------------------------------------------------------
+
+describe("S4 matrix: parseMatrixFlags + cartesian", () => {
+  it("parses two axes and produces correct cartesian product", () => {
+    const axes = parseMatrixFlags(["model=opus,sonnet", "prompt=v1,v2"]);
+    expect(axes.length).toBe(2);
+    const modelAxis = axes.find((a) => a.axis === "model")!;
+    const promptAxis = axes.find((a) => a.axis === "prompt")!;
+    expect(modelAxis.values).toEqual(["opus", "sonnet"]);
+    expect(promptAxis.values).toEqual(["v1", "v2"]);
+
+    const cells = cartesian(axes, { model: "default-model", prompt: "baseline" });
+    // 2 models × 2 prompts = 4 cells
+    expect(cells.length).toBe(4);
+    const slugs = cells.map(cellSlug);
+    // Slugs use underscores, not = signs
+    expect(slugs).toContain("model_opus__prompt_v1");
+    expect(slugs).toContain("model_opus__prompt_v2");
+    expect(slugs).toContain("model_sonnet__prompt_v1");
+    expect(slugs).toContain("model_sonnet__prompt_v2");
+    // No = characters in any slug
+    for (const slug of slugs) {
+      expect(slug).not.toContain("=");
+    }
+  });
+
+  it("rejects unsupported axes with a clear v0 boundary message", () => {
+    expect(() => parseMatrixFlags(["temperature=0.5,1.0"])).toThrow(
+      /axis "temperature" is not supported at v0/,
+    );
+    expect(() => parseMatrixFlags(["judge-model=opus,sonnet"])).toThrow(
+      /axis "judge-model" is not supported at v0/,
+    );
+  });
+
+  it("single-axis (model only) fills in default prompt", () => {
+    const axes = parseMatrixFlags(["model=opus,sonnet"]);
+    const cells = cartesian(axes, { model: "default-model", prompt: "baseline" });
+    expect(cells.length).toBe(2);
+    expect(cells.every((c) => c.prompt === "baseline")).toBe(true);
+  });
+
+  it("gin corpus with no prompt axis yields model-only slug (no = chars)", () => {
+    const axes = parseMatrixFlags(["model=opus,sonnet"]);
+    const cells = cartesian(axes, { model: "claude-sonnet-4-6", prompt: "(embedded)" });
+    const slugs = cells.map(cellSlug);
+    expect(slugs).toContain("model_opus");
+    expect(slugs).toContain("model_sonnet");
+    for (const slug of slugs) {
+      expect(slug).not.toContain("=");
+      expect(slug).not.toContain("prompt");
+    }
+  });
+});
+
+describe("S4 matrix: end-to-end dry-run produces matrix.md + per-cell sub-dirs", () => {
+  const createdDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of createdDirs) {
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    }
+    createdDirs.length = 0;
+  });
+
+  it("2×2 matrix dry-run creates 4 cell dirs + matrix.md + matrix.json + matrix-rollup.json", async () => {
+    const corpus = "effi";
+    const cases = loadCases(corpus, "effi-001-citation-test");
+    const dogsByCase = new Map();
+    for (const c of cases) {
+      dogsByCase.set(c.id, loadDog(c.dog_ref, corpus, c._file_path));
+    }
+
+    const axes = parseMatrixFlags(["model=opus,sonnet", "prompt=baseline,strict-citations"]);
+    const cells = cartesian(axes, { model: "claude-sonnet-4-6", prompt: "baseline" });
+    expect(cells.length).toBe(4);
+
+    const startedAt = new Date().toISOString();
+    const result = await runMatrix(
+      corpus,
+      "default",
+      cells,
+      cases,
+      dogsByCase,
+      "claude-opus-4-7",
+      true, // dry-run
+      undefined,
+      startedAt,
+      () => {},
+    );
+    createdDirs.push(result.runDir);
+
+    // matrix.md exists
+    expect(existsSync(join(result.runDir, "matrix.md"))).toBe(true);
+    // matrix.json exists
+    expect(existsSync(join(result.runDir, "matrix.json"))).toBe(true);
+    // matrix-rollup.json exists (renamed from summary.json at run level)
+    expect(existsSync(join(result.runDir, "matrix-rollup.json"))).toBe(true);
+
+    // 4 cell sub-directories
+    expect(result.cells.length).toBe(4);
+    for (const cell of result.cells) {
+      expect(existsSync(cell.cellDir)).toBe(true);
+      expect(existsSync(join(cell.cellDir, "summary.json"))).toBe(true);
+      expect(existsSync(join(cell.cellDir, "summary.md"))).toBe(true);
+    }
+
+    // matrix.md contains cell slugs (underscore format, no = signs)
+    const md = readFileSync(join(result.runDir, "matrix.md"), "utf-8");
+    expect(md).toContain("model_opus");
+    expect(md).toContain("model_sonnet");
+    expect(md).toContain("prompt_baseline");
+    expect(md).toContain("prompt_strict-");
+    expect(md).not.toContain("model=");
+    expect(md).not.toContain("prompt=");
+
+    // matrix.json has 4 cells and includes dim_scores
+    const matrixJson = JSON.parse(readFileSync(join(result.runDir, "matrix.json"), "utf-8")) as {
+      cells: Array<{ slug: string; dim_scores: unknown[] }>;
+    };
+    expect(matrixJson.cells.length).toBe(4);
+    for (const cell of matrixJson.cells) {
+      expect(Array.isArray(cell.dim_scores)).toBe(true);
+      // slug must not contain = characters
+      expect(cell.slug).not.toContain("=");
+    }
+
+    // matrix-rollup.json has arrays for models/prompts (not comma-joined strings)
+    const rollup = JSON.parse(
+      readFileSync(join(result.runDir, "matrix-rollup.json"), "utf-8"),
+    ) as { meta: { models: string[]; prompts: string[]; git: unknown; whoRan: unknown; finishedAt: string } };
+    expect(Array.isArray(rollup.meta.models)).toBe(true);
+    expect(Array.isArray(rollup.meta.prompts)).toBe(true);
+    expect(rollup.meta.git).toBeDefined();
+    expect(rollup.meta.whoRan).toBeDefined();
+    expect(rollup.meta.finishedAt).toBeDefined();
+  });
+});
+
+describe("S4 matrix: gin corpus + --matrix prompt= errors clearly", () => {
+  it("resolvePrompt throws for gin corpus", () => {
+    expect(() => resolvePrompt("gin", "v1")).toThrow(
+      /Gin cases embed their prompt; --matrix prompt= is Effi-only/,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S4 matrix: CLI-driven tests (fix #6 — drives Commander parseAsync)
+// ---------------------------------------------------------------------------
+
+describe("S4 matrix: CLI-driven end-to-end via Commander", () => {
+  const createdDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of createdDirs) {
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    }
+    createdDirs.length = 0;
+  });
+
+  it("parseAsync: --matrix model=opus,sonnet --matrix prompt=baseline,strict-citations --dry-run produces matrix.md", async () => {
+    // Capture the run dir by watching the effi runs dir before + after
+    const effiRunsDir = join(repoRoot(), "usegin", "evals", "effi", "runs");
+
+    // List dirs before
+    const { readdirSync: rd } = await import("fs");
+    const before = new Set(rd(effiRunsDir).filter((d) => d.endsWith("-matrix")));
+
+    const cmd = buildEvalsRunCommand();
+    // parseAsync does not call process.exit on success
+    await cmd.parseAsync([
+      "--corpus", "effi",
+      "--matrix", "model=opus,sonnet",
+      "--matrix", "prompt=baseline,strict-citations",
+      "--dry-run",
+    ], { from: "user" });
+
+    // Find newly created matrix run dir
+    const after = rd(effiRunsDir).filter((d) => d.endsWith("-matrix") && !before.has(d));
+    expect(after.length).toBeGreaterThanOrEqual(1);
+    const runDir = join(effiRunsDir, after[after.length - 1]!);
+    createdDirs.push(runDir);
+
+    // matrix.md exists and contains both cell slugs (no = chars)
+    const mdPath = join(runDir, "matrix.md");
+    expect(existsSync(mdPath)).toBe(true);
+    const md = readFileSync(mdPath, "utf-8");
+    expect(md).toContain("model_opus");
+    expect(md).toContain("model_sonnet");
+    expect(md).not.toContain("model=");
+    expect(md).not.toContain("prompt=");
+  });
+
+  it("parseAsync: --matrix prompt=v1 --corpus gin --dry-run exits with error message about gin+prompt", async () => {
+    // Override process.exit to capture the exit code
+    const originalExit = process.exit.bind(process);
+    let capturedCode: number | undefined;
+    const stderrChunks: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+
+    process.exit = ((code?: number | string) => {
+      capturedCode = typeof code === "number" ? code : 2;
+      throw new Error(`process.exit(${capturedCode})`);
+    }) as typeof process.exit;
+
+    (process.stderr as NodeJS.WriteStream & { write: (chunk: string) => boolean }).write = (chunk: string) => {
+      stderrChunks.push(chunk);
+      return true;
+    };
+
+    try {
+      const cmd = buildEvalsRunCommand();
+      await cmd.parseAsync([
+        "--corpus", "gin",
+        "--matrix", "prompt=v1",
+        "--dry-run",
+      ], { from: "user" });
+    } catch {
+      // expected — process.exit throws
+    } finally {
+      process.exit = originalExit;
+      (process.stderr as NodeJS.WriteStream & { write: typeof originalWrite }).write = originalWrite;
+    }
+
+    expect(capturedCode).toBe(2);
+    const stderr = stderrChunks.join("");
+    expect(stderr).toContain("Gin cases embed their prompt");
   });
 });

@@ -84,6 +84,25 @@ Effi cases are ship-grade. They reference real user sessions; handle with care.
   Never delete.
 - **Baseline bumps:** Lihu only. Commit message must name the reason.
 
+## Prompts
+
+`effi/prompts/` is where Effi's evaluable system prompts live. These are the
+prompts that the eval runner compares across the matrix — they are canonical
+reference prompts, not test fixtures.
+
+| File | Purpose |
+|------|---------|
+| `baseline.md` | Default prompt used in all runs unless overridden. The current working version under active evaluation. |
+| `strict-citations.md` | Stricter citation variant — every claim must be immediately cited. |
+| `prod-snapshot-2026-04-28.md` | Read-only snapshot of `EFFI_SYSTEM_PROMPT` from production as of 2026-04-28. Run `--prompt prod-snapshot-2026-04-28` to reproduce production-baseline behavior. |
+
+To add a new prompt: create `effi/prompts/<name>.md`, then reference it via
+`--prompt <name>` or `--matrix prompt=<name>,…`.
+
+Production code (`python-services/`) is read-only at v0. New prompt experiments
+live here, in `effi/prompts/`. Apply winners back to production manually after
+Lihu's sign-off.
+
 ## DoGs in this corpus
 
 `effi/dogs/` contains one DoG doc per named goal:
