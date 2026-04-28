@@ -96,3 +96,26 @@ git commit -m "..."
 ```
 
 The hook is a no-op if no snapshot was recorded (interactive humans, recovery flows). For autonomous runs, treat the snapshot step as mandatory before every commit. See `.claude/tikur-records/2026-04-28-multi-gin-checkout-collisions.md` for the full mechanism and the structural fix that supersedes this.
+
+### External-system configuration — probe before trust
+
+When a human collaborator says **"I added the X scope" / "I registered the Y URL" / "I set the Z field"** on an external system you cannot read directly (Slack admin console, Stripe dashboard, OAuth provider settings, Linear webhook config, DNS records, Cloudflare ingress), **trust is not enough — you must probe the live state before claiming the configuration is correct in any downstream artifact** (a map, a status report, a dispatched prompt, a charter).
+
+This is a 2-touch cluster as of 2026-04-28 — see `.claude/tikur-records/2026-04-28-slack-redirect-uri-not-registered-cluster-touch-2.md` and `feedback_preflight_external_identifiers_in_dispatched_prompts` (which the prior 2026-04-27 tikur produced and which did NOT prevent the recurrence because it lived in deep memory). The lekach belongs here, in the front-door handbook.
+
+**Probe shapes by category:**
+
+| External config | Probe |
+|---|---|
+| Slack OAuth redirect URIs | Run the OAuth init (e.g. `connectSlackAction` via playwright). Slack will reject with `redirect_uri did not match any configured URIs. Passed URI: <yours>` if your URL isn't on the list — exposing both *that* it's missing and *what string* the app saw. |
+| Slack bot scopes | Same OAuth init. Slack rejects with `invalid_scope: <scope>` if any requested scope isn't on the app. |
+| Slack Events Subscription URL | When Lihu saves the URL Slack-side, Slack POSTs `{type: "url_verification", challenge: "..."}` to it. Tail the dev-server log for that request; absence of a 200 response = URL never registered or signing-secret mismatch. |
+| Linear API token | `plan list --limit 1` — non-zero exit + auth error = bad token. |
+| Cloudflare tunnel ingress | `just tunnel status` shows CONNECTED + `curl https://local-dev.askeffi.ai/api/health` returns the live status JSON. |
+| Doppler secret | `doppler --project <p> --config <c> secrets get <NAME> --plain` — empty output = not set. |
+| Supabase RLS policies | `EXPLAIN` the query as the target role; missing policy = no rows. |
+| OAuth client_id at any provider | Running the auth flow always reveals it via the redirect chain or error message; never trust "I set it" on the value. |
+
+**Anti-pattern:** "I asked Lihu, he said yes." That counts as evidence-of-intent, not evidence-of-state. Yesterday's tikur was triggered by exactly this pattern; today's tikur was triggered by exactly this pattern after yesterday's lekach landed only in memory. **The minute someone says "I did" on external config, the next action is the probe — not a status update.**
+
+When the probe surfaces a mismatch, the diagnostic question for the human is "read me the exact string from the admin console" — never "did you really add it?" (which yields the same verbal-yes the original assertion did).
