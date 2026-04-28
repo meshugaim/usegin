@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@clack/prompts": "^1.0.1",
     "@slack/web-api": "^7.15.1",
     "commander": "^14.0.3"

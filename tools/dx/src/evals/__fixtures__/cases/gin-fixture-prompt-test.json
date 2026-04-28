@@ -1,0 +1,28 @@
+{
+  "id": "gin-fixture-prompt-test",
+  "title": "Fixture: prompt-kind case for offline dry-run testing",
+  "origin": "hand-curated",
+  "threads": [],
+  "created": "2026-04-27",
+  "authored-by": "gin",
+  "status": "active",
+  "source": {
+    "kind": "prompt",
+    "prompt": "What is 2 + 2?",
+    "assertions": [
+      "Provides a direct numeric answer",
+      "Does not hallucinate"
+    ],
+    "agent_model_default": "claude-haiku-4-5"
+  },
+  "mental_model": {
+    "description": "Trivial arithmetic fixture. No external state required. Used for offline dry-run tests only.",
+    "fixtures": {
+      "tools_available": []
+    }
+  },
+  "dog_ref": "../dogs/fixture-discipline.md",
+  "expected": {
+    "shape_hints": ["answers with the number 4"]
+  }
+}
