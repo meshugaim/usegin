@@ -27,12 +27,10 @@ deleted, only struck-through.
 - [x] `2d85a2828` — wire `check-staging-drift.sh` into `.husky/pre-commit`,
       add `snapshot-staged.sh` helper, document multi-Gin-safe commit recipe
       in `use-gin` SKILL.md.
-- [!] D5.1 — build `dx session-wt` (per-session worktree). **Blocked on
-      Lihu posture call** (CLOSE.md § D5: how Oria's interactive work
-      coexists with agent worktrees). I can write the build-charter as
-      `[ORIA]`-hole spec → next task.
-- [ ] D5.1-spec — author build-charter for `dx session-wt` with the posture
-      questions surfaced; no code, just the spec Lihu reads cold.
+- [x] `46f36da5d` — D5.1 build-charter (`D5.1-charter-session-wt.md`)
+      with 5 `[ORIA]` posture questions. Reads cold; once answered,
+      build is ~half-day single-session.
+- [!] D5.1-build — blocked until Lihu answers Q1-Q5 in the charter.
 
 ### Track B — Marketplace prep (ENG-5417)
 
@@ -56,14 +54,12 @@ Per CLOSE.md "the next slice is C4": Events route already receives messages
 (ENG-5409 shipped); the missing layer is *persisting them as data items so
 Effi can answer questions about Slack messages*.
 
-- [ ] read `recommendation.md` and `SYNTHESIS.md` for the existing C4
-      architecture decisions (already converged in the round).
-- [ ] read existing `data_items` schema + ingestion pipeline (what
-      Drive/Linear ingestion does today) to map Slack onto the same shape.
-- [ ] author spec at `usegin/research/slack-integration/c4-spec.md` —
-      acceptance criteria + open questions as `[ORIA]` holes.
-- [ ] slicing-specs decomposition once spec is approved (post-Lihu).
-- [ ] tdd-impl-plan for slice 1 (post-Lihu).
+- [x] (next commit) — `c4-spec.md`: acceptance criteria A1-A9, slice
+      decomposition C4.1-C4.5, four `[ORIA]` posture questions
+      (backfill story, reactions in `raw`, failure visibility,
+      ship-before-or-after-demo).
+- [!] slicing-specs decomposition — blocked on Q1-Q4 of c4-spec.
+- [!] tdd-impl-plan for C4.1 — blocked on slicing.
 
 ### Track D — Housekeeping
 
