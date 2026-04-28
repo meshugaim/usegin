@@ -63,14 +63,10 @@ Effi can answer questions about Slack messages*.
 
 ### Track D — Housekeeping
 
-- [ ] update CLOSE.md § D5 to reflect that the immediate tripwire landed
-      (was "system-fix-deferred"; now the loose layer is live, structural
-      fix still pending).
-- [ ] zettel: capture the lesson that "the prior tikur identified the
-      tripwire as 'lands this turn' and the tripwire-wiring step was the
-      one missing — a tikur whose system change was *partly* shipped is
-      still partly unshipped." Threads ↑z097, the 2026-04-28 tikur record,
-      and the new self-tripwire rule in the tikur skill.
+- [x] (next commit) — CLOSE.md § D5 updated: tripwire layer landed at
+      `2d85a2828`, charter ready for the structural layer.
+- [x] (next commit) — z109 captured: "a partial tikur fix is still an
+      unfixed tikur — name the layers." Sharpens the self-tripwire rule.
 
 ---
 

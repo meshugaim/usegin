@@ -90,8 +90,19 @@ same cluster identified the right fixes; neither landed.** That meta-finding
 is now embedded as a self-tripwire in the tikur skill — every record's
 `System:` field must cite a commit SHA or be flagged `system-fix-deferred`.
 
-The original recommendation stands: **build `dx session-wt`** (per-session git
-worktrees). Three follow-up questions need your input.
+**Update 2026-04-28 night:** the *loose* layer of the fix landed
+(commit `2d85a2828`) — `scripts/hooks/check-staging-drift.sh` is now wired
+into `.husky/pre-commit`, with a companion `snapshot-staged.sh` helper and
+the multi-Gin-safe commit recipe documented in `.claude/skills/use-gin/SKILL.md`.
+This detects Mode-1 attribution swaps loudly; it does not prevent them.
+
+The structural fix (per-session worktrees) is now spec'd as a build-charter
+ready for your sign-off — see `D5.1-charter-session-wt.md`. **Five posture
+questions, ~5 minutes to read and answer.** Once answered, an autonomous Gin
+builds it in a half-day, no further input.
+
+The original recommendation stands: **build `dx session-wt`**. The five
+follow-up questions are in the charter, not duplicated here.
 
 #### D5.1 — Confirm the lekach: build `dx session-wt`?
 
