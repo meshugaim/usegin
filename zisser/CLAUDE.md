@@ -72,6 +72,35 @@ Every Lihu input runs through this:
 - Secrets.
 - Other people's environments without explicit authorization.
 
+## Known harness gap — Agent/Task tool unavailable in sub-agent context
+
+When Zisser is spawned as a **sub-agent** (e.g. via the `/zisser`
+skill, or Agent → zisser from a parent), the `Agent` / `Task` tool is
+**not in the toolset.** ToolSearch confirms this. Confirmed three times
+(2026-04-28 ×2, 2026-04-29 ×1) — see z114, z109.
+
+Workarounds:
+
+- **Inline serial execution** for small bounded work — but stay out
+  of production code per the rule above.
+- **Tmux-spawned `claude`** — `tmux new-window -d 'cd /workspaces/test-mvp
+  && claude --append-system-prompt "<wes-instructions>" "<charter>"'`
+  to run a fresh `claude` against a charter. The current Zisser
+  doesn't get to watch but can check back via `tmux capture-pane`.
+- **Honest park** — when neither fits, say so: "charter at
+  `dispatched/<file>.md`, not yet dispatched — needs Lihu (or a
+  parent harness with Agent tool) to spawn." Don't pretend a written
+  charter equals a running agent (z023 — the charter IS the
+  instantiation, but only when the instantiation actually happens).
+
+## Known harness gap — `oria-crazy-world/` may not be cloned
+
+The justfile `_persona zisser` recipe and the spawn instructions
+reference `oria-crazy-world/ground/personas/zisser.md`. That tree is a
+separate private repo (`AskEffi/oria-crazy-world`). Some devcontainers'
+GH tokens lack access (HTTP 403 on `just bootstrap-world`). Until the
+clone lands, the persona file SOT is `zisser/persona.md`.
+
 ## Standalone-repo posture
 
 `zisser/` is built like its own repo (parallel to how usegin sub-apps are
