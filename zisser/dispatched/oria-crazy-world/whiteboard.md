@@ -58,7 +58,7 @@ Charter `oria-crazy-world/` as a sibling of `usegin/` locally. Top-level dirs: `
 - 2026-04-28 — kept zones at top level (`ground/sky/space/`) — not nested under `zones/<name>/`. Charter shape held; no shape-change escalation needed.
 - 2026-04-28 — **Reviewed by Ron — Phase 2** — verdict: ship with two fixes applied. Click present in all 5 files; aliases & zone semantics & sibling-of-usegin framing all load-bearing-correct; inhabitants placeholders consistent; no FAQ/Examples/hedging; whiteboard accurately reflects landed shape. **Fixes applied:** (1) `space/README.md:6-7` — "outcomes are byproduct" clause was softened with a *but*-clause that re-lionized byproducts ("byproducts here can ripple") in the one zone where the world exits to external surfaces; rewritten to keep the click clean ("even here … tend the process all the more carefully, and the ripple takes care of itself"). (2) Bare forward-refs to non-existent institution paths in all 3 zone READMEs (academy/visitor-center/gymnastic/university/app-factory/anthropology) phase-tagged with *(scaffolds in Phase 3.)* so a fresh reader doesn't expect to walk to a missing dir. **Notes (no fix; for Oria's call):** CLAUDE.md voice register is all-lowercase / fragment-leaning vs `usegin/CLAUDE.md` + `zisser/CLAUDE.md` sentence-case; declarative + posture-naming intact, only case-style differs. Read-first item 4's "(`usegin/personas/<name>.md`)" parenthetical is partial — alias also pre-loads `.claude/agents/<name>.md`, and zisser additionally loads zisser-tree files. Persona is already injected via `--append-system-prompt`, so a literal walker isn't misled.
 
-### Phase 3 — Five institutions in parallel
+### Phase 3 — Five institutions in parallel (DONE)
 Five independent Wes workers, one per institution. Each scaffolds:
 - `<institution>/README.md` (charter + the click)
 - `<institution>/human/` — human-facing entry points
@@ -66,6 +66,21 @@ Five independent Wes workers, one per institution. Each scaffolds:
 - One starter artifact per face that proves the institution's loop works
 
 Placed under their zones (academy → ground, gymnastic → sky, university → sky, visitor-center → ground, app-factory → space).
+- [x] All five institutions landed (`4a95d56d1` academy, `c8e7a5298` gymnastic, `01fbbc357` university, `356c7a0df` visitor-center, `ca7a6fbf7` app-factory).
+- 2026-04-28 — voice held across all five workers: lowercase / fragment-leaning, declarative posture, click present in every README. No FAQ / Examples / Glossary / Appendix.
+- 2026-04-28 — two-faced doctrine lived: every institution's `human/` and `agent/` files explicitly read each other.
+- 2026-04-28 — pipeline coherence verified: visitor-center's `dream-intake.md` writes to `space/app-factory/intake/<date>-<slug>.md`; app-factory has that exact path with matching schema (`pipeline/step-templates/01-dream-card.md`); step 8 names Yohai correctly (matches `.claude/agents/yohai.md` + `usegin/personas/yohai.md`); 11 step-templates are genuinely 11 different artifacts.
+- 2026-04-28 — `university/departments/.keep` and `university/papers/.keep` are intentionally empty (open-to-empty addresses; physics + anthropology plant in Phase 6). `app-factory/intake/.keep` and `app-factory/runs/.keep` carry usage docs.
+- 2026-04-28 — **Reviewed by Ron — Phase 3 cross-cut sweep** — verdict: ship with seven fixes applied (no blockers).
+  - **Stale phase tags fixed.** Zone READMEs (`ground/`, `sky/`, `space/`) and the top-level `README.md` still tagged the now-landed institutions as *(scaffolds in Phase 3.)*; rewritten as inhabitants. Visitor-center's cross-ref to `space/app-factory/intake/` was tagged *(scaffolds in Phase 7.)* — wrong; intake/ scaffolded in Phase 3, only the *first run* lives in Phase 7. Corrected.
+  - **Anthropology mis-tagged.** `space/README.md` listed anthropology as *(scaffolds in Phase 3.)*. Anthropology is a Phase 6 university department; corrected to point at `sky/university/departments/anthropology/` with the Phase 6 birth tag and the gradient note (promotes to space when load-bearing).
+  - **University ↔ app-factory coherence gap.** University README didn't acknowledge that philosophers own pipeline step 2. Added an "adjacent rooms" section naming step-2 ownership and clarifying that philosophy essays live in the run dir, not `papers/`.
+  - **All cross-references resolve** — verified by direct path-walk of every link. **No filler**, **no "later"**, **no FAQ/Examples/Glossary/Appendix**.
+- 2026-04-28 — **Notes for awareness (no fix):**
+  - Visitor-center intake/ exists as Phase 3 scaffold but the orchestrator that polls it (Mark, in `space/app-factory/agent/factory-orchestrator.md`) doesn't actually run yet — Phase 7 is the first run. The "polls this dir" language is aspirational-but-honest, flagged in `factory-orchestrator.md:103` as "this file describes how it *will* run."
+  - Academy's first-read step 8 points at `usegin/personas/README.md` — confirmed exists.
+  - Gymnastic's `spawn-vs-execute.md` drill is sky-correct (failure-as-curriculum), not space-load-bearing — zoning held.
+  - The 11 step templates each have step-specific schema. dream-card has *what hurts now / smallest version / non-goals*; philosophy has 2-paragraph discipline + threads-for-designers; design has *the click / flow / surfaces*; architecture has seams table + Doppler row; spec mirrors Linear; slices has slice map + cross-slice verification; build is logbook; QA is 3 axes; deploy has rollback; retro is tikur with cluster check + propagation. Not copy-paste rename.
 - Reviewer: one Ron sweeps all five diffs.
 
 ### Phase 4 — Migration
