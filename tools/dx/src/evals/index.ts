@@ -11,11 +11,13 @@
 
 import { Command } from "commander";
 import { buildEvalsRunCommand } from "./commands/run";
+import { buildEvalsIterateCommand } from "./commands/iterate";
 
 export function buildEvalsCommand(): Command {
   const cmd = new Command("evals").description(
     "Eval runner — score Effi and Gin against Definitions of Good.",
   );
   cmd.addCommand(buildEvalsRunCommand());
+  cmd.addCommand(buildEvalsIterateCommand());
   return cmd;
 }
