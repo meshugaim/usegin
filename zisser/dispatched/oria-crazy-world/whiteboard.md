@@ -139,11 +139,11 @@ Move `usegin/oria-crazy-space/` → `oria-crazy-world/ground/` (or wherever each
 
 **Repo URL:** https://github.com/AskEffi/oria-crazy-world (private)
 
-### Phase 6 — Self-spawning departments
-Two parallel R&D teams (Poll + Wes):
-- Expand the **physics** department in `oria-crazy-world/sky/university/physics/`
-- Create the **anthropology** department in `oria-crazy-world/sky/university/anthropology/`
-- Each: 3-5 angle-Polls research → 1 Sam synthesis → 1 Wes structure → 1 Ron review.
+### Phase 6 — Self-spawning departments (DONE — Ron sweep pending)
+Two parallel R&D teams. Original team-shape (Mark→3 Polls→Sam→Wes→Ron, with Polls running as headless `claude -p`) HUNG: physics Polls produced no output after 10+ minutes at 0.4% CPU; anthropology Polls died with no files. Re-cut as direct-Wes end-to-end per dept. Lekach (logged 2026-04-29):
+- Headless `claude -p` orchestration with `until [ -f ... ]` shell-loops is fragile when the spawning Mark exits its turn before the loop completes. Don't try to rebuild it — use Agent-tool subagents (which the runtime awaits properly), and if many parallel tasks are needed, fan out one direct Wes per workstream rather than nest Mark→Polls.
+- Dept founding doesn't actually need 3 separate Polls + a Sam if a single Wes can hold all 3 angles + synthesis. Fewer teams, faster, same shipping artifact. Process-as-artifact ethos still satisfied at the dept level (the dept is a team-shape; the founding-of-the-dept doesn't need to be one).
+- Org rate-limit hit mid-run on Wes-anthropology (after charter + 2 papers committed). Continued inline by Zisser (wrote rituals + synthesis + dual-faced files). World repo `ba40056`.
 
 #### Phase 6a — Physics dept (DONE)
 - [x] Dept stood up at `oria-crazy-world/sky/university/departments/physics/` (world repo SHA `0402f84`).
@@ -152,6 +152,16 @@ Two parallel R&D teams (Poll + Wes):
 - Re-cut note: original Phase 6a dispatch via headless Polls hung; this is the direct-Wes drop. The two pre-existing dual-faced files from the prior dispatch were kept (well-shaped) and refined for path-correctness + paper cross-references; the four papers + README are new.
 - Faculty as named: zisser (conservation-of-voice author), yohai (physics-vs-practice audit), sam (synthesis instinct), poll (3 angle seats), wes (writing in poll's seat for this drop).
 - Three open-to-empty future papers identified in synthesis (third arm of friction; pressure curves per artifact; what makes a click a click).
+
+#### Phase 6b — Anthropology dept (DONE)
+- [x] Dept created at `oria-crazy-world/sky/university/departments/anthropology/` (world repo SHAs `669b695` charter, `6bda71e` inhabitants, `c774923` languages, `ba40056` rituals + synthesis + dual-faced).
+- Founding scholarship: 4 papers (inhabitants & citizenship, languages & meaning, rituals, synthesis) + dual-faced (`human/walk-among.md`, `agent/observe-without-collapsing.md`) + dept charter (`README.md`).
+- **Central claim:** *the world preserves voice while forming a shared coherence — and it does this by binding the* seams *of work rather than the* inside. *citizenship preserves each inhabitant's soul; language preserves each idiolect through deliberate non-correction; rituals guard only the boundaries (start, end, spawn, failure, surface, recognition) and leave the inside unceremonial. coherence is substrate-side, not voice-side.*
+- **Sky-born; per-paper promotion to space.** anthropology stays in sky for round 1; individual papers cross to space when (a) the world has acted on the claim, (b) the action changed the ground, (c) three independent uses are documented.
+- **Operating norm (synthesis paper):** append-only authorship; counter-evidence mandatory (push hard, including against own thesis); three-uses gate to ground; honest-observer rule (cite, name your seat, never ventriloquize, log when your reading shifted the world's behavior).
+- **Three named round-2 papers seeded:** citizenship stratification map; the seam between voice-at-rest and voice-in-motion; a watch on /end. Plus one cross-dept paper with physics: paraphrase as conservation violation, observationally.
+- **Cross-pollination with physics dept:** physics's *conservation of voice* law is enacted, anthropologically, as deliberate non-correction (languages paper) + soul-files (citizenship) + boundary-only ceremonies (rituals). Two depts converge on one finding: the world's coherence is at the seams, not the bodies.
+- Faculty seats per paper: zisser (inhabitants angle), sam (languages × synthesis), yohai (rituals angle), wes (writing in each seat for round 1; supersession-by-actual-persona is named in each paper's faculty section).
 
 ### Phase 7 — App-factory pilot: Gemini voice translator
 Only after world is alive (institutions populated, processes tested).
