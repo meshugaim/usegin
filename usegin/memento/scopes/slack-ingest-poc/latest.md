@@ -1,7 +1,8 @@
 # Polaroid — Slack Ingestion POC
 
 **Written:** 2026-04-28 (liaison-Zisser, end-of-run, REFRESHED)
-**Scope:** `usegin/oria-crazy-space/slack-ingest-poc/`
+**Scope:** `oria-crazy-world/ground/oria-crazy-space/slack-ingest-poc/`
+(moved from `usegin/oria-crazy-space/` in commit `e3f890782`, phase 4 of the world build).
 
 ## Where I am
 
@@ -17,7 +18,7 @@ down to inline serial worked.
 
 **Read the morning report first** — it's the single artifact Oria
 needs:
-`usegin/oria-crazy-space/poc-reports/2026-04-29-slack-ingest.md`
+`oria-crazy-world/ground/oria-crazy-space/poc-reports/2026-04-29-slack-ingest.md`
 
 The whiteboard has the phase-by-phase trail. The dispatched/ charter
 preserves the original-halt reasoning + the resume.
@@ -44,8 +45,8 @@ preserves the original-halt reasoning + the resume.
 ## Resume cue
 
 If you're picking up the night after this:
-1. Verify wire still works: `bash usegin/oria-crazy-space/slack-ingest-poc/scripts/probe-live.sh`
-2. Re-run E2E: `bash usegin/oria-crazy-space/slack-ingest-poc/scripts/run-e2e.sh`
+1. Verify wire still works: `bash oria-crazy-world/ground/oria-crazy-space/slack-ingest-poc/scripts/probe-live.sh`
+2. Re-run E2E: `bash oria-crazy-world/ground/oria-crazy-space/slack-ingest-poc/scripts/run-e2e.sh`
 3. Read morning report.
 4. Decide what's next based on Oria's morning answers to the open
    questions.
