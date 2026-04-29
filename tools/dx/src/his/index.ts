@@ -1,5 +1,7 @@
 import { Command } from "commander";
 import { buildHisRateCommand } from "./commands/rate";
+import { buildHisRateInteractiveCommand } from "./commands/rate-interactive";
+import { buildHisHoldUntilRatedCommand } from "./commands/hold-until-rated";
 import { buildHisNoteCommand } from "./commands/note";
 import { buildHisEndCommand } from "./commands/end";
 import { buildHisShowCommand } from "./commands/show";
@@ -21,6 +23,8 @@ export function buildHisCommand(): Command {
   const cmd = new Command("his")
     .description("How-Is-Session — vibe-rated session telemetry. Both human and Claude rate; ratings accumulate per turn.");
   cmd.addCommand(buildHisRateCommand());
+  cmd.addCommand(buildHisRateInteractiveCommand());
+  cmd.addCommand(buildHisHoldUntilRatedCommand());
   cmd.addCommand(buildHisNoteCommand());
   cmd.addCommand(buildHisEndCommand());
   cmd.addCommand(buildHisShowCommand());

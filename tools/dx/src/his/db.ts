@@ -64,7 +64,14 @@ function migrate(db: Database) {
 }
 
 export type Actor = "human" | "claude";
-export type Trigger = "manual" | "stop-hook" | "end-hook" | "session-end" | "periodic";
+export type Trigger =
+  | "manual"
+  | "stop-hook"
+  | "end-hook"
+  | "session-end"
+  | "periodic"
+  | "rate-interactive"
+  | "auto";
 
 export type SubmissionInput = {
   sessionId: string;
@@ -151,6 +158,16 @@ export function listSessions(limit = 50): SessionRow[] {
   return getDb()
     .prepare(`SELECT * FROM sessions ORDER BY last_seen_at DESC LIMIT ?;`)
     .all(limit) as SessionRow[];
+}
+
+export function lastHumanSubmissionSince(sessionId: string, sinceIso: string): SubmissionRow | undefined {
+  return getDb()
+    .prepare(
+      `SELECT * FROM submissions
+       WHERE session_id = ? AND actor = 'human' AND ts >= ?
+       ORDER BY ts DESC LIMIT 1;`,
+    )
+    .get(sessionId, sinceIso) as SubmissionRow | undefined;
 }
 
 export function lastClaudeSubmissionAt(sessionId: string, turnIndex: number | undefined): SubmissionRow | undefined {

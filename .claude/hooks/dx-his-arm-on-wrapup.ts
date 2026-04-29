@@ -7,6 +7,8 @@
  * Best-effort. Telemetry must never block normal flow — if anything fails,
  * we silently allow.
  */
+import { spawn } from "node:child_process";
+import { join } from "node:path";
 import { readState, writeState } from "../../tools/dx/src/his/state";
 
 const WRAPUP_PATTERNS: RegExp[] = [
@@ -64,6 +66,20 @@ async function main() {
   state.ended = true;
   writeState(state);
 
+  // Spawn the human-side hold daemon (detached). Best-effort — failure is silent.
+  try {
+    const repoRoot = join(__dirname, "..", "..");
+    const cliPath = join(repoRoot, "tools", "dx", "src", "cli.ts");
+    const child = spawn(
+      process.execPath,
+      [cliPath, "his", "hold-until-rated", "--session-id", sessionId],
+      { detached: true, stdio: "ignore", env: process.env },
+    );
+    child.unref();
+  } catch {
+    // ignore
+  }
+
   // Soft nudge to Claude via additionalContext (non-blocking) so it sees the
   // arm and starts drafting its rating proactively rather than being slapped
   // by the Stop hook later.
@@ -74,9 +90,11 @@ async function main() {
         hookEventName: "UserPromptSubmit",
         additionalContext:
           "[his] Wrap-up phrase detected — force_rate armed. " +
-          "When you finish responding, file your final how-is-session reading: " +
-          "`dx his rate --as=claude --trigger=stop-hook --note '...' <aspects>`. " +
-          "Run `dx his aspects` for the full list. The Stop hook will block until you do.",
+          "Tell the human to rate the session before exiting: `dx his rate-interactive` " +
+          "(one keystroke + Enter is enough; Enter through the rest to skip). " +
+          "A background hold daemon is keeping a shell open so /exit will warn them until they rate. " +
+          "Then file your own final reading: `dx his rate --as=claude --trigger=stop-hook --note '...' <aspects>` " +
+          "(`dx his aspects` for the full list). The Stop hook will block you until you do.",
       },
     }) + "\n",
   );
