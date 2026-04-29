@@ -145,6 +145,14 @@ Two parallel R&D teams (Poll + Wes):
 - Create the **anthropology** department in `oria-crazy-world/sky/university/anthropology/`
 - Each: 3-5 angle-Polls research → 1 Sam synthesis → 1 Wes structure → 1 Ron review.
 
+#### Phase 6a — Physics dept (DONE)
+- [x] Dept stood up at `oria-crazy-world/sky/university/departments/physics/` (world repo SHA `0402f84`).
+- Founding scholarship: 4 papers (conservation, friction-signal, distillation, synthesis) + dual-faced structure (`human/walk-the-physics.md`, `agent/apply-the-physics.md`) + dept charter (`README.md`).
+- **Central claim:** *information is conserved by default; the only legal way it leaves the world is concentrated through Lihu's attention as the click; friction is the world telling you the conservation is being tested at this exact point.*
+- Re-cut note: original Phase 6a dispatch via headless Polls hung; this is the direct-Wes drop. The two pre-existing dual-faced files from the prior dispatch were kept (well-shaped) and refined for path-correctness + paper cross-references; the four papers + README are new.
+- Faculty as named: zisser (conservation-of-voice author), yohai (physics-vs-practice audit), sam (synthesis instinct), poll (3 angle seats), wes (writing in poll's seat for this drop).
+- Three open-to-empty future papers identified in synthesis (third arm of friction; pressure curves per artifact; what makes a click a click).
+
 ### Phase 7 — App-factory pilot: Gemini voice translator
 Only after world is alive (institutions populated, processes tested).
 
