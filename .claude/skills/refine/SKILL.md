@@ -12,7 +12,7 @@ This skill drives the **`refine-team`** (see
 
 Cast: **Sam** (semantic-dedup priming), **Mark** (pragmatic context-
 fields priming), **Ron** (correctness / conflicts-mapping priming).
-Per-slice owners. Persona definitions: `usegin/personas/<name>.md`.
+Per-slice owners. Persona definitions: `oria-crazy-world/ground/personas/<name>.md`.
 
 ---
 

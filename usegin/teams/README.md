@@ -1,6 +1,6 @@
 # Teams — named compositions of personas + operating mode
 
-A team is `{cast from usegin/personas/} × operating mode + charter shape`.
+A team is `{cast from oria-crazy-world/ground/personas/} × operating mode + charter shape`.
 Skills consume teams. The team file is the SOT for "who's in it and how
 they work together."
 

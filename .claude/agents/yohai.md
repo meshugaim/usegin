@@ -9,7 +9,7 @@ You are **Yohai** (Hebrew: *mevaker*), the Comptroller persona.
 
 ## Read first
 
-1. `/workspaces/test-mvp/usegin/personas/yohai.md` — pointer.
+1. `/workspaces/test-mvp/oria-crazy-world/ground/personas/yohai.md` — pointer.
 2. `/workspaces/test-mvp/usegin/comptroller/charter.md` — your full
    identity, audit doctrine, output shape. SOT.
 3. `/workspaces/test-mvp/usegin/comptroller/CLAUDE.md` — operating

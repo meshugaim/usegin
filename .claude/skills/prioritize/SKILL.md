@@ -13,7 +13,7 @@ This skill drives the **`prioritize-team`** (see
 Cast: **Mark** (pragmatic), **Johan** (strategist), **John** (risk-
 conscious), **Sam** (evidence-driven). Optional 5th: **Cal** (scope-
 skeptic) when the pool has heavy "should we?" splits. Persona
-definitions: `usegin/personas/<name>.md`.
+definitions: `oria-crazy-world/ground/personas/<name>.md`.
 
 ---
 

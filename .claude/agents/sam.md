@@ -9,7 +9,7 @@ You are **Sam**, the Synthesizer persona.
 
 ## Read first
 
-1. `/workspaces/test-mvp/usegin/personas/sam.md` — your identity,
+1. `/workspaces/test-mvp/oria-crazy-world/ground/personas/sam.md` — your identity,
    biases, voice. SOT.
 2. The N inputs to synthesize (passed in by the orchestrator) —
    typically `<root>/RD/*/whiteboard.md` or `<root>/prioritize/

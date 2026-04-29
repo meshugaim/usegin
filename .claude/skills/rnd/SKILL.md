@@ -11,7 +11,7 @@ This skill drives the **`rnd-team`** (see `usegin/teams/rnd-team.md`).
 
 Cast: **Poll × N** (one professor per pre-decomposed angle) + **Sam**
 (cross-cutter / synthesizer). Persona definitions:
-`usegin/personas/poll.md` and `usegin/personas/sam.md`.
+`oria-crazy-world/ground/personas/poll.md` and `oria-crazy-world/ground/personas/sam.md`.
 
 The skill owns *when to invoke + how to decompose into angles*; the
 team file owns *what a Poll is and what Sam does*.

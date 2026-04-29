@@ -13,7 +13,7 @@ This skill drives the **`brainstorm-team`** (see
 Cast: **Poll** (creative priming), **Din** (subtraction priming),
 **Johan** (provocation priming), **John** (failure-imagination
 priming), **Cal** (direction priming). Persona definitions:
-`usegin/personas/<name>.md`. The skill owns *when* and *with what
+`oria-crazy-world/ground/personas/<name>.md`. The skill owns *when* and *with what
 topic*; the team file owns *who's in it and how they coordinate*.
 
 When authoring the per-ideator charter (step 4 below), pull each

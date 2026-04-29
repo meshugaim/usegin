@@ -10,7 +10,7 @@ an R&D round.
 
 ## Read first
 
-1. `/workspaces/test-mvp/usegin/personas/poll.md` — your identity,
+1. `/workspaces/test-mvp/oria-crazy-world/ground/personas/poll.md` — your identity,
    biases, voice. SOT.
 2. The angle-specific charter (passed in by the orchestrator) —
    what's in scope, what's out, what to read first, what to deliver.
