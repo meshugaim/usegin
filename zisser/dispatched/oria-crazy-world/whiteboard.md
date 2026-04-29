@@ -83,11 +83,22 @@ Placed under their zones (academy → ground, gymnastic → sky, university → 
   - The 11 step templates each have step-specific schema. dream-card has *what hurts now / smallest version / non-goals*; philosophy has 2-paragraph discipline + threads-for-designers; design has *the click / flow / surfaces*; architecture has seams table + Doppler row; spec mirrors Linear; slices has slice map + cross-slice verification; build is logbook; QA is 3 axes; deploy has rollback; retro is tikur with cluster check + propagation. Not copy-paste rename.
 - Reviewer: one Ron sweeps all five diffs.
 
-### Phase 4 — Migration
+### Phase 4 — Migration (DONE)
 Move `usegin/oria-crazy-space/` → `oria-crazy-world/ground/` (or wherever each piece lives). Pull canonical personas, principles, philosophy from `usegin/personas/`, `usegin/`, `usegin/zettel/principles/` as world ground.
 - Worker: Wes
 - Reviewer: Ron
 - **Don't break `usegin/`** — leave breadcrumbs / symlinks if needed so old paths still resolve until rewired.
+- [x] `git mv` of all 4 sub-paths under `usegin/oria-crazy-space/` (personas, poc-reports, slack-ingest-poc, README.md) into `oria-crazy-world/ground/oria-crazy-space/`. The untracked `_NEEDS-FROM-LIHU.md` moved via plain `mv`. The gitignored `slack-ingest-poc/index/messages.jsonl` rode along inside the directory move (still gitignored at new path; `.gitignore` moved with it).
+- [x] Breadcrumb `usegin/oria-crazy-space/README.md` is one-line forward to new location.
+- [x] Personas copied to `oria-crazy-world/ground/personas/` (24 files including `creative/` subdir + README). SoT note added.
+- [x] Principles copied to `oria-crazy-world/ground/principles/` (5 files). SoT note added.
+- [x] `usegin/Gin.md` copied to `oria-crazy-world/ground/philosophy/the-world.md`; `usegin/things-we-grow.md` copied to `oria-crazy-world/ground/philosophy/things-we-grow.md`. SoT note added.
+- [x] `ground/README.md` inhabitants list updated with the four new entries.
+- [x] `ground/.keep` removed (no longer needed; ground is populated).
+- 2026-04-29 — **rename choice for `Gin.md`**: went with `the-world.md` over `permissive-zone.md`. The file is the world's manifesto in the world context (vs `usegin/`'s permissive-zone manifesto in the tooling context); `the-world.md` reads correctly as the destination's primary philosophy file. SoT note in `_canonical-source.md` records the rename.
+- 2026-04-29 — **`_persona` recipe path verified intact**: `usegin/personas/zisser.md`, `usegin/personas/wes.md`, etc. all still present (copies, not moves); guard `[[ "$name" =~ ^[a-z][a-z0-9-]*$ ]]` still triggers; the four wake-up aliases keep working.
+- 2026-04-29 — **`.claude/agents/*.md` untouched** (verified: `git status .claude/agents/` clean).
+- 2026-04-29 — **size sanity**: oria-crazy-space ~10MB, no nested `.git`, no >1MB files. Safe migration; no flags raised.
 
 ### Phase 5 — GitHub repo
 `gh repo create AskEffi/oria-crazy-world --private --source=oria-crazy-world --push`. Wire `usegin/` to clone it as a git submodule (or sibling — TBD by what feels least friction).
