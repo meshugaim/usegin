@@ -42,9 +42,10 @@ Add `zisser`, `yohai`, `mark`, `poll` aliases mirroring `c`'s mechanism (justfil
 - Verification: each alias actually wakes the right persona on a fresh shell.
 - [x] Recipes added (`_persona` helper + 4 wrappers in `justfile`).
 - [x] Aliases added (`.devcontainer/aliases.sh`).
-- [x] Static + dry-run verified. Aliases fully active on next devcontainer rebuild (live `/etc/profile.d/aliases.sh` is baked in at build).
+- [x] Static + dry-run verified. Aliases fully active on next devcontainer rebuild (baked in via Dockerfile L122 → `/etc/bash.bashrc.d/20-aliases.sh`, also re-sourced from `~/.bashrc` to win over Ubuntu defaults).
 - 2026-04-28 — chose `--append-system-prompt` over first-message fallback (flag exists in current `claude --help`).
 - 2026-04-28 — DRY shape: parameterized `_persona name *args` helper with one Zisser branch (only persona needing extra read paths). Underscore-prefix hides it from `just --list`.
+- 2026-04-28 — **Reviewed by Ron** — verdict: ship with one fix. `--append-system-prompt` confirmed live; persona files all present (zisser/yohai/mark/poll, plus ron/wes/sam ready); zisser/ branch paths exist; aliases.sh wired in Dockerfile L122 (corrected — not `/etc/profile.d/`); `just --list` cleanliness verified. **Fix applied:** added `[a-z][a-z0-9-]*` guard to `_persona` to close path-injection pinhole — `just _persona ../../etc/passwd` would have been substituted into the read-list inside the system prompt. Arg-passthrough whitespace-splits, but matches `c`'s existing behavior — consistent, not a regression.
 
 ### Phase 2 — World skeleton (after Phase 1 commits)
 Charter `oria-crazy-world/` as a sibling of `usegin/` locally. Top-level dirs: `ground/`, `sky/`, `space/`. README explaining the world. CLAUDE.md teaching agents how to walk it.
