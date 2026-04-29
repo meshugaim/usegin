@@ -47,10 +47,15 @@ Add `zisser`, `yohai`, `mark`, `poll` aliases mirroring `c`'s mechanism (justfil
 - 2026-04-28 — DRY shape: parameterized `_persona name *args` helper with one Zisser branch (only persona needing extra read paths). Underscore-prefix hides it from `just --list`.
 - 2026-04-28 — **Reviewed by Ron** — verdict: ship with one fix. `--append-system-prompt` confirmed live; persona files all present (zisser/yohai/mark/poll, plus ron/wes/sam ready); zisser/ branch paths exist; aliases.sh wired in Dockerfile L122 (corrected — not `/etc/profile.d/`); `just --list` cleanliness verified. **Fix applied:** added `[a-z][a-z0-9-]*` guard to `_persona` to close path-injection pinhole — `just _persona ../../etc/passwd` would have been substituted into the read-list inside the system prompt. Arg-passthrough whitespace-splits, but matches `c`'s existing behavior — consistent, not a regression.
 
-### Phase 2 — World skeleton (after Phase 1 commits)
+### Phase 2 — World skeleton (DONE)
 Charter `oria-crazy-world/` as a sibling of `usegin/` locally. Top-level dirs: `ground/`, `sky/`, `space/`. README explaining the world. CLAUDE.md teaching agents how to walk it.
 - Worker: Wes (single, sequential — small)
 - Reviewer: Ron
+- [x] Skeleton landed (`9b84bd5e6`): 8 files — top-level README + CLAUDE.md, 3 zone READMEs, 3 `.keep` placeholders.
+- 2026-04-28 — top-level README opens with the click ("outcomes are byproduct"); same phrase grep-confirmed in all 4 READMEs + CLAUDE.md.
+- 2026-04-28 — agent CLAUDE.md names the four wake-up aliases (`zisser`/`yohai`/`mark`/`poll`) so an agent invoked here knows their door.
+- 2026-04-28 — voice: lowercase / fragments where they land naturally; readable cold; no Examples / FAQ / Glossary sections (charter explicit refusal honored).
+- 2026-04-28 — kept zones at top level (`ground/sky/space/`) — not nested under `zones/<name>/`. Charter shape held; no shape-change escalation needed.
 
 ### Phase 3 — Five institutions in parallel
 Five independent Wes workers, one per institution. Each scaffolds:
