@@ -1,10 +1,15 @@
 import { Command } from "commander";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { readState } from "../state";
-import { recordSubmission } from "../db";
+import { recordSubmission, lastHumanSubmissionSince } from "../db";
+
+const SENTINEL_PATH = join(homedir(), ".claude", "dx-his", "last-ended-session.json");
 
 export function buildHisHookSessionEndCommand(): Command {
   return new Command("hook-session-end")
-    .description("SessionEnd hook handler — records a meta marker if the session ended without a Claude final rating.")
+    .description("SessionEnd hook handler — records a meta marker if the session ended without a Claude final rating, and drops a sentinel so the parent shell's claude() wrapper can drop the human into the picker.")
     .action(actionHookSessionEnd);
 }
 
@@ -31,6 +36,28 @@ async function actionHookSessionEnd() {
       raw: "auto:session-end",
       scores: [],
     });
+  }
+
+  // Drop a sentinel for the parent shell's claude() wrapper to pick up.
+  // Best-effort — never break SessionEnd.
+  try {
+    const humanRated =
+      state.last_human_rating_turn !== null ||
+      lastHumanSubmissionSince(sessionId, "1970-01-01T00:00:00.000Z") !== undefined;
+    if (state.force_rate && !humanRated) {
+      mkdirSync(dirname(SENTINEL_PATH), { recursive: true });
+      writeFileSync(
+        SENTINEL_PATH,
+        JSON.stringify({
+          session_id: sessionId,
+          ended_at: new Date().toISOString(),
+          force_rate: true,
+          cwd: process.cwd(),
+        }, null, 2),
+      );
+    }
+  } catch {
+    // ignore — sentinel write is best-effort
   }
 
   process.stdout.write(JSON.stringify({ continue: true }) + "\n");
