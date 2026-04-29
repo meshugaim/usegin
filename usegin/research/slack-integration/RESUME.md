@@ -2,6 +2,34 @@
 
 **Status:** **CLOSED 2026-04-27.** All 8 whiteboards landed; cross-cutting synthesis + Lihu-facing recommendations complete. Angle E collapsed into C mid-round.
 
+## State as of 2026-04-29 (Zisser autonomous run)
+
+**Live & verified (this session):**
+- UseGin-Slack: `dx slack {whoami,send,post,read,inbox}` working. Bot
+  identity via `auth.test`: team=`askeffi`, bot=`useginslack`, scopes
+  granted (chat:write, channels:read|history, groups:read|history,
+  users:read, app_mentions:read, reactions:write).
+- AskEffi-Slack: code complete (OAuth callback, events route, encryption,
+  channel-binding UI, channel picker, lifecycle handlers). 12/12 unit
+  tests pass. Migrations `slack_installs` + `slack_channel_bindings`
+  shipped.
+
+**Pending for "fully functional":**
+1. **C4 message ingestion** — `message.*` event handler that writes
+   `data_items` rows. Charter ready at
+   `zisser/dispatched/2026-04-29-slack-c4-message-ingestion-wes.md`.
+   This is the missing pipe between binding and Effi search.
+2. **OAuth-UI smoke test** — depends on Lihu-only paperwork: confirm
+   which Slack app (Effi Spike `9761199231332.…` or new AskEffi-Slack)
+   gets the customer redirect URL `local-dev.askeffi.ai/api/slack/callback`.
+3. **Marketplace listing** — Lihu-only paperwork track (R4).
+
+**Plan file:** `zisser/plans/2026-04-29-slack-fully-functional.md`.
+
+**Linear hygiene done:** ENG-5412, ENG-5415 closed (status drift; code
+shipped earlier). ENG-5408 + ENG-5409 still in-progress (correctly —
+their respective handoffs aren't fully done).
+
 **Deliverables:**
 - `SYNTHESIS.md` — load-bearing finding (May-2025 ToS cliff), 10 convergent findings, 6 divergent points, per-surface path map.
 - `recommendation.md` — 5 z026-shape decisions for Lihu + default sequence.
