@@ -90,18 +90,22 @@ Each entry states: the package, the component it lives in, the constraint, the *
 
 ### `python-services/`
 
-**`supabase` is the common choke point.** Three of the five transitive caps below (`cachetools`, `rich`, `websockets`) all trace back to `supabase` via its own pinned sub-deps (`storage3`→`pyiceberg`, and `realtime`). We're on the latest stable `supabase==2.28.3`; PyPI has `3.0.0a1` pre-release but no new stable. A single `supabase` stable bump would likely unblock all three.
+**`supabase` is the common choke point — but NOT the unblock we hoped for.** Three of the five transitive caps below (`cachetools`, `rich`, `websockets`) all trace back to `supabase` via its own pinned sub-deps (`storage3`→`pyiceberg`, and `realtime`). 2026-04-30 update: bumped supabase 2.28.3 → 2.29.0 — `realtime==2.29.0` still pins `websockets<16`, and `pyiceberg` in the new chain still requires `cachetools<7` and `rich<15`. So the choke point survived a minor bump. PyPI has `3.0.0a1` pre-release. Re-check after each supabase stable.
 
-- **`chardet` — capped `<6` (pyproject.toml:20).** *Validated breakage.* chardet v6+ broke our encoding detection. Cap added 2026-04-07 in `3f77e2dd` (ENG-4584) by prior deps-update session: *"Pinned chardet<6 (v7 breaks encoding detection)"*. Keep capped until someone re-validates ≥6 against real inputs. **Not a supabase dependency.**
-- **`cachetools` — stuck at 6.x (transitive).** `pyiceberg>=0.10.0` requires `cachetools<7` (chain: `supabase` → `storage3` → `pyiceberg`). Verified sole path via `uv tree --package pyiceberg --invert`. Unblock: new supabase stable.
-- **`rich` — stuck at 14.x (transitive).** `pyiceberg>=0.10.0` requires `rich>=10.11.0,<15.0.0` (supabase chain). `tach@0.34.1` (dev) also bounds `rich<15` via `rich>=13.5.2,<15.0.0` — both caps must lift for rich to move.
-- **`websockets` — stuck at 15.x (transitive).** `realtime==2.28.3` requires `websockets>=11,<16`; `supabase==2.28.3` pins `realtime==2.28.3`. Verified sole path via `uv tree --package realtime --invert`. Newer `realtime` already requires `websockets>=16` — pure supabase-bump unblock.
-- **`protobuf` — stuck at 6.x (transitive).** `google-cloud-aiplatform>=1.136.0` requires `protobuf>4.21.5,<7.0.0`. **Not supabase** — blocked on Google's release cadence. Re-check upstream periodically.
-- **`pdfminer-six` — stuck at 20251230 (transitive).** `pdfplumber==0.11.9` exact-pins `pdfminer-six==20251230`. PyPI's latest pdfplumber is 0.11.9, so unblock requires a new pdfplumber release (0.11.10 or 0.12.x). Discovered 2026-04-23.
+- **`chardet` — capped `<6` (python-services/pyproject.toml:20).** *Validated breakage.* chardet v6+ broke our encoding detection. Cap added 2026-04-07 in `3f77e2dd` (ENG-4584) by prior deps-update session: *"Pinned chardet<6 (v7 breaks encoding detection)"*. Latest is `7.4.3` (2026-04-30). Keep capped until someone re-validates ≥6 against real inputs. **Not a supabase dependency.**
+- **`cachetools` — stuck at 6.x (transitive). Latest `7.0.6`.** `pyiceberg>=0.10.0` requires `cachetools<7` (chain: `supabase` → `storage3` → `pyiceberg`). Verified sole path via `uv tree --package pyiceberg --invert`. Confirmed 2026-04-30: supabase 2.29.0 still pulls the same pyiceberg constraint. Unblock: pyiceberg release that moves the cap, or supabase stable that pins newer pyiceberg.
+- **`rich` — stuck at 14.x (transitive). Latest `15.0.0`.** `pyiceberg>=0.10.0` requires `rich>=10.11.0,<15.0.0` (supabase chain). `tach@0.34.1` (dev) also bounds `rich<15` via `rich>=13.5.2,<15.0.0` — both caps must lift for rich to move.
+- **`websockets` — stuck at 15.x (transitive). Latest `16.0`.** `realtime==2.29.0` requires `websockets>=11,<16`; `supabase==2.29.0` pins `realtime==2.29.0`. Verified 2026-04-30 via dry-run resolver: bumping supabase 2.28.3 → 2.29.0 did NOT lift this cap (the resolver still rejects `websockets>=16`). Newer realtime versions exist with `websockets>=16` but supabase doesn't pin them yet. Pure supabase-stable-bump unblock.
+- **`protobuf` — stuck at 6.x (transitive). Latest `7.34.1`.** `google-cloud-aiplatform>=1.136.0` requires `protobuf>4.21.5,<7.0.0`. **Not supabase** — blocked on Google's release cadence. Re-check upstream periodically.
+- **`pdfminer-six` — stuck at `20251230` (transitive). Latest `20260107`.** `pdfplumber==0.11.9` exact-pins `pdfminer-six==20251230`. PyPI's latest pdfplumber is still 0.11.9 (confirmed 2026-04-30 — `uv lock --upgrade-package pdfplumber` returned `No lockfile changes detected`). Unblock requires a new pdfplumber release.
 
 ### `nextjs-app/`
 
 - **`react` / `react-dom` — exact pin (no caret), both at 19.2.5.** Lockstep siblings; versions must match exactly. Bump as a coordinated pair only.
-- **`eslint-plugin-storybook` — exact pin (no caret), 10.3.5.** Lockstep with `storybook` and `@storybook/*` 10.3.5. Bump only when all Storybook packages move together.
+- **`eslint-plugin-storybook` — exact pin (no caret), currently 10.3.6.** Lockstep with `storybook` and `@storybook/*` (currently 10.3.6). Bump only when all Storybook packages move together — `bun update @storybook/*` won't touch the exact-pinned `eslint-plugin-storybook`, edit by hand.
+
+### `.github/workflows/`
+
+- **`astral-sh/setup-uv` — must pin to immutable tag (e.g. `@v8.1.0`), no major-only.** v8 (2026-04-29) dropped major and minor floating tags for supply-chain security: `@v8` and `@v8.0` no longer resolve. Pin to a specific version like `@v8.1.0` (or full SHA). All other actions in our workflows still float on major (`@v6`, `@v4`).
 
 *(No entries yet for `landing-app/`, `tests/*`, or Python tools. Add as they emerge.)*
