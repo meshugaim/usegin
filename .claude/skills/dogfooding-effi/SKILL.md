@@ -89,6 +89,15 @@ effi api /workspaces
 effi api /chat -f message=hello
 ```
 
+`effi api` substitutes `{workspace}` and `{project}` from the active profile's link — **prefer templates over hardcoded IDs** so the same command works across profiles:
+
+```bash
+effi api /projects/{project}                  # not /projects/1bf0f507-...
+effi api /workspaces/{workspace}/projects
+```
+
+See `effi api --help` for the full template list.
+
 ## Enriching Effi's context
 
 Claude can upload files to the project canon so future Effi answers can cite them. Use this to capture summaries, decisions, or design notes you produced in a session — turns ephemeral agent output into durable project knowledge.
