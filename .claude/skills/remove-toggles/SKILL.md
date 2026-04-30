@@ -9,13 +9,25 @@ Toggles are temporary. This skill covers the complete removal process once a fea
 
 ## Toggle Types
 
-Three types exist in this project:
+Three types are in scope for this skill:
 
 | Type | Scope | Location | Gate |
 |------|-------|----------|------|
-| **Browser flags** | Per-user | Cookies, `nextjs-app/lib/browser-flags/registry.ts` | UI visibility |
-| **DB toggles** | System-wide | `feature_toggles` table rows | Backend behavior |
-| **Config-column toggles** | Per-entity | Boolean columns on config tables (e.g., `project_email_allowlist_config.enabled`) | Per-entity behavior |
+| **Browser flags** | Per-user (cookie) | `nextjs-app/lib/browser-flags/registry.ts` | Temporary UI/feature scaffolding |
+| **Chat tools** | Per-user (cookie) | `nextjs-app/lib/chat-config/registry.ts` | Which tools the chat agent can use |
+| **DB toggles** | System-wide | `feature_toggles` table + `python-services/agent_api/feature_toggles/registry.py` | Backend behavior |
+
+Out of scope (not feature toggles): config-column booleans on entity tables (`workspaces.risk_enabled`, etc.), admin system config (`chat_config` K-V), role gates (`admins`).
+
+## Step 0: Inventory the toggle
+
+Before editing anything, locate the toggle and confirm its type:
+
+- Grep `nextjs-app/lib/browser-flags/registry.ts` — is it a browser flag?
+- Grep `nextjs-app/lib/chat-config/registry.ts` — is it a chat tool?
+- Grep `python-services/agent_api/feature_toggles/registry.py` — is it a DB toggle?
+
+A name can appear in **both** browser flags and chat tools (e.g., `earlyToolUse`, `fathomBrowse`). If so, treat it as a chat tool — that's the permanent home — and remove the browser-flag duplicate as part of the same change.
 
 ## Prerequisites
 
@@ -48,9 +60,8 @@ Same approach in Python services and API routes. Remove `is_feature_enabled()` c
 The cleanup step. Depends on toggle type:
 
 - **Browser flags:** No migration needed.
+- **Chat tools:** No migration needed (cookie-based).
 - **DB toggles:** `DELETE FROM feature_toggles WHERE name = '...';` with a comment explaining stability evidence.
-- **Config columns:** `ALTER TABLE ... DROP COLUMN ...;` or `DROP TABLE` if the table is now empty.
-- **Config-column toggles checked by SQL functions:** Update the function with `CREATE OR REPLACE FUNCTION` in the same migration to remove the conditional logic.
 
 Create migrations with `bunx supabase migration new <name>`. Never create migration files manually.
 
@@ -73,25 +84,27 @@ Start with `checkedBy` in the registry — it lists every non-test file that che
 - [ ] Update/remove tests that set `globalThis.__mockBrowserFlags.xxx`
 - [ ] If flag had `backendFlag` config: remove header passing and backend flag checks
 
+### Removing a chat tool
+
+A chat tool is being decommissioned (the tool itself goes away), not just always-on'd. If the same name also exists in browser-flags, remove the browser-flag entry too.
+
+- [ ] Remove entry from `nextjs-app/lib/chat-config/registry.ts`
+- [ ] Remove the cookie usage and any `isToolEnabled`/`isToolEnabledServer`/`getBackendFlags` call sites
+- [ ] If it had `backendFlag`: remove the matching check in `python-services/agent_api`
+- [ ] Remove the tool's switch from `nextjs-app/app/admin/chat/admin-chat-client.tsx` (driven by the registry, so deleting the entry is usually enough)
+- [ ] Update tests
+- [ ] If the same name exists in `lib/browser-flags/registry.ts`: remove it there too (follow the browser-flag checklist)
+
 ### Removing a DB toggle
 
 - [ ] Remove `is_feature_enabled('xxx')` checks from Python code
 - [ ] Remove `isFeatureEnabled('xxx')` checks from TypeScript code
+- [ ] Remove entry from `python-services/agent_api/feature_toggles/registry.py` (the lint test fails otherwise)
 - [ ] Remove toggle constant from `feature-toggles-server.ts` if defined there
 - [ ] Update tests in both Python and TypeScript
 - [ ] Migration: `DELETE FROM feature_toggles WHERE name = 'xxx';`
 - [ ] Remove from `seed.sql`
 - [ ] Migration comment should explain why it is safe (stability evidence)
-
-### Removing a config-column toggle
-
-- [ ] Update SQL function(s) that read the column -- remove the conditional, make behavior unconditional
-- [ ] Remove service functions for reading/writing the toggle (e.g., `setAllowlistEnabled`)
-- [ ] Remove server actions that wrap those service functions
-- [ ] Remove UI components (switches, toggles) for the column
-- [ ] Update tests at all layers (integration, unit, component)
-- [ ] Migration: `ALTER TABLE ... DROP COLUMN ...;` (or `DROP TABLE` if table becomes empty)
-- [ ] If dropping a table: also drop associated RLS policies, triggers, indexes (CASCADE handles most)
 
 ## Commit Messages
 
