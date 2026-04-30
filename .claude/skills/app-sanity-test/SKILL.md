@@ -169,6 +169,7 @@ After auth is established, delegate all testing to Opus sub-agents. Each sub-age
 - The testing loop: `snapshot → interact → snapshot → verify → repeat`
 - Instruction to `snapshot` before every interaction
 - Reference to the `manual-testing-by-agent` skill for playwright-cli details
+- **Tooling-friction instruction** — every sub-agent's reporting block must include a "Tooling friction" line: any `playwright-cli` (or other harness) hiccup they hit and how they worked around it. Examples worth logging: flaky refs across snapshots, modal click-targets that don't fire, daemon "browser not open" errors, `setInputFiles` workarounds, timing/streaming surprises, session-state quirks. If nothing tripped them, the line says "none." Silent inline workarounds are how skill bugs hide — force them into the report.
 
 **Feature toggles:** Before spawning Phase B agents, check toggle state:
 
@@ -215,6 +216,7 @@ After all sub-agents complete, summarize findings to the user:
 - **Observations** from deeper exploration
 - **Bugs found** — create Linear issues automatically for obvious bugs (`plan create`)
 - **Concerns** — report to user, let them decide
+- **Tooling friction** — collect the "Tooling friction" lines from every sub-agent report. Surface them as a short table to the user (one row per hiccup). Offer to file Linear issues for recurring or load-bearing items (e.g., a click-target bug that wasted multiple minutes, a daemon flake that broke a run). One-off harmless quirks can be left as a note. The skill itself is the consumer — recurring friction is signal that this skill, `playwright-cli`, or the app's UI needs hardening.
 
 ---
 
