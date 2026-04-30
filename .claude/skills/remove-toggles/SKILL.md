@@ -19,15 +19,23 @@ Three types are in scope for this skill:
 
 Out of scope (not feature toggles): config-column booleans on entity tables (`workspaces.risk_enabled`, etc.), admin system config (`chat_config` K-V), role gates (`admins`).
 
-## Step 0: Inventory the toggle
+## Step 0: Inventory and decide
 
-Before editing anything, locate the toggle and confirm its type:
+Before editing anything, list every toggle and ask the user per-entry whether to remove it (make always-on) or keep it. Don't act on a single toggle in isolation when the user says "remove toggles" generically — do the inventory pass first.
 
-- Grep `nextjs-app/lib/browser-flags/registry.ts` — is it a browser flag?
-- Grep `nextjs-app/lib/chat-config/registry.ts` — is it a chat tool?
-- Grep `python-services/agent_api/feature_toggles/registry.py` — is it a DB toggle?
+**Inventory all three registries:**
 
-A name can appear in **both** browser flags and chat tools (e.g., `earlyToolUse`, `fathomBrowse`). If so, treat it as a chat tool — that's the permanent home — and remove the browser-flag duplicate as part of the same change.
+```bash
+grep -E "^\s+[a-zA-Z]+: \{" nextjs-app/lib/browser-flags/registry.ts | sed 's/^[[:space:]]*//;s/: {.*$//'
+grep -E "^\s+[a-zA-Z]+: \{" nextjs-app/lib/chat-config/registry.ts | sed 's/^[[:space:]]*//;s/: {.*$//'
+grep -E '^\s+"[a-zA-Z_]+": DbToggle' python-services/agent_api/feature_toggles/registry.py | sed 's/^[[:space:]]*//;s/": .*$//;s/^"//'
+```
+
+Then call `AskUserQuestion` with one question per unique toggle name. Options: `Remove (always on)` / `Keep as toggle` / `Skip / decide later`. Include a one-line description (what the toggle gates) so the user can decide without reading the registry.
+
+**Duplicates:** a name can appear in both browser flags and chat tools (e.g., `earlyToolUse`, `fathomBrowse`). Ask once; on "Remove", delete from both registries in the same change. Treat the chat-config entry as the permanent home.
+
+**Then for each "Remove" decision:** create a Linear sub-issue under a parent `chore: toggle removal pass YYYY-MM-DD`, and execute the per-type checklist below in a `/worktree-to-main` worktree (one worktree per toggle, one push to main per toggle). Keep "Keep" decisions out of the issue tree — don't track non-actions.
 
 ## Prerequisites
 
