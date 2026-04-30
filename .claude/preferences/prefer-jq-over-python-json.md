@@ -1,6 +1,6 @@
 ---
-match: \bpython3?\s+-c\b.*\bimport\s+json\b
-prefer: Reach for `jq` first in shell pipelines — only use `python -c "import json"` when the transform genuinely needs Python.
+match: \bpython3?\s+-c\b[\s\S]*?\bjson\b
+prefer: Reach for `jq` first in shell pipelines — only use `python -c "...json..."` when the transform genuinely needs Python.
 ---
 
 # Why

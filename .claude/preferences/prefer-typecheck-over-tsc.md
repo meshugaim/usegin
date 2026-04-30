@@ -1,6 +1,6 @@
 ---
 match: \b(bunx\s+)?tsc\b
-prefer: Use `bun run typecheck` (in `nextjs-app/`) — raw `tsc` bypasses our tsconfig (skipLibCheck, module resolution) and produces spurious node_modules type errors.
+prefer: Use `bun run typecheck` from the relevant subpackage (e.g. `nextjs-app/`, `tools/effi-cli/`) — raw `tsc` bypasses tsconfig settings and produces spurious node_modules errors.
 ---
 
 # Why
