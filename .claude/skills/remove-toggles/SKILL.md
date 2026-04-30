@@ -37,6 +37,27 @@ Then call `AskUserQuestion` with one question per unique toggle name. Options: `
 
 **Then for each "Remove" decision:** create a Linear sub-issue under a parent `chore: toggle removal pass YYYY-MM-DD`, and execute the per-type checklist below in a `/worktree-to-main` worktree (one worktree per toggle, one push to main per toggle). Keep "Keep" decisions out of the issue tree — don't track non-actions.
 
+### Worktree dep setup
+
+The `worktree-to-main` recipe gives you a clean checkout but no `node_modules` / `.venv`. Pre-push runs lint+tests+build, so:
+
+- **Symlink** is fine for tests and lint:
+  ```bash
+  ln -s /workspaces/test-mvp/nextjs-app/node_modules <wt>/nextjs-app/node_modules
+  ln -s /workspaces/test-mvp/node_modules <wt>/node_modules
+  ln -s /workspaces/test-mvp/python-services/.venv <wt>/python-services/.venv
+  ```
+- **Real install** is required when the change touches `nextjs-app/app/**/page.tsx`, server actions, or config — pre-push triggers `bun run build`, and Turbopack rejects symlinks pointing outside the worktree root with `Symlink ... is invalid, it points out of the filesystem root`. Run `bun install --frozen-lockfile` at both root and `nextjs-app/` in that case.
+- Remove symlinks/`.venv` before `git worktree remove` (they're untracked and confuse cleanup).
+
+### Compound gates
+
+When two toggles AND together (e.g., `scheduledReportsTab` browser flag × `scheduled_reports_worker` DB toggle in `page.tsx`), removing one means the surviving callsite also changes:
+
+- The `Promise.all([...]).then(([a, b]) => a && b)` collapses to a single `await isFlagEnabledServer("...")`
+- The kept toggle's `description`/`context` should drop the "AND'd with X" framing — they no longer reference a gate that's gone
+- The kept toggle's `checkedBy` may change shape (fewer call sites if the AND went away inside one file)
+
 ## Prerequisites
 
 Before removing a toggle, confirm:
@@ -94,13 +115,18 @@ Start with `checkedBy` in the registry — it lists every non-test file that che
 
 ### Removing a chat tool
 
-A chat tool is being decommissioned (the tool itself goes away), not just always-on'd. If the same name also exists in browser-flags, remove the browser-flag entry too.
+Two flavours — pick one:
+
+- **Always-on** (most common): the gated behavior becomes default. Inline the conditional in the backend (e.g., `if "earlyToolUse" in feature_flags:` → unconditional), delete the flag-off test group, drop the registry entry. The tool itself stays.
+- **Decommission**: the tool goes away. Remove the tool handler from the backend, the registry entry, all call sites.
+
+In both cases:
 
 - [ ] Remove entry from `nextjs-app/lib/chat-config/registry.ts`
-- [ ] Remove the cookie usage and any `isToolEnabled`/`isToolEnabledServer`/`getBackendFlags` call sites
-- [ ] If it had `backendFlag`: remove the matching check in `python-services/agent_api`
-- [ ] Remove the tool's switch from `nextjs-app/app/admin/chat/admin-chat-client.tsx` (driven by the registry, so deleting the entry is usually enough)
-- [ ] Update tests
+- [ ] If it had `backendFlag`: remove the matching `"<flag>" in self.config.feature_flags` check in `python-services/agent_api/agent/agent.py` (or wherever) — inline the gated path for always-on, delete it for decommission
+- [ ] Remove cookie usage and any `isToolEnabled`/`isToolEnabledServer`/`getBackendFlags` call sites
+- [ ] Tool switch in `admin-chat-client.tsx` is registry-driven — deleting the entry is enough
+- [ ] Update tests: drop flag-on/flag-off framing, remove `with_feature_flags(["..."])` from fixtures, delete tests that asserted the gated path
 - [ ] If the same name exists in `lib/browser-flags/registry.ts`: remove it there too (follow the browser-flag checklist)
 
 ### Removing a DB toggle
