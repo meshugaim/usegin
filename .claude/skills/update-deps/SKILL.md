@@ -9,7 +9,7 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 
 ## Before Starting
 
-1. **Discover the current shape.** Scan the repo for all `package.json`, `pyproject.toml`, lockfiles, and any other dependency manifests. The repo is a monorepo — there are sub-packages, tools, apps, and test suites scattered across it. Find all of them. Don't just check the obvious apps — check `tools/`, `tests/`, and `experiments/` too. Every `pyproject.toml` and `package.json` is a separate upgrade target.
+1. **Discover the current shape.** Scan the repo for all `package.json`, `pyproject.toml`, lockfiles, GitHub Actions workflows (`.github/workflows/*.{yml,yaml}`), and any other dependency manifests. The repo is a monorepo — there are sub-packages, tools, apps, and test suites scattered across it. Find all of them. Don't just check the obvious apps — check `tools/`, `tests/`, and `experiments/` too. Every `pyproject.toml` and `package.json` is a separate upgrade target.
 
 2. **Check dependabot PRs early.** Run `gh pr list --label dependencies` during discovery. Dependabot PRs reveal pinned versions and version range constraints that `bun update`/`uv lock --upgrade` can't fix. Incorporate them into the plan rather than discovering them halfway through.
 
@@ -64,6 +64,13 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 
 - **Clean stale generated files.** Next.js `.next/types/` can have stale references to deleted routes. Clean before typechecking: `rm -rf .next/types .next/dev/types`.
 - **Check version overrides.** Some packages have `"overrides"` in package.json that can go stale after updates. Align them with the actual dependency versions.
+
+### GitHub Actions
+
+- **Audit `.github/workflows/*.{yml,yaml}` too.** Extract every `uses: <repo>@<ref>` and check for new majors with `gh release view --repo <repo> --json tagName -q '.tagName'`. There's no `bun outdated` equivalent — you have to walk the list.
+- **Floating major refs (`@v6`) auto-track minor/patch — only majors need action.** A bump from `@v5` → `@v6` is the only meaningful diff most runs will surface.
+- **Flag exact-pinned actions.** `uses: org/action@1.2.3` (no `v` prefix or full SHA) won't auto-track — call them out the same way you'd call out a `==` python pin. Either keep the pin (note why) or convert to floating major.
+- **Can't be locally verified.** Workflow changes only run in CI. Say so explicitly in the commit body — "verified on next CI run."
 
 ### Dependabot PRs
 
