@@ -51,7 +51,7 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 - **Verify after every change — for real.** Every bump, including patches. Run the area's typecheck, lint, and test suite. "It installs" is not verification; neither is "it's just a patch." Package authors ship regressions in patch versions too. If you find pre-existing test failures or typecheck errors along the way, fix them — leave the codebase cleaner than you found it.
 - **For Python, run integration tests too, not just unit.** The bumps most likely to regress (SDKs, database drivers, HTTP clients) only show their behavior at the integration boundary. Unit tests don't exercise them. If integration tests are slow, that's the cost — budget for it.
 - **Call out what you couldn't verify.** Things like GitHub Actions bumps or changes to throwaway experiments can't be locally tested. Say so explicitly in the commit body or PR description — "verified on next CI run" is honest; silence reads as "I tested this" and isn't true.
-- **Use worktrees** to avoid interfering with other agents' work.
+- **Run from a worktree pushing to main** (the `worktree-to-main` skill). Dep sweeps span many files, run for hours, and lockfile churn collides badly with whatever other agents are doing on main. The main worktree must stay on main per `feedback_main_wt_stay_on_main.md` — set up `git worktree add -b deps-<date> /tmp/wt-deps-<date> origin/main`, work there, push `HEAD:main`, clean up the worktree at the end.
 - **Track in Linear** via `plan` — parent issue for the overall effort, sub-issues per stage.
 
 ### Python-specific
