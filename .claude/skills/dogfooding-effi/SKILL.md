@@ -16,20 +16,37 @@ Our team dogfoods Effi on our own real project. As an agent you can reach it via
 - Stale twin to avoid: "AskEffi App" (`140376fb-5b32-454b-87fe-8f25165eaccc`). The linked project on this env is already the right one; only relevant if something dereferences by name.
 - Connected sources today: Email, Google Drive. Live but untested: Linear. Coming: Fathom. Aspirational: GitHub, Claude Code sessions.
 
-## Who you auth as
+## Who you auth as — the `dogfooding` profile
 
-Engineering team members each have a `<name>@askeffi.ai` email — Nitsan, Lihu, Oria. Every agent uses *its human's* email, not a shared one.
+We use a single named profile — **`dogfooding`** — for all team-data calls. It's the same profile name on every machine, but each user's local copy holds *their own* identity. So Nitsan's `~/.effi/profiles/dogfooding/` has Nitsan's email + token; Lihu's has Lihu's. Every command in this skill targets it explicitly:
 
-You inherit the human's `~/.effi` profile, so the profile already exists. Run `effi auth status` to discover the email (output looks like `Profile: <name>@askeffi.ai:prod`), then use that as your `--profile` value. Examples below use `<your-email>` as a placeholder.
+```bash
+effi --profile dogfooding ask "..."
+```
 
-If the token is expired: `effi auth refresh` first. If no `:prod` profile exists yet (only a dev/test profile is set up), bootstrap it non-interactively — the human will fetch the OTP from their inbox:
+This isolates dogfooding state (linked project, session continuity, tokens) from any other profile the human has — local `:dev`, `:staging`, etc. — so calls here never collide with their day-to-day work.
+
+### Bootstrap (once per machine)
+
+Check if the profile exists:
+
+```bash
+effi --profile dogfooding auth status   # exits non-zero if missing or unauthenticated
+```
+
+If it doesn't exist, bootstrap it. The human will fetch the OTP from their inbox:
 
 ```bash
 # Derive <name> from `git config user.name` (lowercased first name) — don't ask.
-effi auth login --env production --email <name>@askeffi.ai
+effi auth login --profile dogfooding --env production --email <name>@askeffi.ai
 # human pastes the code, then:
 effi auth verify --env production --email <name>@askeffi.ai --code <code>
+effi --profile dogfooding link \
+  --workspace f757a1a3-9955-45b3-8aab-50454a7c8001 \
+  --project 1bf0f507-7627-40a0-be72-8d2eacc40dec
 ```
+
+If the token is expired: `effi --profile dogfooding auth refresh`.
 
 ## Orienting
 
@@ -39,11 +56,11 @@ Before writing commands, read the CLI's own help — it's the source of truth an
 effi --help
 effi <subcommand> --help
 effi docs list
-effi docs show claude-usage   # the Claude-Code-specific doc
-effi status                   # profile, linked project, session
+effi docs show claude-usage           # the Claude-Code-specific doc
+effi --profile dogfooding status      # profile, linked project, session
 ```
 
-`effi status` tells you whether the dogfooding project is linked. On dev envs it already is, so subcommands resolve the project implicitly. If not linked, either link it — `effi link --workspace f757a1a3-9955-45b3-8aab-50454a7c8001 --project 1bf0f507-7627-40a0-be72-8d2eacc40dec` — or ask the human to confirm before touching the link.
+`status` confirms the linked project on the `dogfooding` profile. The bootstrap step above sets the link; if `status` shows it missing for some reason, re-run `effi --profile dogfooding link --workspace … --project …` from that section.
 
 Override flags exist per-subcommand (`--project`, `--pr`, `--ws`) for the rare case where you need to target something other than the linked project — not needed for the common path.
 
@@ -54,7 +71,7 @@ Override flags exist per-subcommand (`--project`, `--pr`, `--ws`) for the rare c
 The main path. Ask in natural language, Effi routes to its tools across Gmail/Drive/Linear/Fathom and returns a cited, synthesized answer.
 
 ```bash
-effi --profile <your-email>:prod ask "summarize decisions from this week's meetings about <topic>"
+effi --profile dogfooding ask "summarize decisions from this week's meetings about <topic>"
 ```
 
 **Session continuity.** By default `ask` *continues* the stored session — multi-turn follow-ups just work. Flags:
@@ -66,34 +83,34 @@ Long-running conversations are fine and encouraged. Do **not** use `effi chat` �
 
 ### 2. Drive Effi's tools directly
 
-When you already know what you need, skip the synthesis hop and call the underlying tools. Examples that exist today:
+When you already know what you need, skip the synthesis hop and call the underlying tools. Examples that exist today (all targeting `--profile dogfooding`):
 
 ```bash
 # What's new in the project since N time
-effi dev agent-tools project-delta --after 1w --types email,meeting --json
+effi --profile dogfooding dev agent-tools project-delta --after 1w --types email,meeting --json
 
 # A specific meeting (with transcript)
-effi meetings show <meetingId> --transcript
+effi --profile dogfooding meetings show <meetingId> --transcript
 
 # Project canon (files uploaded to Effi — see next section)
-effi files list
+effi --profile dogfooding files list
 
 # Fathom inclusion rules (read/manage meeting scoping)
-effi fathom rules list
+effi --profile dogfooding fathom rules list
 ```
 
 For anything the dedicated subcommands don't cover, use the `api` escape hatch:
 
 ```bash
-effi api /workspaces
-effi api /chat -f message=hello
+effi --profile dogfooding api /workspaces
+effi --profile dogfooding api /chat -f message=hello
 ```
 
 `effi api` substitutes `{workspace}` and `{project}` from the active profile's link — **prefer templates over hardcoded IDs** so the same command works across profiles:
 
 ```bash
-effi api /projects/{project}                  # not /projects/1bf0f507-...
-effi api /workspaces/{workspace}/projects
+effi --profile dogfooding api /projects/{project}                  # not /projects/1bf0f507-...
+effi --profile dogfooding api /workspaces/{workspace}/projects
 ```
 
 See `effi api --help` for the full template list.
@@ -103,9 +120,9 @@ See `effi api --help` for the full template list.
 Claude can upload files to the project canon so future Effi answers can cite them. Use this to capture summaries, decisions, or design notes you produced in a session — turns ephemeral agent output into durable project knowledge.
 
 ```bash
-effi files add <path>                 # default: internal access
-effi files add <path> --external      # mark external-facing
-effi files list                       # list project-canon files
+effi --profile dogfooding files add <path>             # default: internal access
+effi --profile dogfooding files add <path> --external  # mark external-facing
+effi --profile dogfooding files list                   # list project-canon files
 ```
 
 Note: `files list` shows only files uploaded via `files add` — it's the project-canon layer, separate from the connected sources (Gmail/Drive/Fathom) that Effi also searches. An empty `files list` just means nothing's been uploaded yet.
@@ -115,7 +132,7 @@ Note: `files list` shows only files uploaded via `files add` — it's the projec
 After a useful agent conversation, mint a read-only link for the human:
 
 ```bash
-effi share --session <id> --title "<short title>"
+effi --profile dogfooding share --session <id> --title "<short title>"
 ```
 
 Paste the URL back to the human so they can open it without re-running.
