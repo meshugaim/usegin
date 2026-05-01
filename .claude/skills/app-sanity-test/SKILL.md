@@ -251,6 +251,7 @@ Key commands:
 - Prefer `snapshot` over `screenshot` — more token-efficient, shows element refs for interaction
 - Always `snapshot` before interacting — refs change between page states
 - After Effi responds, wait a few seconds (`sleep 3-5`) before snapshotting — streaming takes time
+- **Streaming-done signals (chat):** the Send button stays `[disabled]` *both* during streaming AND when the input is empty post-send. Don't use button-disabled as the "streaming finished" signal — you'll loop forever. Use one of: chat-input ref becomes `[active]` again, or a new top-level assistant `paragraph` ref appears that wasn't there before send.
 - Save auth state after successful sign-in to avoid re-auth next time
 - Check `console` output if something looks wrong — browser errors are often revealing
 - Auth state files (`*-auth.json`) are gitignored
