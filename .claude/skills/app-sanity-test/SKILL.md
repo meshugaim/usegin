@@ -102,25 +102,37 @@ This is idempotent — it creates the `.playwright/` workspace sentinel and veri
 
 #### Try Existing Session First
 
-Always clean up stale daemons before opening the browser. Before loading auth state, **check if the tokens are still valid** to avoid a stale-token retry storm that triggers Supabase rate limiting:
+Always clean up stale daemons before opening the browser. Before loading auth state, **check whether the tokens are usable** to avoid a stale-token retry storm that triggers Supabase rate limiting. `auth-check` reports one of three states — `valid`, `refreshable`, or `expired` — and the flow branches accordingly:
 
 ```bash
 playwright-cli kill-all 2>/dev/null || true
 playwright-cli open
 
-# Check token validity BEFORE loading state
-if auth-check <env>-auth.json; then
-  playwright-cli state-load <env>-auth.json
-  playwright-cli goto <app-url>
-  playwright-cli snapshot
-  # If page loaded normally (not /sign-in), auth is valid — proceed to testing
-else
-  # Tokens expired — skip straight to fresh sign-in (see below)
-  playwright-cli goto <app-url>/sign-in
-fi
+state=$(auth-check <env>-auth.json)
+case "$state" in
+  valid*)
+    # Access token still good — load state and go.
+    playwright-cli state-load <env>-auth.json
+    playwright-cli goto <app-url>
+    playwright-cli snapshot
+    ;;
+  refreshable*)
+    # Access token expired but refresh token still present — let Supabase
+    # auto-refresh on first navigation, then save the refreshed state.
+    playwright-cli state-load <env>-auth.json
+    playwright-cli goto <app-url>
+    sleep 3   # give the Supabase client time to refresh
+    playwright-cli snapshot   # if not on /sign-in, we're in
+    playwright-cli state-save <env>-auth.json
+    ;;
+  *)
+    # Truly expired or invalid — fresh sign-in (see below).
+    playwright-cli goto <app-url>/sign-in
+    ;;
+esac
 ```
 
-**NEVER load expired auth state** — it triggers a token refresh retry storm that rate-limits the Supabase auth endpoint, blocking fresh sign-in attempts too.
+**Never load `expired` (vs `refreshable`) state** — that's the case `auth-check` flags as unusable, and loading it triggers a token refresh retry storm that rate-limits the Supabase auth endpoint. The `refreshable` path is the supported way to skip OTP re-entry between hourly access-token rotations.
 
 #### If Auth Expired or Missing
 
