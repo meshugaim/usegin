@@ -59,7 +59,17 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 - **`uv lock --upgrade` updates the lockfile but doesn't install.** Always follow with `uv sync`. Otherwise `uv pip list --outdated` still shows old versions and you think nothing changed.
 - **Understand upstream constraints before reporting skips.** `uv pip list --outdated` shows ALL installed packages including transitive deps. Many are blocked by upstream constraints. Use `uv tree --package X --invert` to see why a package can't upgrade — say "blocked by pyiceberg requiring cachetools<7" not just "skipped."
 - **Each Python tool is independent.** Tools with their own `pyproject.toml` + `uv.lock` (e.g., `tools/fathom/`, `tools/gmail/`) have separate dependency trees. Upgrade each one individually.
-- **Raise `>=` floors in `pyproject.toml` after a successful lockfile bump.** `uv lock --upgrade` only writes the new version into `uv.lock` — the manifest's `>=X.Y.Z` floor stays at the old number. Dependabot reads the manifest, sees the stale floor, and opens a PR per package to raise it (10 redundant PRs after the 2026-04-30 run — see commits `65111550e`, `8b9159e8d`, `053752573`). After verifying a bump works, edit the matching `>=` in `pyproject.toml` to the new locked version so the floor reflects "we're known to work at this or newer." Do this **only for applications** (`python-services/`, `tools/*` — anything not published to a registry). For library packages consumed by external code, raising the floor tightens downstream constraints; leave those alone and note the package is a library in the commit body.
+- **Raise `>=` floors in `pyproject.toml` after a successful lockfile bump.** `uv lock --upgrade` only writes the new version into `uv.lock` — the manifest's `>=X.Y.Z` floor stays at the old number. Dependabot reads the manifest, sees the stale floor, and opens a PR per package to raise it (10 redundant PRs after the 2026-04-30 run — see commits `65111550e`, `8b9159e8d`, `053752573`). After verifying a bump works, sync the floor to the locked version so dependabot stops re-opening the PR. Do this **only for applications** (`python-services/`, `tools/*` — anything not published to a registry). For library packages consumed by external code, raising the floor tightens downstream constraints; leave those alone and note the package is a library in the commit body.
+
+  There's no single uv flag for this — `uv lock` won't touch `pyproject.toml`, and `uv add <pkg> --bounds lower` is a no-op when the existing `>=` already satisfies the resolved version (uv sees the constraint is met and skips the rewrite). What works is feeding the locked version back as an explicit specifier. Loop over the direct deps that just bumped:
+
+  ```bash
+  # for each package <pkg> that uv lock --upgrade moved:
+  LOCKED=$(awk -v p="$pkg" '$0 == "name = \""p"\"" {getline; sub(/.*"/,""); sub(/"$/,""); print; exit}' uv.lock)
+  uv add "$pkg>=$LOCKED"
+  ```
+
+  This rewrites the existing entry in `pyproject.toml` to `<pkg>>=<locked-version>` without re-resolving. Run after `uv sync` + tests pass — never raise a floor for a version you haven't validated.
 
 ### JS-specific
 
