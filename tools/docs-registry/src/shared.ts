@@ -38,7 +38,10 @@ export function parseFrontmatter(content: string): { meta: Record<string, unknow
     return { meta: {}, body: content };
   }
 
-  const [, frontmatter, body] = match;
+  // Regex matched, so groups 1 and 2 are present. Default to empty string to
+  // satisfy noUncheckedIndexedAccess without changing runtime behavior.
+  const frontmatter = match[1] ?? "";
+  const body = match[2] ?? "";
   const meta: Record<string, unknown> = {};
 
   for (const line of frontmatter.split("\n")) {
@@ -127,6 +130,7 @@ export function formatDocsList(docs: Doc[]): string {
 
   for (let i = 0; i < docs.length; i++) {
     const doc = docs[i];
+    if (!doc) continue;
     const num = (i + 1).toString().padStart(2);
     const typeTag = `[${doc.meta.type}]`;
 
@@ -189,6 +193,7 @@ export function getDocsHelpText(cliName: string, getDocsDir: (internal?: boolean
 function formatAndPrint(docs: Doc[], startNum = 1): number {
   for (let i = 0; i < docs.length; i++) {
     const doc = docs[i];
+    if (!doc) continue;
     const num = (startNum + i).toString().padStart(2);
     const typeTag = `[${doc.meta.type}]`;
 
@@ -265,7 +270,9 @@ export function createDocsCommand(cliName: string, getDocsDir: (internal?: boole
         if (allDocs.length > 0) {
           console.error("Available docs:");
           for (let i = 0; i < allDocs.length; i++) {
-            console.error(dim(`  ${i + 1}  ${allDocs[i].meta.handle}`));
+            const d = allDocs[i];
+            if (!d) continue;
+            console.error(dim(`  ${i + 1}  ${d.meta.handle}`));
           }
         } else {
           console.error(dim("No docs available."));
