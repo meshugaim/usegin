@@ -87,7 +87,12 @@ export function loadDocsFromDir(docsDir: string): Doc[] {
       const { meta, body } = parseFrontmatter(content);
 
       // Validate required fields
-      if (!meta.name || !meta.handle || !meta.type || !meta.context) {
+      if (
+        !meta["name"] ||
+        !meta["handle"] ||
+        !meta["type"] ||
+        !meta["context"]
+      ) {
         continue;
       }
 
