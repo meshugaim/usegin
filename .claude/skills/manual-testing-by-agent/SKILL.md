@@ -159,6 +159,33 @@ just supabase-reset
 
 ---
 
+## Known harness friction (`@playwright/cli@0.1.9`)
+
+We don't own `playwright-cli` — it's the upstream `@playwright/cli` package, shimmed at `tools/bin/playwright-cli`. A few command forms are flaky or unsupported. Three independent sub-agents during a 2026-05-03 staging sanity run hit these and worked around them; codified here so future agents start with the working forms.
+
+| Don't | Do | Why |
+|---|---|---|
+| `playwright-cli type --submit <ref> "text"` | `fill <ref> "text"` then `press Enter` (or `click <send-button-ref>`) | `--submit` crashes with a websocket stack trace |
+| `playwright-cli type <ref> "text"` against React-controlled inputs (chat input, etc.) | `fill <ref> "text"` | `type` crashes with a node socket error on some refs |
+| `fill 'textbox "Send a message"' "..."` (string selector) | `fill e71 "..."` (ref from snapshot) | The string-selector parser fails CSS-parse on selector forms with quotes/spaces |
+
+**Rule of thumb**: prefer `fill <ref>` + explicit `click <button-ref>`; ignore `--submit` and string-form selectors. Always snapshot first to get the ref.
+
+### Streaming-done signal (chat inputs)
+
+For chat-style flows: the Send button stays `[disabled]` *both* during streaming AND when the input is empty post-send. **Don't loop on button-disabled** — you'll wait forever. Use either:
+
+- chat-input ref becomes `[active]` again, OR
+- a new top-level assistant `paragraph` ref appears that wasn't in the pre-send snapshot.
+
+After clicking Send, `sleep 5–8` then snapshot.
+
+### `upload` allowed-roots
+
+`playwright-cli upload` rejects files outside an allow-list with "outside allowed roots". `/tmp/...` is NOT allowed. Place upload fixtures under `/workspaces/test-mvp/.playwright-cli/` (or another in-repo path).
+
+---
+
 ## Tips
 
 - **Always run `playwright-cli` from the repo root** (`/workspaces/test-mvp`). The daemon uses a cwd-based hash to find the browser — if cwd differs between commands, you get "browser not open" errors.

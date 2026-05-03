@@ -180,8 +180,8 @@ After auth is established, delegate all testing to Opus sub-agents. Each sub-age
 - Instructions to use `playwright-cli` (start with `playwright-cli --help`)
 - The testing loop: `snapshot → interact → snapshot → verify → repeat`
 - Instruction to `snapshot` before every interaction
-- Reference to the `manual-testing-by-agent` skill for playwright-cli details
-- **Tooling-friction instruction** — every sub-agent's reporting block must include a "Tooling friction" line: any `playwright-cli` (or other harness) hiccup they hit and how they worked around it. Examples worth logging: flaky refs across snapshots, modal click-targets that don't fire, daemon "browser not open" errors, `setInputFiles` workarounds, timing/streaming surprises, session-state quirks. If nothing tripped them, the line says "none." Silent inline workarounds are how skill bugs hide — force them into the report.
+- Reference to the `manual-testing-by-agent` skill for playwright-cli details — specifically its **"Known harness friction"** section, which lists the working forms (`fill <ref>` over `type`, ref-form selectors over string-form, no `--submit`, streaming-done signals). Tell the sub-agent to start with the working forms; this saves rediscovering them.
+- **Tooling-friction instruction** — every sub-agent's reporting block must include a "Tooling friction" line: any `playwright-cli` (or other harness) hiccup they hit and how they worked around it — *especially* anything not already covered by the "Known harness friction" section in `manual-testing-by-agent`. New friction is the load-bearing signal; rediscovered friction means we forgot to read the section. If nothing tripped them, the line says "none." Silent inline workarounds are how skill bugs hide — force them into the report.
 
 **Feature toggles:** Before spawning Phase B agents, check toggle state:
 
@@ -228,7 +228,7 @@ After all sub-agents complete, summarize findings to the user:
 - **Observations** from deeper exploration
 - **Bugs found** — create Linear issues automatically for obvious bugs (`plan create`)
 - **Concerns** — report to user, let them decide
-- **Tooling friction** — collect the "Tooling friction" lines from every sub-agent report. Surface them as a short table to the user (one row per hiccup). Offer to file Linear issues for recurring or load-bearing items (e.g., a click-target bug that wasted multiple minutes, a daemon flake that broke a run). One-off harmless quirks can be left as a note. The skill itself is the consumer — recurring friction is signal that this skill, `playwright-cli`, or the app's UI needs hardening.
+- **Tooling friction** — collect the "Tooling friction" lines from every sub-agent report. Surface them as a short table to the user (one row per hiccup). For every non-"none" item, propose a concrete next step inline — codify the workaround in `manual-testing-by-agent`, file a Linear issue, or check for a newer `@playwright/cli` release. Don't end the run with friction items unaddressed; silent inline workarounds are how the same bugs get rediscovered three sanity tests in a row. `playwright-cli` is upstream `@playwright/cli` (shimmed at `tools/bin/playwright-cli`) — we don't fix it directly, but we do learn the working subset and write it down.
 
 ---
 
