@@ -47,20 +47,19 @@ def main(target_user: str) -> int:
             kwargs["icon_emoji"] = case["icon_emoji"]
         r = c.chat_postMessage(**kwargs)
         posted.append((case, r["ts"]))
-        print(f"  posted #{i}: username={case['username']}  ts={r['ts']}")
-        time.sleep(2.5)  # space them so each push is distinguishable
+        print(f"  posted #{i}: username={case['username']!r}  icon={case['icon_emoji']!r}  ts={r['ts']}", flush=True)
+        if i < len(cases):
+            print("  (waiting 20s before next so you can read this banner)", flush=True)
+            time.sleep(20)
 
     print()
-    print("Now check your phone's lock screen / push notification banners.")
-    print("For each, note: what NAME shows in the push notification?")
+    print("Messages will stay visible for 60s — check your phone now.")
+    print("For each, note: what NAME shows in the push notification banner?")
+    print("Then come back and tell the agent what you saw.")
     print()
-    print("Expected outcomes:")
-    print("  - if push shows 'Effi Spike' on all 3 → username override does NOT propagate")
-    print("    to push (the suspected Path A blocker).")
-    print("  - if push shows 'oria' / 'claude-on-lihu' / 'Effi Spike' respectively → push")
-    print("    DOES propagate the override (Path A is fully usable).")
-    print()
-    input("Press Enter once you've checked your phone (will then delete the messages): ")
+    for remaining in range(60, 0, -10):
+        print(f"  ...{remaining}s remaining")
+        time.sleep(10)
 
     for case, ts in posted:
         try:

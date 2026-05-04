@@ -21,7 +21,7 @@ doppler run -- uv run --project experiments/slack-direct \
 | iii-update | Does `chat.update` preserve username/icon_emoji overrides set on the original post? Does it accept different overrides on update? | **Identity locked at post time.** Update without override: identity persists. Update with a different override: ignored — message stays under the original identity. | No identity drift on edit; but no way to "rewrite history" under a different persona either. |
 | iii-delete | Is `chat.delete` blocked on overridden messages? (Handoff suspected yes.) | **No — chat.delete works on overridden messages.** All 4 cases (control, username only, icon only, both) deleted cleanly and were confirmed gone. | Disproves one of the 3 suspected Path A annoyances. Path A is one less annoyance than the handoff thought. |
 | bot-self | Does Socket Mode deliver the bot's own messages back to its listeners? | **Yes**, with `bot_id` set to the bot's `B…` id. | Receiver code MUST filter self-echo (matches the 18 cribbable patterns; check `bot_id`, `bot_profile.app_id`, AND `user`). |
-| ii (mobile push) | Does mobile push notification show the `username`-overridden identity or the bot's identity? | **Deferred** — needs human's phone for the lock-screen check. Script ready: `probes/probe_ii_mobile_push.py`. | Outstanding. The suspected Path A blocker. |
+| ii (mobile push) | Does mobile push notification show the `username`-overridden identity or the bot's identity? | **Override propagates.** Banners showed `oria` / `claude-on-lihu` / `Effi Spike` (control) — the override is visible at the lock-screen, not just bot identity. | Disproves the suspected Path A blocker. Path A's mobile-notification UX is fully usable. |
 | Q1 (MCP) | Does stock Claude Code recognize `notifications/claude/channel` MCP messages from the `claude-code-slack-channel` plugin? | **Not run.** Future-upgrade question, low priority. | TBD. |
 
 ## Detail per probe
@@ -79,9 +79,14 @@ This means receiver code MUST implement self-echo filtering. The 18 patterns in 
 
 ## Open
 
-- **Probe ii (mobile push).** Script ready, needs human at phone. ~30 seconds when convenient.
 - **Q1 (MCP recognition).** Install `claude-code-slack-channel` plugin, run stock `claude` (without `--dangerously-load-development-channels`), DM the bot, watch for `<channel>` system tag in Claude's context. Determines whether MCP-based injection is a future-available alternative path. Low priority.
 - **APP badge visual.** Wasn't probed — visual constraint that Slack documents. Verify by eye on a test message: post one with a username override and look for a small `APP` label next to the name. (Confirmed by Slack docs and many third-party reports; running probes wouldn't add information.)
+
+## Side note — DM-back is currently blocked
+
+When Lihu saw the probe ii DMs on his phone, Slack showed "Sending messages to this app has been turned off" at the bottom of the DM thread. This is a Slack app-config setting on the **App Home** tab → "Allow users to send Slash commands and messages from the messages tab".
+
+Doesn't affect the dev-channel design (replies happen in `#effi-dev` via @-mention or thread reply, not via direct DM to the bot). Flag for later if we ever want a DM-reply path.
 
 ## Updated decision impact
 
@@ -90,8 +95,10 @@ This means receiver code MUST implement self-echo filtering. The 18 patterns in 
 1. Socket Mode load-balances across listeners → each dev sees ~1/N of messages without polling.
 2. Slack drops events for windows with no Socket Mode connection → offline gaps would lose messages without a backfill on reconnect.
 
-`SYNTHESIS.md` D6 (Path A "3 annoyances" list) is now **2 annoyances**:
+`SYNTHESIS.md` D6 (Path A "3 annoyances" list) collapses to **1 annoyance**:
 
-- non-removable `APP` badge — still standing (visual)
-- mobile push fallback to bot identity — **still suspected, needs probe ii**
+- non-removable `APP` badge — still standing (visual, undocumented to disable)
+- ~~mobile push fallback to bot identity~~ — **disproven by probe ii** — push banners show the overridden name
 - ~~chat.delete blocked on overridden messages~~ — **disproven by probe iii-delete**
+
+**Verdict on Path A:** the only remaining cost is a small `APP` badge next to the sender name in the desktop UI. Mobile push, edits, and deletes all work cleanly under the per-message identity override. Path A is the recommended path; Hybrid (per-user OAuth) is no longer needed as a fallback.
