@@ -152,4 +152,34 @@ End with a single "what Lihu sees" paragraph.
 
 ## Returned
 
-(filled when agent returns)
+- when: 2026-05-04 (~4.5 min)
+- agent: a1b3caef35fe838f4
+
+### Outcome
+**Iterate.** Substrate shape collapses 9/10 friction points to zero
+ceremony per kind; single `search()` answers cross-kind. Not Adopt
+because: 1 project, 3 fixtures, mock embeddings, no real RLS, no real
+wires — heterogeneity proven; production-shape claims still open.
+
+### Yes-if / no-if
+- **Yes-if** Lihu wants to take one bounded provider slice with real
+  embedder + real access checks (Phase 6+ shape).
+- **No-if** a substrate pick is forced this quarter — fall back to
+  JSONB-on-Postgres (control's runner-up; one bill, free RLS, slower
+  on LLM-read but tractable).
+
+### Artifacts
+- `experiments/poc-knowledge-store/VERDICT.md` (694 words / 700 cap)
+- `experiments/poc-knowledge-store/WALKTHROUGH.md` (790 words / 800 cap)
+- `experiments/poc-knowledge-store/README.md` — pointer added at top
+
+### Invariant + green
+- `git diff bdf92b93d..HEAD -- app/store/ app/index/ app/kinds/`
+  empty (0 lines)
+- `bun run app/demo.ts` exits 0 on 7/7 checks
+
+### Commits (pushed to main)
+- `b186759f8` VERDICT.md
+- `39239d1c8` WALKTHROUGH.md + README pointer
+
+### Status: closed — arc complete

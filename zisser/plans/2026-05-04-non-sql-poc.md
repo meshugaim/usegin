@@ -1,11 +1,12 @@
 # Plan — non-SQL PoC for project "data items" (small Effi, big breath)
 
-> **Status (2026-05-04 evening):** Phases 0–4 closed. Storage:
-> markdown-on-disk + LanceDB hybrid. 3 kinds (fathom, email, note).
-> Multi-turn REPL with session memory. Demo green on 7/7 including
-> cross-kind + follow-up. Architectural invariant held: zero diff to
-> `app/store/` `app/index/` across phases 3–4. **Phase 5 (side-by-side
-> writeup + walkthrough — the close-out) dispatching next.**
+> **Status (2026-05-04 — ARC CLOSED):** All 5 phases done.
+> Verdict = **Iterate** — substrate shape collapses 9/10 Phase-0
+> friction points; production-shape claims (RLS, real wires, scale)
+> still open. Decision-grade output at
+> `experiments/poc-knowledge-store/VERDICT.md` (≤700 words) and
+> `WALKTHROUGH.md` (≤800 words, real REPL transcript with per-turn
+> friction callouts). Awaiting Lihu's call.
 
 
 > Lihu, 2026-05-04: *"prove that the SQL concept... gives us a lot of
