@@ -13,6 +13,7 @@
  */
 
 import { Command } from "commander";
+import { buildSlackChannelCommand } from "./commands/channel";
 import { buildSlackInboxCommand } from "./commands/inbox";
 import { buildSlackPostCommand } from "./commands/post";
 import { buildSlackReadCommand } from "./commands/read";
@@ -21,12 +22,13 @@ import { buildSlackWhoamiCommand } from "./commands/whoami";
 
 export function buildSlackCommand(): Command {
   const cmd = new Command("slack").description(
-    "UseGin-Slack CLI — Gin-mediated team Slack R/W (whoami, send, post, read, inbox).",
+    "UseGin-Slack CLI — Gin-mediated team Slack R/W (whoami, send, post, read, inbox, channel).",
   );
   cmd.addCommand(buildSlackWhoamiCommand());
   cmd.addCommand(buildSlackSendCommand());
   cmd.addCommand(buildSlackPostCommand());
   cmd.addCommand(buildSlackReadCommand());
   cmd.addCommand(buildSlackInboxCommand());
+  cmd.addCommand(buildSlackChannelCommand());
   return cmd;
 }
