@@ -21,6 +21,7 @@ import { buildSlackPostCommand } from "./commands/post";
 import { buildSlackReactCommand } from "./commands/react";
 import { buildSlackReadCommand } from "./commands/read";
 import { buildSlackSendCommand } from "./commands/send";
+import { buildSlackSmokeCommand } from "./commands/smoke";
 import { buildSlackUserCommand } from "./commands/user";
 import { buildSlackWhoamiCommand } from "./commands/whoami";
 
@@ -38,5 +39,6 @@ export function buildSlackCommand(): Command {
   cmd.addCommand(buildSlackDmCommand());
   cmd.addCommand(buildSlackFilesCommand());
   cmd.addCommand(buildSlackReactCommand());
+  cmd.addCommand(buildSlackSmokeCommand());
   return cmd;
 }
