@@ -10,6 +10,12 @@
 
 import { Command } from "commander";
 import { dxShouldOutputJson } from "../../output";
+import {
+	addBookmark,
+	formatBookmarkHuman,
+	formatBookmarkJson,
+	type SlackBookmarkClient,
+} from "../bookmark";
 import { ChannelResolutionError } from "../channel";
 import {
 	archiveChannel,
@@ -30,7 +36,7 @@ import { SlackConfigError } from "../config";
 
 export function buildSlackChannelCommand(): Command {
 	const cmd = new Command("channel").description(
-		"Admin ops on Slack channels (create / invite / join / archive / topic / purpose / members).",
+		"Admin ops on Slack channels (create / invite / join / archive / topic / purpose / members / bookmark).",
 	);
 	cmd.addCommand(buildCreate());
 	cmd.addCommand(buildInvite());
@@ -39,6 +45,67 @@ export function buildSlackChannelCommand(): Command {
 	cmd.addCommand(buildTopic());
 	cmd.addCommand(buildPurpose());
 	cmd.addCommand(buildMembers());
+	cmd.addCommand(buildBookmark());
+	return cmd;
+}
+
+function buildBookmark(): Command {
+	const cmd = new Command("bookmark").description(
+		"Channel bookmarks — pinned links in the channel header.",
+	);
+	cmd.addCommand(
+		new Command("add")
+			.description("Add a link bookmark to a channel.")
+			.argument("<channel>", "channel (#name or Cxxx)")
+			.argument("<url>", "URL to bookmark")
+			.option("--title <text>", "bookmark title (default: the URL)")
+			.option("--emoji <emoji>", "leading emoji (e.g. :pin:)")
+			.option("--json", "Output as JSON to stdout")
+			.action(async (channel, url, opts) => {
+				let handle;
+				try {
+					handle = buildSlackClient();
+				} catch (err) {
+					if (err instanceof SlackConfigError) {
+						process.stderr.write(
+							`dx slack channel bookmark add: ${err.message}\n`,
+						);
+						process.exit(2);
+					}
+					throw err;
+				}
+
+				let result;
+				try {
+					result = await addBookmark(
+						handle.client as unknown as SlackBookmarkClient,
+						channel,
+						url,
+						opts.title ?? url,
+						handle.config,
+						{ emoji: opts.emoji },
+					);
+				} catch (err) {
+					if (err instanceof ChannelResolutionError) {
+						process.stderr.write(
+							`dx slack channel bookmark add: ${err.message} (token: ${err.tokenMask})\n`,
+						);
+						process.exit(1);
+					}
+					const msg = err instanceof Error ? err.message : String(err);
+					process.stderr.write(`dx slack channel bookmark add: ${msg}\n`);
+					process.exit(1);
+				}
+
+				const useJson = dxShouldOutputJson(opts);
+				if (useJson) {
+					process.stdout.write(formatBookmarkJson(result) + "\n");
+				} else {
+					process.stderr.write(formatBookmarkHuman(result) + "\n");
+				}
+				if (!result.ok) process.exit(1);
+			}),
+	);
 	return cmd;
 }
 
