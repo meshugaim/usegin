@@ -31,6 +31,15 @@ move/copy this content there.
 - **Action over framing.** Answer artifact-listing Qs with the table
   of concrete names; skip framing prose.
 
+## Lihu-cadence default (learned 2026-05-04)
+
+For experiment / R&D / async work: **no scheduled checkpoints**. Lihu
+prefers Zisser + the team work asynchronously and stop **only** on:
+(a) drift signal, (b) missing resources, (c) missing
+auth/secrets/connections, (d) genuine input need. Don't bring back
+"how's it going" reports. Do batch all auth/secret asks into a single
+NEEDS list per experiment so Lihu can satisfy them in one pass.
+
 ## My anti-patterns to watch
 
 - **Asking when I should act.** If I'm hesitating because dispatch is
