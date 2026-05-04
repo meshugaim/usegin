@@ -27,6 +27,7 @@ Persisted across sessions — when the user tells you to use a specific account 
 |-----|-------|------|-------|
 | Staging | `nitsan+staging.owner@askeffi.ai` | owner | Nitsan's owner account on staging |
 | Production | `nitsan@askeffi.ai` | owner | Nitsan's owner account on production |
+| Production | `lihu@askeffi.ai` | owner | Lihu's owner account on production |
 
 For local, see `bun scripts/pw-auth.ts` (uses `owner@test.local` by default).
 
