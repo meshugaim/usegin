@@ -115,4 +115,29 @@ After the existing 5 questions, run a 2-turn mini-conversation:
 
 ## Returned
 
-(filled when agent returns)
+- when: 2026-05-04 (~4 min)
+- agent: a5bf5a4c6aa7ed336
+
+### Outcome
+**Multi-turn REPL works.** All 7 demo checks green (5 originals + 2
+multi-turn). Follow-up "across which kinds?" pulls citations from the
+prior turn's topic — proven by `email_thread` appearing in turn B's
+`/citations` despite having zero anchor on pricing in B's text alone
+(only the merged retrieval query "B | A" brings it in).
+
+### Architectural invariant — STILL HELD
+`git diff cd9efbfc9..HEAD -- app/store/ app/index/ app/kinds/` is
+empty across Phase 4. All mass landed in `app/chat/` + `app/repl.ts`
++ `app/demo.ts` + README, as charter required.
+
+### LoC
+959 → 1292 (+333). Under 1500 cap.
+
+### Commit (pushed to main)
+- `bdf92b93d` phase 4 — REPL + multi-turn session memory
+
+### NEEDS rows
+Unchanged. Two existing items (Anthropic + embedding key) still
+sufficient; stubs carry multi-turn deterministically.
+
+### Status: closed
