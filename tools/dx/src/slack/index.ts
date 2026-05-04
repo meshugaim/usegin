@@ -15,6 +15,7 @@
 import { Command } from "commander";
 import { buildSlackChannelCommand } from "./commands/channel";
 import { buildSlackDmCommand } from "./commands/dm";
+import { buildSlackFilesCommand } from "./commands/files";
 import { buildSlackInboxCommand } from "./commands/inbox";
 import { buildSlackPostCommand } from "./commands/post";
 import { buildSlackReadCommand } from "./commands/read";
@@ -34,5 +35,6 @@ export function buildSlackCommand(): Command {
   cmd.addCommand(buildSlackChannelCommand());
   cmd.addCommand(buildSlackUserCommand());
   cmd.addCommand(buildSlackDmCommand());
+  cmd.addCommand(buildSlackFilesCommand());
   return cmd;
 }
