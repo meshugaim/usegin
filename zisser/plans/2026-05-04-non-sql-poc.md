@@ -1,9 +1,12 @@
 # Plan — non-SQL PoC for project "data items" (small Effi, big breath)
 
-> **Status (2026-05-04 evening):** Phase 0 + Phase 1 closed. Storage
-> decision = **markdown-on-disk + LanceDB hybrid** — see
-> `experiments/poc-knowledge-store/1-storage/SYNTHESIS.md`. Phase 2
-> walking skeleton dispatching next.
+> **Status (2026-05-04 evening):** Phase 0–3 closed. Storage decision =
+> **markdown-on-disk + LanceDB hybrid** (`SYNTHESIS.md`). Walking
+> skeleton + 3 kinds (fathom, email, note) live; demo green on 5/5
+> including 2 cross-kind questions. Architectural invariant
+> ("heterogeneity in `kinds/`, uniformity in `store|index|chat`")
+> held under its first test — zero diff to plumbing dirs across Phase
+> 3. Phase 4 (REPL chat surface) dispatching next.
 
 
 > Lihu, 2026-05-04: *"prove that the SQL concept... gives us a lot of
