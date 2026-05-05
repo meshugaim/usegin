@@ -11,6 +11,8 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 
 1. **Discover the current shape.** Scan the repo for all `package.json`, `pyproject.toml`, lockfiles, GitHub Actions workflows (`.github/workflows/*.{yml,yaml}`), and any other dependency manifests. The repo is a monorepo — there are sub-packages, tools, apps, and test suites scattered across it. Find all of them. Don't just check the obvious apps — check `tools/`, `tests/`, and `experiments/` too. Every `pyproject.toml` and `package.json` is a separate upgrade target.
 
+   **Also audit devcontainer-layer pins.** `.devcontainer/devcontainer.json` features (e.g., `docker-in-docker`'s `version`), `.devcontainer/Dockerfile` apt installs, and `.devcontainer/apt-preferences/*.pref` files all pin runtime versions outside `bun`/`uv`'s reach. Treat each pin there as a row in Table 2 with its own root-reason — devcontainer pins exist because something upstream broke, and the revisit-trigger needs to live in Known Constraints (below) so the pin doesn't outlive the bug.
+
 2. **Check dependabot PRs early.** Run `gh pr list --label dependencies` during discovery. Dependabot PRs reveal pinned versions and version range constraints that `bun update`/`uv lock --upgrade` can't fix. Incorporate them into the plan rather than discovering them halfway through.
 
 3. **Flag pinned versions — and understand *why*.** `bun update` only bumps within version ranges. Exact pins without `^` or `~` (e.g., `"react": "19.2.4"`, `claude-agent-sdk==0.1.56`) need manual edits, so they'd otherwise be silently skipped.
@@ -126,5 +128,9 @@ Each entry states: the package, the component it lives in, the constraint, the *
 ### `.github/workflows/`
 
 - **`astral-sh/setup-uv` — must pin to immutable tag (e.g. `@v8.1.0`), no major-only.** v8 (2026-04-29) dropped major and minor floating tags for supply-chain security: `@v8` and `@v8.0` no longer resolve. Pin to a specific version like `@v8.1.0` (or full SHA). All other actions in our workflows still float on major (`@v6`, `@v4`).
+
+### `.devcontainer/`
+
+- **`docker-in-docker` feature pinned to `version: "29.4.1"` (devcontainer.json), with companion apt-pin `moby-containerd=2.2.3-ubuntu24.04u1` (apt-preferences/moby-containerd.pref, Pin-Priority 1001).** *Validated breakage.* containerd 2.3.0 + dockerd 29.4.x deadlocks on dockerd startup — fresh devcontainers came up with no docker daemon at all. Upstream: [moby/moby#42747](https://github.com/moby/moby/issues/42747). Pins added in `125e2fe46` (Docker) + `92edc6ee0` (containerd, 2026-05-05). Without both, the DinD feature's post-Dockerfile apt-install picks containerd `latest` and breaks. **Revisit when** containerd ≥ 2.3.1 ships, or moby/moby#42747 closes, or Docker 29.5.x changes the dockerd↔containerd handshake. Verify by removing the apt-preferences file + unpinning `version` in a worktree's devcontainer rebuild and confirming `docker ps` works.
 
 *(No entries yet for `landing-app/`, `tests/*`, or Python tools. Add as they emerge.)*
