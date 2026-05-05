@@ -10,7 +10,6 @@ plan list                                     # Active backlog (priority order)
 plan list --limit 5                           # Cap top-level results
 plan list --label bug                         # Filter by label
 plan list --status "In Progress"              # Filter by status
-plan list --assignee @me                      # My issues
 plan list --active                            # Sort by recent activity
 plan list --latest                            # Sort by creation date
 plan list --flat                              # Flat list of every issue (top-level + sub-issues)
@@ -96,3 +95,4 @@ The response includes a `pagination` envelope:
 | `--sort` | Use `--latest` or `--active` |
 | `--all` on `list` | Use `--show-done` for done sub-issues |
 | `--count` | Not available |
+| `--assignee @me` | Exists, but **don't use it** — the team shares one Linear API key, so `@me` returns everything anyone has touched, not your work. To find in-flight work, use `--status "In Progress"` + `--active`, or read the graph and recent commits. See `plan docs show attribution`. |

@@ -16,7 +16,7 @@ The `plan` CLI is available on the PATH and ready to use. We track work in Linea
 
 **The plan is for us too**: Let's keep it legible, well connected, up to date.
 
-**Shared API key**: You, other agents, and the human share one Linear API key, so every author/assignee field shows the same user. Treat issues as team-owned (people focus on distinct things), and check git history when real attribution matters. See `plan docs show attribution`.
+**Shared API key — assignee/author mean nothing**: The whole team (human + every agent) shares one Linear API key, so every author, assignee, and comment-author field shows the same user. **Don't filter by `--assignee @me`** and don't say "your X" / "their Y" based on assignee — it's degenerate, not signal. Treat issues as team-owned; to find in-flight work, use `--status "In Progress"` + `--active`, the graph (parent/siblings), and recent commits. For real attribution, read git history. See `plan docs show attribution`.
 
 **The graph**: Work lives in a web of connected issues. When creating, connect it to existing items - `--parent` for sub-issues, `--related-to` for loose connections. This means, first start by familiarizing with the existing `plan list`. Standalone issues are rare.
 
