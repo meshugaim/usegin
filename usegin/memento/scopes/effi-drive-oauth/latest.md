@@ -95,6 +95,11 @@ Flip Google's Drive OAuth consent screen from "to continue to **unified.to**" �
 ## Pointers
 
 - ENG-5186 — `plan show ENG-5186 --comments` (Nitsan's 2026-04-22 / 04-23 status comments are the source of the now-stale staging client_id).
+- **Demo video (current cut, for ENG-5186 step 8):** https://youtu.be/itr-12fHtuc — the cut to attach to Google's verification submission. Re-record only if Google reviewers reject.
+- **Verification form facts (Lihu, 2026-05-05):**
+  - Scoping: customers can scope Drive ingestion at **either project or workspace** level (not project-only as an earlier note implied).
+  - Target customers: customer-facing service companies — IT consultancies, ERP integrators, construction companies, and similar professional-service firms running named client engagements.
+  - App category for the OAuth verification form: **Productivity** (Google's "Drive productivity" label is the Workspace-Marketplace category, not the OAuth-form category — the substance is the same).
 - Tikur: `.claude/tikur-records/2026-04-28-stale-client-ids-in-browser-prompt.md`
 - Memory: `~/.claude/projects/-workspaces-test-mvp/memory/MEMORY.md`
 - Probe code path: `python-services/agent_api/connectors/unified_client.py:190-220` (`get_auth_url`)
