@@ -38,3 +38,14 @@ Use blockquotes / inline annotations only when:
 - you want to surface a tradeoff before making the change.
 
 Chat reply is minimal: one sentence noting what you changed, or "standing by" on a no-op save. Fall back to chat only for meta-questions (process, scope, "should I…?") that don't belong in the artifact.
+
+## Composes with `plan checkout` / `plan push`
+
+The skill works on any file path, including the temp file `plan checkout <ID>` writes for a Linear issue description (`/tmp/linear/<ID>/description.md`). Workflow:
+
+1. `plan checkout ENG-XXXX` — pulls the description to disk.
+2. Arm pair-on-file on `/tmp/linear/ENG-XXXX/description.md`.
+3. Edit-save-edit with Claude responding inline.
+4. `plan push ENG-XXXX` when the description is right.
+
+Same pattern for any file the team uses as a substrate for an iterative loop — design docs, specs, drafts, notes.
