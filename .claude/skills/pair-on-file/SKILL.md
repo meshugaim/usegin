@@ -1,11 +1,11 @@
 ---
 name: pair-on-file
-description: Pair with the user on a single file (spec, design doc, plan) where each save triggers a Monitor notification and you reply by editing the file in place rather than chat. Use when the user wants to iterate on a doc together, when they say "monitor my edits", "reply by editing", "let's collaborate on this file", "I'll add inline comments", or "I'll save and you respond". Don't use for code work spanning many files (use interactive-dev) or when normal chat back-and-forth is fine.
+description: Pair with the user on a single file (spec, design doc, plan) where each save triggers a Monitor notification and you reply by editing the file in place rather than chat. Use when the user wants to iterate on a doc together, when they say "monitor my edits", "reply by editing", "let's collaborate on this file", "I'll add inline comments", or "I'll save and you respond".
 ---
 
 # Pair on file
 
-A pattern for collaborating on a single file across many turns without the user typing `.` to trigger each response. A file-watcher Monitor fires one notification per save; you read the changes and respond by editing the file in place.
+A pattern for collaborating on a single file across many turns without each response needing to be manually triggered. A file-watcher Monitor fires one notification per save; you read the changes and respond by editing the file in place.
 
 ## When to use
 
@@ -17,7 +17,7 @@ Don't use when work spans many files, edits are in code (use `interactive-dev` o
 
 ## Setup
 
-1. Check `inotifywait` is on PATH; if not, `sudo apt-get install -y inotify-tools`.
+1. `inotifywait` is preinstalled in the devcontainer (`inotify-tools`). On a host that's missing it, `sudo apt-get install -y inotify-tools`.
 2. Arm a persistent Monitor against the file's **directory** (not the file directly — atomic-save renames would orphan a direct watch), filtered to the filename:
 
    ```
@@ -30,17 +30,11 @@ Don't use when work spans many files, edits are in code (use `interactive-dev` o
 
 ## Reply convention
 
-Each save is one turn. Default to replying **by editing the file**, not chat:
+Each save is one turn. **Most asks are about editing the file itself — so the right move is just to do the edit. If the user's comment is fully addressed by your change, remove the comment too.** Don't accumulate ack-markers when the comment was the ask.
 
-- Inline answers next to the user's question — a short `>` blockquote, a small revision, an annotation.
-- Leave a marker the user can grep (`> _ack_`, `> _changed §X.Y_`) so they don't have to read the whole file to find your reply.
-- Chat reply is then minimal: one sentence noting what you changed, or "standing by" on a no-op save.
+Use blockquotes / inline annotations only when:
+- the answer is partial or deferred (you need to flag what's still open),
+- the user asked a question that doesn't translate to a file edit,
+- you want to surface a tradeoff before making the change.
 
-Fall back to chat only for meta-questions (process, scope, "should I…?") that don't belong in the artifact.
-
-## Watch out for
-
-- **No-op saves.** Read the file and diff against your last view; if nothing material changed, acknowledge briefly and stand by.
-- **Truncated system-reminder diffs.** The reminder may be cut off; Read the file directly when the relevant part is past the cut.
-- **Cleanup.** When the topic shifts or the work is done, TaskStop the monitor. A forgotten persistent watcher burning context across an unrelated topic is the failure mode.
-- **Handoff.** If ending the session with the watch still armed, name the task id in the handoff so the next agent decides whether to keep it.
+Chat reply is minimal: one sentence noting what you changed, or "standing by" on a no-op save. Fall back to chat only for meta-questions (process, scope, "should I…?") that don't belong in the artifact.
