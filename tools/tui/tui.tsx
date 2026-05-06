@@ -13,6 +13,44 @@ function done(result: unknown) {
   writeFileSync(outPath, JSON.stringify(result));
 }
 
+type RichItem = string | { name: string; description?: string; details?: string };
+function itemName(it: RichItem): string {
+  return typeof it === "string" ? it : it.name;
+}
+function itemDescription(it: RichItem): string | undefined {
+  return typeof it === "string" ? undefined : it.description;
+}
+function itemDetails(it: RichItem): string | undefined {
+  return typeof it === "string" ? undefined : it.details;
+}
+
+function DetailPanel({ item, maxLines = 8 }: { item: RichItem | undefined; maxLines?: number }) {
+  if (!item) return null;
+  const desc = itemDescription(item);
+  const details = itemDetails(item);
+  if (!desc && !details) return null;
+  const lines = details ? details.split("\n") : [];
+  const shown = lines.slice(0, maxLines);
+  const truncated = lines.length - shown.length;
+  return (
+    <Box
+      flexDirection="column"
+      marginTop={1}
+      borderStyle="round"
+      borderColor="gray"
+      paddingX={1}
+    >
+      <Text bold>{itemName(item)}</Text>
+      {desc && <Text dimColor>{desc}</Text>}
+      {shown.length > 0 && desc && <Text> </Text>}
+      {shown.map((l, i) => (
+        <Text key={i}>{l || " "}</Text>
+      ))}
+      {truncated > 0 && <Text dimColor>… ({truncated} more lines)</Text>}
+    </Box>
+  );
+}
+
 function isWordChar(c: string) {
   return /\S/.test(c);
 }
@@ -145,7 +183,7 @@ function Header({ title, hint }: { title: string; hint: string }) {
   );
 }
 
-function Reorder({ items: initial, prompt }: { items: string[]; prompt?: string }) {
+function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: string }) {
   const { exit } = useApp();
   const [items, setItems] = useState(initial);
   const [cursor, setCursor] = useState(0);
@@ -158,7 +196,7 @@ function Reorder({ items: initial, prompt }: { items: string[]; prompt?: string 
       return;
     }
     if (key.return) {
-      done({ ordered: items });
+      done({ ordered: items.map(itemName) });
       exit();
       return;
     }
@@ -187,18 +225,21 @@ function Reorder({ items: initial, prompt }: { items: string[]; prompt?: string 
         const isCursor = i === cursor;
         const marker = isCursor ? (grabbed ? "▶▶" : "▶ ") : "  ";
         const color = isCursor ? (grabbed ? "yellow" : "cyan") : undefined;
+        const desc = itemDescription(item);
         return (
           <Text key={i} color={color}>
             {marker}
-            {String(i + 1).padStart(2)}. {item}
+            {String(i + 1).padStart(2)}. {itemName(item)}
+            {desc ? <Text dimColor>  — {desc}</Text> : null}
           </Text>
         );
       })}
+      <DetailPanel item={items[cursor]} />
     </Box>
   );
 }
 
-function Choose({ items, prompt }: { items: string[]; prompt?: string }) {
+function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
   useInput((input, key) => {
@@ -208,7 +249,7 @@ function Choose({ items, prompt }: { items: string[]; prompt?: string }) {
       return;
     }
     if (key.return) {
-      done({ index: cursor, value: items[cursor] });
+      done({ index: cursor, value: itemName(items[cursor]) });
       exit();
       return;
     }
@@ -218,12 +259,17 @@ function Choose({ items, prompt }: { items: string[]; prompt?: string }) {
   return (
     <Box flexDirection="column" padding={1}>
       <Header title={prompt ?? "Pick one"} hint="↑/↓ or j/k · enter confirm · esc/q cancel" />
-      {items.map((item, i) => (
-        <Text key={i} color={i === cursor ? "cyan" : undefined}>
-          {i === cursor ? "▶ " : "  "}
-          {item}
-        </Text>
-      ))}
+      {items.map((item, i) => {
+        const desc = itemDescription(item);
+        return (
+          <Text key={i} color={i === cursor ? "cyan" : undefined}>
+            {i === cursor ? "▶ " : "  "}
+            {itemName(item)}
+            {desc ? <Text dimColor>  — {desc}</Text> : null}
+          </Text>
+        );
+      })}
+      <DetailPanel item={items[cursor]} />
     </Box>
   );
 }
@@ -233,7 +279,7 @@ function Multi({
   prompt,
   preselected,
 }: {
-  items: string[];
+  items: RichItem[];
   prompt?: string;
   preselected?: number[];
 }) {
@@ -248,7 +294,7 @@ function Multi({
     }
     if (key.return) {
       const indices = [...picked].sort((a, b) => a - b);
-      done({ indices, values: indices.map((i) => items[i]) });
+      done({ indices, values: indices.map((i) => itemName(items[i])) });
       exit();
       return;
     }
@@ -275,13 +321,18 @@ function Multi({
         title={prompt ?? "Pick any"}
         hint="↑/↓ or j/k · space toggle · a all · n none · enter confirm · esc/q cancel"
       />
-      {items.map((item, i) => (
-        <Text key={i} color={i === cursor ? "cyan" : undefined}>
-          {i === cursor ? "▶ " : "  "}
-          {picked.has(i) ? "[x] " : "[ ] "}
-          {item}
-        </Text>
-      ))}
+      {items.map((item, i) => {
+        const desc = itemDescription(item);
+        return (
+          <Text key={i} color={i === cursor ? "cyan" : undefined}>
+            {i === cursor ? "▶ " : "  "}
+            {picked.has(i) ? "[x] " : "[ ] "}
+            {itemName(item)}
+            {desc ? <Text dimColor>  — {desc}</Text> : null}
+          </Text>
+        );
+      })}
+      <DetailPanel item={items[cursor]} />
     </Box>
   );
 }
@@ -476,7 +527,7 @@ function Score({
   max = 5,
   default: dflt,
 }: {
-  items: string[];
+  items: RichItem[];
   prompt?: string;
   min?: number;
   max?: number;
@@ -496,7 +547,7 @@ function Score({
       return;
     }
     if (key.return) {
-      done({ scores: items.map((value, i) => ({ value, score: scores[i] })) });
+      done({ scores: items.map((it, i) => ({ value: itemName(it), score: scores[i] })) });
       exit();
       return;
     }
@@ -533,29 +584,32 @@ function Score({
       />
       {items.map((item, i) => {
         const isCursor = i === cursor;
+        const desc = itemDescription(item);
         return (
           <Text key={i} color={isCursor ? "cyan" : undefined}>
             {isCursor ? "▶ " : "  "}
             <Text color="yellow">{String(scores[i]).padStart(String(max).length)}</Text>{" "}
-            <Text dimColor>{renderBar(scores[i])}</Text> {item}
+            <Text dimColor>{renderBar(scores[i])}</Text> {itemName(item)}
+            {desc ? <Text dimColor>  — {desc}</Text> : null}
           </Text>
         );
       })}
+      <DetailPanel item={items[cursor]} />
     </Box>
   );
 }
 
 type FieldSpec =
-  | { name: string; type: "text"; label?: string; default?: string }
+  | { name: string; type: "text"; label?: string; default?: string; placeholder?: string; mask?: string }
   | { name: string; type: "confirm"; label?: string; default?: boolean }
-  | { name: string; type: "choose"; label?: string; items: string[]; default?: number }
-  | { name: string; type: "multi"; label?: string; items: string[]; preselected?: number[] }
-  | { name: string; type: "reorder"; label?: string; items: string[] }
+  | { name: string; type: "choose"; label?: string; items: RichItem[]; default?: number }
+  | { name: string; type: "multi"; label?: string; items: RichItem[]; preselected?: number[] }
+  | { name: string; type: "reorder"; label?: string; items: RichItem[] }
   | {
       name: string;
       type: "score";
       label?: string;
-      items: string[];
+      items: RichItem[];
       min?: number;
       max?: number;
       default?: number;
@@ -570,13 +624,14 @@ function MultiField({
   onExit,
   isActive,
 }: {
-  spec: { items: string[] };
+  spec: { items: RichItem[] };
   value: string[];
   onChange: (v: string[]) => void;
   onExit: () => void;
   isActive: boolean;
 }) {
   const [cursor, setCursor] = useState(0);
+  const names = spec.items.map(itemName);
   useInput(
     (input, key) => {
       if (key.return || key.escape || key.tab) {
@@ -585,12 +640,12 @@ function MultiField({
       }
       if (input === " ") {
         const sel = new Set(value);
-        const item = spec.items[cursor];
-        sel.has(item) ? sel.delete(item) : sel.add(item);
-        onChange(spec.items.filter((it) => sel.has(it)));
+        const name = names[cursor];
+        sel.has(name) ? sel.delete(name) : sel.add(name);
+        onChange(names.filter((n) => sel.has(n)));
         return;
       }
-      if (input === "a") return onChange([...spec.items]);
+      if (input === "a") return onChange([...names]);
       if (input === "n") return onChange([]);
       if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
       else if (key.downArrow || input === "j")
@@ -601,13 +656,19 @@ function MultiField({
   const sel = new Set(value);
   return (
     <Box flexDirection="column">
-      {spec.items.map((item, i) => (
-        <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
-          {isActive && i === cursor ? "▶ " : "  "}
-          {sel.has(item) ? "[x] " : "[ ] "}
-          {item}
-        </Text>
-      ))}
+      {spec.items.map((item, i) => {
+        const name = names[i];
+        const desc = itemDescription(item);
+        return (
+          <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
+            {isActive && i === cursor ? "▶ " : "  "}
+            {sel.has(name) ? "[x] " : "[ ] "}
+            {name}
+            {desc ? <Text dimColor>  — {desc}</Text> : null}
+          </Text>
+        );
+      })}
+      {isActive && <DetailPanel item={spec.items[cursor]} />}
     </Box>
   );
 }
@@ -619,7 +680,7 @@ function ReorderField({
   onExit,
   isActive,
 }: {
-  spec: { items: string[] };
+  spec: { items: RichItem[] };
   value: string[];
   onChange: (v: string[]) => void;
   onExit: () => void;
@@ -627,6 +688,7 @@ function ReorderField({
 }) {
   const [cursor, setCursor] = useState(0);
   const [grabbed, setGrabbed] = useState(false);
+  const byName = new Map(spec.items.map((it) => [itemName(it), it]));
   useInput(
     (input, key) => {
       if (key.return || key.escape || key.tab) {
@@ -652,17 +714,21 @@ function ReorderField({
   );
   return (
     <Box flexDirection="column">
-      {value.map((item, i) => {
+      {value.map((name, i) => {
         const isCur = isActive && i === cursor;
         const color = isCur ? (grabbed ? "yellow" : "cyan") : undefined;
         const marker = isCur ? (grabbed ? "▶▶" : "▶ ") : "  ";
+        const item = byName.get(name);
+        const desc = item ? itemDescription(item) : undefined;
         return (
           <Text key={i} color={color}>
             {marker}
-            {String(i + 1).padStart(2)}. {item}
+            {String(i + 1).padStart(2)}. {name}
+            {desc ? <Text dimColor>  — {desc}</Text> : null}
           </Text>
         );
       })}
+      {isActive && <DetailPanel item={byName.get(value[cursor])} />}
     </Box>
   );
 }
@@ -716,13 +782,18 @@ function ScoreField({
   };
   return (
     <Box flexDirection="column">
-      {spec.items.map((item, i) => (
-        <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
-          {isActive && i === cursor ? "▶ " : "  "}
-          <Text color="yellow">{String(value[i]).padStart(String(max).length)}</Text>{" "}
-          <Text dimColor>{renderBar(value[i])}</Text> {item}
-        </Text>
-      ))}
+      {spec.items.map((item, i) => {
+        const desc = itemDescription(item);
+        return (
+          <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
+            {isActive && i === cursor ? "▶ " : "  "}
+            <Text color="yellow">{String(value[i]).padStart(String(max).length)}</Text>{" "}
+            <Text dimColor>{renderBar(value[i])}</Text> {itemName(item)}
+            {desc ? <Text dimColor>  — {desc}</Text> : null}
+          </Text>
+        );
+      })}
+      {isActive && <DetailPanel item={spec.items[cursor]} />}
     </Box>
   );
 }
@@ -751,7 +822,8 @@ function compactSummary(f: FieldSpec, v: unknown, width: number): React.ReactEle
     );
   }
   if (f.type === "choose") {
-    const idx = f.items.indexOf(String(v));
+    const names = f.items.map(itemName);
+    const idx = names.indexOf(String(v));
     return (
       <Text>
         <Text color="yellow">{String(v)}</Text>{" "}
@@ -807,11 +879,13 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
       if (f.type === "text") v[f.name] = f.default ?? "";
       else if (f.type === "confirm") v[f.name] = f.default ?? false;
       else if (f.type === "choose")
-        v[f.name] = f.items[Math.min(Math.max(0, f.default ?? 0), f.items.length - 1)];
+        v[f.name] = itemName(
+          f.items[Math.min(Math.max(0, f.default ?? 0), f.items.length - 1)]
+        );
       else if (f.type === "multi") {
         const sel = new Set(f.preselected ?? []);
-        v[f.name] = f.items.filter((_, i) => sel.has(i));
-      } else if (f.type === "reorder") v[f.name] = [...f.items];
+        v[f.name] = f.items.filter((_, i) => sel.has(i)).map(itemName);
+      } else if (f.type === "reorder") v[f.name] = f.items.map(itemName);
       else if (f.type === "score") {
         const min = f.min ?? 1;
         const max = f.max ?? 5;
@@ -904,14 +978,15 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
           setFocus((x) => Math.min(totalSlots - 1, x + 1));
           return;
         }
-        const idx = f.items.indexOf(String(values[f.name]));
+        const names = f.items.map(itemName);
+        const idx = names.indexOf(String(values[f.name]));
         if (input === "h" || key.leftArrow) {
-          const next = (idx - 1 + f.items.length) % f.items.length;
-          return setVal(f.name, f.items[next]);
+          const next = (idx - 1 + names.length) % names.length;
+          return setVal(f.name, names[next]);
         }
         if (input === "l" || key.rightArrow || input === " ") {
-          const next = (idx + 1) % f.items.length;
-          return setVal(f.name, f.items[next]);
+          const next = (idx + 1) % names.length;
+          return setVal(f.name, names[next]);
         }
         return;
       }
@@ -967,6 +1042,8 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
             onChange={(nv) => setVal(f.name, nv)}
             onSubmit={() => setFocus((x) => Math.min(totalSlots - 1, x + 1))}
             focus={isFocus && navActive}
+            placeholder={f.placeholder}
+            mask={f.mask}
           />
         </Box>
       );
