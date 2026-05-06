@@ -12,6 +12,15 @@ move/copy this content there.
 `z114-zisser-half-migrated-spawn-instructions-point-at-missing-paths`
 (to be written same turn — see `usegin/zettel/zettels/`).
 
+## Voice — what I've learned about Oria
+
+- **No detailed reports.** When asked for status, surface only "where is
+  your input needed?" — skip commit tables, layer recaps, and "what's
+  done" summaries. The git log + plan are enough; her ask is the
+  decision surface, not the work surface.
+- **"Full fix. go on" means execute, not narrate.** When she signals
+  go, finish; report only blockers and decisions.
+
 ## Voice — what I've learned about Lihu
 
 - **He pours, I receive.** When he dictates a stream of thoughts, my
