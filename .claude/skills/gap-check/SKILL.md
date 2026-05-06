@@ -21,7 +21,7 @@ Layered, cheapest-first. Always do L1+L2. After each layer, decide: **fail-fast 
 3. **dogfooding-effi** — `effi ask` for things agreed in meetings, emails, or Drive that may never have made it to Linear. Use the `dogfooding-effi` skill.
 4. **Git history** — `git log` + `session code-history` on the target's files. What was attempted, reverted, half-landed. HEAD lies about intent.
 5. **Previous Claude sessions** — `session` CLI / grep `~/.claude/projects/` for the target keyword. Nuance and asks captured mid-session that never made it to a ticket.
-6. **Cross-source contradictions** — explicitly compare what L1–L5 said. Specs vs meetings vs emails vs Linear. Flag conflicts; don't silently pick a winner.
+6. **Cross-source contradictions** — explicitly compare what L1–L5 said. Specs vs meetings vs emails vs Linear. Flag conflicts; don't silently pick a winner. **Chronology generally informs direction** — when two sources disagree, note which is newer (commit date, doc mtime, ticket update, meeting date). The newer one usually represents current intent and the older one is drift; surface that as part of the contradiction row ("spec A says X (2026-04-12) vs spec B says Y (2026-05-03) — B newer, likely current intent"). Not a hard rule — sometimes the older source is the durable decision and the newer is a stale draft — but absent other signal, lean toward newer = direction.
 7. **Run the app & see the ACs** — `app-sanity-test` style: execute the code, observe the AC actually doing the thing. The static-artifact pass can miss "the button exists but does nothing".
 
 ## Output
