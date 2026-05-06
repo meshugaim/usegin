@@ -24,14 +24,31 @@ function itemDetails(it: RichItem): string | undefined {
   return typeof it === "string" ? undefined : it.details;
 }
 
-function DetailPanel({ item, maxLines = 8 }: { item: RichItem | undefined; maxLines?: number }) {
+function panelMaxLines(itemsCount: number): number {
+  // Popup is ~85% of terminal height; reserve room for list rows + chrome.
+  const termRows = process.stdout.rows ?? 30;
+  const popupRows = Math.max(12, Math.floor(termRows * 0.85));
+  const listRows = Math.min(itemsCount, popupRows - 10);
+  return Math.max(6, popupRows - listRows - 8);
+}
+
+function DetailPanel({
+  item,
+  maxLines,
+  scroll = 0,
+}: {
+  item: RichItem | undefined;
+  maxLines: number;
+  scroll?: number;
+}) {
   if (!item) return null;
   const desc = itemDescription(item);
   const details = itemDetails(item);
   if (!desc && !details) return null;
   const lines = details ? details.split("\n") : [];
-  const shown = lines.slice(0, maxLines);
-  const truncated = lines.length - shown.length;
+  const shown = lines.slice(scroll, scroll + maxLines);
+  const above = scroll;
+  const below = Math.max(0, lines.length - scroll - shown.length);
   return (
     <Box
       flexDirection="column"
@@ -43,10 +60,11 @@ function DetailPanel({ item, maxLines = 8 }: { item: RichItem | undefined; maxLi
       <Text bold>{itemName(item)}</Text>
       {desc && <Text dimColor>{desc}</Text>}
       {shown.length > 0 && desc && <Text> </Text>}
+      {above > 0 && <Text dimColor>↑ {above} more</Text>}
       {shown.map((l, i) => (
         <Text key={i}>{l || " "}</Text>
       ))}
-      {truncated > 0 && <Text dimColor>… ({truncated} more lines)</Text>}
+      {below > 0 && <Text dimColor>↓ {below} more · &lt;/&gt; or PgUp/PgDn to scroll</Text>}
     </Box>
   );
 }
@@ -188,8 +206,13 @@ function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: strin
   const [items, setItems] = useState(initial);
   const [cursor, setCursor] = useState(0);
   const [grabbed, setGrabbed] = useState(false);
+  const [panelScroll, setPanelScroll] = useState(0);
+  const maxLines = panelMaxLines(items.length);
+  useEffect(() => setPanelScroll(0), [cursor]);
 
   useInput((input, key) => {
+    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
       done({ cancelled: true });
       exit();
@@ -219,7 +242,7 @@ function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: strin
     <Box flexDirection="column" padding={1}>
       <Header
         title={prompt ?? "Reorder"}
-        hint="↑/↓ or j/k move · space grab/drop · enter confirm · esc/q cancel"
+        hint="↑/↓ or j/k move · space grab/drop · </> scroll details · enter confirm · esc/q cancel"
       />
       {items.map((item, i) => {
         const isCursor = i === cursor;
@@ -234,7 +257,7 @@ function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: strin
           </Text>
         );
       })}
-      <DetailPanel item={items[cursor]} />
+      <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />
     </Box>
   );
 }
@@ -242,6 +265,9 @@ function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: strin
 function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
+  const [panelScroll, setPanelScroll] = useState(0);
+  const maxLines = panelMaxLines(items.length);
+  useEffect(() => setPanelScroll(0), [cursor]);
   useInput((input, key) => {
     if (key.escape || input === "q") {
       done({ cancelled: true });
@@ -253,12 +279,17 @@ function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
       exit();
       return;
     }
+    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
     else if (key.downArrow || input === "j") setCursor((c) => Math.min(items.length - 1, c + 1));
   });
   return (
     <Box flexDirection="column" padding={1}>
-      <Header title={prompt ?? "Pick one"} hint="↑/↓ or j/k · enter confirm · esc/q cancel" />
+      <Header
+        title={prompt ?? "Pick one"}
+        hint="↑/↓ or j/k · </> or PgUp/PgDn scroll details · enter confirm · esc/q cancel"
+      />
       {items.map((item, i) => {
         const desc = itemDescription(item);
         return (
@@ -269,7 +300,7 @@ function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
           </Text>
         );
       })}
-      <DetailPanel item={items[cursor]} />
+      <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />
     </Box>
   );
 }
@@ -286,7 +317,12 @@ function Multi({
   const { exit } = useApp();
   const [cursor, setCursor] = useState(0);
   const [picked, setPicked] = useState<Set<number>>(new Set(preselected ?? []));
+  const [panelScroll, setPanelScroll] = useState(0);
+  const maxLines = panelMaxLines(items.length);
+  useEffect(() => setPanelScroll(0), [cursor]);
   useInput((input, key) => {
+    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
       done({ cancelled: true });
       exit();
@@ -319,7 +355,7 @@ function Multi({
     <Box flexDirection="column" padding={1}>
       <Header
         title={prompt ?? "Pick any"}
-        hint="↑/↓ or j/k · space toggle · a all · n none · enter confirm · esc/q cancel"
+        hint="↑/↓ or j/k · space toggle · a all · n none · </> scroll details · enter confirm · esc/q cancel"
       />
       {items.map((item, i) => {
         const desc = itemDescription(item);
@@ -332,7 +368,7 @@ function Multi({
           </Text>
         );
       })}
-      <DetailPanel item={items[cursor]} />
+      <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />
     </Box>
   );
 }
@@ -537,10 +573,15 @@ function Score({
   const start = dflt ?? Math.round((min + max) / 2);
   const [scores, setScores] = useState<number[]>(items.map(() => start));
   const [cursor, setCursor] = useState(0);
+  const [panelScroll, setPanelScroll] = useState(0);
+  const maxLines = panelMaxLines(items.length);
+  useEffect(() => setPanelScroll(0), [cursor]);
   const clamp = (n: number) => Math.max(min, Math.min(max, n));
   const big = Math.max(1, Math.round((max - min) / 10));
 
   useInput((input, key) => {
+    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
       done({ cancelled: true });
       exit();
@@ -580,7 +621,7 @@ function Score({
     <Box flexDirection="column" padding={1}>
       <Header
         title={prompt ?? `Rate (${min}–${max})`}
-        hint="↑/↓ select · ←/→ or h/l adjust · [/] big jump · digit set · enter confirm · esc cancel"
+        hint="↑/↓ select · ←/→ or h/l adjust · [/] big jump · digit set · </> scroll details · enter confirm · esc cancel"
       />
       {items.map((item, i) => {
         const isCursor = i === cursor;
@@ -594,7 +635,7 @@ function Score({
           </Text>
         );
       })}
-      <DetailPanel item={items[cursor]} />
+      <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />
     </Box>
   );
 }
@@ -631,6 +672,9 @@ function MultiField({
   isActive: boolean;
 }) {
   const [cursor, setCursor] = useState(0);
+  const [panelScroll, setPanelScroll] = useState(0);
+  const maxLines = panelMaxLines(spec.items.length);
+  useEffect(() => setPanelScroll(0), [cursor]);
   const names = spec.items.map(itemName);
   useInput(
     (input, key) => {
@@ -638,6 +682,8 @@ function MultiField({
         onExit();
         return;
       }
+      if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+      if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
       if (input === " ") {
         const sel = new Set(value);
         const name = names[cursor];
@@ -668,7 +714,9 @@ function MultiField({
           </Text>
         );
       })}
-      {isActive && <DetailPanel item={spec.items[cursor]} />}
+      {isActive && (
+        <DetailPanel item={spec.items[cursor]} maxLines={maxLines} scroll={panelScroll} />
+      )}
     </Box>
   );
 }
@@ -688,6 +736,9 @@ function ReorderField({
 }) {
   const [cursor, setCursor] = useState(0);
   const [grabbed, setGrabbed] = useState(false);
+  const [panelScroll, setPanelScroll] = useState(0);
+  const maxLines = panelMaxLines(spec.items.length);
+  useEffect(() => setPanelScroll(0), [cursor]);
   const byName = new Map(spec.items.map((it) => [itemName(it), it]));
   useInput(
     (input, key) => {
@@ -696,6 +747,8 @@ function ReorderField({
         onExit();
         return;
       }
+      if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+      if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
       if (input === " ") return setGrabbed((g) => !g);
       const move = (dir: -1 | 1) => {
         const next = cursor + dir;
@@ -728,7 +781,9 @@ function ReorderField({
           </Text>
         );
       })}
-      {isActive && <DetailPanel item={byName.get(value[cursor])} />}
+      {isActive && (
+        <DetailPanel item={byName.get(value[cursor])} maxLines={maxLines} scroll={panelScroll} />
+      )}
     </Box>
   );
 }
@@ -740,7 +795,7 @@ function ScoreField({
   onExit,
   isActive,
 }: {
-  spec: { items: string[]; min?: number; max?: number };
+  spec: { items: RichItem[]; min?: number; max?: number };
   value: number[];
   onChange: (v: number[]) => void;
   onExit: () => void;
@@ -749,6 +804,9 @@ function ScoreField({
   const min = spec.min ?? 1;
   const max = spec.max ?? 5;
   const [cursor, setCursor] = useState(0);
+  const [panelScroll, setPanelScroll] = useState(0);
+  const maxLines = panelMaxLines(spec.items.length);
+  useEffect(() => setPanelScroll(0), [cursor]);
   const clamp = (n: number) => Math.max(min, Math.min(max, n));
   const big = Math.max(1, Math.round((max - min) / 10));
   useInput(
@@ -757,6 +815,8 @@ function ScoreField({
         onExit();
         return;
       }
+      if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+      if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
       if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
       else if (key.downArrow || input === "j")
         setCursor((c) => Math.min(spec.items.length - 1, c + 1));
@@ -793,7 +853,9 @@ function ScoreField({
           </Text>
         );
       })}
-      {isActive && <DetailPanel item={spec.items[cursor]} />}
+      {isActive && (
+        <DetailPanel item={spec.items[cursor]} maxLines={maxLines} scroll={panelScroll} />
+      )}
     </Box>
   );
 }
