@@ -57,6 +57,7 @@ Surface what they unlocked, in plain terms:
 - Their Claude Code session can now read the team's Slack & Gmail under their identity (no shared bot, no leakage to teammates' contexts)
 - Effi can answer "what did the team decide / discuss / ship around X" via `effi --profile dogfooding ask` — synthesis across emails + Drive
 - *(if they did Apps Script)* Their agent can ship outbound emails, not just draft them
+- Sign-in OTP retrieval is now agent-driven — sanity tests, `dogfooding` bootstrap, and any other "wait for the email" flow can read the code from their Gmail instead of pausing for a paste. See `app-sanity-test`, `dogfooding-effi`, `manual-testing-by-agent`, `tools/app-driver/CLAUDE.md`.
 - For "who's who" lookups, the family of skills `team-people`, `team-customers`, `team-slack`, `team-gmail`, `team-communication-channels` is now activated for them
 
 ## Not to be confused with

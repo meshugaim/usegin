@@ -34,17 +34,19 @@ Check if the profile exists:
 effi --profile dogfooding auth status   # exits non-zero if missing or unauthenticated
 ```
 
-If it doesn't exist, bootstrap it. The human will fetch the OTP from their inbox:
+If it doesn't exist, bootstrap it. The OTP arrives by email:
 
 ```bash
 # Derive <name> from `git config user.name` (lowercased first name) — don't ask.
 effi auth login --profile dogfooding --env production --email <name>@askeffi.ai
-# human pastes the code, then:
+# Fetch the 6-digit code (see below), then:
 effi auth verify --env production --email <name>@askeffi.ai --code <code>
 effi --profile dogfooding link \
   --workspace f757a1a3-9955-45b3-8aab-50454a7c8001 \
   --project 1bf0f507-7627-40a0-be72-8d2eacc40dec
 ```
+
+**Fetching the code.** Preferred — if the live human's Gmail is connected via the claude.ai connector, the agent reads the OTP itself: `mcp__claude_ai_Gmail__search_threads query="askeffi sign in newer_than:5m" pageSize=1` → `get_thread` → parse the 6-digit code. Fallback — ask the human to paste it.
 
 If the token is expired: `effi --profile dogfooding auth refresh`.
 

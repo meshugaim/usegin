@@ -157,11 +157,18 @@ If `pw-auth.ts` fails, fall back to OTP sign-in via Inbucket:
 3. Fill the code into the "Verification code" input, click "Verify"
 4. OTP codes expire quickly — extract and enter within a few seconds
 
-**Staging / Production** (one-time human in the loop):
+**Staging / Production**:
 
 1. Use `AskUserQuestion` to ask which email to sign in with. Offer the matching env's entry from the **Known Users** table at the top of this skill as the default option — "Other" lets them type a different one. If the user supplies a new email, update the Known Users table so the next run already has it.
 2. Navigate to `/sign-in`, fill email, click "Send code"
-3. Ask the user to paste the 6-digit code from their email (plain text — don't use `AskUserQuestion` for this, just ask and wait for their response)
+3. Fetch the 6-digit code:
+   - **Preferred — Gmail connector** (no human-in-the-loop). If the sign-in email belongs to the live human and the claude.ai Gmail connector is authorized, the agent reads the OTP from their inbox directly:
+     ```
+     mcp__claude_ai_Gmail__search_threads query="askeffi sign in newer_than:5m" pageSize=1
+     mcp__claude_ai_Gmail__get_thread threadId=<id>
+     ```
+     Parse the 6-digit code from the message body.
+   - **Fallback — human paste**. If the connector isn't connected, the address isn't the live human's, or the search didn't return the code, ask the user to paste it (plain text — don't use `AskUserQuestion`, just ask and wait).
 4. Fill the code into the "Verification code" input, click "Verify"
 5. Save state for reuse:
    ```bash

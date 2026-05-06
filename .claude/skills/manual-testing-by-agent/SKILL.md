@@ -88,6 +88,10 @@ For testing the actual sign-in flow, or when `pw-auth.ts` isn't available:
 
 OTP codes expire quickly — extract and enter within a few seconds of sending.
 
+### Option 3: Real OTP via Gmail Connector (staging / production)
+
+For sign-in against a real environment with the live human's address, see `app-sanity-test/SKILL.md` § Authentication — the agent fetches the OTP from the human's Gmail via `mcp__claude_ai_Gmail__*` (preferred), with human-paste as fallback.
+
 ---
 
 ## Test Data
