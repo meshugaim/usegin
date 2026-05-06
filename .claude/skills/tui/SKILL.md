@@ -31,6 +31,28 @@ Pass `{"allowOther": true}` on `choose` or `multi` and a synthetic `Other…` ro
 - The list is 2–3 items (chat is faster than launching a popup).
 - You're outside tmux. The wrapper exits with `{"cancelled":true,"reason":"no-tmux"}` (exit 1) by design — fall back to chat. Setting `TUI_FORCE_INLINE=1` forces the raw-mode render but mangles chat scrollback; treat as a last resort.
 
+## Attention modes (`TUI_ATTENTION`)
+
+The user often pairs across multiple tmux windows — Claude in one, real work in another. The default popup is loud: it floats over whichever pane the user is currently looking at, regardless of where Claude lives. That's correct when Claude *wants* to interrupt, wrong when Claude just wants to ask politely.
+
+| Mode | Behavior | Use when |
+|---|---|---|
+| `now` (default) | Pop immediately over whatever pane the user is on. | Active pairing; you have the user's attention; the question gates your next step. |
+| `ring` | Bell + status flash, then pop now. | You drifted into a long-running task and want the user's eyes back; interrupt, but signal it. |
+| `quiet` | Bell + status flash; **wait** until the user navigates to Claude's window/pane, then pop. Blocks (cap: `TUI_TIMEOUT_S`, default 1h). | The question is real but you don't need to interrupt them. You'd rather wait than break flow. Returns `{"skipped":true,"reason":"timeout"}` if they never come. |
+| `optional` | Like `quiet` but bounded (default `TUI_TIMEOUT_S=60`). On timeout returns `{"skipped":true,"reason":"timeout","default":<spec.default>}` and exits 1. | You'd rather use a default than block. Set a `default` field on the spec; the wrapper echoes it back. Lines up with the "pick a sensible default, surface the assumption, keep going" posture. |
+
+### Preferred workflow
+
+- Default to **`now`** during interactive pairing — interrupting *is* what the user signed up for.
+- Switch to **`quiet`** the moment you sense the user has moved on to other work (long agentic stretches, watching a build, in another window for >a minute). Better to wait politely than break their flow.
+- Reach for **`optional`** when the answer would be nice but you have a sane default. Set `default` on the spec. Treat the timeout-skip as *information* — "user wasn't around, I picked X, surface that in the end-of-turn line."
+- **`ring`** is the mid-point — when you genuinely want their attention but want to mark "this is from Claude" rather than just stealing the screen.
+
+### Detection limits
+
+`window_active` and `pane_active` only know about *this* tmux session. We can't tell whether the user is in another tmux session, in their browser, or AFK. So "user is here" is a best-effort signal — `quiet` and `optional` both have timeouts to avoid blocking forever.
+
 ## Protocol
 
 ```bash
