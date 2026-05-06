@@ -1,13 +1,13 @@
 ---
 name: parking-question
-description: How to handle a `!question "..."` from Lihu — a non-blocking question that arrives mid-work via `tools/bin/question`. Lihu types `!question "<q>"` in the chat; the script parks the question to a queue and prints a `[Q parked TIMESTAMP]:` banner that you (Gin) see in your context. Triggered when you see `[Q parked` in the recent transcript, when a `!question` invocation is visible, or when the user asks about parked questions. **You MUST honor this skill any time the banner appears — never silently drop a parked Q.** The contract: acknowledge inline with `↑Q:` (≤30s answer) or `↑Q: parked` (answer at next pause), never break the current task to answer.
+description: How to handle a `!question "..."` from the live user — a non-blocking question that arrives mid-work via `tools/bin/question`. The user types `!question "<q>"` in the chat; the script parks the question to a queue and prints a `[Q parked TIMESTAMP]:` banner that you (Gin) see in your context. Triggered when you see `[Q parked` in the recent transcript, when a `!question` invocation is visible, or when the user asks about parked questions. **You MUST honor this skill any time the banner appears — never silently drop a parked Q.** The contract: acknowledge inline with `↑Q:` (≤30s answer) or `↑Q: parked` (answer at next pause), never break the current task to answer.
 ---
 
 # parking-question
 
-Lihu can interrupt without interrupting. He types `!question "..."` in chat;
-the `tools/bin/question` shell script runs, persists the question to a
-per-day queue, and prints a banner like:
+The live user can interrupt without interrupting. They type `!question "..."`
+in chat; the `tools/bin/question` shell script runs, persists the question
+to a per-day queue, and prints a banner like:
 
 ```
 [Q parked 2026-04-27T20:42:00Z]: what's the status of the OAuth migration?
@@ -17,8 +17,8 @@ This is the **inverse of Zisser's `↑` marker**:
 
 | Direction | Marker | Source |
 |---|---|---|
-| Gin → Lihu (non-blocking question) | `↑` | Zisser principle 5 |
-| Lihu → Gin (non-blocking question) | `!question` → `[Q parked ...]` | this skill |
+| Gin → live user (non-blocking question) | `↑` | Zisser principle 5 |
+| Live user → Gin (non-blocking question) | `!question` → `[Q parked ...]` | this skill |
 
 Both are designed so neither side has to stop what they're doing.
 
@@ -29,8 +29,8 @@ When you see a `[Q parked ...]` banner in your transcript:
 ### 1. Don't drop your current task
 
 Whatever you were doing — keep doing it. The whole point of parking is
-that Lihu doesn't want to interrupt your flow. If you're mid-investigation,
-mid-spawn, mid-commit — finish that step.
+that the live user doesn't want to interrupt your flow. If you're
+mid-investigation, mid-spawn, mid-commit — finish that step.
 
 ### 2. Acknowledge inline
 
@@ -59,7 +59,7 @@ Then answer at the next natural pause (see below).
 - After committing a batch of changes
 - After spawning a parallel batch of sub-agents (while you wait for them)
 - Before invoking a new skill that takes >5 minutes
-- Before asking Lihu a clarifying question of your own
+- Before asking the live user a clarifying question of your own
 - Right before you'd say "done" / end-of-turn
 
 At the pause, emit:
@@ -88,29 +88,29 @@ fine — just answer.
 
 - **Laconic.** Short answers for short questions. Don't expand a one-liner
   into a paragraph.
-- **No restating the question.** Lihu asked it; he remembers it.
-- **The `↑` marker is load-bearing** — it tells Lihu "this is the parked
-  Q, not a normal sentence."
+- **No restating the question.** The user asked it; they remember it.
+- **The `↑` marker is load-bearing** — it tells the user "this is the
+  parked Q, not a normal sentence."
 
 ## What this is *not*
 
-- **Not a way to bypass real questions.** If Lihu asks something
+- **Not a way to bypass real questions.** If the user asks something
   blocking ("STOP. did you push?") that's not a `!question` — that's a
   direct ask, answer it directly.
 - **Not for things you should just do.** If the parked Q is "did you
   remember to commit X?" and you didn't, *commit X first*, then answer.
   Don't answer "no" and continue without acting.
 - **Not for Zisser's outbound questions.** Zisser uses `↑` (principle 5)
-  for *his* non-blocking questions to Lihu. `!question` is the other
-  direction.
+  for *his* non-blocking questions to the live user. `!question` is the
+  other direction.
 
 ## Edge cases
 
 - **Multiple parked Qs in flight.** Answer in order received. If two are
   related, answer together with one `↑Q answer` block.
 - **Session resume picks up an old queue.** Read the queue file; surface
-  unanswered ones with `↑Q (parked from prior session):`. Lihu may have
-  already acted on them — ask before re-investigating.
+  unanswered ones with `↑Q (parked from prior session):`. The user may
+  have already acted on them — ask before re-investigating.
 - **You can't answer (need info you don't have).** Reply with
   `↑Q (parked HH:MM): need <X> to answer — should I dispatch?` That's
   itself a `↑` (your outbound parallel question). Two arrows, one line.

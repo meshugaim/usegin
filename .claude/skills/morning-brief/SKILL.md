@@ -1,11 +1,11 @@
 ---
 name: morning-brief
-description: Pull-on-demand cross-Gin synthesis at the start of a session — overnight commits, open zettels (especially open-to-empty / decisions-pending), Sentry deltas, Linear changes, active sub-Gin state. The cadence is the load-bearing piece, not the artifact (per war research C5 + DL1 lean B). Triggered by phrases like "morning brief", "what happened overnight", "catch me up", "/morning-brief", or by your own judgment when Lihu is opening a fresh session and the substrate has moved.
+description: Pull-on-demand cross-Gin synthesis at the start of a session — overnight commits, open zettels (especially open-to-empty / decisions-pending), Sentry deltas, Linear changes, active sub-Gin state. The cadence is the load-bearing piece, not the artifact (per war research C5 + DL1 lean B). Triggered by phrases like "morning brief", "what happened overnight", "catch me up", "/morning-brief", or by your own judgment when the live user is opening a fresh session and the substrate has moved.
 ---
 
 # Morning Brief
 
-Pull-on-demand session-start synthesis. Battle rhythm at our scale, kept light: no enforced cadence, no hook-driven alarm, just an artifact Lihu reaches for when he opens a session and wants to know what moved while he was away.
+Pull-on-demand session-start synthesis. Battle rhythm at our scale, kept light: no enforced cadence, no hook-driven alarm, just an artifact the live user reaches for when they open a session and want to know what moved while they were away.
 
 ## Why
 
