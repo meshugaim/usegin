@@ -26,16 +26,23 @@ USER=$(echo "$OUT" | jq -r '.user // empty')
 
 SIGNALS=$(echo "$OUT" | jq -r '[.signals[] | "\(.signal)=\(.value)"] | join(", ")')
 
+CONFIG="$REPO_ROOT/.dx/config.json"
+TEAM=""
+if [ -f "$CONFIG" ]; then
+  TEAM=$(jq -r '.users | keys | join(", ")' "$CONFIG" 2>/dev/null)
+fi
+
 cat <<BANNER
 ═══════════════════════════════════════════════════════════════════
 👤  LIVE USER: ${USER}
 ═══════════════════════════════════════════════════════════════════
 Source of truth: \`dx identify\` (signals: ${SIGNALS}).
 
-The auto-memory store is team-shared across devcontainers — never trust
-it for per-human identity. When a memory note attributes a preference to
-"the user", check whether the live user is the same person who gave the
-feedback before applying it.
+Team roster (from \`.dx/config.json\` users): ${TEAM:-unknown}.
+Other teammates' names appear in shared auto-memory because the store is
+team-shared across devcontainers — never trust it for per-human identity,
+and never pair the live user with another teammate in the address line.
+Address the live user as "you".
 
 If wrong: \`dx identify --as <name>\` to correct, or trust in-chat signals.
 ═══════════════════════════════════════════════════════════════════
