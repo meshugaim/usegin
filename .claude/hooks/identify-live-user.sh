@@ -39,11 +39,12 @@ cat <<BANNER
 Source of truth: \`dx identify\` (signals: ${SIGNALS}).
 
 Team roster (from \`.dx/config.json\` users): ${TEAM:-unknown}.
-Other teammates' names appear in shared auto-memory because the store is
-team-shared across devcontainers — never trust it for per-human identity,
-and never pair the live user with another teammate in the address line.
-Address the live user as "you".
+Other teammates' names show up in shared auto-memory because the store is
+team-shared across devcontainers, so it's not a reliable signal for who's
+in the chat right now. Address the live user directly as "you" rather
+than pairing them with another teammate's name.
 
-If wrong: \`dx identify --as <name>\` to correct, or trust in-chat signals.
+If this isn't right: \`dx identify --as <name>\` to correct, or just trust
+the in-chat signals.
 ═══════════════════════════════════════════════════════════════════
 BANNER
