@@ -7,7 +7,7 @@ description: Ask the human for a structured answer through an interactive tmux-p
 
 The `tui` CLI (`tools/bin/tui`) renders a small ink-based TUI inside a tmux popup, takes a JSON spec on stdin, and emits a JSON result on stdout. Use it instead of asking the human to type a list back in chat.
 
-Subcommands: `reorder`, `choose`, `multi`, `confirm`, `input`, `preview`, `score`, `form`. Run `tui <subcmd>` with no stdin or read `tools/bin/tui` for the spec shapes — they're tiny.
+Subcommands: `reorder`, `choose`, `multi`, `confirm`, `input`, `preview`, `score`, `form`, `batch`. Run `tui <subcmd>` with no stdin or read `tools/bin/tui` for the spec shapes — they're tiny.
 
 ## When to reach for it
 
@@ -18,13 +18,18 @@ Subcommands: `reorder`, `choose`, `multi`, `confirm`, `input`, `preview`, `score
 - **Preview**: show a charter/spec/diff/markdown blob with an action footer (approve/edit/reject/…). The right tool when you want a gate after the human reads something — beats "here's the doc, ok?" in chat.
 - **Score**: rate a list of items on a scale (1–5 stars or 1–100 bar). Direct fit for `prioritize`, retros, vibe ratings — replaces a chat list of "X: 4, Y: 3, …".
 - **Form**: 3+ fields collected at once, tab between fields, single submit. Field types: `text`, `confirm`, `choose` (single-line, edited inline), plus `multi`, `reorder`, `score` (multi-row, focus-mode — press enter to drop into the field, enter/esc/tab to leave back to form-nav). Use when you'd otherwise ask three or more questions in a row (`spec` metadata, issue creation, slicing-with-priorities in one screen).
+- **Batch**: 1–4 *sequential* questions in one popup invocation (one-screen-per-question, next question appears after answer). Different from `form` — use when later questions depend on earlier answers, or when each question wants its own full-screen real estate (rich items, scrollable details). Closest match to AskUserQuestion's batched-questions shape.
+
+## "Other" escape (choose / multi)
+
+Pass `{"allowOther": true}` on `choose` or `multi` and a synthetic `Other…` row appears at the bottom of the list. On `choose`, picking it opens a text input and returns `{"index":-1,"value":"<typed>","other":true}`. On `multi`, pressing space on it opens an input; the typed string comes back alongside ticked items as `{"indices":[...], "values":[...], "other":"<typed>"}`. Use when the right answer might not be in the option list — the user is never trapped.
 
 ## When NOT to use it
 
 - The answer needs reasoning or explanation (use chat).
 - Open-ended discussion / brainstorm (use chat).
 - The list is 2–3 items (chat is faster than launching a popup).
-- You're outside tmux without a TTY (the wrapper falls back to inline raw mode, but that mangles the chat scrollback — prefer chat).
+- You're outside tmux. The wrapper exits with `{"cancelled":true,"reason":"no-tmux"}` (exit 1) by design — fall back to chat. Setting `TUI_FORCE_INLINE=1` forces the raw-mode render but mangles chat scrollback; treat as a last resort.
 
 ## Protocol
 
@@ -50,6 +55,7 @@ Cancel handling: treat exit 1 as "the human declined to answer this way" — fal
 | `preview` | `{"action":"approve","index":N}` (one of `actions[]`) |
 | `score` | `{"scores":[{"value":"...","score":N}, ...]}` |
 | `form` | `{"values":{name1: ..., name2: ...}}` |
+| `batch` | `{"values":{name1: <result>, name2: <result>}}` — each `<result>` is the per-subcmd shape above. Cancelling mid-batch returns `{"cancelled":true,"cancelledAt":"<name>","values":<partial>}`. |
 
 ## Implementation pointer
 

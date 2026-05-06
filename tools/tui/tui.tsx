@@ -13,6 +13,20 @@ function done(result: unknown) {
   writeFileSync(outPath, JSON.stringify(result));
 }
 
+type DoneFn = (result: unknown) => void;
+
+function useFinish(onDone?: DoneFn): DoneFn {
+  const { exit } = useApp();
+  return (r) => {
+    if (onDone) {
+      onDone(r);
+      return;
+    }
+    done(r);
+    exit();
+  };
+}
+
 type RichItem = string | { name: string; description?: string; details?: string };
 function itemName(it: RichItem): string {
   return typeof it === "string" ? it : it.name;
@@ -209,8 +223,16 @@ function Header({ title, hint }: { title: string; hint: string }) {
   );
 }
 
-function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: string }) {
-  const { exit } = useApp();
+function Reorder({
+  items: initial,
+  prompt,
+  onDone,
+}: {
+  items: RichItem[];
+  prompt?: string;
+  onDone?: DoneFn;
+}) {
+  const finish = useFinish(onDone);
   const [items, setItems] = useState(initial);
   const [cursor, setCursor] = useState(0);
   const [grabbed, setGrabbed] = useState(false);
@@ -224,13 +246,11 @@ function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: strin
       return setPanelScroll((s) => Math.min(panelMax, s + 4));
     if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
-      done({ cancelled: true });
-      exit();
+      finish({ cancelled: true });
       return;
     }
     if (key.return) {
-      done({ ordered: items.map(itemName) });
-      exit();
+      finish({ ordered: items.map(itemName) });
       return;
     }
     if (input === " ") return setGrabbed((g) => !g);
@@ -272,30 +292,68 @@ function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: strin
   );
 }
 
-function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
-  const { exit } = useApp();
+function Choose({
+  items,
+  prompt,
+  allowOther,
+  onDone,
+}: {
+  items: RichItem[];
+  prompt?: string;
+  allowOther?: boolean;
+  onDone?: DoneFn;
+}) {
+  const finish = useFinish(onDone);
+  const otherIndex = allowOther ? items.length : -1;
+  const totalRows = items.length + (allowOther ? 1 : 0);
   const [cursor, setCursor] = useState(0);
   const [panelScroll, setPanelScroll] = useState(0);
-  const maxLines = panelMaxLines(items.length);
+  const [otherMode, setOtherMode] = useState(false);
+  const [otherText, setOtherText] = useState("");
+  const maxLines = panelMaxLines(totalRows);
   useEffect(() => setPanelScroll(0), [cursor]);
-  const panelMax = maxPanelScroll(items[cursor], maxLines);
-  useInput((input, key) => {
-    if (key.escape || input === "q") {
-      done({ cancelled: true });
-      exit();
-      return;
-    }
-    if (key.return) {
-      done({ index: cursor, value: itemName(items[cursor]) });
-      exit();
-      return;
-    }
-    if (input === ">" || key.pageDown)
-      return setPanelScroll((s) => Math.min(panelMax, s + 4));
-    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
-    if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
-    else if (key.downArrow || input === "j") setCursor((c) => Math.min(items.length - 1, c + 1));
-  });
+  const onOther = cursor === otherIndex;
+  const panelMax = onOther ? 0 : maxPanelScroll(items[cursor], maxLines);
+  useInput(
+    (input, key) => {
+      if (key.escape || input === "q") {
+        finish({ cancelled: true });
+        return;
+      }
+      if (key.return) {
+        if (onOther) {
+          setOtherMode(true);
+          return;
+        }
+        finish({ index: cursor, value: itemName(items[cursor]) });
+        return;
+      }
+      if (input === ">" || key.pageDown)
+        return setPanelScroll((s) => Math.min(panelMax, s + 4));
+      if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
+      if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
+      else if (key.downArrow || input === "j") setCursor((c) => Math.min(totalRows - 1, c + 1));
+    },
+    { isActive: !otherMode }
+  );
+  if (otherMode) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Header title={prompt ?? "Pick one"} hint="enter submit · esc cancel" />
+        <Text dimColor>Other:</Text>
+        <Box>
+          <Text color="cyan">› </Text>
+          <TextInput
+            value={otherText}
+            onChange={setOtherText}
+            onSubmit={(v) => finish({ index: -1, value: v, other: true })}
+            focus
+            placeholder="type your answer"
+          />
+        </Box>
+      </Box>
+    );
+  }
   return (
     <Box flexDirection="column" padding={1}>
       <Header
@@ -312,7 +370,13 @@ function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
           </Text>
         );
       })}
-      <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />
+      {allowOther && (
+        <Text color={onOther ? "cyan" : undefined} dimColor={!onOther} italic>
+          {onOther ? "▶ " : "  "}
+          Other…
+        </Text>
+      )}
+      {!onOther && <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />}
     </Box>
   );
 }
@@ -321,50 +385,89 @@ function Multi({
   items,
   prompt,
   preselected,
+  allowOther,
+  onDone,
 }: {
   items: RichItem[];
   prompt?: string;
   preselected?: number[];
+  allowOther?: boolean;
+  onDone?: DoneFn;
 }) {
-  const { exit } = useApp();
+  const finish = useFinish(onDone);
   const [cursor, setCursor] = useState(0);
   const [picked, setPicked] = useState<Set<number>>(new Set(preselected ?? []));
   const [panelScroll, setPanelScroll] = useState(0);
-  const maxLines = panelMaxLines(items.length);
+  const [otherMode, setOtherMode] = useState(false);
+  const [otherText, setOtherText] = useState("");
+  const totalRows = items.length + (allowOther ? 1 : 0);
+  const otherIndex = allowOther ? items.length : -1;
+  const maxLines = panelMaxLines(totalRows);
   useEffect(() => setPanelScroll(0), [cursor]);
-  const panelMax = maxPanelScroll(items[cursor], maxLines);
-  useInput((input, key) => {
-    if (input === ">" || key.pageDown)
-      return setPanelScroll((s) => Math.min(panelMax, s + 4));
-    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
-    if (key.escape || input === "q") {
-      done({ cancelled: true });
-      exit();
-      return;
-    }
-    if (key.return) {
-      const indices = [...picked].sort((a, b) => a - b);
-      done({ indices, values: indices.map((i) => itemName(items[i])) });
-      exit();
-      return;
-    }
-    if (input === " ") {
-      const copy = new Set(picked);
-      copy.has(cursor) ? copy.delete(cursor) : copy.add(cursor);
-      setPicked(copy);
-      return;
-    }
-    if (input === "a") {
-      setPicked(new Set(items.map((_, i) => i)));
-      return;
-    }
-    if (input === "n") {
-      setPicked(new Set());
-      return;
-    }
-    if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
-    else if (key.downArrow || input === "j") setCursor((c) => Math.min(items.length - 1, c + 1));
-  });
+  const onOther = cursor === otherIndex;
+  const panelMax = onOther ? 0 : maxPanelScroll(items[cursor], maxLines);
+  const submit = () => {
+    const indices = [...picked].sort((a, b) => a - b);
+    finish({
+      indices,
+      values: indices.map((i) => itemName(items[i])),
+      ...(otherText ? { other: otherText } : {}),
+    });
+  };
+  useInput(
+    (input, key) => {
+      if (input === ">" || key.pageDown)
+        return setPanelScroll((s) => Math.min(panelMax, s + 4));
+      if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
+      if (key.escape || input === "q") {
+        finish({ cancelled: true });
+        return;
+      }
+      if (key.return) {
+        submit();
+        return;
+      }
+      if (input === " ") {
+        if (onOther) {
+          setOtherMode(true);
+          return;
+        }
+        const copy = new Set(picked);
+        copy.has(cursor) ? copy.delete(cursor) : copy.add(cursor);
+        setPicked(copy);
+        return;
+      }
+      if (input === "a") {
+        setPicked(new Set(items.map((_, i) => i)));
+        return;
+      }
+      if (input === "n") {
+        setPicked(new Set());
+        return;
+      }
+      if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
+      else if (key.downArrow || input === "j") setCursor((c) => Math.min(totalRows - 1, c + 1));
+    },
+    { isActive: !otherMode }
+  );
+  if (otherMode) {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Header title={prompt ?? "Pick any"} hint="enter save · esc clear" />
+        <Text dimColor>Other (free text — included alongside ticked items):</Text>
+        <Box>
+          <Text color="cyan">› </Text>
+          <TextInput
+            value={otherText}
+            onChange={setOtherText}
+            onSubmit={() => setOtherMode(false)}
+            focus
+            placeholder="type your answer"
+          />
+        </Box>
+      </Box>
+    );
+  }
   return (
     <Box flexDirection="column" padding={1}>
       <Header
@@ -382,33 +485,43 @@ function Multi({
           </Text>
         );
       })}
-      <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />
+      {allowOther && (
+        <Text color={onOther ? "cyan" : undefined} dimColor={!onOther} italic>
+          {onOther ? "▶ " : "  "}
+          {otherText ? `Other: ${otherText}` : "Other…  (space to type)"}
+        </Text>
+      )}
+      {!onOther && <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />}
     </Box>
   );
 }
 
-function Confirm({ prompt, default: dflt }: { prompt?: string; default?: boolean }) {
-  const { exit } = useApp();
+function Confirm({
+  prompt,
+  default: dflt,
+  onDone,
+}: {
+  prompt?: string;
+  default?: boolean;
+  onDone?: DoneFn;
+}) {
+  const finish = useFinish(onDone);
   const [val, setVal] = useState<boolean>(dflt ?? false);
   useInput((input, key) => {
     if (key.escape || input === "q") {
-      done({ cancelled: true });
-      exit();
+      finish({ cancelled: true });
       return;
     }
     if (key.return) {
-      done({ value: val });
-      exit();
+      finish({ value: val });
       return;
     }
     if (input === "y" || input === "Y") {
-      done({ value: true });
-      exit();
+      finish({ value: true });
       return;
     }
     if (input === "n" || input === "N") {
-      done({ value: false });
-      exit();
+      finish({ value: false });
       return;
     }
     if (key.leftArrow || key.rightArrow || input === "h" || input === "l") setVal((v) => !v);
@@ -434,18 +547,19 @@ function Input({
   default: dflt,
   placeholder,
   mask,
+  onDone,
 }: {
   prompt?: string;
   default?: string;
   placeholder?: string;
   mask?: string;
+  onDone?: DoneFn;
 }) {
-  const { exit } = useApp();
+  const finish = useFinish(onDone);
   const [val, setVal] = useState(dflt ?? "");
   useInput((input, key) => {
     if (key.escape) {
-      done({ cancelled: true });
-      exit();
+      finish({ cancelled: true });
     }
   });
   return (
@@ -459,10 +573,7 @@ function Input({
         <TextInput
           value={val}
           onChange={setVal}
-          onSubmit={(v) => {
-            done({ value: v });
-            exit();
-          }}
+          onSubmit={(v) => finish({ value: v })}
           focus
           placeholder={placeholder}
           mask={mask}
@@ -576,14 +687,16 @@ function Score({
   min = 1,
   max = 5,
   default: dflt,
+  onDone,
 }: {
   items: RichItem[];
   prompt?: string;
   min?: number;
   max?: number;
   default?: number;
+  onDone?: DoneFn;
 }) {
-  const { exit } = useApp();
+  const finish = useFinish(onDone);
   const start = dflt ?? Math.round((min + max) / 2);
   const [scores, setScores] = useState<number[]>(items.map(() => start));
   const [cursor, setCursor] = useState(0);
@@ -599,13 +712,11 @@ function Score({
       return setPanelScroll((s) => Math.min(panelMax, s + 4));
     if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
-      done({ cancelled: true });
-      exit();
+      finish({ cancelled: true });
       return;
     }
     if (key.return) {
-      done({ scores: items.map((it, i) => ({ value: itemName(it), score: scores[i] })) });
-      exit();
+      finish({ scores: items.map((it, i) => ({ value: itemName(it), score: scores[i] })) });
       return;
     }
     if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
@@ -1217,6 +1328,55 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
   );
 }
 
+type BatchQuestion =
+  | { name: string; type: "choose"; spec: Parameters<typeof Choose>[0] }
+  | { name: string; type: "multi"; spec: Parameters<typeof Multi>[0] }
+  | { name: string; type: "confirm"; spec: Parameters<typeof Confirm>[0] }
+  | { name: string; type: "input"; spec: Parameters<typeof Input>[0] }
+  | { name: string; type: "reorder"; spec: Parameters<typeof Reorder>[0] }
+  | { name: string; type: "score"; spec: Parameters<typeof Score>[0] };
+
+function Batch({ questions }: { questions: BatchQuestion[] }) {
+  const { exit } = useApp();
+  const [idx, setIdx] = useState(0);
+  const [results, setResults] = useState<Record<string, unknown>>({});
+
+  if (idx >= questions.length) return null;
+  const q = questions[idx];
+  const handle = (r: any) => {
+    if (r && r.cancelled) {
+      done({ cancelled: true, cancelledAt: q.name, values: results });
+      exit();
+      return;
+    }
+    const next = { ...results, [q.name]: r };
+    if (idx + 1 >= questions.length) {
+      done({ values: next });
+      exit();
+      return;
+    }
+    setResults(next);
+    setIdx(idx + 1);
+  };
+
+  // key forces remount per question so internal state resets cleanly.
+  const k = `${idx}:${q.name}`;
+  switch (q.type) {
+    case "choose":
+      return <Choose key={k} {...q.spec} onDone={handle} />;
+    case "multi":
+      return <Multi key={k} {...q.spec} onDone={handle} />;
+    case "confirm":
+      return <Confirm key={k} {...q.spec} onDone={handle} />;
+    case "input":
+      return <Input key={k} {...q.spec} onDone={handle} />;
+    case "reorder":
+      return <Reorder key={k} {...q.spec} onDone={handle} />;
+    case "score":
+      return <Score key={k} {...q.spec} onDone={handle} />;
+  }
+}
+
 const components: Record<string, () => React.ReactElement> = {
   reorder: () => <Reorder {...spec} />,
   choose: () => <Choose {...spec} />,
@@ -1226,6 +1386,7 @@ const components: Record<string, () => React.ReactElement> = {
   preview: () => <PreviewAction {...spec} />,
   score: () => <Score {...spec} />,
   form: () => <Form {...spec} />,
+  batch: () => <Batch {...spec} />,
 };
 
 const Comp = components[subcmd];
