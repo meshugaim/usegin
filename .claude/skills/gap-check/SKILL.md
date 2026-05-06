@@ -18,7 +18,10 @@ Layered, cheapest-first. Always do L1+L2. After each layer, decide: **fail-fast 
 
 1. **Linear issues vs code** — open ACs on in-flight/recent issues for the target, compared against HEAD. `plan show <id>` + read the actual files referenced.
 2. **Repo docs/specs** — `docs/`, `docs/decisions/`, slice plans, any `*.md` alongside the target's code. ACs and constraints often live here, not in Linear.
-3. **dogfooding-effi** — `effi ask` for things agreed in meetings, emails, or Drive that may never have made it to Linear. Use the `dogfooding-effi` skill.
+3. **Team comms outside the codebase** — asks, decisions, and constraints that landed in Slack, email, or shared docs and never made it to Linear. Three sources in this family, pick by what fits the target:
+   - **`dogfooding-effi`** — broad cross-source `effi ask` (Slack + Gmail + Drive + Linear blended). Best when you don't know which channel the discussion happened in.
+   - **`team-slack`** — search a specific channel or thread. Best when you remember the conversation was on Slack but not the exact ticket fallout.
+   - **`team-gmail`** — find a specific thread. Best for customer commitments, vendor decisions, or anything that landed in email rather than chat.
 4. **Git history** — `git log` + `session code-history` on the target's files. What was attempted, reverted, half-landed. HEAD lies about intent.
 5. **Previous Claude sessions** — `session` CLI / grep `~/.claude/projects/` for the target keyword. Nuance and asks captured mid-session that never made it to a ticket.
 6. **Cross-source contradictions** — explicitly compare what L1–L5 said. Specs vs meetings vs emails vs Linear. Flag conflicts; don't silently pick a winner. **Chronology generally informs direction** — when two sources disagree, note which is newer (commit date, doc mtime, ticket update, meeting date). The newer one usually represents current intent and the older one is drift; surface that as part of the contradiction row ("spec A says X (2026-04-12) vs spec B says Y (2026-05-03) — B newer, likely current intent"). Not a hard rule — sometimes the older source is the durable decision and the newer is a stale draft — but absent other signal, lean toward newer = direction.
@@ -29,7 +32,7 @@ Layered, cheapest-first. Always do L1+L2. After each layer, decide: **fail-fast 
 Two-part:
 
 1. **Gap table** — one row per gap. Columns: `gap`, `source` (which layer surfaced it), `severity` (blocker / nit / contradiction).
-2. **What was checked** — one line per layer actually run, plus the proposed deeper layers that weren't run yet ("L3 dogfooding-effi — would add forgotten asks from team meetings; ~30s, want me to?").
+2. **What was checked** — one line per layer actually run, plus the proposed deeper layers that weren't run yet ("L3 dogfooding-effi / team-slack / team-gmail — would add forgotten asks from team meetings, channel discussions, or customer threads; ~30s–2min, want me to?").
 
 End with one short offer to drill into a specific row.
 
