@@ -601,13 +601,21 @@ function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, Math.max(0, n - 1)) + "…";
 }
 
-function compactSummary(f: FieldSpec, v: unknown, width: number): React.ReactElement {
+function compactSummary(
+  f: FieldSpec,
+  v: unknown,
+  width: number,
+  isFocus: boolean
+): React.ReactElement {
   if (f.type === "text") {
     const s = String(v ?? "");
+    const shown = s ? truncate(s, width) : "";
     return (
       <Text>
         <Text color="cyan">› </Text>
-        {s ? truncate(s, width) : <Text dimColor>(empty)</Text>}
+        {shown}
+        {!shown && !isFocus ? <Text dimColor>(empty)</Text> : null}
+        {isFocus ? <Text color="cyan">▌</Text> : null}
       </Text>
     );
   }
@@ -803,8 +811,17 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
   // ------------- render --------------
   const navHint =
     "tab/↑↓ move · enter advance or edit list · type to edit · tab to Submit to confirm · esc cancel";
-  const editHint =
-    `editing — enter/esc/tab to leave field back to form (won't cancel)`;
+  function editHintFor(f: FieldSpec | null): string {
+    const back = "enter/esc/tab leave field";
+    if (!f) return back;
+    if (f.type === "multi")
+      return `space toggle · a all · n none · ↑/↓ or j/k move · ${back}`;
+    if (f.type === "reorder")
+      return `space grab/drop · ↑/↓ or j/k move · ${back}`;
+    if (f.type === "score")
+      return `↑/↓ or j/k select · ←/→ or h/l adjust · digit set · [/] big jump · ${back}`;
+    return back;
+  }
 
   function renderSlot(i: number): React.ReactElement {
     const isFocus = i === focus;
@@ -828,7 +845,7 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
           {isFocus ? "▶ " : "  "}
           {label}
         </Text>
-        {compactSummary(f, v, summaryWidth)}
+        {compactSummary(f, v, summaryWidth, isFocus)}
       </Box>
     );
   }
@@ -840,7 +857,7 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
     <Box flexDirection="column" padding={1}>
       <Box flexDirection="column">
         <Text bold>{title ?? "Form"}</Text>
-        <Text dimColor>{mode === "edit" ? editHint : navHint}</Text>
+        <Text dimColor>{mode === "edit" ? editHintFor(cur) : navHint}</Text>
       </Box>
       <Box marginTop={1} flexDirection="column" height={bodyHeight}>
         {mode === "nav" ? (
