@@ -1,0 +1,9 @@
+{
+  "name": "tui",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ink": "^7.0.2",
+    "react": "^19.0.0"
+  }
+}
