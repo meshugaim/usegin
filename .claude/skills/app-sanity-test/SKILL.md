@@ -21,13 +21,19 @@ Start by running `playwright-cli --help` to familiarize yourself with available 
 
 ## Known Users
 
-Persisted across sessions — when the user tells you to use a specific account on an environment, add it here so future runs don't have to ask. Default to offering the matching env's user first (with "Other" as fallback) when prompting for sign-in.
+**Default to the live user, not this table.** The system tells you who's at the keyboard via `userEmail` in the claudeMd context, the `LIVE USER:` SessionStart banner, and `git config user.email`. The staging/production owner-account convention is `<name>+staging.owner@askeffi.ai` / `<name>@askeffi.ai`. Derive the candidate from the live user first; this table is a *fallback* for when no live-user signal is available, never the default.
+
+The Linear-assignee shared-API-key trap (memory `feedback_linear_assignee_not_ownership`) makes it tempting to read this table as authoritative — don't. Linear's `assignee=nitsan` is degenerate signal; auth accounts are real per-human.
+
+When the user tells you to use a specific account on an environment, add it here so future runs don't have to ask.
 
 | Env | Email | Role | Notes |
 |-----|-------|------|-------|
-| Staging | `nitsan+staging.owner@askeffi.ai` | owner | Nitsan's owner account on staging |
-| Production | `nitsan@askeffi.ai` | owner | Nitsan's owner account on production |
-| Production | `lihu@askeffi.ai` | owner | Lihu's owner account on production |
+| Staging | `oria+staging.owner@askeffi.ai` | owner | Oria's staging owner account (convention `<name>+staging.owner@askeffi.ai`) |
+| Staging | `nitsan+staging.owner@askeffi.ai` | owner | Nitsan's staging owner account |
+| Production | `oria@askeffi.ai` | owner | Oria's production account |
+| Production | `nitsan@askeffi.ai` | owner | Nitsan's production account |
+| Production | `lihu@askeffi.ai` | owner | Lihu's production account |
 
 For local, see `bun scripts/pw-auth.ts` (uses `owner@test.local` by default).
 
@@ -159,7 +165,7 @@ If `pw-auth.ts` fails, fall back to OTP sign-in via Inbucket:
 
 **Staging / Production**:
 
-1. Use `AskUserQuestion` to ask which email to sign in with. Offer the matching env's entry from the **Known Users** table at the top of this skill as the default option — "Other" lets them type a different one. If the user supplies a new email, update the Known Users table so the next run already has it.
+1. Pick the email from the **live user** first — read `userEmail` in claudeMd context, the SessionStart `LIVE USER:` banner, or `git config user.email`. Apply the env convention: staging adds `+staging.owner` (e.g. `oria@askeffi.ai` → `oria+staging.owner@askeffi.ai`); production keeps the bare email. Only fall back to `AskUserQuestion` against the **Known Users** table if no live-user signal is available. Confirm the derived candidate inline ("signing in as `oria+staging.owner@askeffi.ai` — say otherwise to override") rather than asking up-front; act-don't-ask. If the user names a new account, add it to the Known Users table so the next run already has it.
 2. Navigate to `/sign-in`, fill email, click "Send code"
 3. Fetch the 6-digit code:
    - **Preferred — Gmail connector** (no human-in-the-loop). If the sign-in email belongs to the live human and the claude.ai Gmail connector is authorized, the agent reads the OTP from their inbox directly:
