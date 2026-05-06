@@ -7,7 +7,7 @@ description: Ask the human for a structured answer through an interactive tmux-p
 
 The `tui` CLI (`tools/bin/tui`) renders a small ink-based TUI inside a tmux popup, takes a JSON spec on stdin, and emits a JSON result on stdout. Use it instead of asking the human to type a list back in chat.
 
-Subcommands: `reorder`, `choose`, `multi`, `confirm`, `input`. Run `tui <subcmd>` with no stdin or read `tools/bin/tui` for the spec shapes — they're tiny.
+Subcommands: `reorder`, `choose`, `multi`, `confirm`, `input`, `preview`, `score`, `form`. Run `tui <subcmd>` with no stdin or read `tools/bin/tui` for the spec shapes — they're tiny.
 
 ## When to reach for it
 
@@ -15,6 +15,9 @@ Subcommands: `reorder`, `choose`, `multi`, `confirm`, `input`. Run `tui <subcmd>
 - **Choose / multi**: 5+ candidates and the human's answer is a pick, not an explanation. Below ~5, chat is fine.
 - **Confirm**: only when the question is genuinely binary AND you want to gate a non-trivial action. For "ok?" mid-conversation, chat is faster.
 - **Input**: a single short string with a default — branch name, file path, label. For anything multi-line or exploratory, chat.
+- **Preview**: show a charter/spec/diff/markdown blob with an action footer (approve/edit/reject/…). The right tool when you want a gate after the human reads something — beats "here's the doc, ok?" in chat.
+- **Score**: rate a list of items on a scale (1–5 stars or 1–100 bar). Direct fit for `prioritize`, retros, vibe ratings — replaces a chat list of "X: 4, Y: 3, …".
+- **Form**: 3+ fields collected at once (text/confirm/choose), tab between fields, single submit. Use when you'd otherwise ask three questions in a row (`spec` metadata, charter scaffolding, issue creation).
 
 ## When NOT to use it
 
@@ -44,6 +47,9 @@ Cancel handling: treat exit 1 as "the human declined to answer this way" — fal
 | `multi` | `{"indices":[...],"values":[...]}` (input order preserved) |
 | `confirm` | `{"value":true|false}` |
 | `input` | `{"value":"..."}` |
+| `preview` | `{"action":"approve","index":N}` (one of `actions[]`) |
+| `score` | `{"scores":[{"value":"...","score":N}, ...]}` |
+| `form` | `{"values":{name1: ..., name2: ...}}` |
 
 ## Implementation pointer
 
