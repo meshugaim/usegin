@@ -24,6 +24,14 @@ function itemDetails(it: RichItem): string | undefined {
   return typeof it === "string" ? undefined : it.details;
 }
 
+function detailLineCount(item: RichItem | undefined): number {
+  const d = item ? itemDetails(item) : undefined;
+  return d ? d.split("\n").length : 0;
+}
+function maxPanelScroll(item: RichItem | undefined, maxLines: number): number {
+  return Math.max(0, detailLineCount(item) - maxLines);
+}
+
 function panelMaxLines(itemsCount: number): number {
   // Popup is ~85% of terminal height; reserve room for list rows + chrome.
   const termRows = process.stdout.rows ?? 30;
@@ -209,9 +217,11 @@ function Reorder({ items: initial, prompt }: { items: RichItem[]; prompt?: strin
   const [panelScroll, setPanelScroll] = useState(0);
   const maxLines = panelMaxLines(items.length);
   useEffect(() => setPanelScroll(0), [cursor]);
+  const panelMax = maxPanelScroll(items[cursor], maxLines);
 
   useInput((input, key) => {
-    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === ">" || key.pageDown)
+      return setPanelScroll((s) => Math.min(panelMax, s + 4));
     if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
       done({ cancelled: true });
@@ -268,6 +278,7 @@ function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
   const [panelScroll, setPanelScroll] = useState(0);
   const maxLines = panelMaxLines(items.length);
   useEffect(() => setPanelScroll(0), [cursor]);
+  const panelMax = maxPanelScroll(items[cursor], maxLines);
   useInput((input, key) => {
     if (key.escape || input === "q") {
       done({ cancelled: true });
@@ -279,7 +290,8 @@ function Choose({ items, prompt }: { items: RichItem[]; prompt?: string }) {
       exit();
       return;
     }
-    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === ">" || key.pageDown)
+      return setPanelScroll((s) => Math.min(panelMax, s + 4));
     if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
     else if (key.downArrow || input === "j") setCursor((c) => Math.min(items.length - 1, c + 1));
@@ -320,8 +332,10 @@ function Multi({
   const [panelScroll, setPanelScroll] = useState(0);
   const maxLines = panelMaxLines(items.length);
   useEffect(() => setPanelScroll(0), [cursor]);
+  const panelMax = maxPanelScroll(items[cursor], maxLines);
   useInput((input, key) => {
-    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === ">" || key.pageDown)
+      return setPanelScroll((s) => Math.min(panelMax, s + 4));
     if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
       done({ cancelled: true });
@@ -576,11 +590,13 @@ function Score({
   const [panelScroll, setPanelScroll] = useState(0);
   const maxLines = panelMaxLines(items.length);
   useEffect(() => setPanelScroll(0), [cursor]);
+  const panelMax = maxPanelScroll(items[cursor], maxLines);
   const clamp = (n: number) => Math.max(min, Math.min(max, n));
   const big = Math.max(1, Math.round((max - min) / 10));
 
   useInput((input, key) => {
-    if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+    if (input === ">" || key.pageDown)
+      return setPanelScroll((s) => Math.min(panelMax, s + 4));
     if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
     if (key.escape || input === "q") {
       done({ cancelled: true });
@@ -676,13 +692,15 @@ function MultiField({
   const maxLines = panelMaxLines(spec.items.length);
   useEffect(() => setPanelScroll(0), [cursor]);
   const names = spec.items.map(itemName);
+  const panelMax = maxPanelScroll(spec.items[cursor], maxLines);
   useInput(
     (input, key) => {
       if (key.return || key.escape || key.tab) {
         onExit();
         return;
       }
-      if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+      if (input === ">" || key.pageDown)
+        return setPanelScroll((s) => Math.min(panelMax, s + 4));
       if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
       if (input === " ") {
         const sel = new Set(value);
@@ -740,6 +758,7 @@ function ReorderField({
   const maxLines = panelMaxLines(spec.items.length);
   useEffect(() => setPanelScroll(0), [cursor]);
   const byName = new Map(spec.items.map((it) => [itemName(it), it]));
+  const panelMax = maxPanelScroll(byName.get(value[cursor]), maxLines);
   useInput(
     (input, key) => {
       if (key.return || key.escape || key.tab) {
@@ -747,7 +766,8 @@ function ReorderField({
         onExit();
         return;
       }
-      if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+      if (input === ">" || key.pageDown)
+        return setPanelScroll((s) => Math.min(panelMax, s + 4));
       if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
       if (input === " ") return setGrabbed((g) => !g);
       const move = (dir: -1 | 1) => {
@@ -807,6 +827,7 @@ function ScoreField({
   const [panelScroll, setPanelScroll] = useState(0);
   const maxLines = panelMaxLines(spec.items.length);
   useEffect(() => setPanelScroll(0), [cursor]);
+  const panelMax = maxPanelScroll(spec.items[cursor], maxLines);
   const clamp = (n: number) => Math.max(min, Math.min(max, n));
   const big = Math.max(1, Math.round((max - min) / 10));
   useInput(
@@ -815,7 +836,8 @@ function ScoreField({
         onExit();
         return;
       }
-      if (input === ">" || key.pageDown) return setPanelScroll((s) => s + 4);
+      if (input === ">" || key.pageDown)
+        return setPanelScroll((s) => Math.min(panelMax, s + 4));
       if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
       if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
       else if (key.downArrow || input === "j")
