@@ -64,9 +64,13 @@ mcp__claude_ai_Gmail__create_draft \
 
 The four core humans Cc it routinely. The product's transactional sender is `noreply@mail.askeffi.ai` — different role, not for agent draft Cc.
 
-## Auto-send pipeline (optional)
+## Auto-send pipeline (optional, per-team-member)
 
-If the team's Apps Script auto-send loop is set up (see `docs/claude-ai-connectors.md`), agent can mark a draft for automated sending:
+The auto-send Apps Script lives in *each teammate's* own Google account — there's no shared setup. Each person who wants their drafts to actually send has to wire their own Apps Script once (~3 min, see `docs/claude-ai-connectors.md` § Apps Script auto-send).
+
+**Before suggesting auto-send to the live human, assume they may not have set it up.** If they haven't, the marker is harmless (draft sits in Drafts as normal) but the agent's "I'll send this for you" promise silently doesn't deliver. Easiest probe: ask the human "is your Apps Script auto-send set up?" once, remember the answer for the session.
+
+When set up, agent can mark a draft for automated sending:
 
 1. **First body line**: `[auto-send]` — script strips before send
 2. **Last body line**: `Sent from <Name>'s Claude Code` — convention, kept as honest disclosure
