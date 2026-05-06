@@ -418,7 +418,187 @@ function Score({
 type FieldSpec =
   | { name: string; type: "text"; label?: string; default?: string }
   | { name: string; type: "confirm"; label?: string; default?: boolean }
-  | { name: string; type: "choose"; label?: string; items: string[]; default?: number };
+  | { name: string; type: "choose"; label?: string; items: string[]; default?: number }
+  | { name: string; type: "multi"; label?: string; items: string[]; preselected?: number[] }
+  | { name: string; type: "reorder"; label?: string; items: string[] }
+  | {
+      name: string;
+      type: "score";
+      label?: string;
+      items: string[];
+      min?: number;
+      max?: number;
+      default?: number;
+    };
+
+const LIST_FIELD_TYPES = new Set(["multi", "reorder", "score"]);
+
+function MultiField({
+  spec,
+  value,
+  onChange,
+  onExit,
+  isActive,
+}: {
+  spec: { items: string[] };
+  value: string[];
+  onChange: (v: string[]) => void;
+  onExit: () => void;
+  isActive: boolean;
+}) {
+  const [cursor, setCursor] = useState(0);
+  useInput(
+    (input, key) => {
+      if (key.return || key.escape || key.tab) {
+        onExit();
+        return;
+      }
+      if (input === " ") {
+        const sel = new Set(value);
+        const item = spec.items[cursor];
+        sel.has(item) ? sel.delete(item) : sel.add(item);
+        onChange(spec.items.filter((it) => sel.has(it)));
+        return;
+      }
+      if (input === "a") return onChange([...spec.items]);
+      if (input === "n") return onChange([]);
+      if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
+      else if (key.downArrow || input === "j")
+        setCursor((c) => Math.min(spec.items.length - 1, c + 1));
+    },
+    { isActive }
+  );
+  const sel = new Set(value);
+  return (
+    <Box flexDirection="column">
+      {spec.items.map((item, i) => (
+        <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
+          {"     "}
+          {isActive && i === cursor ? "▶ " : "  "}
+          {sel.has(item) ? "[x] " : "[ ] "}
+          {item}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function ReorderField({
+  spec,
+  value,
+  onChange,
+  onExit,
+  isActive,
+}: {
+  spec: { items: string[] };
+  value: string[];
+  onChange: (v: string[]) => void;
+  onExit: () => void;
+  isActive: boolean;
+}) {
+  const [cursor, setCursor] = useState(0);
+  const [grabbed, setGrabbed] = useState(false);
+  useInput(
+    (input, key) => {
+      if (key.return || key.escape || key.tab) {
+        setGrabbed(false);
+        onExit();
+        return;
+      }
+      if (input === " ") return setGrabbed((g) => !g);
+      const move = (dir: -1 | 1) => {
+        const next = cursor + dir;
+        if (next < 0 || next >= value.length) return;
+        if (grabbed) {
+          const copy = [...value];
+          [copy[cursor], copy[next]] = [copy[next], copy[cursor]];
+          onChange(copy);
+        }
+        setCursor(next);
+      };
+      if (key.upArrow || input === "k") move(-1);
+      else if (key.downArrow || input === "j") move(1);
+    },
+    { isActive }
+  );
+  return (
+    <Box flexDirection="column">
+      {value.map((item, i) => {
+        const isCur = isActive && i === cursor;
+        const color = isCur ? (grabbed ? "yellow" : "cyan") : undefined;
+        const marker = isCur ? (grabbed ? "▶▶" : "▶ ") : "  ";
+        return (
+          <Text key={i} color={color}>
+            {"     "}
+            {marker}
+            {String(i + 1).padStart(2)}. {item}
+          </Text>
+        );
+      })}
+    </Box>
+  );
+}
+
+function ScoreField({
+  spec,
+  value,
+  onChange,
+  onExit,
+  isActive,
+}: {
+  spec: { items: string[]; min?: number; max?: number };
+  value: number[];
+  onChange: (v: number[]) => void;
+  onExit: () => void;
+  isActive: boolean;
+}) {
+  const min = spec.min ?? 1;
+  const max = spec.max ?? 5;
+  const [cursor, setCursor] = useState(0);
+  const clamp = (n: number) => Math.max(min, Math.min(max, n));
+  const big = Math.max(1, Math.round((max - min) / 10));
+  useInput(
+    (input, key) => {
+      if (key.return || key.escape || key.tab) {
+        onExit();
+        return;
+      }
+      if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
+      else if (key.downArrow || input === "j")
+        setCursor((c) => Math.min(spec.items.length - 1, c + 1));
+      else if (key.leftArrow || input === "h" || input === "-")
+        onChange(value.map((v, i) => (i === cursor ? clamp(v - 1) : v)));
+      else if (key.rightArrow || input === "l" || input === "+" || input === "=")
+        onChange(value.map((v, i) => (i === cursor ? clamp(v + 1) : v)));
+      else if (input === "[") onChange(value.map((v, i) => (i === cursor ? clamp(v - big) : v)));
+      else if (input === "]") onChange(value.map((v, i) => (i === cursor ? clamp(v + big) : v)));
+      else if (input && /^[0-9]$/.test(input)) {
+        const n = parseInt(input, 10);
+        if (n >= min && n <= max) onChange(value.map((v, i) => (i === cursor ? n : v)));
+      }
+    },
+    { isActive }
+  );
+  const range = max - min;
+  const renderBar = (v: number) => {
+    if (range <= 9) return "★".repeat(v - min + 1) + "☆".repeat(max - v);
+    const width = 16;
+    const filled = Math.round(((v - min) / range) * width);
+    return "█".repeat(filled) + "░".repeat(width - filled);
+  };
+  return (
+    <Box flexDirection="column">
+      {spec.items.map((item, i) => (
+        <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
+          {"     "}
+          {isActive && i === cursor ? "▶ " : "  "}
+          <Text color="yellow">{String(value[i]).padStart(String(max).length)}</Text>{" "}
+          <Text dimColor>{renderBar(value[i])}</Text> {item}
+        </Text>
+      ))}
+    </Box>
+  );
+}
 
 function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
   const { exit } = useApp();
@@ -429,97 +609,175 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
       else if (f.type === "confirm") v[f.name] = f.default ?? false;
       else if (f.type === "choose")
         v[f.name] = f.items[Math.min(Math.max(0, f.default ?? 0), f.items.length - 1)];
+      else if (f.type === "multi") {
+        const sel = new Set(f.preselected ?? []);
+        v[f.name] = f.items.filter((_, i) => sel.has(i));
+      } else if (f.type === "reorder") v[f.name] = [...f.items];
+      else if (f.type === "score") {
+        const min = f.min ?? 1;
+        const max = f.max ?? 5;
+        const dflt = f.default ?? Math.round((min + max) / 2);
+        v[f.name] = f.items.map(() => dflt);
+      }
     }
     return v;
   });
   const [focus, setFocus] = useState(0);
+  const [mode, setMode] = useState<"nav" | "edit">("nav");
   const cur = fields[focus];
+  const curIsList = LIST_FIELD_TYPES.has(cur.type);
+  const navActive = mode === "nav";
 
-  useInput((input, key) => {
-    if (key.escape) {
-      done({ cancelled: true });
-      exit();
-      return;
-    }
-    if (key.return) {
-      done({ values });
-      exit();
-      return;
-    }
-    if (key.tab && key.shift) {
-      setFocus((f) => (f - 1 + fields.length) % fields.length);
-      return;
-    }
-    if (key.tab) {
-      setFocus((f) => (f + 1) % fields.length);
-      return;
-    }
-    if (cur.type === "text") {
-      if (key.backspace || key.delete) {
-        setValues((v) => ({ ...v, [cur.name]: String(v[cur.name] ?? "").slice(0, -1) }));
+  const setVal = (name: string, v: unknown) => setValues((s) => ({ ...s, [name]: v }));
+
+  useInput(
+    (input, key) => {
+      if (key.escape) {
+        done({ cancelled: true });
+        exit();
         return;
       }
-      if (key.ctrl && input === "u") {
-        setValues((v) => ({ ...v, [cur.name]: "" }));
+      if (key.return) {
+        if (curIsList) {
+          setMode("edit");
+          return;
+        }
+        done({ values });
+        exit();
         return;
       }
-      if (key.upArrow) {
+      if (key.tab && key.shift) {
         setFocus((f) => (f - 1 + fields.length) % fields.length);
         return;
       }
-      if (key.downArrow) {
+      if (key.tab) {
         setFocus((f) => (f + 1) % fields.length);
         return;
       }
-      if (input && !key.ctrl && !key.meta)
-        setValues((v) => ({ ...v, [cur.name]: String(v[cur.name] ?? "") + input }));
-      return;
-    }
-    if (cur.type === "confirm") {
-      if (input === "y" || input === "Y") {
-        setValues((v) => ({ ...v, [cur.name]: true }));
+      if (cur.type === "text") {
+        if (key.backspace || key.delete) {
+          setVal(cur.name, String(values[cur.name] ?? "").slice(0, -1));
+          return;
+        }
+        if (key.ctrl && input === "u") return setVal(cur.name, "");
+        if (key.upArrow) {
+          setFocus((f) => (f - 1 + fields.length) % fields.length);
+          return;
+        }
+        if (key.downArrow) {
+          setFocus((f) => (f + 1) % fields.length);
+          return;
+        }
+        if (input && !key.ctrl && !key.meta)
+          setVal(cur.name, String(values[cur.name] ?? "") + input);
         return;
       }
-      if (input === "n" || input === "N") {
-        setValues((v) => ({ ...v, [cur.name]: false }));
+      if (cur.type === "confirm") {
+        if (input === "y" || input === "Y") return setVal(cur.name, true);
+        if (input === "n" || input === "N") return setVal(cur.name, false);
+        if (input === " " || input === "h" || input === "l" || key.leftArrow || key.rightArrow)
+          return setVal(cur.name, !values[cur.name]);
+        if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
+        if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
         return;
       }
-      if (input === " " || input === "h" || input === "l" || key.leftArrow || key.rightArrow) {
-        setValues((v) => ({ ...v, [cur.name]: !v[cur.name] }));
+      if (cur.type === "choose") {
+        const idx = cur.items.indexOf(String(values[cur.name]));
+        if (input === "h" || key.leftArrow) {
+          const next = (idx - 1 + cur.items.length) % cur.items.length;
+          return setVal(cur.name, cur.items[next]);
+        }
+        if (input === "l" || key.rightArrow || input === " ") {
+          const next = (idx + 1) % cur.items.length;
+          return setVal(cur.name, cur.items[next]);
+        }
+        if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
+        if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
         return;
       }
-      if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
-      if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
-      return;
-    }
-    if (cur.type === "choose") {
-      const idx = cur.items.indexOf(String(values[cur.name]));
-      if (input === "h" || key.leftArrow) {
-        const next = (idx - 1 + cur.items.length) % cur.items.length;
-        setValues((v) => ({ ...v, [cur.name]: cur.items[next] }));
+      if (curIsList) {
+        if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
+        if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
         return;
       }
-      if (input === "l" || key.rightArrow || input === " ") {
-        const next = (idx + 1) % cur.items.length;
-        setValues((v) => ({ ...v, [cur.name]: cur.items[next] }));
-        return;
-      }
-      if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
-      if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
-      return;
-    }
-  });
+    },
+    { isActive: navActive }
+  );
+
+  const navHint =
+    "tab/↑↓ next field · enter submit · enter on list-field to edit · esc cancel";
+  const editHint =
+    "(in field) field-specific keys · enter/esc/tab leave field back to form";
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Header
-        title={title ?? "Form"}
-        hint="tab/↑↓ next field · enter submit · esc cancel · field-specific keys below"
-      />
+      <Header title={title ?? "Form"} hint={mode === "edit" ? editHint : navHint} />
       {fields.map((f, i) => {
         const isFocus = i === focus;
+        const isEditingThis = isFocus && mode === "edit";
         const label = f.label ?? f.name;
         const v = values[f.name];
+        const focusMarker = isEditingThis ? "▣ " : isFocus ? "▶ " : "  ";
+
+        if (f.type === "multi") {
+          return (
+            <Box key={f.name} flexDirection="column">
+              <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
+                {focusMarker}
+                {label.padEnd(14)}
+                <Text dimColor>
+                  ({(v as string[]).length}/{f.items.length} selected)
+                </Text>
+              </Text>
+              <MultiField
+                spec={f}
+                value={v as string[]}
+                onChange={(nv) => setVal(f.name, nv)}
+                onExit={() => setMode("nav")}
+                isActive={isEditingThis}
+              />
+            </Box>
+          );
+        }
+        if (f.type === "reorder") {
+          return (
+            <Box key={f.name} flexDirection="column">
+              <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
+                {focusMarker}
+                {label.padEnd(14)}
+                <Text dimColor>({(v as string[]).length} items)</Text>
+              </Text>
+              <ReorderField
+                spec={f}
+                value={v as string[]}
+                onChange={(nv) => setVal(f.name, nv)}
+                onExit={() => setMode("nav")}
+                isActive={isEditingThis}
+              />
+            </Box>
+          );
+        }
+        if (f.type === "score") {
+          const arr = v as number[];
+          const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+          return (
+            <Box key={f.name} flexDirection="column">
+              <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
+                {focusMarker}
+                {label.padEnd(14)}
+                <Text dimColor>(avg {avg.toFixed(1)})</Text>
+              </Text>
+              <ScoreField
+                spec={f}
+                value={arr}
+                onChange={(nv) => setVal(f.name, nv)}
+                onExit={() => setMode("nav")}
+                isActive={isEditingThis}
+              />
+            </Box>
+          );
+        }
+
         let display: React.ReactElement;
         if (f.type === "text") {
           display = (
@@ -556,7 +814,7 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
         return (
           <Box key={f.name} flexDirection="row">
             <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
-              {isFocus ? "▶ " : "  "}
+              {focusMarker}
               {label.padEnd(14)}
             </Text>
             {display}

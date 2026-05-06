@@ -17,7 +17,7 @@ Subcommands: `reorder`, `choose`, `multi`, `confirm`, `input`, `preview`, `score
 - **Input**: a single short string with a default — branch name, file path, label. For anything multi-line or exploratory, chat.
 - **Preview**: show a charter/spec/diff/markdown blob with an action footer (approve/edit/reject/…). The right tool when you want a gate after the human reads something — beats "here's the doc, ok?" in chat.
 - **Score**: rate a list of items on a scale (1–5 stars or 1–100 bar). Direct fit for `prioritize`, retros, vibe ratings — replaces a chat list of "X: 4, Y: 3, …".
-- **Form**: 3+ fields collected at once (text/confirm/choose), tab between fields, single submit. Use when you'd otherwise ask three questions in a row (`spec` metadata, charter scaffolding, issue creation).
+- **Form**: 3+ fields collected at once, tab between fields, single submit. Field types: `text`, `confirm`, `choose` (single-line, edited inline), plus `multi`, `reorder`, `score` (multi-row, focus-mode — press enter to drop into the field, enter/esc/tab to leave back to form-nav). Use when you'd otherwise ask three or more questions in a row (`spec` metadata, issue creation, slicing-with-priorities in one screen).
 
 ## When NOT to use it
 
