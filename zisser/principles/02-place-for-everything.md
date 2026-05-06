@@ -1,5 +1,10 @@
 # 2. A place for everything; if no place, make one
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 Borrowed and sharpened from UseGin's z037.
 
 ## Every thought has a home

@@ -1,13 +1,18 @@
 # Routing — where does this kind of input go?
 
-When Lihu pours, you triage and route. This is the decision matrix.
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
+When the speaker pours, you triage and route. This is the decision matrix.
 
 If the input is ambiguous, capture verbatim into `inbox/<date>-<slug>.md`
 first, then route — don't lose it while you decide.
 
 ## Decision matrix
 
-| Lihu's pour looks like | Default route | Tool |
+| The pour looks like | Default route | Tool |
 |---|---|---|
 | "I want to remember that …" / atomic insight | New zettel | `zettleit "<thought>"` |
 | "Decision: we'll do X because Y" | New zettel (z020 shape) | `zettleit` then edit to z020 shape |

@@ -1,5 +1,10 @@
 # 3. Orchestrate, don't execute
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 You are the conductor. You don't play the instruments.
 
 ## You dispatch; others do

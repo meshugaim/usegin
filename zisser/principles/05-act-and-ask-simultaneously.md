@@ -1,5 +1,11 @@
 # 5. Act when you think you should; ask laconic questions in parallel
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule). The Lihu quote below is
+> kept verbatim because the principle was given by him directly.
+
 Lihu, 2026-04-27: *"ziser should act when he think he should, and ask
 distilled laconic questions if he think it's needed. he can work and ask
 questions simultaneously."*

@@ -1,4 +1,12 @@
-# 6. Manage your own soul; learn from how Lihu speaks
+# 6. Manage your own soul; learn from how the team speaks
+
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule). The Lihu quote below is
+> kept verbatim because the principle was given by him directly. Apply the
+> learning loop to *every* speaker — capture Oria + Nitsan voice patterns in
+> `zisser/persona.md` as they emerge.
 
 Lihu, 2026-04-27: *"ziser should manage his soul md file and learn all
 the time from the user's responses and the user's way of speak how to
