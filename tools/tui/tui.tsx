@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { render, Box, Text, useInput, useApp } from "ink";
 import { readFileSync, writeFileSync } from "fs";
 
@@ -473,7 +473,6 @@ function MultiField({
     <Box flexDirection="column">
       {spec.items.map((item, i) => (
         <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
-          {"     "}
           {isActive && i === cursor ? "▶ " : "  "}
           {sel.has(item) ? "[x] " : "[ ] "}
           {item}
@@ -529,7 +528,6 @@ function ReorderField({
         const marker = isCur ? (grabbed ? "▶▶" : "▶ ") : "  ";
         return (
           <Text key={i} color={color}>
-            {"     "}
             {marker}
             {String(i + 1).padStart(2)}. {item}
           </Text>
@@ -590,7 +588,6 @@ function ScoreField({
     <Box flexDirection="column">
       {spec.items.map((item, i) => (
         <Text key={i} color={isActive && i === cursor ? "cyan" : undefined}>
-          {"     "}
           {isActive && i === cursor ? "▶ " : "  "}
           <Text color="yellow">{String(value[i]).padStart(String(max).length)}</Text>{" "}
           <Text dimColor>{renderBar(value[i])}</Text> {item}
@@ -598,6 +595,76 @@ function ScoreField({
       ))}
     </Box>
   );
+}
+
+function truncate(s: string, n: number): string {
+  return s.length <= n ? s : s.slice(0, Math.max(0, n - 1)) + "…";
+}
+
+function compactSummary(f: FieldSpec, v: unknown, width: number): React.ReactElement {
+  if (f.type === "text") {
+    const s = String(v ?? "");
+    return (
+      <Text>
+        <Text color="cyan">› </Text>
+        {s ? truncate(s, width) : <Text dimColor>(empty)</Text>}
+      </Text>
+    );
+  }
+  if (f.type === "confirm") {
+    return (
+      <Text color={v ? "green" : "red"} bold>
+        {v ? "yes" : "no"}
+      </Text>
+    );
+  }
+  if (f.type === "choose") {
+    const idx = f.items.indexOf(String(v));
+    return (
+      <Text>
+        <Text color="yellow">{String(v)}</Text>{" "}
+        <Text dimColor>
+          ({idx + 1}/{f.items.length})
+        </Text>
+      </Text>
+    );
+  }
+  if (f.type === "multi") {
+    const sel = v as string[];
+    const summary = sel.length === 0 ? "(none)" : truncate(sel.join(", "), width - 10);
+    return (
+      <Text>
+        <Text color="yellow">{summary}</Text>{" "}
+        <Text dimColor>
+          ({sel.length}/{f.items.length})
+        </Text>
+      </Text>
+    );
+  }
+  if (f.type === "reorder") {
+    const ord = v as string[];
+    return <Text color="yellow">{truncate(ord.join(" → "), width)}</Text>;
+  }
+  if (f.type === "score") {
+    const arr = v as number[];
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const min = f.min ?? 1;
+    const max = f.max ?? 5;
+    const range = max - min;
+    let bars: string;
+    if (range <= 9) {
+      bars = arr.map((n) => "★".repeat(n - min + 1) + "☆".repeat(max - n)).join(" ");
+    } else {
+      bars = arr.map((n) => String(n)).join(" ");
+    }
+    return (
+      <Text>
+        <Text color="yellow">{truncate(bars, width - 10)}</Text>{" "}
+        <Text dimColor>(avg {avg.toFixed(1)})</Text>
+      </Text>
+    );
+  }
+  return <Text>?</Text>;
 }
 
 function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
@@ -622,12 +689,32 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
     }
     return v;
   });
+
+  const SUBMIT = fields.length;
+  const totalSlots = fields.length + 1;
+
   const [focus, setFocus] = useState(0);
   const [mode, setMode] = useState<"nav" | "edit">("nav");
-  const cur = fields[focus];
-  const curIsList = LIST_FIELD_TYPES.has(cur.type);
-  const navActive = mode === "nav";
+  const [scrollOffset, setScrollOffset] = useState(0);
 
+  const termRows = process.stdout.rows ?? 30;
+  const termCols = process.stdout.columns ?? 80;
+  // Outer padding 2 + header 3 + footer 2 = 7
+  const bodyHeight = Math.max(6, termRows - 8);
+  // Each field row uses 1 line + 1 marginTop (except first) → 2 lines per slot, last slot needs 1.
+  // visible slots ≈ floor((bodyHeight + 1) / 2), capped at totalSlots
+  const visibleSlots = Math.min(totalSlots, Math.max(1, Math.floor((bodyHeight + 1) / 2)));
+  const summaryWidth = Math.max(20, termCols - 30);
+
+  useEffect(() => {
+    if (focus < scrollOffset) setScrollOffset(focus);
+    else if (focus >= scrollOffset + visibleSlots)
+      setScrollOffset(focus - visibleSlots + 1);
+  }, [focus, visibleSlots, scrollOffset]);
+
+  const cur = focus < fields.length ? fields[focus] : null;
+  const curIsList = !!cur && LIST_FIELD_TYPES.has(cur.type);
+  const navActive = mode === "nav";
   const setVal = (name: string, v: unknown) => setValues((s) => ({ ...s, [name]: v }));
 
   useInput(
@@ -637,190 +724,185 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
         exit();
         return;
       }
-      if (key.return) {
-        if (curIsList) {
-          setMode("edit");
-          return;
-        }
-        done({ values });
-        exit();
-        return;
-      }
       if (key.tab && key.shift) {
-        setFocus((f) => (f - 1 + fields.length) % fields.length);
+        setFocus((f) => (f - 1 + totalSlots) % totalSlots);
         return;
       }
       if (key.tab) {
-        setFocus((f) => (f + 1) % fields.length);
+        setFocus((f) => (f + 1) % totalSlots);
         return;
       }
-      if (cur.type === "text") {
+      if (key.upArrow) {
+        setFocus((f) => Math.max(0, f - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setFocus((f) => Math.min(totalSlots - 1, f + 1));
+        return;
+      }
+
+      // Submit slot — enter submits, nothing else.
+      if (focus === SUBMIT) {
+        if (key.return) {
+          done({ values });
+          exit();
+        }
+        return;
+      }
+
+      const f = cur!;
+      if (f.type === "text") {
+        if (key.return) {
+          setFocus((x) => Math.min(totalSlots - 1, x + 1));
+          return;
+        }
         if (key.backspace || key.delete) {
-          setVal(cur.name, String(values[cur.name] ?? "").slice(0, -1));
+          setVal(f.name, String(values[f.name] ?? "").slice(0, -1));
           return;
         }
-        if (key.ctrl && input === "u") return setVal(cur.name, "");
-        if (key.upArrow) {
-          setFocus((f) => (f - 1 + fields.length) % fields.length);
-          return;
-        }
-        if (key.downArrow) {
-          setFocus((f) => (f + 1) % fields.length);
-          return;
-        }
+        if (key.ctrl && input === "u") return setVal(f.name, "");
         if (input && !key.ctrl && !key.meta)
-          setVal(cur.name, String(values[cur.name] ?? "") + input);
+          setVal(f.name, String(values[f.name] ?? "") + input);
         return;
       }
-      if (cur.type === "confirm") {
-        if (input === "y" || input === "Y") return setVal(cur.name, true);
-        if (input === "n" || input === "N") return setVal(cur.name, false);
+      if (f.type === "confirm") {
+        if (key.return) {
+          setFocus((x) => Math.min(totalSlots - 1, x + 1));
+          return;
+        }
+        if (input === "y" || input === "Y") return setVal(f.name, true);
+        if (input === "n" || input === "N") return setVal(f.name, false);
         if (input === " " || input === "h" || input === "l" || key.leftArrow || key.rightArrow)
-          return setVal(cur.name, !values[cur.name]);
-        if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
-        if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
+          return setVal(f.name, !values[f.name]);
         return;
       }
-      if (cur.type === "choose") {
-        const idx = cur.items.indexOf(String(values[cur.name]));
+      if (f.type === "choose") {
+        if (key.return) {
+          setFocus((x) => Math.min(totalSlots - 1, x + 1));
+          return;
+        }
+        const idx = f.items.indexOf(String(values[f.name]));
         if (input === "h" || key.leftArrow) {
-          const next = (idx - 1 + cur.items.length) % cur.items.length;
-          return setVal(cur.name, cur.items[next]);
+          const next = (idx - 1 + f.items.length) % f.items.length;
+          return setVal(f.name, f.items[next]);
         }
         if (input === "l" || key.rightArrow || input === " ") {
-          const next = (idx + 1) % cur.items.length;
-          return setVal(cur.name, cur.items[next]);
+          const next = (idx + 1) % f.items.length;
+          return setVal(f.name, f.items[next]);
         }
-        if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
-        if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
         return;
       }
-      if (curIsList) {
-        if (key.upArrow) setFocus((f) => (f - 1 + fields.length) % fields.length);
-        if (key.downArrow) setFocus((f) => (f + 1) % fields.length);
+      if (curIsList && key.return) {
+        setMode("edit");
         return;
       }
     },
     { isActive: navActive }
   );
 
+  // ------------- render --------------
   const navHint =
-    "tab/↑↓ next field · enter submit · enter on list-field to edit · esc cancel";
+    "tab/↑↓ move · enter advance or edit list · type to edit · tab to Submit to confirm · esc cancel";
   const editHint =
-    "(in field) field-specific keys · enter/esc/tab leave field back to form";
+    `editing — enter/esc/tab to leave field back to form (won't cancel)`;
+
+  function renderSlot(i: number): React.ReactElement {
+    const isFocus = i === focus;
+    const margin = i > scrollOffset ? 1 : 0;
+    if (i === SUBMIT) {
+      return (
+        <Box key="submit" marginTop={margin} flexDirection="row">
+          <Text color={isFocus ? "green" : "gray"} bold={isFocus}>
+            {isFocus ? "▶ " : "  "}[ Submit ]
+          </Text>
+          {isFocus && <Text dimColor>  press enter to confirm</Text>}
+        </Box>
+      );
+    }
+    const f = fields[i];
+    const label = (f.label ?? f.name).padEnd(14);
+    const v = values[f.name];
+    return (
+      <Box key={f.name} marginTop={margin} flexDirection="row">
+        <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
+          {isFocus ? "▶ " : "  "}
+          {label}
+        </Text>
+        {compactSummary(f, v, summaryWidth)}
+      </Box>
+    );
+  }
+
+  const visibleStart = scrollOffset;
+  const visibleEnd = Math.min(totalSlots, scrollOffset + visibleSlots);
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Header title={title ?? "Form"} hint={mode === "edit" ? editHint : navHint} />
-      {fields.map((f, i) => {
-        const isFocus = i === focus;
-        const isEditingThis = isFocus && mode === "edit";
-        const label = f.label ?? f.name;
-        const v = values[f.name];
-        const focusMarker = isEditingThis ? "▣ " : isFocus ? "▶ " : "  ";
-
-        if (f.type === "multi") {
-          return (
-            <Box key={f.name} flexDirection="column">
-              <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
-                {focusMarker}
-                {label.padEnd(14)}
-                <Text dimColor>
-                  ({(v as string[]).length}/{f.items.length} selected)
-                </Text>
-              </Text>
-              <MultiField
-                spec={f}
-                value={v as string[]}
-                onChange={(nv) => setVal(f.name, nv)}
-                onExit={() => setMode("nav")}
-                isActive={isEditingThis}
-              />
-            </Box>
-          );
-        }
-        if (f.type === "reorder") {
-          return (
-            <Box key={f.name} flexDirection="column">
-              <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
-                {focusMarker}
-                {label.padEnd(14)}
-                <Text dimColor>({(v as string[]).length} items)</Text>
-              </Text>
-              <ReorderField
-                spec={f}
-                value={v as string[]}
-                onChange={(nv) => setVal(f.name, nv)}
-                onExit={() => setMode("nav")}
-                isActive={isEditingThis}
-              />
-            </Box>
-          );
-        }
-        if (f.type === "score") {
-          const arr = v as number[];
-          const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
-          return (
-            <Box key={f.name} flexDirection="column">
-              <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
-                {focusMarker}
-                {label.padEnd(14)}
-                <Text dimColor>(avg {avg.toFixed(1)})</Text>
-              </Text>
-              <ScoreField
-                spec={f}
-                value={arr}
-                onChange={(nv) => setVal(f.name, nv)}
-                onExit={() => setMode("nav")}
-                isActive={isEditingThis}
-              />
-            </Box>
-          );
-        }
-
-        let display: React.ReactElement;
-        if (f.type === "text") {
-          display = (
-            <Text>
-              <Text color="cyan">› </Text>
-              {String(v ?? "")}
-              {isFocus ? <Text color="cyan">▌</Text> : null}
-            </Text>
-          );
-        } else if (f.type === "confirm") {
-          display = (
-            <Text>
-              <Text color={v ? "green" : undefined} bold={!!v}>
-                {v ? "[x] yes" : "[ ] yes"}
-              </Text>{" "}
-              <Text color={!v ? "red" : undefined} bold={!v}>
-                {!v ? "[x] no" : "[ ] no"}
-              </Text>
-            </Text>
-          );
-        } else {
-          const idx = f.items.indexOf(String(v));
-          display = (
-            <Text>
-              <Text dimColor>{idx > 0 ? "‹ " : "  "}</Text>
-              <Text color="yellow">{String(v)}</Text>
-              <Text dimColor>{idx < f.items.length - 1 ? " ›" : "  "}</Text>{" "}
+      <Box flexDirection="column">
+        <Text bold>{title ?? "Form"}</Text>
+        <Text dimColor>{mode === "edit" ? editHint : navHint}</Text>
+      </Box>
+      <Box marginTop={1} flexDirection="column" height={bodyHeight}>
+        {mode === "nav" ? (
+          <Box flexDirection="column">
+            {visibleStart > 0 && (
               <Text dimColor>
-                ({idx + 1}/{f.items.length})
+                ↑ {visibleStart} more above
               </Text>
-            </Text>
-          );
-        }
-        return (
-          <Box key={f.name} flexDirection="row">
-            <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
-              {focusMarker}
-              {label.padEnd(14)}
-            </Text>
-            {display}
+            )}
+            {Array.from({ length: visibleEnd - visibleStart }, (_, k) =>
+              renderSlot(visibleStart + k)
+            )}
+            {visibleEnd < totalSlots && (
+              <Text dimColor>
+                ↓ {totalSlots - visibleEnd} more below
+              </Text>
+            )}
           </Box>
-        );
-      })}
+        ) : (
+          <Box flexDirection="column">
+            <Text bold color="cyan">
+              ▣ Editing: {cur?.label ?? cur?.name}
+            </Text>
+            <Box marginTop={1} flexDirection="column">
+              {cur?.type === "multi" && (
+                <MultiField
+                  spec={cur}
+                  value={values[cur.name] as string[]}
+                  onChange={(nv) => setVal(cur.name, nv)}
+                  onExit={() => setMode("nav")}
+                  isActive={true}
+                />
+              )}
+              {cur?.type === "reorder" && (
+                <ReorderField
+                  spec={cur}
+                  value={values[cur.name] as string[]}
+                  onChange={(nv) => setVal(cur.name, nv)}
+                  onExit={() => setMode("nav")}
+                  isActive={true}
+                />
+              )}
+              {cur?.type === "score" && (
+                <ScoreField
+                  spec={cur}
+                  value={values[cur.name] as number[]}
+                  onChange={(nv) => setVal(cur.name, nv)}
+                  onExit={() => setMode("nav")}
+                  isActive={true}
+                />
+              )}
+            </Box>
+          </Box>
+        )}
+      </Box>
+      <Box marginTop={1} flexDirection="column">
+        <Text dimColor>
+          {mode === "nav"
+            ? `${focus + 1}/${totalSlots}${focus === SUBMIT ? " · Submit" : ""}`
+            : "in field"}
+        </Text>
+      </Box>
     </Box>
   );
 }
