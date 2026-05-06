@@ -5,6 +5,11 @@ description: Autonomously capture a zettel mid-session whenever a thought, decis
 
 # Zettel capture — autonomous UseGin capture
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 ## Triggers from the human — `!zettleit`
 
 When the human types `!zettleit "<thought>"` (or `zettleit "..."` in their shell), the bash output you see contains a `[ZETTLEIT]` banner. That banner *is the instruction*: same turn, run the procedure below — `dx zettel list` (zettleread) → choose placement + threads → `dx zettel add --as=usegin` → `dx zettel show` to verify. v0 captures autonomously; v1 will gate on approval first. Don't ignore the banner; don't ask the human to also tell you "now write it" — the trigger already did.

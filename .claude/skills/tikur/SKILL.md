@@ -5,6 +5,11 @@ description: Run a post-mortem in the Israeli-Air-Force tarbut-ha-tikkur (תחק
 
 # Tikur (תחקור)
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 Israeli-Air-Force-style post-mortem. Lifted because their culture is the operational state-of-the-art for *learning from mistakes without punishing people*. The point is to change the system, not the person.
 
 ## When to run

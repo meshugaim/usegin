@@ -5,6 +5,11 @@ description: Memento — wake up. Read the Polaroid, check tattoos, reconstruct 
 
 # m-resume — read the Polaroid, wake up
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 You are waking up. You may have **no memory** of the prior session beyond what's in durable artifacts (files, commits, zettels). The Polaroid is your map.
 
 ## The doctrine

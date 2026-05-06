@@ -5,6 +5,11 @@ description: Memento — write the Polaroid before sleep. Use when ending a sess
 
 # m-stop — write the Polaroid
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 You are about to **sleep**. A fresh Gin will wake into your shoes with no memory of this conversation. Write the Polaroid that lets them resume cleanly.
 
 ## The doctrine

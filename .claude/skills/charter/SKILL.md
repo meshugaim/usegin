@@ -5,6 +5,11 @@ description: Emit a sub-Gin charter in the canonical Auftragstaktik shape — pu
 
 # Charter
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 The shape every sub-Gin spawn carries. Lifted from Mission Command (FM 6-0 + CALL "Less is Better"), IDF TO"L (משימה ולא מטלה), and IAF orient-infrastructure. See `usegin/zettel/principles/05-the-twelve-from-war-research.md` for grounding (principles 1–4, 10).
 
 ## When to use

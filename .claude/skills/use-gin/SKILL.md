@@ -5,6 +5,11 @@ description: Gin's own toolkit handbook — the FIRST place to check when asking
 
 # Use Gin
 
+> **Speaker convention:** "Lihu" in this file is the *primary* speaker; the
+> actual live user may be Oria, Lihu, or Nitsan. Check the LIVE USER banner /
+> userEmail / in-chat signals before binding to a name (root `CLAUDE.md`
+> "Live user — who's in the chat" precedence rule).
+
 Gin's repo-local capabilities — what *this* agent can do here that upstream Claude Code can't on its own.
 
 ## Principle: First-place capture
