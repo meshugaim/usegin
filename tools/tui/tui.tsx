@@ -13,6 +13,129 @@ function done(result: unknown) {
   writeFileSync(outPath, JSON.stringify(result));
 }
 
+function isWordChar(c: string) {
+  return /\S/.test(c);
+}
+function wordLeft(s: string, c: number): number {
+  let i = c;
+  while (i > 0 && !isWordChar(s[i - 1])) i--;
+  while (i > 0 && isWordChar(s[i - 1])) i--;
+  return i;
+}
+function wordRight(s: string, c: number): number {
+  let i = c;
+  while (i < s.length && isWordChar(s[i])) i++;
+  while (i < s.length && !isWordChar(s[i])) i++;
+  return i;
+}
+
+function TextInput({
+  value,
+  onChange,
+  onSubmit,
+  focus = true,
+  placeholder,
+  mask,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit?: (v: string) => void;
+  focus?: boolean;
+  placeholder?: string;
+  mask?: string;
+}) {
+  const [cursor, setCursor] = useState(value.length);
+  useEffect(() => {
+    if (cursor > value.length) setCursor(value.length);
+  }, [value, cursor]);
+
+  useInput(
+    (input, key) => {
+      if (key.upArrow || key.downArrow || key.tab || key.escape) return;
+      if (key.return) {
+        onSubmit?.(value);
+        return;
+      }
+      // Word jump (Ctrl+arrow or Alt/Meta+b/f)
+      if (key.ctrl && key.leftArrow) return setCursor(wordLeft(value, cursor));
+      if (key.ctrl && key.rightArrow) return setCursor(wordRight(value, cursor));
+      if (key.meta && input === "b") return setCursor(wordLeft(value, cursor));
+      if (key.meta && input === "f") return setCursor(wordRight(value, cursor));
+      // Start / end (Ctrl+A / Ctrl+E)
+      if (key.ctrl && input === "a") return setCursor(0);
+      if (key.ctrl && input === "e") return setCursor(value.length);
+      // Char movement
+      if (key.leftArrow) return setCursor((c) => Math.max(0, c - 1));
+      if (key.rightArrow) return setCursor((c) => Math.min(value.length, c + 1));
+      // Kill operations
+      if (key.ctrl && input === "u") {
+        onChange(value.slice(cursor));
+        setCursor(0);
+        return;
+      }
+      if (key.ctrl && input === "k") {
+        onChange(value.slice(0, cursor));
+        return;
+      }
+      if (key.ctrl && input === "w") {
+        const start = wordLeft(value, cursor);
+        onChange(value.slice(0, start) + value.slice(cursor));
+        setCursor(start);
+        return;
+      }
+      if (key.backspace) {
+        if (cursor > 0) {
+          onChange(value.slice(0, cursor - 1) + value.slice(cursor));
+          setCursor((c) => c - 1);
+        }
+        return;
+      }
+      if (key.delete) {
+        if (cursor < value.length) onChange(value.slice(0, cursor) + value.slice(cursor + 1));
+        return;
+      }
+      if (key.ctrl || key.meta) return;
+      if (input) {
+        onChange(value.slice(0, cursor) + input + value.slice(cursor));
+        setCursor((c) => c + input.length);
+      }
+    },
+    { isActive: focus }
+  );
+
+  const display = mask ? mask.repeat(value.length) : value;
+  if (!focus) {
+    if (display.length > 0) return <Text>{display}</Text>;
+    return placeholder ? <Text dimColor>{placeholder}</Text> : <Text> </Text>;
+  }
+  if (display.length === 0) {
+    if (placeholder) {
+      return (
+        <Text>
+          <Text inverse>{placeholder[0] ?? " "}</Text>
+          <Text dimColor>{placeholder.slice(1)}</Text>
+        </Text>
+      );
+    }
+    return <Text inverse> </Text>;
+  }
+  if (cursor >= display.length) {
+    return (
+      <Text>
+        {display}
+        <Text inverse> </Text>
+      </Text>
+    );
+  }
+  return (
+    <Text>
+      {display.slice(0, cursor)}
+      <Text inverse>{display[cursor]}</Text>
+      {display.slice(cursor + 1)}
+    </Text>
+  );
+}
+
 function Header({ title, hint }: { title: string; hint: string }) {
   return (
     <Box flexDirection="column" marginBottom={1}>
@@ -205,38 +328,45 @@ function Confirm({ prompt, default: dflt }: { prompt?: string; default?: boolean
   );
 }
 
-function Input({ prompt, default: dflt }: { prompt?: string; default?: string }) {
+function Input({
+  prompt,
+  default: dflt,
+  placeholder,
+  mask,
+}: {
+  prompt?: string;
+  default?: string;
+  placeholder?: string;
+  mask?: string;
+}) {
   const { exit } = useApp();
   const [val, setVal] = useState(dflt ?? "");
   useInput((input, key) => {
     if (key.escape) {
       done({ cancelled: true });
       exit();
-      return;
     }
-    if (key.return) {
-      done({ value: val });
-      exit();
-      return;
-    }
-    if (key.backspace || key.delete) {
-      setVal((v) => v.slice(0, -1));
-      return;
-    }
-    if (key.ctrl && input === "u") {
-      setVal("");
-      return;
-    }
-    if (input && !key.ctrl && !key.meta) setVal((v) => v + input);
   });
   return (
     <Box flexDirection="column" padding={1}>
-      <Header title={prompt ?? "Enter text"} hint="enter confirm · ctrl-u clear · esc cancel" />
-      <Text>
+      <Header
+        title={prompt ?? "Enter text"}
+        hint="enter confirm · ←/→ char · ctrl/alt-b/f word · ctrl-a/e start/end · ctrl-w/u/k kill · esc cancel"
+      />
+      <Box>
         <Text color="cyan">› </Text>
-        {val}
-        <Text color="cyan">▌</Text>
-      </Text>
+        <TextInput
+          value={val}
+          onChange={setVal}
+          onSubmit={(v) => {
+            done({ value: v });
+            exit();
+          }}
+          focus
+          placeholder={placeholder}
+          mask={mask}
+        />
+      </Box>
     </Box>
   );
 }
@@ -601,21 +731,15 @@ function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, Math.max(0, n - 1)) + "…";
 }
 
-function compactSummary(
-  f: FieldSpec,
-  v: unknown,
-  width: number,
-  isFocus: boolean
-): React.ReactElement {
+function compactSummary(f: FieldSpec, v: unknown, width: number): React.ReactElement {
   if (f.type === "text") {
+    // Text rendering uses <TextInput> directly in renderSlot; this branch is
+    // unused but kept for type completeness.
     const s = String(v ?? "");
-    const shown = s ? truncate(s, width) : "";
     return (
       <Text>
         <Text color="cyan">› </Text>
-        {shown}
-        {!shown && !isFocus ? <Text dimColor>(empty)</Text> : null}
-        {isFocus ? <Text color="cyan">▌</Text> : null}
+        {s ? truncate(s, width) : <Text dimColor>(empty)</Text>}
       </Text>
     );
   }
@@ -760,17 +884,8 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
 
       const f = cur!;
       if (f.type === "text") {
-        if (key.return) {
-          setFocus((x) => Math.min(totalSlots - 1, x + 1));
-          return;
-        }
-        if (key.backspace || key.delete) {
-          setVal(f.name, String(values[f.name] ?? "").slice(0, -1));
-          return;
-        }
-        if (key.ctrl && input === "u") return setVal(f.name, "");
-        if (input && !key.ctrl && !key.meta)
-          setVal(f.name, String(values[f.name] ?? "") + input);
+        // TextInput owns char/cursor/enter handling for the focused text field;
+        // parent only routes the keys it doesn't handle (tab/up/down/esc above).
         return;
       }
       if (f.type === "confirm") {
@@ -839,13 +954,30 @@ function Form({ title, fields }: { title?: string; fields: FieldSpec[] }) {
     const f = fields[i];
     const label = (f.label ?? f.name).padEnd(14);
     const v = values[f.name];
+    if (f.type === "text") {
+      return (
+        <Box key={f.name} marginTop={margin} flexDirection="row">
+          <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
+            {isFocus ? "▶ " : "  "}
+            {label}
+          </Text>
+          <Text color="cyan">› </Text>
+          <TextInput
+            value={String(v ?? "")}
+            onChange={(nv) => setVal(f.name, nv)}
+            onSubmit={() => setFocus((x) => Math.min(totalSlots - 1, x + 1))}
+            focus={isFocus && navActive}
+          />
+        </Box>
+      );
+    }
     return (
       <Box key={f.name} marginTop={margin} flexDirection="row">
         <Text color={isFocus ? "cyan" : undefined} bold={isFocus}>
           {isFocus ? "▶ " : "  "}
           {label}
         </Text>
-        {compactSummary(f, v, summaryWidth, isFocus)}
+        {compactSummary(f, v, summaryWidth)}
       </Box>
     );
   }
