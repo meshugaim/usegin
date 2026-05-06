@@ -308,57 +308,42 @@ function Choose({
   const totalRows = items.length + (allowOther ? 1 : 0);
   const [cursor, setCursor] = useState(0);
   const [panelScroll, setPanelScroll] = useState(0);
-  const [otherMode, setOtherMode] = useState(false);
   const [otherText, setOtherText] = useState("");
   const maxLines = panelMaxLines(totalRows);
   useEffect(() => setPanelScroll(0), [cursor]);
   const onOther = cursor === otherIndex;
   const panelMax = onOther ? 0 : maxPanelScroll(items[cursor], maxLines);
-  useInput(
-    (input, key) => {
-      if (key.escape || input === "q") {
-        finish({ cancelled: true });
-        return;
-      }
-      if (key.return) {
-        if (onOther) {
-          setOtherMode(true);
-          return;
-        }
-        finish({ index: cursor, value: itemName(items[cursor]) });
-        return;
-      }
-      if (input === ">" || key.pageDown)
-        return setPanelScroll((s) => Math.min(panelMax, s + 4));
-      if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
-      if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
-      else if (key.downArrow || input === "j") setCursor((c) => Math.min(totalRows - 1, c + 1));
-    },
-    { isActive: !otherMode }
-  );
-  if (otherMode) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Header title={prompt ?? "Pick one"} hint="enter submit · esc cancel" />
-        <Text dimColor>Other:</Text>
-        <Box>
-          <Text color="cyan">› </Text>
-          <TextInput
-            value={otherText}
-            onChange={setOtherText}
-            onSubmit={(v) => finish({ index: -1, value: v, other: true })}
-            focus
-            placeholder="type your answer"
-          />
-        </Box>
-      </Box>
-    );
-  }
+  useInput((input, key) => {
+    if (key.escape) {
+      finish({ cancelled: true });
+      return;
+    }
+    if (onOther) {
+      // Typing falls through to the inline TextInput; only handle list-nav here.
+      if (key.upArrow) setCursor((c) => Math.max(0, c - 1));
+      else if (key.downArrow) setCursor((c) => Math.min(totalRows - 1, c + 1));
+      // enter is handled by TextInput.onSubmit below.
+      return;
+    }
+    if (input === "q") {
+      finish({ cancelled: true });
+      return;
+    }
+    if (key.return) {
+      finish({ index: cursor, value: itemName(items[cursor]) });
+      return;
+    }
+    if (input === ">" || key.pageDown)
+      return setPanelScroll((s) => Math.min(panelMax, s + 4));
+    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
+    if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
+    else if (key.downArrow || input === "j") setCursor((c) => Math.min(totalRows - 1, c + 1));
+  });
   return (
     <Box flexDirection="column" padding={1}>
       <Header
         title={prompt ?? "Pick one"}
-        hint="↑/↓ or j/k · </> or PgUp/PgDn scroll details · enter confirm · esc/q cancel"
+        hint="↑/↓ or j/k · </> or PgUp/PgDn scroll details · enter confirm · esc cancel"
       />
       {items.map((item, i) => {
         const desc = itemDescription(item);
@@ -371,10 +356,19 @@ function Choose({
         );
       })}
       {allowOther && (
-        <Text color={onOther ? "cyan" : undefined} dimColor={!onOther} italic>
-          {onOther ? "▶ " : "  "}
-          Other…
-        </Text>
+        <Box>
+          <Text color={onOther ? "cyan" : undefined}>
+            {onOther ? "▶ " : "  "}
+            Other:{" "}
+          </Text>
+          <TextInput
+            value={otherText}
+            onChange={setOtherText}
+            onSubmit={(v) => finish({ index: -1, value: v, other: true })}
+            focus={onOther}
+            placeholder="type here"
+          />
+        </Box>
       )}
       {!onOther && <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />}
     </Box>
@@ -398,7 +392,6 @@ function Multi({
   const [cursor, setCursor] = useState(0);
   const [picked, setPicked] = useState<Set<number>>(new Set(preselected ?? []));
   const [panelScroll, setPanelScroll] = useState(0);
-  const [otherMode, setOtherMode] = useState(false);
   const [otherText, setOtherText] = useState("");
   const totalRows = items.length + (allowOther ? 1 : 0);
   const otherIndex = allowOther ? items.length : -1;
@@ -414,65 +407,51 @@ function Multi({
       ...(otherText ? { other: otherText } : {}),
     });
   };
-  useInput(
-    (input, key) => {
-      if (input === ">" || key.pageDown)
-        return setPanelScroll((s) => Math.min(panelMax, s + 4));
-      if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
-      if (key.escape || input === "q") {
-        finish({ cancelled: true });
-        return;
-      }
-      if (key.return) {
-        submit();
-        return;
-      }
-      if (input === " ") {
-        if (onOther) {
-          setOtherMode(true);
-          return;
-        }
-        const copy = new Set(picked);
-        copy.has(cursor) ? copy.delete(cursor) : copy.add(cursor);
-        setPicked(copy);
-        return;
-      }
-      if (input === "a") {
-        setPicked(new Set(items.map((_, i) => i)));
-        return;
-      }
-      if (input === "n") {
-        setPicked(new Set());
-        return;
-      }
-      if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
-      else if (key.downArrow || input === "j") setCursor((c) => Math.min(totalRows - 1, c + 1));
-    },
-    { isActive: !otherMode }
-  );
-  if (otherMode) {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Header title={prompt ?? "Pick any"} hint="enter save · esc clear" />
-        <Text dimColor>Other (free text — included alongside ticked items):</Text>
-        <Box>
-          <Text color="cyan">› </Text>
-          <TextInput
-            value={otherText}
-            onChange={setOtherText}
-            onSubmit={() => setOtherMode(false)}
-            focus
-            placeholder="type your answer"
-          />
-        </Box>
-      </Box>
-    );
-  }
+  useInput((input, key) => {
+    if (key.escape) {
+      finish({ cancelled: true });
+      return;
+    }
+    if (onOther) {
+      // Typing falls through to the inline TextInput.
+      if (key.upArrow) setCursor((c) => Math.max(0, c - 1));
+      else if (key.downArrow) setCursor((c) => Math.min(totalRows - 1, c + 1));
+      else if (key.return) submit();
+      return;
+    }
+    if (input === ">" || key.pageDown)
+      return setPanelScroll((s) => Math.min(panelMax, s + 4));
+    if (input === "<" || key.pageUp) return setPanelScroll((s) => Math.max(0, s - 4));
+    if (input === "q") {
+      finish({ cancelled: true });
+      return;
+    }
+    if (key.return) {
+      submit();
+      return;
+    }
+    if (input === " ") {
+      const copy = new Set(picked);
+      copy.has(cursor) ? copy.delete(cursor) : copy.add(cursor);
+      setPicked(copy);
+      return;
+    }
+    if (input === "a") {
+      setPicked(new Set(items.map((_, i) => i)));
+      return;
+    }
+    if (input === "n") {
+      setPicked(new Set());
+      return;
+    }
+    if (key.upArrow || input === "k") setCursor((c) => Math.max(0, c - 1));
+    else if (key.downArrow || input === "j") setCursor((c) => Math.min(totalRows - 1, c + 1));
+  });
   return (
     <Box flexDirection="column" padding={1}>
       <Header
         title={prompt ?? "Pick any"}
-        hint="↑/↓ or j/k · space toggle · a all · n none · </> scroll details · enter confirm · esc/q cancel"
+        hint="↑/↓ or j/k · space toggle · a all · n none · </> scroll details · enter confirm · esc cancel"
       />
       {items.map((item, i) => {
         const desc = itemDescription(item);
@@ -486,10 +465,18 @@ function Multi({
         );
       })}
       {allowOther && (
-        <Text color={onOther ? "cyan" : undefined} dimColor={!onOther} italic>
-          {onOther ? "▶ " : "  "}
-          {otherText ? `Other: ${otherText}` : "Other…  (space to type)"}
-        </Text>
+        <Box>
+          <Text color={onOther ? "cyan" : undefined}>
+            {onOther ? "▶ " : "  "}
+            Other:{" "}
+          </Text>
+          <TextInput
+            value={otherText}
+            onChange={setOtherText}
+            focus={onOther}
+            placeholder="type here"
+          />
+        </Box>
       )}
       {!onOther && <DetailPanel item={items[cursor]} maxLines={maxLines} scroll={panelScroll} />}
     </Box>
