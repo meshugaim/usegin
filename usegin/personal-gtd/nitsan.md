@@ -16,8 +16,11 @@ _Items we haven't clarified yet — need discussion between you and Claude befor
 - **Stale Q from Apr 30 status thread** — your "Where's the commit data coming from?" never got answered; Guy deflected to "ask her". Probably moot now. — [gmail](https://mail.google.com/mail/u/2/#inbox/19de0d4a9ce2722c) — captured 2026-05-01.
 - **Calendar-prep idea (your Slack post)** — "if we integrate with a calendar, Effi could send prep notes before meetings" — [#product](https://askeffiworkspace.slack.com/archives/C09QZ570RAA/p1778068878579729) — captured 2026-05-06. Possibly Someday/Maybe.
 
-## Waiting For
-- **ENG-5838 investigation** — bug filed for Guy's scheduled-reports failure; needs a dispatched-Gin to investigate. — [linear](https://linear.app/askeffi/issue/ENG-5838) — sent 2026-05-07.
+## Next Actions
+_Filed tickets stay here until done-in-prod (DoD). Each carries `track:<depth>` and `comms:<cadence>` so future runs know what to surface and what to draft._
+
+- **[ENG-5838](https://linear.app/askeffi/issue/ENG-5838)** — scheduled-reports Loose-ends fire silently fails post-ENG-5817 (3 occurrences). Next move: dispatch fresh-Gin to investigate. `track:through-production` `comms:Guy on-solve + on-deploy`
+- **[ENG-5839](https://linear.app/askeffi/issue/ENG-5839)** — remove email frame wrapper from outbound report body. `track:through-production` `comms:Guy final-ack`
 
 ## Top focus
 - **Scheduled Updates / Reports — ENG-5318.** Most recent 14d arcs (ranked by commit count, already done unless flagged): ENG-5750 anchored-fetch gate, ENG-5748 back-to-config, ENG-5791 test-fire status bug, ENG-5803 canon pipeline, ENG-5788 empty audience, ENG-5787 recipients v2, ENG-5817 wall-clock fix (the live failure above is downstream of this). Sub-tree drilldown lives in Linear.
