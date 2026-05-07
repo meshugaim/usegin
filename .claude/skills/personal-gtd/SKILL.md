@@ -147,6 +147,7 @@ The GTD file is the only artifact this skill freely edits. Everything else is a 
 - **Per-item user approval** for every action. Never batch-execute. Never assume approval from a prior similar approval.
 - **Concrete proposal, artifact-shaped.** Not "I'll investigate" — name the artifact: "I'll file `bug(scope): <title>` with body X — approve?" or "I'll draft this Slack reply: '<exact text>' — approve?".
 - **Action form chosen in real time.** Don't pre-bake a policy ("always leave as draft" or "always send"). Judge per situation, propose, let the user steer. The connector limitations factor in (e.g., Gmail connector currently only drafts — say so when proposing).
+- **Don't propose investigation moves, even as escape hatches.** No "want me to pull the rows first?" / "want me to read the JSONL?" / "want me to check Sentry?" — those are work, not meta. The ticket body can *list* investigation seeds for the next agent; the personal-gtd turn doesn't offer to do them. Escape hatches stay meta-shaped: steer the body, change the artifact form, defer, drop.
 
 ## Asking the user — context and shape
 

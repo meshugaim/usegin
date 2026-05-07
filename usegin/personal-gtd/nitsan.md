@@ -9,7 +9,7 @@ gmail_account_index: 2  # nitsan's Gmail is /u/2 in the multi-account URL — us
 ## Inbox
 _Items we haven't clarified yet — need discussion between you and Claude before they can be classified. OK to persist across runs._
 
-- **Guy scheduled-reports failure — STILL LIVE** — third forwarded `[Scheduled Report failed] Loose ends` arrived 2026-05-07 14:01Z (7:00 AM fire failed again, post-ENG-5817 deploy). Earlier "nope" Slack DM + Gmail #1 in the 22:11 feedback thread. Bug not yet filed. — [gmail (latest fwd)](https://mail.google.com/mail/u/2/#inbox/19e02bf0db134f34) → [gmail (orig feedback)](https://mail.google.com/mail/u/2/#inbox/19dff58cf0160ddd) → [slack DM](https://askeffiworkspace.slack.com/archives/D09N6780Y13) — captured 2026-05-07.
+_(Guy scheduled-reports failure → filed as [ENG-5838](https://linear.app/askeffi/issue/ENG-5838); see Waiting For below.)_
 - **Email-frame removal** — you committed in-thread ("Frame was added by Claude, can remove 👍") to remove the wrapping frame from scheduled-report emails. Not yet done. — [gmail](https://mail.google.com/mail/u/2/#inbox/19e02ccc32109f13) — captured 2026-05-07.
 - **"emailing Effi" requirements doc** — Guy shared a Google Doc with you+Oria+Lihu, "Took a pass at the requirements … let's push for simple". You haven't read or responded. — [gmail](https://mail.google.com/mail/u/2/#inbox/19e00a095d908218) → [gdoc](https://docs.google.com/document/d/1RFGyLNLnIWppzHsNQi5EN-Gw0hWJnaEX8BdbT8LJMKw/edit?tab=t.0#heading=h.75bfx7nnm76u) — captured 2026-05-07.
 - **xlsx support — what to communicate** — Guy at 13:38 asked you+Lihu: "Let's do the easy on if easy. Anything I can communicate?". Lihu said he may have a solution. Ball is split: Lihu owns the fix, you might owe the user-facing line. — [gmail](https://mail.google.com/mail/u/2/#inbox/19e02a9cb520eee2) — captured 2026-05-07.
@@ -19,7 +19,7 @@ _Items we haven't clarified yet — need discussion between you and Claude befor
 - **Calendar-prep idea (your Slack post)** — "if we integrate with a calendar, Effi could send prep notes before meetings" — [#product](https://askeffiworkspace.slack.com/archives/C09QZ570RAA/p1778068878579729) — captured 2026-05-06. Possibly Someday/Maybe.
 
 ## Waiting For
-_(empty — Guy arc moved to Inbox since the ball is back on you)_
+- **ENG-5838 investigation** — bug filed for Guy's scheduled-reports failure; needs a dispatched-Gin to investigate. — [linear](https://linear.app/askeffi/issue/ENG-5838) — sent 2026-05-07.
 
 ## Top focus
 - **Scheduled Updates / Reports — ENG-5318.** Most recent 14d arcs (ranked by commit count, already done unless flagged): ENG-5750 anchored-fetch gate, ENG-5748 back-to-config, ENG-5791 test-fire status bug, ENG-5803 canon pipeline, ENG-5788 empty audience, ENG-5787 recipients v2, ENG-5817 wall-clock fix (the live failure above is downstream of this). Sub-tree drilldown lives in Linear.
