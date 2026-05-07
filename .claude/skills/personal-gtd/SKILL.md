@@ -75,6 +75,29 @@ When `/personal-gtd` runs:
 
 The skill's conversational triage flows through these: Inbox → discussion → Proposed → user promotes → Next Actions → action taken → deletion. Closure is always user-approved, never automatic.
 
+### Filed tickets stay on the GTD until done-in-production
+
+When `personal-gtd` files a Linear ticket where the user is the doer (or a co-doer), it adds a one-liner breadcrumb to **Next Actions**, not to Waiting For. Filing is not the end of the line — **Definition of Done is "shipped to production, with interested parties updated along the way"**, not "ticket exists in Linear".
+
+The breadcrumb stays alive through file → implement → review → staging → production, and it tracks the comms thread alongside (the original reporter / stakeholders need to know it landed).
+
+**Per-item ask at filing time** — Claude must ask the user, for each new ticket:
+
+1. **How far do we track it?** — Options typically include:
+   - **file-only** (low-stakes; track in Linear, not on GTD)
+   - **through-merge** (until code lands)
+   - **through-staging** (until deployed to staging)
+   - **through-production** (until deployed to production — DoD default for user-visible bugs and stakeholder-flagged items)
+2. **Updates to interested parties?** — Options typically include:
+   - **silent** (no proactive comms)
+   - **final-ack** (one message when done)
+   - **on-transitions** (ack at staging, ack at production, ack on blockers)
+   - **running** (open thread the user steers as they go)
+
+The answers shape: (a) when the breadcrumb auto-clears, (b) what comms drafts the skill proposes during subsequent runs.
+
+**Waiting For is reserved for "blocked on someone else"** — a dispatched-Gin investigation, a teammate's reply, a vendor response. Not "blocked on myself".
+
 ```markdown
 # Personal GTD — <user>
 
