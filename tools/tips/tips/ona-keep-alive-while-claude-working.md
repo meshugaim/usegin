@@ -55,4 +55,4 @@ is visible to several polls before it ages out.
   the env stays alive an extra `BUFFER_MIN` after a test run.
 
 For the unconditional version (always ping while it's running), see
-`ona-keep-alive`.
+`ona-keep-alive-forever`.
