@@ -160,9 +160,7 @@ function getScriptDescription(filePath: string, name: string): string {
   const knownDescriptions: Record<string, string> = {
     "api-dev": "Run FastAPI dev server",
     "autopull": "Auto-pull daemon for syncing from main",
-    "claude-sync": "Sync Claude sessions between environments",
     "fathom": "CLI for Fathom API - list, view, export meetings",
-    "gmail": "Sync and search Gmail via CLI",
     "google-file-search": "Test Google Gemini File Search Tool API",
     "hebrew-to-english": "Convert Hebrew keyboard input to English",
     "mailgun-send": "Send real emails via Mailgun API (supports threading headers)",
@@ -170,9 +168,7 @@ function getScriptDescription(filePath: string, name: string): string {
     "tunnel": "Start/stop Cloudflare Tunnel for local webhook testing (Mailgun, Unified.to, future providers)",
     "test-tunnel": "Start cloudflared quick tunnels for tests and one-off CLIs (random per-invocation URLs)",
     "nextjs-dev": "Run Next.js dev server",
-    "pick-and-push-session.ts": "Pick a session and push for retro",
     "pick-issue": "Interactive issue picker with fzf",
-    "push-session": "Push Claude sessions to git for retro analysis",
     "publish-terms-version": "Publish a new legal document version with SHA-256 hash migration",
     "qr-port": "Generate QR code for port forwarding",
     "sentry-toggle": "Toggle real Sentry reporting on/off for local dev",
@@ -218,7 +214,6 @@ function discoverNpmScripts(repoRoot: string): ToolMeta[] {
     const scriptDescriptions: Record<string, string> = {
       c: "Run Claude Code CLI",
       "set-env": "Set environment variables",
-      "gitpod-claude-sync": "Sync Claude sessions in Gitpod",
       autosync: "Auto-sync git after commits",
       autopull: "Auto-pull from main branch",
       prepare: "Setup git hooks",
