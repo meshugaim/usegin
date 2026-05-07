@@ -46,5 +46,4 @@ Default to baseline; use auto-send only when the human explicitly asks for it.
 ## Not to be confused with
 
 - The per-channel skills themselves — this skill *points to* them; doesn't replace them
-- `delegating-to-claude-bot` — a different concern (delegation patterns), not channel routing
 - AskEffi the *product*'s communication features — this skill is about *our team's* internal surfaces only
