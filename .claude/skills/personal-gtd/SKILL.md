@@ -13,7 +13,7 @@ Distinct from `morning-brief` (read-only dev substrate, no state, no actions). T
 
 - **Personal.** From the live user's point of view. Identity is resolved from the SessionStart `LIVE USER` banner — never from git config, never from auto-memory.
 - **Stateful.** A markdown file at `usegin/personal-gtd/<user>.md` holds your open items, decisions, and project list. Subsequent runs read it so the skill doesn't re-prompt you on resolved threads.
-- **GTD-shaped.** The file uses the canonical GTD sections: Inbox / Next Actions / Waiting For / Projects (list only) / Someday-Maybe. Items carry source citations.
+- **GTD-shaped, not GTD-canonical.** The file uses GTD-flavored section names — Inbox / Next Actions / Waiting For / Projects / Someday-Maybe — but their meanings are repurposed for the human↔Claude loop (see "Sections" below). In particular **Inbox is not a generic capture bucket**; the user's real inboxes (Gmail, Slack, Linear) stay where they are. Items carry source citations.
 - **Bidirectional.** Not just a digest — the skill proposes actions (reply, file Linear, capture zettel, etc.), takes them on user approval, and writes the result back to the file.
 - **Pull-on-demand.** No cron, no hook. User runs `/personal-gtd` when they want to know what's open.
 
@@ -62,7 +62,18 @@ When `/personal-gtd` runs:
 
 **What does NOT go in:** message bodies, draft text, anything the user wouldn't want a teammate reading. Drafts live in Gmail Drafts / transient session state — not this file.
 
-### Sections (GTD canon)
+### Sections (our shape, not GTD canon)
+
+| Section | Means |
+|---|---|
+| **Inbox** | Items we haven't clarified yet — need discussion between user and Claude before they can be classified. OK to persist across runs; we don't always have time to clear them in one pass. **Not** a generic capture bucket; the user's real inboxes (Gmail, Slack, Linear) stay where they are. |
+| **Next Actions** | Things the user has explicitly committed to do next. User-promoted from **Proposed** (subsection below). |
+| **Proposed** (subsection of Next Actions) | Claude-suggested actions, derived from Inbox + Waiting-For. User promotes, dismisses, or steers. |
+| **Waiting For** | Blocked on someone else, with who + when sent. |
+| **Projects** | Project-level orientation. Top-focus project may be expanded with sub-tracking (in-progress / backlog buckets); other projects stay flat name-only or get dropped if they're not load-bearing. |
+| **Someday / Maybe** | Explicitly not-now. |
+
+The skill's conversational triage flows through these: Inbox → discussion → Proposed → user promotes → Next Actions → action taken → deletion. Closure is always user-approved, never automatic.
 
 ```markdown
 # Personal GTD — <user>
@@ -73,23 +84,29 @@ When `/personal-gtd` runs:
 last_run: <ISO timestamp>
 
 ## Inbox
+_Items we haven't clarified yet — need discussion between you and Claude before they can be classified. OK to persist across runs._
 - <one-line description> — [<source>](<url>) — captured <date>
 
 ## Next Actions
-- <one-line action> — [<source>](<url>) — captured <date>
+_(promoted by you from Proposed below)_
+
+### Proposed (Claude → you — promote, dismiss, or steer)
+- <one-line proposal> — [<source>](<url>)
 
 ## Waiting For
 - <what we're waiting on, from whom> — [<source>](<url>) — sent <date>
 
 ## Projects
-- <project name>
-- <project name>
+
+### ⭐ <Top focus project> (ENG-XXXX) — top focus
+- **In Progress**
+  - <issue> — <one-liner>
+- **Backlog — <bucket>**
+  - <issue> — <one-liner>
 
 ## Someday / Maybe
 - <one-line idea> — captured <date>
 ```
-
-**Projects is a flat list of project names**, not a drill-down of next actions. The actions for each project live in **Next Actions** (and the connection between them is implicit / loose; tag with `[<project>]` prefix only when ambiguous).
 
 ### Item format
 
