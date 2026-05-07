@@ -46,6 +46,7 @@ When `/personal-gtd` runs:
    - **UNCHANGED** — already in the file, no movement
    - **RESOLVED** — was open last time, now looks closed (reply landed, issue merged, meeting happened)
    - **NEW MOVEMENT** — was on the list, but new info changes the picture (a "waiting on Dennis" item where Dennis just replied)
+   - **DROPPED** — matches an entry in the file's **Dropped** section by stable id or class. Filter out before surfacing — do not re-surface, do not propose. If the same source fires again with materially different content (e.g., a Sentry issue resurfaces after long silence with a 10× count), that's a fresh signal worth raising once with a "previously dropped — re-raising because <reason>" tag.
 5. **Update the file.** New findings land in **Inbox**. Items that look RESOLVED get a **closure proposal** — never auto-deleted; the user must approve. Commit + push (small commits, see Git rhythm below).
 6. **Surface to user.** Present the top of the file conversationally — newest + most-actionable first. Don't dump the whole file; show the click and let the user opt into depth.
 7. **Triage.** User responds in chat. For each **Inbox** item, clarify conversationally into Next Actions / Waiting For / Project / Someday / ignore. For each **closure proposal**, the user approves or declines. Every state mutation = small commit + push.
@@ -72,6 +73,7 @@ When `/personal-gtd` runs:
 | **Waiting For** | Blocked on someone else, with who + when sent. |
 | **Projects** | Project-level orientation. Top-focus project may be expanded with sub-tracking (in-progress / backlog buckets); other projects stay flat name-only or get dropped if they're not load-bearing. |
 | **Someday / Maybe** | Explicitly not-now. |
+| **Dropped** | Items the user explicitly declined to track. Each carries a stable id (Sentry issue id, gmail thread id, Linear identifier, slack ts, or a class-rule for clusters/recurring) so future scans filter them out before surfacing. Append-only during normal triage; entries leave only when the user reverses the decision. |
 
 The skill's conversational triage flows through these: Inbox → discussion → Proposed → user promotes → Next Actions → action taken → deletion. Closure is always user-approved, never automatic.
 
@@ -130,6 +132,11 @@ _(promoted by you from Proposed below)_
 
 ## Someday / Maybe
 - <one-line idea> — captured <date>
+
+## Dropped
+_Items the user explicitly declined to track. Future scans skip matches. Each line: stable id (or class rule) — one-line reason — dropped <date>._
+- `<source-type>:<stable-id>` — <reason> — dropped <date>
+- `class:<rule>` — <reason> — dropped <date>
 ```
 
 ### Item format

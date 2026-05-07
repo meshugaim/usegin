@@ -24,3 +24,10 @@ _Filed tickets stay here until done-in-prod (DoD). Each carries `track:<depth>` 
 - DB cleanup: gfs_sync_item triggers (ENG-5272)
 - **"emailing Effi" feature** — Guy's [requirements doc](https://docs.google.com/document/d/1RFGyLNLnIWppzHsNQi5EN-Gw0hWJnaEX8BdbT8LJMKw/edit?tab=t.0#heading=h.75bfx7nnm76u) — parked until scheduled reports is more stable, unless someone else picks up. Auto-send reply queued [gmail](https://mail.google.com/mail/u/2/#inbox/19e00a095d908218) — captured 2026-05-07.
 - **Calendar-prep idea** — "if we integrate with a calendar, Effi could send prep notes before meetings" — [#product](https://askeffiworkspace.slack.com/archives/C09QZ570RAA/p1778068878579729) — captured 2026-05-06.
+
+## Dropped
+_Items you explicitly declined to track. Future scans skip matches. Re-raise only on materially different signal (e.g., Sentry issue resurfaces after long silence with much higher rate)._
+- `sentry:PYTHON-FASTAPI-N7` — scheduled_report_runs CHECK violation; folded into ENG-5838 territory, not a separate item — dropped 2026-05-07
+- `sentry:PYTHON-FASTAPI-NB` — sharepoint VAIS sync 404; not your surface — dropped 2026-05-07
+- `class:sentry-storm/JSON-could-not-be-generated` — May 1-5 cluster (PYTHON-FASTAPI-MW, N0–N5) on `_delete_document_api_call` / `_finalize_disconnecting_connections` / `_cleanup_timed_out_deleting_items` — upstream-transient class, don't raise per-occurrence — dropped 2026-05-07
+- `class:calendar-nudge/critical-loop-recurring` — already-accepted recurring meeting (Fri 18:30 CEST), don't surface as a heads-up each run — dropped 2026-05-07

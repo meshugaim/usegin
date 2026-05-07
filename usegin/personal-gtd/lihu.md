@@ -42,6 +42,11 @@ _(empty)_
 
 _(empty)_
 
+## Dropped
+_Items you explicitly declined to track. Future scans skip matches. Re-raise only on materially different signal._
+
+_(empty)_
+
 ## Closure proposals
 
 - **XLSX scheduled-updates solution** — you told Guy "I may have a solution" on 2026-05-07 09:14 and shipped XLSX parity commits (`418ab5799`, `c31d2a64c`, plus the `vais-xlsx` spike) the same day. Looks delivered; close with a one-line ping to Guy?
