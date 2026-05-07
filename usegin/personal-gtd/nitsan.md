@@ -3,13 +3,15 @@
 > Managed by the `personal-gtd` skill (`.claude/skills/personal-gtd/SKILL.md`).
 > Don't hand-edit; steer it conversationally via `/personal-gtd`. Hand-edits between runs are honored but may be flagged if unparseable.
 
-last_run: 2026-05-07T14:30:00Z
+last_run: 2026-05-07T15:35:00Z
 gmail_account_index: 2  # nitsan's Gmail is /u/2 in the multi-account URL — use this when minting mail.google.com links
 
 ## Inbox
 _Items we haven't clarified yet — need discussion between you and Claude before they can be classified. OK to persist across runs._
 
-_(empty)_
+- **[PYTHON-FASTAPI-N7](https://askeffi.sentry.io/issues/?project=python-fastapi&query=PYTHON-FASTAPI-N7)** — fresh `scheduled_report_runs_status_check` CHECK violation on `/api/internal/scheduled-reports/fire-now` at 15:15Z (≈20min ago). Same shape as N6 which `ebba0efe9` fixed by allowing `cancelled_no_audience` — N7 is a *different* status still missing from the constraint. Likely same root area as ENG-5838 — fold in or file separately? — [gmail](https://mail.google.com/mail/u/2/#inbox/19e0301f5cb0cd55) — captured 2026-05-07
+- **[PYTHON-FASTAPI-NB](https://askeffi.sentry.io/issues/?project=python-fastapi&query=PYTHON-FASTAPI-NB)** — `sharepoint-ab8189bb VAIS sync failed: 404 Data store projects/639...` at 13:29Z. Looks like Lihu's surface (sharepoint/VAIS) — route or own? — [gmail](https://mail.google.com/mail/u/2/#inbox/19e02a111d4600e9) — captured 2026-05-07
+- **JSON-could-not-be-generated Sentry storm May 1-5** — 5+ occurrences across `_delete_document_api_call`, `_finalize_disconnecting_connections`, `_cleanup_timed_out_deleting_items` (PYTHON-FASTAPI-MW, N0–N5). Code 520 = upstream transient; pattern points at VAIS/canon delete cleanup. Still recurring or stabilized? — [gmail search](https://mail.google.com/mail/u/2/#search/JSON+could+not+be+generated) — captured 2026-05-07
 
 ## Next Actions
 _Filed tickets stay here until done-in-prod (DoD). Each carries `track:<depth>` and `comms:<cadence>` so future runs know what to surface and what to draft._
