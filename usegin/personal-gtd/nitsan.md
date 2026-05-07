@@ -26,4 +26,4 @@ _Filed tickets stay here until done-in-prod (DoD). Each carries `track:<depth>` 
 
 ## Someday / Maybe
 - DB cleanup: gfs_sync_item triggers (ENG-5272)
-- **"emailing Effi" feature** — Guy's [requirements doc](https://docs.google.com/document/d/1RFGyLNLnIWppzHsNQi5EN-Gw0hWJnaEX8BdbT8LJMKw/edit?tab=t.0#heading=h.75bfx7nnm76u) — parked until scheduled reports is more stable, unless someone else picks up. Replied [gmail](https://mail.google.com/mail/u/2/#inbox/19e00a095d908218) — captured 2026-05-07.
+- **"emailing Effi" feature** — Guy's [requirements doc](https://docs.google.com/document/d/1RFGyLNLnIWppzHsNQi5EN-Gw0hWJnaEX8BdbT8LJMKw/edit?tab=t.0#heading=h.75bfx7nnm76u) — parked until scheduled reports is more stable, unless someone else picks up. Auto-send reply queued [gmail](https://mail.google.com/mail/u/2/#inbox/19e00a095d908218) — captured 2026-05-07.
