@@ -73,7 +73,7 @@ The auto-send Apps Script lives in *each teammate's* own Google account — ther
 When set up, agent can mark a draft for automated sending:
 
 1. **First body line**: `[auto-send]` — script strips before send
-2. **Last body line**: `Sent from <Name>'s Claude Code` — convention, kept as honest disclosure
+2. **Last body line**: `Sent from <Name>'s Claude Code` — **mandatory** honest disclosure (script keeps this in the sent message). `<Name>` is the live user's first name from the SessionStart `LIVE USER` banner — e.g., `Sent from Nitsan's Claude Code`. This applies to **every** draft Claude creates on behalf of the user, not only auto-send ones (so a manually-sent draft also carries the disclosure when it goes out).
 
 ```
 body =
@@ -85,6 +85,16 @@ body =
 Apps Script picks it up within ~1 min, strips line 1, sends, leaves the disclosure footer.
 
 **Only use when the human explicitly asks for auto-send** — otherwise the draft sits in Drafts as the safer default.
+
+### Verify after auto-send (mandatory)
+
+After queuing an `[auto-send]` draft, wait ~90s and call `get_thread` on the target thread to verify the result. Check:
+
+1. **Exactly one new sent message landed** — not zero (script didn't fire, marker silently ineffective), not two (duplicate from a stale earlier draft).
+2. **Marker was stripped** — line 1 of the sent body is the real first line, not literal `[auto-send]`. If the marker leaked, the recipient sees it.
+3. **The body matches what was queued** — modulo the stripped marker line.
+
+Report the verification result back to the user. If anything is off — no message, duplicate, leaked marker — surface it immediately and propose a recovery (correction email, "ignore the duplicate" follow-up, ask the user to inspect their Apps Script trigger). **Don't claim "sent" until verified.** This catches Apps Script misconfigurations and stale-draft duplicates that are otherwise invisible.
 
 ## When the email links a Drive doc
 
