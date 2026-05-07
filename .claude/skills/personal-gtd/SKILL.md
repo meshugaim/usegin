@@ -82,6 +82,7 @@ The skill's conversational triage flows through these: Inbox → discussion → 
 > Don't hand-edit; steer it conversationally via `/personal-gtd`. Hand-edits between runs are honored but may be flagged if unparseable.
 
 last_run: <ISO timestamp>
+gmail_account_index: <N>  # only if user has multiple Google accounts; controls /u/N in mail.google.com links
 
 ## Inbox
 _Items we haven't clarified yet — need discussion between you and Claude before they can be classified. OK to persist across runs._
@@ -154,7 +155,7 @@ Without context, "pick A or B" is asking the user to commit blind. **Surface the
 **Practices:**
 
 - **Show, don't summarize.** Before asking "what next?", paste the relevant comms verbatim — the actual email line, the actual Slack message, the actual Linear comment. A snippet is not context.
-- **One-click links.** Every cited source gets a markdown link the user can open in a browser to read the full thread. Even when quoting inline.
+- **One-click links.** Every cited source gets a markdown link the user can open in a browser to read the full thread. Even when quoting inline. **Respect per-user URL particulars** stored in the state file's preamble — e.g., a user with multiple Google accounts has a `gmail_account_index` so `mail.google.com/mail/u/<N>/...` lands on their actual inbox, not a logged-out tab.
 - **Allow "more context" as an option.** When asking AskUserQuestion, the user should always be able to pull more depth: "show me the full thread", "show me the related runs", "show me what the agent did". Don't trap them in a forced multiple-choice.
 - **One arc at a time, conversational.** Lead with the evidence + a single concrete proposal. Use AskUserQuestion only when there's a real fork between artifacts (e.g., "file as bug vs. file as chore vs. dispatch fresh-Gin to investigate"). For most asks, plain chat is fine.
 - **Fetch first, then ask.** If a thread is short and pullable in seconds (Slack `slack_read_thread`, Linear `plan show`, Gmail `get_thread`), pull it and surface inline before asking. Don't make the user re-read their own email by hand.

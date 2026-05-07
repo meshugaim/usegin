@@ -4,14 +4,14 @@
 > Don't hand-edit; steer it conversationally via `/personal-gtd`. Hand-edits between runs are honored but may be flagged if unparseable.
 
 last_run: 2026-05-07T13:00:00Z
+gmail_account_index: 2  # nitsan's Gmail is /u/2 in the multi-account URL — use this when minting mail.google.com links
 
 ## Inbox
 _Items we haven't clarified yet — need discussion between you and Claude before they can be classified. OK to persist across runs._
 
-- **Guy + scheduled-reports failure arc** — Guy's [feedback email](https://mail.google.com/mail/u/0/#inbox/19dfe69d103bdb2c) → you deployed fixes → he hit "10 min after, no email" → you deployed timeout fix at 01:14 ("3min→10min wall-clock + JSONL on timeout") → Guy [tried again, still broken](https://askeffiworkspace.slack.com/archives/D09N6780Y13/p1778112431719459) ("let me try / nope"). Currently broken; prod is on the new build. Captured 2026-05-07.
 - **Cross-test isolation bug — `unified-forward.test.ts:173`** — you `--no-verify`'d to land 18449e6bc; [DM'd Oria](https://askeffiworkspace.slack.com/archives/D0B080WEJHE/p1778076457178719) flagging the AC-2 tampered-sig case (closure-scoped fix in d581d1dd8 not the regressor). No owner yet. Captured 2026-05-06.
-- **Calendar invite: Critical loop / AskEffi** — weekly Fri 18:30–19:00 CEST recurring — [gmail](https://mail.google.com/mail/u/0/#inbox/19de5803c5df06b3) — captured 2026-05-01.
-- **Stale Q from Apr 30 status thread** — your "Where's the commit data coming from?" never got answered; Guy deflected to "ask her". Probably moot now. — [gmail](https://mail.google.com/mail/u/0/#inbox/19de0d4a9ce2722c) — captured 2026-05-01.
+- **Calendar invite: Critical loop / AskEffi** — weekly Fri 18:30–19:00 CEST recurring — [gmail](https://mail.google.com/mail/u/2/#inbox/19de5803c5df06b3) — captured 2026-05-01.
+- **Stale Q from Apr 30 status thread** — your "Where's the commit data coming from?" never got answered; Guy deflected to "ask her". Probably moot now. — [gmail](https://mail.google.com/mail/u/2/#inbox/19de0d4a9ce2722c) — captured 2026-05-01.
 - **Calendar-prep idea (your Slack post)** — "if we integrate with a calendar, Effi could send prep notes before meetings" — [#product](https://askeffiworkspace.slack.com/archives/C09QZ570RAA/p1778068878579729) — captured 2026-05-06. Possibly Someday/Maybe.
 
 ## Waiting For
