@@ -1,6 +1,6 @@
 ---
 name: team-communication-channels
-description: Meta-skill / decision tree across the team's communication surfaces. Use this when the channel choice is ambiguous — "I want to find/say X, where do I go?". Triggered by "find the discussion about X" or "tell the team Y" without a named channel. Routes to the per-channel skills (`team-slack`, `team-gmail`, `dogfooding-effi`, `use-gin`). NOT a replacement for those — this skill points; it doesn't act.
+description: Meta-skill / decision tree across the team's communication surfaces. Use this when the channel choice is ambiguous — "I want to find/say X, where do I go?". Triggered by "find the discussion about X" or "tell the team Y" without a named channel. Routes to the per-channel skills (`team-slack`, `team-gmail`, `team-drive`, `dogfooding-effi`, `use-gin`). NOT a replacement for those — this skill points; it doesn't act.
 ---
 
 # Team communication channels
@@ -14,6 +14,7 @@ Decision tree across the team's surfaces. Lands here when the channel choice isn
 | "Find what was decided/discussed about X" — denseness matters more than channel | `dogfooding-effi` (Effi synthesizes across email + Drive; Slack coming) |
 | "Find a specific Slack message / thread / DM" | `team-slack` |
 | "Find a specific email thread; draft a reply" | `team-gmail` |
+| "Read a Google Doc / Sheet / Slides / PDF (by URL or fileId)" | `team-drive` |
 | "Post a status update / decision" — speaking *as* the human | `team-slack` (live as you) |
 | "Post a status update / decision" — speaking *as* an agent (with attribution + ENG-ID auto-link) | `use-gin` § Slack (`dx slack` bot path) |
 | "Send an outbound email — customer, advisor, etc." | `team-gmail` (draft, you press send) |

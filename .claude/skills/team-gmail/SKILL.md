@@ -86,10 +86,15 @@ Apps Script picks it up within ~1 min, strips line 1, sends, leaves the disclosu
 
 **Only use when the human explicitly asks for auto-send** — otherwise the draft sits in Drafts as the safer default.
 
+## When the email links a Drive doc
+
+Common case: an email points at a Google Doc. Hand off to `team-drive` — fileId comes from the URL, read via the Drive connector. Don't try `WebFetch` against Drive URLs (401).
+
 ## Cross-references
 
 - `team-people` — internal recipient lookup
 - `team-customers` — external recipient lookup
+- `team-drive` — read Drive docs linked from an email
 - `docs/claude-ai-connectors.md` — full Apps Script auto-send setup
 - `dogfooding-effi` — synthesis layer that *includes* email; this skill is the direct-access surface
 
