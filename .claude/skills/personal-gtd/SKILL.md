@@ -146,7 +146,9 @@ The GTD file is the only artifact this skill freely edits. Everything else is a 
 **Hard rules:**
 - **Per-item user approval** for every action. Never batch-execute. Never assume approval from a prior similar approval.
 - **Concrete proposal, artifact-shaped.** Not "I'll investigate" — name the artifact: "I'll file `bug(scope): <title>` with body X — approve?" or "I'll draft this Slack reply: '<exact text>' — approve?".
-- **Action form chosen in real time.** Don't pre-bake a policy ("always leave as draft" or "always send"). Judge per situation, propose, let the user steer. The connector limitations factor in (e.g., Gmail connector currently only drafts — say so when proposing).
+- **Action form chosen in real time.** Don't pre-bake a policy ("always leave as draft" or "always send"). Judge per situation, propose, let the user steer. **Connector capabilities differ — know them, don't guess:**
+  - **Gmail (`team-gmail`)** — `create_draft` only, no send. Anything you propose lands as a Gmail draft for the user to open + send.
+  - **Slack (`team-slack`)** — both `slack_send_message` (sends directly) and `slack_send_message_draft` (lands in Slack drafts). Default to chat-show-the-text → user-approves → `slack_send_message`. Use `_draft` only when the user wants to refine in Slack itself.
 - **Don't propose investigation moves, even as escape hatches.** No "want me to pull the rows first?" / "want me to read the JSONL?" / "want me to check Sentry?" — those are work, not meta. The ticket body can *list* investigation seeds for the next agent; the personal-gtd turn doesn't offer to do them. Escape hatches stay meta-shaped: steer the body, change the artifact form, defer, drop.
 
 ## Asking the user — context and shape
