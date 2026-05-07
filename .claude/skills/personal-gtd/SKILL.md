@@ -122,14 +122,42 @@ Mutable file. Append + amend in place. **Git is the history layer** — small co
 
 Closed items get **deleted** (not archived in-file) once Claude has proposed closure and the user has approved. The deletion shows up in `git log`; if the user wants to reconstruct what closed when, they read the log.
 
-## Action scope
+## Boundary — personal-gtd is meta, not work
 
-Open-ended. Claude can take any action it has tooling for: reply to email (`team-gmail`), reply to Slack (`team-slack`), create/update Linear issues (`plan`), capture a zettel (`zettel-capture`), file a tikur (`tikur`), record a decision (`recording-decisions`), commit and push code, run `dx his`, etc.
+While running personal-gtd, **Claude does not do the underlying investigative or implementation work**. The skill is for orchestration: it triages, routes, files, drafts, dispatches. Investigation (pulling a JSONL transcript, querying a DB, reading Sentry, debugging a test, writing code) happens elsewhere — in a fresh Wes/agent dispatched from here, in a separate `/fix-bug` session, in a different chat the user opens later.
+
+**Allowed action verbs inside personal-gtd:**
+- `file Linear issue` (via `plan create`)
+- `draft reply` (Slack DM, Gmail) — never auto-send; show the draft, get approval
+- `dispatch agent` (Wes / Explore / fresh-Gin via Agent tool, with a charter)
+- `route to skill X` (hand the item to `tikur`, `zettel-capture`, `fix-bug`, etc.)
+- `park` (move to Someday/Maybe, or close-and-delete)
+- `capture as zettel` (via `zettel-capture`)
+
+**Not allowed inside personal-gtd** (these need a separate session/agent):
+- Pulling logs, JSONLs, DB rows, Sentry events
+- Running tests, builds, queries
+- Editing production code
+- Anything in the "Coding vibe" (CLAUDE.md): writing/changing work artifacts beyond the GTD file itself, the new Linear issue body, or the draft reply text.
+
+The GTD file is the only artifact this skill freely edits. Everything else is a *proposal* to the user.
 
 **Hard rules:**
 - **Per-item user approval** for every action. Never batch-execute. Never assume approval from a prior similar approval.
-- **Concrete proposal.** Not "I'll handle it" — name the action: "I'll reply to Guy: '<exact draft>' — approve?"
+- **Concrete proposal, artifact-shaped.** Not "I'll investigate" — name the artifact: "I'll file `bug(scope): <title>` with body X — approve?" or "I'll draft this Slack reply: '<exact text>' — approve?".
 - **Action form chosen in real time.** Don't pre-bake a policy ("always leave as draft" or "always send"). Judge per situation, propose, let the user steer. The connector limitations factor in (e.g., Gmail connector currently only drafts — say so when proposing).
+
+## Asking the user — context and shape
+
+Without context, "pick A or B" is asking the user to commit blind. **Surface the evidence before asking the question.**
+
+**Practices:**
+
+- **Show, don't summarize.** Before asking "what next?", paste the relevant comms verbatim — the actual email line, the actual Slack message, the actual Linear comment. A snippet is not context.
+- **One-click links.** Every cited source gets a markdown link the user can open in a browser to read the full thread. Even when quoting inline.
+- **Allow "more context" as an option.** When asking AskUserQuestion, the user should always be able to pull more depth: "show me the full thread", "show me the related runs", "show me what the agent did". Don't trap them in a forced multiple-choice.
+- **One arc at a time, conversational.** Lead with the evidence + a single concrete proposal. Use AskUserQuestion only when there's a real fork between artifacts (e.g., "file as bug vs. file as chore vs. dispatch fresh-Gin to investigate"). For most asks, plain chat is fine.
+- **Fetch first, then ask.** If a thread is short and pullable in seconds (Slack `slack_read_thread`, Linear `plan show`, Gmail `get_thread`), pull it and surface inline before asking. Don't make the user re-read their own email by hand.
 
 ## Git rhythm
 
