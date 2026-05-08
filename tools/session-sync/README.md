@@ -7,6 +7,34 @@ Gitpod, Ona).
 
 See `docs/specs/dev-session-sync.spec.md` for the full spec.
 
+## Cross-environment startup
+
+The daemon runs under PM2 (`tools/session-sync/ecosystem.config.cjs`). One
+process per developer environment. Recipes per env (AC 22-26):
+
+| Env | How it's started | Notes |
+|---|---|---|
+| Local devcontainer | `.devcontainer/post-create.sh` runs `bun pm2 start tools/session-sync/ecosystem.config.cjs` after `just install` and `set-env` | AC 22 |
+| GitHub Codespaces | Same `post-create.sh` path | AC 23 |
+| Gitpod | `.gitpod/automations.yaml` task `session-sync-daemon`, depends on `setup-environment` | AC 24 |
+| Ona | TBD — Lihu owns the Ona-side recipe | AC 25, deferred |
+| Local laptop without devcontainer | Not in v1 scope; future verb is `dx daemon install` (user-level systemd unit / launchd plist) | AC 26, gated on demand |
+
+Lifecycle commands (run from the project root):
+
+```sh
+bun pm2 start tools/session-sync/ecosystem.config.cjs   # start (idempotent)
+bun pm2 logs session-sync                                # tail logs
+bun pm2 restart session-sync                             # after `dx login` if creds were missing
+bun pm2 stop session-sync                                # stop without forgetting state
+bun pm2 delete session-sync                              # forget (state.json on disk persists)
+```
+
+`autorestart: false` in the ecosystem file: when `src/cli.ts` exits because
+auth/profile loading failed (no `dx login` yet, or token expired), PM2 keeps
+the process in "stopped" state. Recovery is `dx login` followed by
+`bun pm2 restart session-sync`.
+
 ## Slice 1 scope (Steps 3a + 3b + 3c)
 
 The slice-1 daemon is complete: pure-logic helpers, HTTP layer, and the
