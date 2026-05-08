@@ -11,4 +11,6 @@ index + on-demand notes) and TTFT-as-target.
 
 ## Maps of Content
 
-- [Company](moc/company.md) — fundraising, ICP, pricing, positioning, traction
+- [Company](moc/company.md) — team, founders, fundraising, financials
+- [Product](moc/product.md) — what Effi does, data sources, tech stack, roadmap, compliance
+- [Market](moc/market.md) — positioning, ICP, pricing, design partners, GTM, competitors

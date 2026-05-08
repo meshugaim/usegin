@@ -1,6 +1,6 @@
 ---
 topic: icp
-moc: company
+moc: market
 updated: 2026-05-01
 conflict_pending: false
 ---

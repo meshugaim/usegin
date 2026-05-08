@@ -1,6 +1,6 @@
 ---
 topic: pricing
-moc: company
+moc: market
 updated: 2026-04-23
 conflict_pending: false
 ---

@@ -1,6 +1,6 @@
 ---
 topic: design-partners
-moc: company
+moc: market
 updated: 2026-05-08
 conflict_pending: false
 ---

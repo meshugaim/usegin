@@ -1,6 +1,6 @@
 ---
 topic: positioning
-moc: company
+moc: market
 updated: 2026-05-07
 conflict_pending: false
 ---
