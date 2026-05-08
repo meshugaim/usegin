@@ -5,7 +5,9 @@ note. Each note has a `Current` line (one claim, one citation, one
 timestamp) and a `History` log.
 
 See [_conventions.md](_conventions.md) for note shape, citation format,
-conflict handling, and source-of-signal hierarchy.
+conflict handling, and source-of-signal hierarchy. See
+[_architecture.md](_architecture.md) for retrieval shape (preloaded
+index + on-demand notes) and TTFT-as-target.
 
 ## Maps of Content
 
