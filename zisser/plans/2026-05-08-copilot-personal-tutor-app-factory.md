@@ -21,7 +21,7 @@ product. demo for oria's boss.
 | raw pour (verbatim brainstorm) | `zisser/inbox/2026-05-08-copilot-personal-tutor-pour.md` | landed |
 | dream-card | `oria-crazy-world/space/app-factory/intake/2026-05-08-copilot-personal-tutor.md` | landed, awaiting oria eyeball |
 | factory run dir | `oria-crazy-world/space/app-factory/runs/2026-05-08-copilot-personal-tutor/` | not yet minted (Mark's job on dispatch) |
-| running code repo | TBD — default new repo `AskEffi/copilot-personal-tutor` | not created |
+| running code repo | `oria-ai/HandsOnAi-Copilot` (existing, year-of-work) | cloned to `/workspaces/HandsOnAi-Copilot/` |
 | this tracker | `zisser/plans/2026-05-08-copilot-personal-tutor-app-factory.md` | this file |
 
 ## factory pipeline (10 steps, OCW canonical)
@@ -43,10 +43,29 @@ product. demo for oria's boss.
 
 - **eyeball the dream-card.** if oria says "good, go", Zisser dispatches
   Mark next turn → Mark mints the run + walks step 2 (philosophy).
-- **video + site password.** oria committed to provide; not a step-1/2
-  blocker, becomes load-bearing at design/build.
-- **at architecture (step 4):** confirm running-code repo location +
-  Supabase tenancy + LLM-backend choice. these are real keys/decisions.
+- **OCW push 403.** dream-card committed locally in `oria-crazy-world/`
+  (SHA `b23de46`), but `oria-ai` GH token lacks write to
+  `AskEffi/oria-crazy-world`. need: grant `oria-ai` write, or hand to a
+  teammate whose token has write.
+- **site to browse for the placeholder video.** oria committed to
+  provide; browse capability now confirmed autonomous.
+- **at architecture (step 4):** Supabase tenancy + LLM-backend choice
+  + how the new POC layer fits onto HandsOnAi-Copilot's existing
+  Vite/React/Prisma/Express foundation. real keys/decisions.
+
+## resolved (this turn)
+
+- **running code repo:** `oria-ai/HandsOnAi-Copilot` cloned to
+  `/workspaces/HandsOnAi-Copilot/`. Vite + React + TS + shadcn-ui +
+  Tailwind + Prisma/MySQL + Express; has author/manager/learner modes,
+  i18n (HE+EN), video (@vimeo/player), markdown w/ KaTeX & mermaid,
+  @dnd-kit, react-hook-form, confetti. existing seed users:
+  `learner@example.com / passowrd123`, `author@example.com / …`,
+  `manager@example.com / …`. **POC layers on top, not from scratch.**
+- **autonomous browse:** confirmed via `playwright-cli` probe against
+  `example.com`. open / goto / snapshot / click / fill all work in
+  headless. credentials pasted in chat are enough for authenticated
+  sites; no Brown needed unless a site has aggressive bot-detection.
 
 ## non-blocking opens (architects + spec team to resolve)
 
