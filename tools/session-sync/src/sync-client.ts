@@ -107,7 +107,7 @@ export async function postSync(
 	const res = await fetchImpl(url, {
 		method: "POST",
 		headers: {
-			authorization: `Bearer ${req.token}`,
+			Authorization: `Bearer ${req.token}`,
 		},
 		body,
 	});

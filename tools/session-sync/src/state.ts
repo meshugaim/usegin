@@ -22,6 +22,10 @@ export const PerFileStateSchema = z
 		lastUploadedSize: z.number(),
 		sessionId: z.string(),
 		storagePath: z.string(),
+		// `""` (empty string) is the sentinel for "never uploaded" — emitted
+		// by the sync-flow when a kill_switch outcome creates a fresh state
+		// entry with no prior upload. Consumers reading this field for time
+		// math must guard against empty-string before parsing as a date.
 		lastUploadedAt: z.string(),
 		// Optional ISO timestamp; set when an upload returns 503 per AC 45,
 		// cleared once the daemon has retried past it.

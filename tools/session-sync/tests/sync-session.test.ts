@@ -281,4 +281,48 @@ describe("syncSession — agentId extraction", () => {
 			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/deadbeef-1234-1234-1234-123456789abc/sync",
 		);
 	});
+
+	test("non-UUID agent filename → skipped (no POST)", async () => {
+		const subPath = "/some/where/nested/agent-foo.jsonl";
+		const { fetchImpl, calls } = makeFetch(() =>
+			jsonResponse(200, { session: { storage_path: "p" } }),
+		);
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => [subPath],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		// Only the parent POST; subagent skipped because filename isn't a UUID.
+		expect(out.outcomes.length).toBe(1);
+		expect(calls.length).toBe(1);
+		expect(calls[0]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/sync",
+		);
+	});
+
+	test("path-traversal-shaped agent filename → skipped (no POST)", async () => {
+		// `basename` strips dirs, but the loose `.+` pattern would still have
+		// accepted `agent-../../escape.jsonl` as a literal filename if it
+		// reached the regex. Pin: anything non-UUID is rejected.
+		const subPath = "/some/where/nested/agent-../../escape.jsonl";
+		const { fetchImpl, calls } = makeFetch(() =>
+			jsonResponse(200, { session: { storage_path: "p" } }),
+		);
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => [subPath],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		expect(out.outcomes.length).toBe(1);
+		expect(calls.length).toBe(1);
+		expect(calls[0]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/sync",
+		);
+	});
 });

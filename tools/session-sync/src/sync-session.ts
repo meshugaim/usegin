@@ -40,11 +40,14 @@ export type SyncSessionOutcome =
 	  }
 	| { kind: "parent_failed"; error: Error };
 
-const AGENT_FILE_REGEX = /^agent-(.+)\.jsonl$/;
+const AGENT_FILE_REGEX =
+	/^agent-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
 
 /**
  * Extract the agentId from a filename like `agent-{uuid}.jsonl`. Returns
- * null if the filename doesn't match the convention — caller should skip.
+ * null if the filename doesn't match the UUID convention — caller should
+ * skip. The UUID-anchored shape rejects loose matches like `agent-foo.jsonl`
+ * or path-traversal attempts that a `.+` pattern would have admitted.
  */
 function extractAgentId(filePath: string): string | null {
 	const name = basename(filePath);
