@@ -21,7 +21,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async () => 100,
 			now: NOW,
 		});
@@ -44,7 +44,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async () => 100,
 			now: NOW,
 		});
@@ -66,7 +66,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async () => 100,
 			now: NOW,
 		});
@@ -85,7 +85,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async (p) => (p === PATH_A ? 250 : 0),
 			now: NOW,
 		});
@@ -106,7 +106,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async () => 100,
 			now: NOW,
 		});
@@ -130,7 +130,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async () => 100,
 			now: NOW,
 		});
@@ -152,7 +152,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async () => 250, // also "grew"
 			now: NOW,
 		});
@@ -181,7 +181,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A, PATH_B],
+			candidatePaths: [PATH_A, PATH_B],
 			fileSizeFn: async (p) => (p === PATH_B ? 80 : 100),
 			now: NOW,
 		});
@@ -203,7 +203,7 @@ describe("safetyNetTick", () => {
 		};
 		const items = await safetyNetTick({
 			state,
-			watchedPaths: [PATH_A],
+			candidatePaths: [PATH_A],
 			fileSizeFn: async () => 50,
 			now: NOW,
 		});

@@ -27,8 +27,13 @@ export interface SafetyItem {
 
 export interface SafetyNetInput {
 	state: StateFile;
-	/** Paths actively under fs.watch — only these are eligible. */
-	watchedPaths: string[];
+	/**
+	 * Candidate paths — typically all paths in state. Safety-net considers
+	 * each for retry-due or stale-since-last-tick reasons regardless of
+	 * fs.watch attachment (orphaned-state retries are exactly the case
+	 * where the path may not be under fs.watch anymore).
+	 */
+	candidatePaths: string[];
 	fileSizeFn: (path: string) => Promise<number>;
 	now: Date;
 	/** Reserved for future "stale since X" comparisons; not currently consumed. */
@@ -38,11 +43,11 @@ export interface SafetyNetInput {
 export async function safetyNetTick(
 	input: SafetyNetInput,
 ): Promise<SafetyItem[]> {
-	const { state, watchedPaths, fileSizeFn, now } = input;
+	const { state, candidatePaths, fileSizeFn, now } = input;
 	const out: SafetyItem[] = [];
 	const nowMs = now.getTime();
 
-	for (const path of watchedPaths) {
+	for (const path of candidatePaths) {
 		const prior = state[path];
 		if (!prior) continue;
 

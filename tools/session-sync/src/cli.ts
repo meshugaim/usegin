@@ -346,10 +346,10 @@ async function tick(d: DaemonState): Promise<void> {
 
 async function safetyTick(d: DaemonState): Promise<void> {
 	if (d.stopping) return;
-	const watchedPaths = Object.keys(d.state);
+	const candidatePaths = Object.keys(d.state);
 	const items = await safetyNetTick({
 		state: d.state,
-		watchedPaths,
+		candidatePaths,
 		fileSizeFn: fileSize,
 		now: new Date(),
 	});
@@ -382,7 +382,12 @@ async function shutdown(d: DaemonState, signal: string): Promise<void> {
 			while (d.pending.has(target) && Date.now() - start < 1_000) {
 				await new Promise((r) => setTimeout(r, 25));
 			}
-			if (remaining <= 0) break;
+			if (remaining <= 0) {
+				// Burst the budget mid-loop: persist before bailing so we
+				// don't skip the persist-state step at the tail of `plan.steps`.
+				await persistStateMaybe(d, true);
+				break;
+			}
 		} else if (step.kind === "abandon") {
 			// Just record — bytes get re-synced on next boot via state replay.
 			d.pending.delete(step.uploadId);
@@ -392,8 +397,6 @@ async function shutdown(d: DaemonState, signal: string): Promise<void> {
 			break;
 		}
 	}
-	// Always persist + exit even if we burst the budget mid-loop.
-	await persistStateMaybe(d, true);
 	try {
 		await unlink(d.config.pidFile);
 	} catch {
