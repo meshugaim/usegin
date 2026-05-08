@@ -1,0 +1,29 @@
+{
+	"name": "session-sync",
+	"version": "0.1.0",
+	"description": "Daemon that syncs Claude Code session JSONL files to Supabase via the dev-sessions API",
+	"module": "src/cli.ts",
+	"type": "module",
+	"bin": {
+		"session-sync": "./src/cli.ts"
+	},
+	"scripts": {
+		"start": "bun run src/cli.ts",
+		"check": "bunx tsgo --noEmit",
+		"lint": "bunx biome check .",
+		"lint:fix": "bunx biome check --write .",
+		"format": "bunx biome format --write .",
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.10",
+		"@types/bun": "latest",
+		"@typescript/native-preview": "^7.0.0-dev.20260407.1"
+	},
+	"peerDependencies": {
+		"typescript": "^6.0.2"
+	},
+	"dependencies": {
+		"zod": "^4.3.6"
+	}
+}

@@ -3,10 +3,13 @@
  */
 
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import { $ } from "bun";
+import { discoverSubagentFiles } from "../../lib/jsonl-discovery.ts";
 import type { Config } from "./config";
 import { extractConversation, formatConversation } from "./extractor";
+
+export { discoverSubagentFiles };
 
 /**
  * Options for syncConversation
@@ -139,9 +142,7 @@ export async function findExistingArchive(
 
 	try {
 		const { Glob } = await import("bun");
-		const glob = new Glob(
-			`**/*conversation-${conversationId}.jsonl.gz`,
-		);
+		const glob = new Glob(`**/*conversation-${conversationId}.jsonl.gz`);
 		const files = Array.from(glob.scanSync(userDir));
 
 		if (files.length > 0 && files[0]) {
@@ -239,47 +240,6 @@ async function compressAndWrite(
 }
 
 /**
- * Discover subagent JSONL files associated with a session.
- *
- * Claude Code stores subagent files in two possible layouts:
- * - Flat: agent-*.jsonl in the same directory as the main JSONL
- * - Nested: {session-uuid}/subagents/agent-*.jsonl
- */
-export async function discoverSubagentFiles(
-	jsonlPath: string,
-): Promise<string[]> {
-	const dir = dirname(jsonlPath);
-	const sessionId = basename(jsonlPath, ".jsonl");
-	const subagentFiles: string[] = [];
-
-	try {
-		const { Glob } = await import("bun");
-
-		// Flat layout: agent-*.jsonl in the same directory
-		const flatGlob = new Glob("agent-*.jsonl");
-		for (const file of flatGlob.scanSync(dir)) {
-			subagentFiles.push(join(dir, file));
-		}
-
-		// Nested layout: {session-uuid}/subagents/agent-*.jsonl
-		const nestedDir = join(dir, sessionId, "subagents");
-		if (existsSync(nestedDir)) {
-			const nestedGlob = new Glob("agent-*.jsonl");
-			for (const file of nestedGlob.scanSync(nestedDir)) {
-				subagentFiles.push(join(nestedDir, file));
-			}
-		}
-	} catch (error) {
-		console.error(
-			"Warning: Error discovering subagent files:",
-			(error as Error).message,
-		);
-	}
-
-	return subagentFiles;
-}
-
-/**
  * Archive the main session JSONL and any subagent JSONL files.
  *
  * Returns an array of relative paths (relative to cloneDir) of all newly written
@@ -305,10 +265,7 @@ async function archiveSessionJsonl(
 	const subagentFiles = await discoverSubagentFiles(jsonlPath);
 	if (subagentFiles.length > 0) {
 		// Subagents go into a directory named after the text file (minus .txt)
-		const subagentsDir = join(
-			outputPath.replace(/\.txt$/, ""),
-			"subagents",
-		);
+		const subagentsDir = join(outputPath.replace(/\.txt$/, ""), "subagents");
 		mkdirSync(subagentsDir, { recursive: true });
 
 		for (const subagentPath of subagentFiles) {
