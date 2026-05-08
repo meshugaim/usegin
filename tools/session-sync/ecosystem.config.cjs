@@ -13,9 +13,9 @@
  *   bun pm2 status
  *
  * autorestart: false — `src/cli.ts` exits cleanly when auth/profile
- * loading fails (no `dx login` yet, or the token expired). Letting PM2
+ * loading fails (no `effi auth login` yet, or the token expired). Letting PM2
  * keep restarting in that state burns CPU and produces noisy logs. The
- * recovery flow is: `dx login`, then `bun pm2 restart session-sync`.
+ * recovery flow is: `effi auth login`, then `bun pm2 restart session-sync`.
  *
  * Environment variables consumed by `src/cli.ts` (see README):
  *   SESSION_SYNC_PROJECTS_DIR, SESSION_SYNC_STATE_DIR, SESSION_SYNC_IDLE_MS,

@@ -25,21 +25,24 @@ Lifecycle commands (run from the project root):
 ```sh
 bun pm2 start tools/session-sync/ecosystem.config.cjs   # start (idempotent)
 bun pm2 logs session-sync                                # tail logs
-bun pm2 restart session-sync                             # after `dx login` if creds were missing
+bun pm2 restart session-sync                             # after `effi auth login` if creds were missing
 bun pm2 stop session-sync                                # stop without forgetting state
 bun pm2 delete session-sync                              # forget (state.json on disk persists)
 ```
 
 `autorestart: false` in the ecosystem file: when `src/cli.ts` exits because
-auth/profile loading failed (no `dx login` yet, or token expired), PM2 keeps
-the process in "stopped" state. Recovery is `dx login` followed by
+auth/profile loading failed (no `effi auth login` yet, or token expired), PM2 keeps
+the process in "stopped" state. Recovery is `effi auth login` followed by
 `bun pm2 restart session-sync`.
 
 ## Slice 1 scope (Steps 3a + 3b + 3c)
 
 The slice-1 daemon is complete: pure-logic helpers, HTTP layer, and the
-wire-glue main loop (`src/cli.ts`) that composes them. ACs covered on
-the daemon side: 13, 14, 16, 17, 18, 19, 20, 21, 22, 45.
+wire-glue main loop (`src/cli.ts`) that composes them. ACs covered:
+12 (project), 13-14 (fs.watch + sync), 16 (state), 17 (subagent share),
+18 (completion), 19 (env detect), 20-21 (crash/SIGTERM), 22-24
+(cross-env startup), 45 (kill-switch daemon-side). AC 25 (Ona) and AC 26
+(local laptop without devcontainer) are deferred.
 
 Module map (alphabetical):
 
