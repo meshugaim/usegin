@@ -40,4 +40,12 @@ describe("isSessionComplete", () => {
 	test("blank trailing newline is tolerated", () => {
 		expect(isSessionComplete('{"type":"result"}\n')).toBe(true);
 	});
+
+	test("type:'result' as substring inside a user message content stays false", () => {
+		const jsonl = `${JSON.stringify({
+			type: "user",
+			content: 'I said: type:"result"',
+		})}\n`;
+		expect(isSessionComplete(jsonl)).toBe(false);
+	});
 });

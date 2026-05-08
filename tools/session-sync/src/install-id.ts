@@ -6,8 +6,14 @@
  * so the daemon never POSTs with an empty `environment_id` even if the
  * box loses power immediately after the first sync attempt.
  *
- * On concurrent first calls we use `O_EXCL` create-or-fail to ensure
- * exactly one writer; losers read the winner's id.
+ * Concurrency model: each caller writes to a per-process-unique tmp
+ * path (`<filePath>.<pid>.<ts>.<rand>.tmp`), `fsync`s it, then
+ * `rename`s atomically onto the final path. Only one rename "wins" in
+ * the sense of being last, but any rename produces a valid file —
+ * losers re-read the on-disk value after their own attempt and return
+ * whatever id is canonical there, so all callers agree. `O_EXCL` on
+ * the tmp open is just defense-in-depth against tmp-name collisions;
+ * it is not what makes the final-path write concurrency-safe.
  */
 
 import {
