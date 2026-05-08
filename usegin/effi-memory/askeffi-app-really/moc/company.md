@@ -5,6 +5,7 @@ Topical notes about AskEffi-the-company — who we are, money, team. See [../_co
 ## Team
 - [Founders](../notes/founders.md) — Guy Levit (CEO), Lihu Berman (CTO)
 - [Team](../notes/team.md) — beyond founders (Courtney, Nitsan, Oria, Chris Baum, DreamLabs, recruiters, AI Architect open role)
+- [Activity](../notes/activity.md) — observable cadence per person over last 30–60 days (active core: Guy + Lihu + Nitsan + Oria; Courtney silent since Mar 24; Chris tapering)
 
 ## Fundraising
 - [Raise](../notes/raise.md) — current round status ($2M pre-seed SAFE)
