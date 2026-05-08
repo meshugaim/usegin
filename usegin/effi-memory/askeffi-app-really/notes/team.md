@@ -159,5 +159,6 @@ For Guy + Lihu, see [founders](founders.md). This note covers everyone else who 
 
 ## See also
 - [founders](founders.md) — Guy + Lihu
+- [activity](activity.md) — observable cadence per person (active core: Guy + Lihu + Nitsan + Oria; Courtney silent since Mar 24)
 - [design-partners](design-partners.md) — Courtney's commercial follow-ups touch design-partner workflow
 - [compliance](compliance.md) — DreamLabs onboarding session surfaced the internal-collaborator bug

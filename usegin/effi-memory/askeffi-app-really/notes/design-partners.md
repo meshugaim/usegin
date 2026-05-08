@@ -230,4 +230,5 @@ The deck is technically accurate for #1 and #2 but the third bullet's framing as
 ---
 
 ## See also
+- [prospects](prospects.md) — wider funnel beyond the 8 named partners (the 8 here are the converted subset)
 - [icp](icp.md), [positioning](positioning.md), [raise](raise.md), [pricing](pricing.md), [north-star](north-star.md)
