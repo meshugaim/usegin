@@ -28,11 +28,11 @@ product. demo for oria's boss.
 
 | # | step | owner | status |
 |---|---|---|---|
-| 1 | dream-card | visitor-center / Zisser-mediated (oria in chat) | **done — awaiting oria eyeball** |
-| 2 | philosophy | university (philosopher sub-agent) | not started |
-| 3 | design | designer | not started |
-| 4 | architecture | architect | not started — surfaces repo + Supabase + LLM-backend questions |
-| 5 | spec | spec skill | not started |
+| 1 | dream-card | visitor-center / Zisser-mediated (oria in chat) | **done** — moved to run dir as `01-dream-card.md` (OCW SHA `e554318`) |
+| 2 | philosophy | mark-in-philosopher's-seat | **done** 2026-05-08 — `02-philosophy-essay.md` (OCW SHA `d0abc8f`) |
+| 3 | design | mark-in-designer's-seat | **done** 2026-05-08 — `03-design-sketch.md` (OCW SHA `5dee12f`) |
+| 4 | architecture | mark-in-architect's-seat | **done** 2026-05-08 — `04-architecture-seams.md` (OCW SHA `53fe5e5`) — open questions batched back to oria via Zisser |
+| 5 | spec | spec skill | not started — gated on oria sign-off of step-4 open questions |
 | 6 | slicing | slicing-specs skill | not started |
 | 7 | build | one Wes per slice | not started |
 | 8 | QA | Yohai | not started |
@@ -41,17 +41,38 @@ product. demo for oria's boss.
 
 ## blockers / waiting-on-oria
 
-- **eyeball the dream-card.** if oria says "good, go", Zisser dispatches
-  Mark next turn → Mark mints the run + walks step 2 (philosophy).
-- **OCW push 403.** dream-card committed locally in `oria-crazy-world/`
-  (SHA `b23de46`), but `oria-ai` GH token lacks write to
-  `AskEffi/oria-crazy-world`. need: grant `oria-ai` write, or hand to a
-  teammate whose token has write.
-- **site to browse for the placeholder video.** oria committed to
-  provide; browse capability now confirmed autonomous.
-- **at architecture (step 4):** Supabase tenancy + LLM-backend choice
-  + how the new POC layer fits onto HandsOnAi-Copilot's existing
-  Vite/React/Prisma/Express foundation. real keys/decisions.
+- **OCW push 403.** all four factory commits (run-dir, philosophy,
+  design, architecture) sit on local `main` in `oria-crazy-world/`
+  awaiting batch push once `oria-ai` GH token gains write to
+  `AskEffi/oria-crazy-world`. local SHAs: `e554318`, `d0abc8f`,
+  `5dee12f`, `53fe5e5`. plus the prior `b23de46` (intake landing).
+- **architecture's batch of open questions for oria** (step 5 spec
+  is gated on these — Mark surfaces them as one package, not
+  trickled):
+  1. Word vs Excel anchor — recommend **Word** as primary; Excel as
+     placeholder-video / "same idea applies" example.
+  2. POC variant — recommend **V1** (task-first/buffet); V4
+     (prompting-first diagnostic) violates the "no investigation"
+     philosophy.
+  3. Supabase tenancy — recommend **don't introduce Supabase**.
+     existing HandsOnAi-Copilot stack is Prisma + MySQL; adding
+     Supabase doubles auth + DB + migration tooling for a POC.
+     reuse MySQL via Prisma; one optional `poc_sessions` table.
+  4. LLM backend — recommend **Claude default + user pick at q4**
+     (Claude / Gemini / OpenAI / no-preference). server already has
+     `openai`; we add `@anthropic-ai/sdk` and `@google/genai`.
+  5. Capabilities/Skills buffet shape — recommend **mixed** (single
+     ranked list with `capability` / `skill` badges per item).
+  6. "tell someone else" placement — recommend **both** (q5 in
+     onboarding as persona signal + load-bearing moment inside
+     prompting lesson, isomorphism named out loud).
+- **Doppler reachability** — before slice 1 starts, spec must verify
+  `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY` are
+  reachable from the `HandsOnAi-Copilot` deploy env. no slice-1
+  blocker yet (we're at step 4, not 7).
+- **the placeholder video.** oria committed to provide one Excel-
+  context video + site credentials. lesson works without it (text +
+  screenshots); video is enrichment. not a step-5/6 blocker.
 
 ## resolved (this turn)
 
