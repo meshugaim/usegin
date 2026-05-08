@@ -1,0 +1,16 @@
+{
+  "t0": 1778241461.819009,
+  "t1": 1778241462.0565965,
+  "t2": 1778241503.9950492,
+  "ttft_s": 0.23758745193481445,
+  "ttc_s": 42.176040172576904,
+  "exit": 0,
+  "cmd": [
+    "effi",
+    "--profile",
+    "dogfooding",
+    "ask",
+    "--new",
+    "Write a short, accurate blurb about AskEffi suitable to send to a friend who may become an angel investor. Around 200 words. Include: what we do (and the angle that makes us different), target market, current traction, and the current raise. Be factually accurate and only state things you can cite. End with a one-line offer to dig in further."
+  ]
+}
