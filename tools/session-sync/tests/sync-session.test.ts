@@ -1,0 +1,284 @@
+import { describe, expect, test } from "bun:test";
+import type { AuthContext } from "../src/auth.ts";
+import type { StateFile } from "../src/state.ts";
+import type { FetchLike } from "../src/sync-client.ts";
+import { syncSession } from "../src/sync-session.ts";
+
+const NOW = new Date("2026-05-08T12:00:00.000Z");
+const PARENT_PATH = "/home/u/.claude/projects/-x/sess-1.jsonl";
+
+const auth: AuthContext = {
+	token: "jwt",
+	apiUrl: "http://localhost:63000",
+	userId: "user-uuid",
+};
+
+const envIdentity = { kind: "local-devcontainer", id: "env-id-1" };
+
+const PARENT_BYTES = new TextEncoder().encode(
+	`${[
+		JSON.stringify({ type: "user", message: { role: "user", content: "hi" } }),
+		JSON.stringify({
+			type: "assistant",
+			message: { role: "assistant", model: "m", content: "ok" },
+		}),
+	].join("\n")}\n`,
+);
+
+const SUB_BYTES_A = new TextEncoder().encode(
+	`${JSON.stringify({ type: "user", message: { role: "user", content: "a" } })}\n`,
+);
+const SUB_BYTES_B = new TextEncoder().encode(
+	`${JSON.stringify({ type: "user", message: { role: "user", content: "b" } })}\n`,
+);
+
+function jsonResponse(status: number, body: unknown): Response {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { "content-type": "application/json" },
+	});
+}
+
+interface FetchCall {
+	url: string;
+}
+
+function makeFetch(responder: (url: string) => Response): {
+	fetchImpl: FetchLike;
+	calls: FetchCall[];
+} {
+	const calls: FetchCall[] = [];
+	const fetchImpl: FetchLike = async (input) => {
+		const url = String(input);
+		calls.push({ url });
+		return responder(url);
+	};
+	return { fetchImpl, calls };
+}
+
+function baseInput(state: StateFile = {}) {
+	return {
+		parentPath: PARENT_PATH,
+		sessionId: "sess-1",
+		state,
+		auth,
+		envIdentity,
+		username: "lihu",
+		projectPath: "/workspaces/test-mvp",
+		now: NOW,
+	};
+}
+
+describe("syncSession — happy path", () => {
+	test("parent uploaded → both subagents synced", async () => {
+		const subPathA =
+			"/home/u/.claude/projects/-x/agent-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl";
+		const subPathB =
+			"/home/u/.claude/projects/-x/agent-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl";
+		const { fetchImpl, calls } = makeFetch((url) => {
+			if (url.includes("/subagents/")) {
+				return jsonResponse(200, { session: { storage_path: "sub.gz" } });
+			}
+			return jsonResponse(200, { session: { storage_path: "parent.gz" } });
+		});
+		const readMap: Record<string, Uint8Array> = {
+			[PARENT_PATH]: PARENT_BYTES,
+			[subPathA]: SUB_BYTES_A,
+			[subPathB]: SUB_BYTES_B,
+		};
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async (path) => {
+				const bytes = readMap[path];
+				if (!bytes) throw new Error(`unexpected path ${path}`);
+				return bytes;
+			},
+			discoverFn: async () => [subPathA, subPathB],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		expect(out.outcomes.length).toBe(3);
+		expect(out.outcomes[0]?.outcome.kind).toBe("uploaded");
+		expect(out.outcomes[1]?.outcome.kind).toBe("uploaded");
+		expect(out.outcomes[2]?.outcome.kind).toBe("uploaded");
+		expect(calls.length).toBe(3);
+		expect(calls[0]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/sync",
+		);
+		expect(calls[1]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/sync",
+		);
+		expect(calls[2]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/sync",
+		);
+	});
+
+	test("parent uploaded with no subagents", async () => {
+		const { fetchImpl, calls } = makeFetch(() =>
+			jsonResponse(200, { session: { storage_path: "parent.gz" } }),
+		);
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => [],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		expect(out.outcomes.length).toBe(1);
+		expect(calls.length).toBe(1);
+	});
+});
+
+describe("syncSession — parent did not advance → subagents skipped", () => {
+	test("parent skipped_hash → subagents NOT synced", async () => {
+		const { computeContentHash } = await import("../src/content-hash.ts");
+		const hash = await computeContentHash(PARENT_BYTES);
+		const state: StateFile = {
+			[PARENT_PATH]: {
+				contentHash: hash,
+				lastUploadedSize: PARENT_BYTES.length,
+				sessionId: "sess-1",
+				storagePath: "p",
+				lastUploadedAt: "2026-05-08T11:00:00.000Z",
+			},
+		};
+		let discoverCalled = false;
+		const { fetchImpl, calls } = makeFetch(() =>
+			jsonResponse(500, { error: "should not be hit" }),
+		);
+		const out = await syncSession({
+			...baseInput(state),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => {
+				discoverCalled = true;
+				return ["/should/not/be/used.jsonl"];
+			},
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		expect(out.outcomes.length).toBe(1);
+		expect(out.outcomes[0]?.outcome.kind).toBe("skipped_hash");
+		expect(discoverCalled).toBe(false);
+		expect(calls.length).toBe(0);
+	});
+
+	test("parent skipped_backoff → subagents NOT synced", async () => {
+		const state: StateFile = {
+			[PARENT_PATH]: {
+				contentHash: "x".repeat(64),
+				lastUploadedSize: 0,
+				sessionId: "sess-1",
+				storagePath: "p",
+				lastUploadedAt: "2026-05-08T11:00:00.000Z",
+				nextRetryAt: "2026-05-08T12:05:00.000Z",
+			},
+		};
+		const { fetchImpl } = makeFetch(() => jsonResponse(200, { session: {} }));
+		const out = await syncSession({
+			...baseInput(state),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => ["/x.jsonl"],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		expect(out.outcomes.length).toBe(1);
+		expect(out.outcomes[0]?.outcome.kind).toBe("skipped_backoff");
+	});
+
+	test("parent kill_switch → subagents NOT synced", async () => {
+		const { fetchImpl } = makeFetch(() =>
+			jsonResponse(503, { error: "sync_disabled" }),
+		);
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => ["/x.jsonl"],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		expect(out.outcomes.length).toBe(1);
+		expect(out.outcomes[0]?.outcome.kind).toBe("kill_switch");
+	});
+});
+
+describe("syncSession — parent failed", () => {
+	test("parent fatal_error → parent_failed", async () => {
+		const { fetchImpl } = makeFetch(() =>
+			jsonResponse(403, { error: "Not a dev team member" }),
+		);
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => [],
+		});
+		expect(out.kind).toBe("parent_failed");
+	});
+
+	test("parent transient_error → parent_failed", async () => {
+		const { fetchImpl } = makeFetch(() => jsonResponse(500, { error: "boom" }));
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => [],
+		});
+		expect(out.kind).toBe("parent_failed");
+	});
+});
+
+describe("syncSession — subagent error reported, parent succeeds", () => {
+	test("subagent fatal_error reported in outcomes; parent already uploaded", async () => {
+		const subPath =
+			"/home/u/.claude/projects/-x/agent-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl";
+		const { fetchImpl } = makeFetch((url) => {
+			if (url.includes("/subagents/")) {
+				return jsonResponse(403, { error: "no" });
+			}
+			return jsonResponse(200, { session: { storage_path: "p" } });
+		});
+		const readMap: Record<string, Uint8Array> = {
+			[PARENT_PATH]: PARENT_BYTES,
+			[subPath]: SUB_BYTES_A,
+		};
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async (p) => {
+				const b = readMap[p];
+				if (!b) throw new Error(`unexpected path ${p}`);
+				return b;
+			},
+			discoverFn: async () => [subPath],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		expect(out.outcomes[0]?.outcome.kind).toBe("uploaded");
+		expect(out.outcomes[1]?.outcome.kind).toBe("fatal_error");
+	});
+});
+
+describe("syncSession — agentId extraction", () => {
+	test("derives agentId from agent-{uuid}.jsonl filename", async () => {
+		const subPath =
+			"/some/where/nested/agent-deadbeef-1234-1234-1234-123456789abc.jsonl";
+		const { fetchImpl, calls } = makeFetch(() =>
+			jsonResponse(200, { session: { storage_path: "p" } }),
+		);
+		await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async () => PARENT_BYTES,
+			discoverFn: async () => [subPath],
+		});
+		// Second call is the subagent.
+		expect(calls[1]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/deadbeef-1234-1234-1234-123456789abc/sync",
+		);
+	});
+});
