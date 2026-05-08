@@ -70,4 +70,5 @@ These have not shifted across the entire history:
 | Apr–May | **"Executive Control" / "Executive Oversight Layer"** / "Project Assurance Layer" (end-state) | cross-company; calm-to-escalation wedge |
 
 ## See also
-- [icp](icp.md), [pricing](pricing.md), [design-partners](design-partners.md), [raise](raise.md)
+- [pricing](pricing.md) — price point belongs in any blurb-shaped answer about positioning
+- [icp](icp.md), [design-partners](design-partners.md), [raise](raise.md)

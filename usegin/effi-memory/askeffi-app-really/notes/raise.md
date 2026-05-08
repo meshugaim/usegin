@@ -36,4 +36,5 @@ Founder self-investment: Guy Levit committed **$80k MFN SAFE** (converts at inst
 **Alternate path under consideration (open):** angels-first on MFN SAFEs → more traction → "proper round" from VCs in fall — fathom:0c6d9496-f393-432e-a592-71b6850548d3 (Chandra/Guy, 2026-04-29). Not a contradiction with $2M SAFE; same instrument, different sequencing.
 
 ## See also
-- [pricing](pricing.md), [icp](icp.md), [design-partners](design-partners.md), [positioning](positioning.md)
+- [north-star](north-star.md) — what this round must prove (milestones the raise enables)
+- [founders](founders.md), [pricing](pricing.md), [icp](icp.md), [design-partners](design-partners.md), [positioning](positioning.md)
