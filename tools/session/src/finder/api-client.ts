@@ -214,6 +214,9 @@ export async function listSessions(
   const body = await parseBody(res);
 
   if (res.status === 200) {
+    if (!body || typeof body !== "object") {
+      throw makeError("malformed 200 body", "other", 200);
+    }
     return body as ApiListResponse;
   }
   throw classifyError(res.status, body);
@@ -242,6 +245,9 @@ export async function getSession(
   const body = await parseBody(res);
 
   if (res.status === 200) {
+    if (!body || typeof body !== "object") {
+      throw makeError("malformed 200 body", "other", 200);
+    }
     return body as { session: ApiSessionItem; signed_url: string };
   }
   if (res.status === 404) {

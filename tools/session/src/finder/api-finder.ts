@@ -24,14 +24,14 @@
 import {
   getApiUrl as defaultGetApiUrl,
   readCredentials as defaultReadCredentials,
-} from "../../../effi-cli/src/lib/credentials.ts";
+} from "../../../effi-cli/src/lib/credentials";
 import {
   type ApiListOptions,
   type ApiSessionItem,
   type FetchLike,
   getSession,
   listSessions,
-} from "./api-client.ts";
+} from "./api-client";
 
 interface CredentialsShape {
   access_token: string;

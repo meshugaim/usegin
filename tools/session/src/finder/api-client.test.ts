@@ -263,6 +263,25 @@ describe("listSessions — response classification", () => {
     );
   });
 
+  test("200 with malformed JSON body → throws kind=other status=200", async () => {
+    // Proxy mangling, content-type mismatch, or stream cut can land a 200 with
+    // non-JSON text. Without the structural guard the cast lies and downstream
+    // crashes; assert we throw at the boundary instead.
+    const fetchImpl: FetchLike = async () =>
+      new Response("not-valid-json", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    let caught: ApiClientError | null = null;
+    try {
+      await listSessions(auth, {}, fetchImpl);
+    } catch (e) {
+      caught = e as ApiClientError;
+    }
+    expect(caught?.kind).toBe("other");
+    expect(caught?.status).toBe(200);
+  });
+
   test("cursor passthrough on second page", async () => {
     const seen: { url?: string } = {};
     const fetchImpl: FetchLike = async (input) => {
@@ -401,5 +420,23 @@ describe("getSession — response classification", () => {
     await expect(getSession(auth, "id", fetchImpl)).rejects.toThrow(
       "ECONNREFUSED",
     );
+  });
+
+  test("200 with malformed JSON body → throws kind=other status=200", async () => {
+    // Same guard as listSessions: a 200 with unparseable body must throw at
+    // the boundary rather than letting a `null` cast escape into Step 5b.
+    const fetchImpl: FetchLike = async () =>
+      new Response("not-valid-json", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    let caught: ApiClientError | null = null;
+    try {
+      await getSession(auth, "id", fetchImpl);
+    } catch (e) {
+      caught = e as ApiClientError;
+    }
+    expect(caught?.kind).toBe("other");
+    expect(caught?.status).toBe(200);
   });
 });
