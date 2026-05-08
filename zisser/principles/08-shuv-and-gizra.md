@@ -81,6 +81,21 @@ parent identifier. The minimum unit is the *charter file* in
 `zisser/dispatched/<date>-<topic>.md` — that file already exists by
 convention; principle 8 promotes it to *registry*.
 
+**Humans are bound by Shu"v too.** When a human (Oria, Lihu, Nitsan)
+opens a `/zisser` skill or a fresh Claude session that will touch a
+sector — typing a charter, opening a doc, starting a refactor — the
+session is itself a "force in the field" for Shu"v purposes. The
+practical consequence: a human-driven session that touches the same
+sector as an in-flight agent IS the same kind of seam as agent-meets-
+agent. The seam protocol below applies symmetrically. The human's
+charter file is the chat itself; principle 8 asks them to leave a
+trace before they walk in deep — at minimum a `zisser/inbox/`
+placement before opening a long-running session in a sector they know
+has neighbors.
+
+(human-binding clause — added 2026-05-08 by parent Zisser when Azisa
+asked whether to bind humans; default = yes, system-wide.)
+
 The commander (the spawning agent, or Zisser at the top of the tree)
 maintains the single picture by reading the registry. Today that
 registry is `zisser/dispatched/`; principle 8 mandates it stay
