@@ -21,9 +21,31 @@ Zisser is the conductor. This file is how he conducts.
 ## The dispatch shape
 
 Every spawn writes a charter into `dispatched/<topic>.md` *before* invoking
-the `Agent` tool. The charter is the SOT. Shape:
+the `Agent` tool. The charter is the SOT, **and** the registry entry for
+Shu"v / G"G (principle 8) — sector + in-flight fields in the frontmatter
+so the parent (and any sibling) can see the spawn while it runs.
 
 ```markdown
+---
+date: YYYY-MM-DD
+charter_for: <agent type / persona>
+caller: <who chartered this>
+parent_plan: <path to parent plan, if any>
+parent_session_id: <UUID of the spawning agent's session>
+output_path: <expected return-file path>
+status: pending | in-flight | returned | parked
+started_at: <UTC when Agent tool actually fired>
+expected_duration: <5min | <30min | <2h | >2h
+sector:
+  paths_in: [<paths the agent reads>]
+  paths_out: [<paths the agent writes>]
+  external_systems: [<linear, doppler, slack, supabase, ...>]
+  mutable_state: [<git_worktree, dev_server_ports, db_rows, ...>]
+neighbors:                              # optional; only when a peer exists
+  - charter: <path to sibling charter>
+    seam: <read-only crossing | sequential by status | disjoint by partition>
+---
+
 # Charter — <topic>
 
 ## Goal
@@ -43,17 +65,18 @@ the `Agent` tool. The charter is the SOT. Shape:
 ## Stop condition
 <when does this come back to me?>
 
-## Dispatched
-- when: YYYY-MM-DD HH:MM
-- to: <agent type>
-- expected back: <when>
-
 ## Returned
 (filled when the agent returns)
 - when: ...
 - summary: ...
-- next: closed / re-dispatched / waiting on Lihu
+- sector_actually_touched: ...
+- seams_crossed: ...
+- next: closed / re-dispatched / waiting on caller
 ```
+
+The sector + in-flight fields are load-bearing per principle 8 — the
+parent reads `dispatched/` to see the in-flight set before every spawn,
+and a stale `in-flight` past its `expected_duration` is a Shu"v alarm.
 
 When you invoke the `Agent` tool, paste the charter (or a tight derivative)
 into the `prompt` field. That way the agent has the full charter and you have
