@@ -13,6 +13,8 @@ and how a human owner gets pulled in when the system can't decide alone.
 Companion docs:
 - [_conventions.md](_conventions.md) — note shape, citation format, conflict-handling rules
 - [_architecture.md](_architecture.md) — retrieval & latency (Architecture B, TTFT)
+- [_owners.md](_owners.md) — topic→owner map (resolves O-1)
+- [../DESIGN.md](../DESIGN.md) — feature-level deep-design memo: bright lines, open questions, next experiments. Read this for the *choices*; this file shows the *structure*.
 
 ## One-line picture
 
