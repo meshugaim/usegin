@@ -9,5 +9,6 @@ Topical notes about AskEffi-the-company — who we are, money, team. See [../_co
 
 ## Fundraising
 - [Raise](../notes/raise.md) — current round status ($2M pre-seed SAFE)
+- [Investors and advisors](../notes/investors-and-advisors.md) — relationship layer: 1 closed (Guy's MFN), 5 active, 7 passed, 0 formal advisors, 6 informal sounding-board
 - [North star](../notes/north-star.md) — milestones the round must prove (>50 customers, >$1.2M ARR, <$8K CAC, >5 via network)
 - [Financials](../notes/financials.md) — burn, runway, comp, founder SAFE, equity, vendor spend
