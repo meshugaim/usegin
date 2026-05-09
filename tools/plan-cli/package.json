@@ -6,7 +6,7 @@
   "scripts": {
     "test": "bun test",
     "test:e2e": "bun test tests/e2e",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@linear/sdk": "^84.0.0",
