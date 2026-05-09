@@ -6,14 +6,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_SCRIPT="$SCRIPT_DIR/expose-session-id.sh"
 
-# Create temp file for env output
 ENV_FILE=$(mktemp)
 trap "rm -f $ENV_FILE" EXIT
 
-echo "Test 1: Hook sets CLAUDE_SESSION_ID when session_id is provided"
+echo "Test 1: Hook sets CLAUDE_SESSION_ID and emits banner when session_id is provided"
 INPUT='{"session_id": "test-session-123", "trigger": "startup"}'
 export CLAUDE_ENV_FILE="$ENV_FILE"
-echo "$INPUT" | "$HOOK_SCRIPT"
+OUTPUT=$(echo "$INPUT" | "$HOOK_SCRIPT")
 
 if grep -q 'export CLAUDE_SESSION_ID="test-session-123"' "$ENV_FILE"; then
   echo "  PASS: CLAUDE_SESSION_ID was set correctly"
@@ -23,30 +22,42 @@ else
   exit 1
 fi
 
-# Clear the file for next test
+if echo "$OUTPUT" | grep -q "Session ID: test-session-123" \
+   && echo "$OUTPUT" | grep -q '\$CLAUDE_SESSION_ID'; then
+  echo "  PASS: Banner names session id and env var"
+else
+  echo "  FAIL: Expected banner with session id and env-var name, got:"
+  echo "$OUTPUT"
+  exit 1
+fi
+
 > "$ENV_FILE"
 
 echo "Test 2: Hook handles missing session_id gracefully"
 INPUT='{"trigger": "startup"}'
-echo "$INPUT" | "$HOOK_SCRIPT"
+OUTPUT=$(echo "$INPUT" | "$HOOK_SCRIPT")
 
-if [ ! -s "$ENV_FILE" ]; then
-  echo "  PASS: No output when session_id is missing"
+if [ ! -s "$ENV_FILE" ] && [ -z "$OUTPUT" ]; then
+  echo "  PASS: No env-file write and no banner when session_id is missing"
 else
-  echo "  FAIL: Expected no output, got:"
-  cat "$ENV_FILE"
+  echo "  FAIL: Expected silence, got env=$(cat "$ENV_FILE") stdout=$OUTPUT"
   exit 1
 fi
 
-# Clear the file for next test
 > "$ENV_FILE"
 
-echo "Test 3: Hook does nothing when CLAUDE_ENV_FILE is not set"
+echo "Test 3: Hook still emits banner when CLAUDE_ENV_FILE is not set"
 INPUT='{"session_id": "test-session-456"}'
-# Unset CLAUDE_ENV_FILE
 unset CLAUDE_ENV_FILE
-echo "$INPUT" | "$HOOK_SCRIPT"
-echo "  PASS: Hook exits cleanly without CLAUDE_ENV_FILE"
+OUTPUT=$(echo "$INPUT" | "$HOOK_SCRIPT")
+
+if echo "$OUTPUT" | grep -q "Session ID: test-session-456"; then
+  echo "  PASS: Banner emitted even without CLAUDE_ENV_FILE"
+else
+  echo "  FAIL: Expected banner without CLAUDE_ENV_FILE, got:"
+  echo "$OUTPUT"
+  exit 1
+fi
 
 echo ""
 echo "All tests passed!"
