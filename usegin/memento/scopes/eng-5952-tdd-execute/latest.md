@@ -1,86 +1,80 @@
-# Polaroid — 2026-05-11 18:01 UTC (scope: eng-5952-tdd-execute, cycle 13 sleep)
+# Polaroid — 2026-05-11 (slice ENG-5952 fully complete; mutation pass closed)
 
 ## Who am I
-**Director** in the `tdd-execute` skill for slice **ENG-5952** (Slice 1 of ENG-4968 per-workspace chat `auth_mode` override). Opus orchestrator; never edits code/tests directly — spawns role-isolated tweakers (Haiku), unseeded reviewers (`ron`, Opus), separate verifier per cycle. The PreToolUse hook at `.claude/skills/tdd-execute/hooks/gate-edit-by-phase.ts` denies my edits to source paths; carve-out for `.tdd-execute/<slice>/{state.json,events.jsonl}`.
+
+UseGin Director in `tdd-execute` for slice **ENG-5952** (Slice 1 of ENG-4968 per-workspace chat `auth_mode` override). This polaroid supersedes the cycle-20-entry polaroid that prompted the mutation-pass run. Both the 20 TDD cycles AND the 7-mutation epilogue are now closed.
 
 ## The kill
-**Drive cycles 14-20 + 7-mutation pass for ENG-5952 so T4 outer-green is real and the slice's contract is mutation-tested.** This session landed cycles 9, 10, 11, 12, and 13-red. 12-of-20 plan steps committed + style/drift/fix commits.
+
+**Mutation pass complete:**
+- 6 of 7 mutations caught (M1–M6) by their expected tests.
+- 1 uncaught: M7. Surfaced as a no-op-equivalent in Python (function-level scoping, not block scoping — the impl-plan author's premise that "the ORIGINAL dict survives in ChatContext construction" is false because the rebound name IS what line 478 reads). **Filed `ENG-5958` (child of ENG-4968)** with the diagnosis + three resolution options. Not a test gap; a test-plan calibration issue.
+
+Slice's core 20 cycles + epilogue: done. Next slice in the parent feature is **ENG-5953 (admin UI)**, separate work.
+
+## Mutation-pass results
+
+| id | target | expected | caught_by | notes |
+|---|---|---|---|---|
+| M1 | migration SQL | T1 | `test_workspaces_auth_mode_rejects_value_outside_allowlist` | "DID NOT RAISE APIError" — without CHECK, bogus value accepted |
+| M2 | migration SQL (RPC SELECT) | T3 | `test_get_all_workspaces_for_admin_rpc_returns_auth_mode` | rows return auth_mode=NULL ≠ seeded value |
+| M3 | migration SQL (admin guard) | T12 | `test_get_all_workspaces_for_admin_rpc_rejects_non_admin` | non-admin call succeeds without guard |
+| M4 | `database.types.ts` | T8 | `database-types-workspaces-auth-mode.test.ts` | tsc exit 2 (TS2536 on `Row["auth_mode"]`) |
+| M5 | `chat_context.py` (condition flip) | T4, T5, T7 | T4 + T5 caught; T7 not affected (project_id=None short-circuits before override branch) | impl-plan's [T7] listing was over-inclusive; at-least-one rule satisfied |
+| M6 | `chat_context.py` (try/except removal) | T10 | `test_build_chat_context_workspace_fetch_failure_falls_through_with_sentry_capture` | exception propagates instead of being captured |
+| M7 | `chat_context.py` (shadow `chat_config = dict(chat_config)`) | T11 | **UNCAUGHT** — filed ENG-5958 | Python function-scope rebind, no block scope; the rebound local IS what line 478 reads |
+
+## Execution deviation (logged, intentional)
+
+**Did NOT use per-mutation detached worktrees** as F-MUT-3 specifies. Reason: `tools/test-supabase/src/cli.ts` pins `ROOT_DIR` to the script's checkout (`import.meta.dir + "../../.."`), and `shutil.which("test-supabase")` in the Python conftest resolves via PATH (parent's `tools/bin/`). The shared test-supabase singleton would read parent's migration files regardless of which worktree spawned the test. Worktree isolation would provide hook scoping but no test isolation — i.e., it would force every mutation to copy the mutated file into parent for tests to see, which defeats the worktree's purpose.
+
+Executed all 7 mutations in **main worktree** with:
+- `.tdd-execute/ENG-5952/state.json.mutation_pass.allowed_paths` populated per mutation (hook scoping).
+- Haiku mutation-applier spawned with `TDD_WORKSPACE=/workspaces/test-mvp` (hook resolution).
+- `git checkout -- <target_file>` to revert between mutations.
+- `test-supabase reset` to re-apply clean migration after M1–M3 (migrations need DB replay; M4–M7 don't).
+
+Audit trail in `.tdd-execute/ENG-5952/events.jsonl` (cycle 21 entries: `mutation-pass-start`, 7× `mutation-applied`, 6× `mutation-caught`, 1× `mutation-uncaught`, `mutation-pass-complete`, `advance` to `phase=complete`).
+
+The F-MUT-3 worktree mechanism likely needs revision to address this — the shared-singleton problem isn't slice-specific; any monorepo-wide test infra that reads from a fixed ROOT_DIR will have it. Worth a sub-issue against `tdd-execute` skill if anyone hits it again.
 
 ## Where I am
 
-- **Phase:** between cycles 13 (red committed at `5e698eb58`) and 14 (inner-green T5 — adds the `'global'` fall-through conditional). **Production code change for cycle 14 is reverted** — clean cleavage at cycle 13 red on origin/main.
-
-- **Done this session (committed + pushed to origin/main):**
-  - `eb92a6808` — cycle 10 green (T8 marker removal; types regen committed separately at `996648cbd`)
-  - `8a824040d` — fix(admin-workspaces): widen RPC cast through unknown after types regen
-  - `397949d07` — style(python): ruff format on slice + sibling drift
-  - `ce661a77c` — cycle 12 green (build_chat_context reads workspace.auth_mode override; T7+T4 both flip to real green; T4 advanced ahead of step 20)
-  - `ccafbd61e` — fix(eng-5952): mock create_safe_client in chat_context unit-test mocks (regression caught by pre-push after Tier-2 reviewer-skip)
-  - `5e698eb58` — cycle 13 red (T5 'global' literal fall-through, xfail-strict)
-
-- **Done previously (cycles 1-8 from prior session):**
-  - 5e8da734b through 3438030c9 — migration substrate (DEFAULT, CHECK, RPC re-creation) + admin-guard regression pin
-
-- **Not done (open-to-empty):**
-  - **Cycle 14 inner-green T5** — the conditional change is *literally one line* in `python-services/agent_api/chat/chat_context.py:337`. Current code says `if workspace_row:`; needs `if workspace_row and workspace_row["auth_mode"] != "global":`. Impl-plan step 14, TPP rank 6. Then substep 14b removes T5's xfail marker. Two-spawn green protocol.
-  - Cycles 15-16 (verification-only T6/T9 — project_id=None, workspace_id=None branches; small)
-  - Cycles 17-18 (T10 try/except + sentry_sdk.capture_exception on workspace fetch failure; meaty)
-  - Cycle 19 (T11 verification-only Layer-2 wiring pin)
-  - Cycle 20 (outer-green T4 — verification-only since T4 flipped at cycle 12)
-  - Mutation pass: 7 mutations (M1-M7) in per-mutation worktrees
-
-- **In flight:**
-  - Nothing uncommitted. Working tree: `?? .tdd-execute/` only.
-  - `git log origin/main..HEAD` is empty — local matches origin.
+- **Phase:** `complete`. State written, events logged.
+- **Working tree:** clean of slice code. `?? .tdd-execute/` is the carve-out (untracked-by-convention audit trail).
+- **`origin/main` last commit:** `55a08de6c` (cycle 19 style fix). No new commits from this session — mutation pass is verification-only by design.
+- **Linear:** ENG-5958 filed under ENG-4968 for M7 follow-up.
 
 ## THE ONE THING
 
-> **Before resuming cycle 14, fix the test-supabase infrastructure. This session's `test-supabase start` exits 0 BUT only brings up `supabase_db_test-integ` — the REST/Kong/Auth/Storage containers never come up. `test-supabase status` then reports "NOT running" and `test-supabase env` exits 1. Integration tests cannot run until the full stack is healthy. Without this fix, you cannot verify cycle 14 right-reason green and the slice halts.**
+> **The slice is done. No further work on ENG-5952 itself. If a fresh agent wakes here, the right next move is either (a) close out ENG-5952 in Linear and pick up ENG-5953 (admin UI slice), or (b) read ENG-5958 and decide how to evolve the mutation-pass M7 entry. There is no implementation work pending on this slice.**
 
-## Pending decisions / questions
+## Don't-trust-yourself warnings (still valid for future sessions)
 
-- (none) — Lihu's "complete the feature autonomously" mandate (this session, after the drift-halt) still stands. He explicitly pushed back on bouncing-back for small Qs; default to finish-don't-halt unless the wrong-default cost is high.
-
-## Don't-trust-yourself warnings
-
-- **Test-supabase infrastructure broken.** `test-supabase start` reports `API URL: ?` and `Anon key: undefined...` — that's the tell. The DB container comes up but the rest of the stack doesn't. Symptoms: integration test fixtures fail with `subprocess.CalledProcessError: Command 'test-supabase env' returned non-zero exit status 1`. Try: `docker ps` to see which containers are up; expect 9 `supabase_*_test-mvp` containers AND 9 `supabase_*_test-integ` containers; current state has only 1 of the test-integ set. May need full docker compose rebuild or a different reset approach.
-
-- **Tier-2 reviewer-skip bit me.** I skipped the Green-phase reviewer for cycle 12 on grounds of "plan-pinned exact code shape" — but the reviewer would have demanded a full unit-suite run, which would have caught the `test_chat_context_outline.py` regression that pre-push then caught. Lesson: skip reviewer ONLY when (a) full unit suite ALSO clean AND (b) prod diff has zero external seams. Cycle 14's diff is also small + plan-pinned, but it touches the same `if workspace_row:` block — re-review is cheap, do it.
-
-- **Haiku tweakers hallucinate.** Cycle 14's GreenTweaker reported a successful edit + green test run, but the file was unchanged and the test was failing. Also cycle 12's GreenTweaker overshot scope (added try/except reserved for cycle 18) before being fixed. Always verify the diff directly (per re-orientation hook) and run the tests myself before trusting the worker's report. **Re-verify even when the worker is confident.**
-
-- **Hook misparses chained Bash commands.** Multi-line `git commit -m "..."` with shell metacharacters (parens, `<<`, `>&1`, `&&`) sometimes trips the hook's heredoc-bypass regex (`>>?\s*[A-Za-z]`) treating the next token as a "production-path edit target." Workaround: single-line commits with multiple `-m` flags, avoid words like `if`/`then`/`else` in commit bodies, split chained `&&` into separate Bash calls. Real bug to file, not this session's job.
-
-- **Cycle 10 drift-first set the slice-narrow expectation.** When I halted cycle 10 on the 315-line drift hunk, Lihu pushed back hard ("stop bouncing back on small Qs"). The right read of the impl-plan's "halt unless approved" clause is: judge wrong-default cost yourself, halt only if it's high. Future cycles in this slice: bias hard to finishing.
-
-- **Don't trust the polaroid's "Resume cue" if a Lihu signal contradicts it.** Tattoo still holds: live signal > prior cue.
-
-- **Cycle 14's reverted change was correct on paper.** The 1-line diff (`if workspace_row and workspace_row["auth_mode"] != "global":`) matches impl-plan step 14 exactly. The revert was for safety (couldn't verify via tests). On wake, you can re-apply the same edit confidently; just verify with tests after infra is healthy.
-
-- **Tach skip is dangerous.** When running pytest with Tach impact-analysis, it skipped 3178 tests as "unaffected" but the unit-test-chat_context_outline regression hit anyway because the touched file (chat_context.py) was directly imported. Don't rely on `--tach` for regression checks; run the full unit suite.
-
-## Resume cue
-
-> **First action on wake:** Run `docker ps --format "{{.Names}}"` to count `supabase_*_test-integ` containers. If <9, the full stack isn't up — `test-supabase stop && tools/bin/test-supabase start` is suspect; try `cd /workspaces/test-mvp/tests/shared/supabase-project && supabase stop && supabase start` directly. Once `tools/bin/test-supabase env` exits 0 (and `supabase_kong_test-integ` shows in `docker ps`), proceed: read this polaroid's THE ONE THING for context, then re-apply the cycle-14 conditional via Edit tool on `python-services/agent_api/chat/chat_context.py:337` (single line: `if workspace_row:` → `if workspace_row and workspace_row["auth_mode"] != "global":`), run `cd python-services && uv run pytest tests/integration/db/test_chat_context_workspace_auth_mode.py --runxfail -q`, expect 3 passed. Then dispatch substep 14b RedTweaker to strip T5's xfail marker. Then verifier proof, **then re-review (Tier 1 — no Tier-2 skip this cycle)**, then commit + push.
+- **Parallel-agent-in-same-session collisions** were the dominant friction in cycles 1–20. Subjects can lie about diffs. Always read the diff, not the subject.
+- **Test-supabase env can wedge silently.** Symptom: start exits 0 but `API URL: ?` + `Anon key: undefined...`. Fix: `cd tests/shared/supabase-project && bunx supabase stop --no-backup && cd -` then re-start. This session started clean (51.3s cold-start).
+- **CI vs pre-push tach gap.** Pre-push uses tach impact-analysis; CI runs full. Run `uv run pytest tests/unit/ -p no:tach -q` for prod-side changes. Not relevant for mutation-pass (which always uses `-p no:tach` on targeted tests), but the gap stays for future cycles.
+- **M7's Python-scoping issue is a class signal:** when an impl-plan's mutation comes from another language's intuition (JS block scope, C++ scope), verify the mutation actually breaks the target before promoting it. Mutation-pass is honest about catching false positives — that's its job.
 
 ## Tattoos still holding
 
-- z003 (open-to-empty), z032 (laconic), z002 (no later), z020 (decision shape) — standard.
-- z109 (tikur self-tripwire) — still relevant; no new tikurs filed this session despite the test-supabase infra failure (it's an env issue, not a tikur-worthy systemic gap... yet — if it recurs next session, write the tikur).
-- **Lihu's "finish, don't bounce" mandate** — this session's strongest tattoo. Pick a sensible default, surface the assumption, keep going. Halt only when wrong-default cost > redo cost.
-- **Verify the diff directly, don't trust worker summaries** — re-orientation hook says it; this session's two tweaker hallucinations make it load-bearing.
-- **Two-spawn green for xfail removal** — still applies (T5 will hit it at cycle 14).
-- **Slice files PARKED for unrelated work** — don't drift into other ENG-* areas during this slice's cycles.
-- `[ORIA]` not `[LIHU UNKNOWN]` for human-needed-input markers.
+- **z003, z032, z002, z020** (standard).
+- **Director never edits source code/tests** — held throughout (Haiku mutation-applier did every edit). Director-only touched state.json + events.jsonl + the polaroid.
+- **`feedback_finish_dont_halt`** — held this session: M7 uncaught didn't trigger a halt-for-user-input; followed the polaroid's pre-stated directive (file a stub).
+- **`feedback_parallel_agents_share_git_worktree`** — informed the deviation. Documented in the events.jsonl rather than fighting the infra.
+- **No PR language**, no force-push, no `--no-verify`.
 
-## Pointers
+## Pointers (final state)
 
-- `git log origin/main --oneline -10` — last 10 commits, cycles 9-13.
-- `.tdd-execute/ENG-5952/state.json` — Director cursor (phase=green, cycle_index=14, target=T5, red_commit_T5=5e698eb58).
-- `.tdd-execute/ENG-5952/events.jsonl` — full audit (60+ entries; see cycle 9-13 events for this session's narrative).
-- `docs/specs/eng-4968-per-workspace-auth-mode/impl-plan-eng-5952.md` — 20-step plan + 7 mutations. Step `n: 14` is the immediate next.
-- `docs/specs/eng-4968-per-workspace-auth-mode/test-plan-eng-5952.md` — T5 row for cycle 14.
-- `python-services/agent_api/chat/chat_context.py:325-338` — the override block landed at cycle 12 and pending one-line widen at cycle 14.
-- `python-services/tests/integration/db/test_chat_context_workspace_auth_mode.py` — T4 + T7 + T5 all live here (T4/T7 real-passing, T5 xfail-strict).
-- `usegin/memento/scopes/eng-5952-tdd-execute/archive/2026-05-11-180112.md` — prior polaroid (cycle 8 sleep) for full prior context.
-- Linear: ENG-4968 (parent spec), ENG-5952 (this slice), ENG-5953 (Slice 2 — admin UI, downstream).
+- `.tdd-execute/ENG-5952/state.json` — `phase=complete`. Mutations caught/uncaught/followups recorded.
+- `.tdd-execute/ENG-5952/events.jsonl` — full audit, ~70 entries through cycle 21.
+- `docs/specs/eng-4968-per-workspace-auth-mode/impl-plan-eng-5952.md` — mutation_pass block; M7 entry needs revision per ENG-5958.
+- `docs/specs/eng-4968-per-workspace-auth-mode/test-plan-eng-5952.md` — T1–T12 reference, all tests green at HEAD.
+- Linear: parent ENG-4968, slice ENG-5952 (this one, done), follow-on slice ENG-5953 (admin UI, not started), calibration stub ENG-5958 (filed).
+- Slice's integration tests (all green at HEAD):
+  - `python-services/tests/integration/db/test_chat_context_workspace_auth_mode.py` (T4–T10, 6 tests)
+  - `python-services/tests/integration/db/test_workspaces_auth_mode_migration.py` (T1, T2, T3, T12, 4 tests)
+  - `python-services/tests/unit/test_auth_fallback_layer2.py::test_workspace_override_flows_to_agent_construction` (T11, 1 test of 12)
+  - `tests/browser-integration/tests/database-types-workspaces-auth-mode.test.ts` (T8, 1 test)
+- Production change site: `python-services/agent_api/chat/chat_context.py` lines 327–346 (override + try/except).
+- Migration: `supabase/migrations/20260511122718_workspace_auth_mode_and_admin_rpc.sql`.
