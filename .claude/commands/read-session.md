@@ -40,29 +40,13 @@ If the summary lists many commits, the tail usually includes the commit log bloc
 
 ## Step 2 — Synthesize
 
-Report in this shape (per the project Reporting rule — opening line, then table):
-
-> One plain sentence naming what the session was.
-
-| | |
-|---|---|
-| **Topic** | What the work was about — domain, not process |
-| **Arc** | The 3–6 beat shape of how it went |
-| **How far we got** | Concrete output — commits, issues closed, decisions made, dead-ends hit |
-| **Where it stopped** | Last meaningful state — done / mid-flight / blocked / abandoned. Quote the closing line if the run self-terminated |
+Write 3–6 sentences of prose. **No tables.** One opening sentence naming what the session was, then cover: what the work was about (domain, not process), the shape of how it went (the 3–6 beats), concrete output (commits, issues closed, decisions made, dead-ends hit), and where it stopped (done / mid-flight / blocked / abandoned). If the run self-terminated, quote the closing line.
 
 Keep it tight. The user wants the click, not the recap.
 
 ## Step 3 — Offer deeper only if relevant
 
-Close with `AskUserQuestion`. Tailor options to what's actually in the session — don't offer "dig into a beat" if there were no notable beats.
-
-| Option | When to offer |
-|---|---|
-| Pick up where it left off | Session ended mid-task with a clear next move |
-| Dig into a specific beat | Multiple subagents, blockers, or decisions worth unpacking |
-| Read the full transcript | First pass left intent ambiguous |
-| Just context, no action | Always offer as the no-op fallback |
+Close with `AskUserQuestion`. Tailor options to what's actually in the session — common shapes: "pick up where it left off" (session ended mid-task with a clear next move), "dig into a specific beat" (multiple subagents, blockers, or decisions worth unpacking), "read the full transcript" (first pass left intent ambiguous), and "just context, no action" as the no-op fallback. Don't offer options that don't fit the actual session.
 
 If the session is cleanly done and there's nothing to continue, a single line "nothing in flight — anything you want me to do with this?" is fine without `AskUserQuestion`.
 
