@@ -21,6 +21,12 @@ The frame: this is a feature that gets **better the more it gets used**,
 because user-corrections in chat-history are the highest-priority source.
 The whole design is in service of that flywheel.
 
+**Effi-memory is a system feature, not opt-in.** AskEffi creates a wiki
+per project as a mechanism for Effi to be better at project-knowledge
+questions. Project owners consult on the *content* of their project's
+wiki (what topics matter, what nuances apply); they do not opt in or
+out of the mechanism. Access is gated to project members (RLS) at v1.
+
 ---
 
 ## 1. Offline processing
@@ -263,17 +269,52 @@ reconciler must:
 
 ## 3. Persistence
 
-### The two-tier picture
+### Storage progression — markdown bootstrap, DB destination
 
-- **Authoring tier (markdown)** — the human-readable, git-versioned,
-  greppable surface. SoT for AskEffi's own dogfooding wiki. Lives at
-  `usegin/effi-memory/<instance>/`.
-- **Runtime tier (database)** — for production multi-tenant Effi, each
-  customer project's wiki lives in Supabase rows. SoT for customer wikis.
+Two phases, not two parallel substrates:
 
-These look the same shape but have different SoT. Per-instance the
-authoring tier dominates if the wiki is "the team's"; the runtime tier
-dominates if the wiki is "the customer's project's".
+- **Experimentation phase (current)** — markdown files in
+  `usegin/effi-memory/<project>/`, edited in git. This is the iteration
+  substrate: cheap to edit conventions, add fields, restructure notes,
+  bulk-rename topics. SoT during experimentation for whichever projects
+  we're prototyping (currently just the AskEffi dogfooding wiki).
+- **Shipping phase (v1)** — Supabase `project_wiki_notes` rows, RLS-gated
+  by project membership. SoT for every project including dogfooding.
+  Markdown is no longer SoT; it can be exported for human review but is
+  read-only.
+
+**The dogfooding wiki we authored in `askeffi-app-really/` is seed content
+for one project, not a permanent home.** When we ship, an import script
+runs once against the final markdown shape and the content moves into
+the DB; from there it lives in rows, evolves in rows, gets edited via
+the offline reconciler and in-app surfaces. Same for every other
+project's wiki — it's authored into the DB from day one.
+
+Why this split (rather than DB from the start, or markdown forever):
+
+- **Iteration cost dominates v0.** Edits, schema changes, bulk operations
+  on conventions are free in markdown and friction-taxed in any DB. While
+  we're still figuring out what a wiki note *should be*, markdown wins.
+- **Authoring at scale is not us.** Once shipping, the authors are Effi
+  herself (offline reconciler — primary mechanism), project members
+  curating via app surfaces, Effi-with-user via in-chat corrections.
+  None of them touch our monorepo. Markdown-in-git is convenience for
+  the AskEffi team bootstrapping the mechanism — not for production
+  authoring.
+- **Multi-tenant access control.** A per-project wiki gated to project
+  members maps cleanly to RLS on a Supabase table. Implementing the same
+  gate over filesystem reads is friction without benefit.
+- **Live updates.** Deploy-per-edit is a non-starter beyond small
+  experiments. DB updates are immediate.
+
+### Designing markdown against the eventual DB shape
+
+The one cost of markdown-first is that conventions could drift into
+shapes that don't map cleanly to SQL. Mitigation: treat each note as
+*one row*; the sections (Current / History / Conflicts / Gaps) as
+*columns*; the in-note citations as a *related table*. As long as
+conventions respect that shape, the import script is mechanical.
+`_conventions.md` already commits to roughly this — preserve it.
 
 ### Schema for the runtime tier
 
@@ -304,23 +345,19 @@ CREATE TABLE memory_notes (
 The schema mirrors the markdown frontmatter + sections. The reconciler
 is the only writer (per `_conventions.md`); RLS enforces it.
 
-### Markdown ↔ DB sync
+### The v0→v1 transition mechanic
 
-For the dogfooding case, markdown is SoT and DB is a derived index:
-- A repo-side hook on commit serializes touched notes into Supabase.
-- Or: the reconciler writes both simultaneously (markdown + DB row).
+1. Freeze the markdown shape — conventions are settled.
+2. Schema-design `project_wiki_notes` to mirror sections-as-columns.
+3. Write `import-wiki-from-markdown <project_id> <source_dir>` once.
+4. Run it against the dogfooding markdown — content moves in one shot.
+5. Switch the runtime tool's storage adapter from filesystem read to SQL.
+6. RLS policy replaces the env-var access gate (see §4 below).
+7. Build authoring surfaces: reconciler-side writes (priority-1), optional
+   in-app curator UI for project members, in-chat correction affordance.
 
-For the per-customer case, DB is SoT and markdown isn't authoritative —
-we *might* periodically export to markdown for human review, but it's
-read-only.
-
-### Why not markdown all the way
-
-Two reasons we can't make markdown SoT for production multi-tenant:
-- Multi-tenancy. Customer A's wiki cannot live in our git repo (data
-  segregation, RLS enforcement, deletion-on-request).
-- Read latency. Reading + parsing markdown per query is bounded by
-  filesystem; a Supabase row read is faster and amortizes better.
+Steps 2–6 are days of work *once we know what the schema should be*.
+That's what experimentation is for.
 
 ### Open questions on persistence
 
@@ -341,7 +378,13 @@ Two reasons we can't make markdown SoT for production multi-tenant:
 
 ### Tool surface
 
-Two tools at the runtime layer:
+**v0 (exp 005) — one tool, MOC pre-loaded.**
+
+The MOCs (`moc/company.md`, `moc/product.md`, `moc/market.md`) plus
+`_conventions.md` get injected into the system prompt at session start
+for any session whose `project_id` matches the configured wiki project.
+Effi sees the topic index immediately — no search step needed to *find*
+the right note.
 
 ```
 memory_lookup(topic: string) -> {
@@ -351,6 +394,13 @@ memory_lookup(topic: string) -> {
 ```
 
 Slug-keyed, deterministic. Returns `null` if topic doesn't exist.
+
+System prompt instructs: *the wiki is your fast path for project-knowledge
+questions; use it freely; fall through to raw data when insufficient or
+when the user asks for source-level detail.* No routing heuristic. Effi
+decides per turn.
+
+**v1 — two tools (when wiki grows beyond pre-loadable MOC).**
 
 ```
 memory_search(query: string, top_k: int = 3) -> [{
@@ -362,6 +412,10 @@ Embedding over `Current` lines + topic slugs (NOT full History — too
 noisy). Returns empty list if no result crosses relevance threshold.
 **Crucially**: must be willing to return empty. Effi must be able to say
 "the wiki doesn't cover that" rather than force a low-relevance match.
+
+Trigger to add `memory_search`: when MOC + conventions cross ~3K tokens
+(roughly 30+ topics) or when wiki spans multiple project domains and the
+pre-loaded index becomes too noisy to be the index.
 
 ### When does Effi call which tool
 
@@ -495,23 +549,31 @@ Architecture B). We have evidence on the *quality* of curated wikis
 (this session built 17 topic notes by hand). **We have zero evidence on
 the offline processor's automation shape.** That's the gap.
 
-### Next experiment — exp 004
+### Two parallel experiments — exp 004 and exp 005
 
-A v0.5 offline processor prototype, scoped to ONE topic to keep the
-blast radius small. See `usegin/effi-memory/experiments/004-offline-processor-prototype/PLAN.md`.
+The feature has two load-bearing arms; both need evidence and both can
+run in parallel.
 
-Core question: **on a real topic, does an artifact-event pipeline produce
-a wiki-correct proposal, automatically?**
+**Exp 004 — does the offline processor work?** A v0.5 offline-processor
+prototype scoped to ONE topic to keep blast radius small. See
+`experiments/004-offline-processor-prototype/PLAN.md`. Core question:
+on a real topic, does an artifact-event pipeline produce a wiki-correct
+proposal, automatically? Test on `notes/activity.md` (freshest, just
+built, known-good baseline). Emits a *proposal*, not a write.
 
-Pick `notes/activity.md` as the test topic — it's the freshest, changes
-most often, and was just built so we have a known-good starting state.
-Watermark it; feed in new gmail/fathom artifacts since the watermark;
-have the prototype emit a *proposal*, not a write. Compare proposal
-against what a manual extraction would have produced.
+**Exp 005 — does the wiki help Effi at runtime?** Minimal runtime tool
+(`memory_lookup` + system-prompt MOC injection) wired into Effi, run
+against a curated eval set of ~10–15 questions about AskEffi-the-company,
+compared to wiki-disabled baseline. Core question: on average, faster
+TTFT, with quality at least as good? See
+`experiments/005-effi-wiki-tool/PLAN.md`. Markdown storage, bundled into
+the python-services image; intentionally throwaway storage so we can
+answer the runtime question without paying for v1 infrastructure first.
 
-If the prototype works on `activity` it likely generalizes. If it fails
-we learn whether the failure is in matching, synthesis, or proposal
-shape — each of which is a separate fix.
+The two arms close different questions: 004 closes "can we keep it
+fresh"; 005 closes "is it worth keeping fresh". If 005 says no, we
+don't ship the offline processor regardless. If 004 says no but 005 says
+yes, the wiki ships with manual curation only.
 
 ---
 
@@ -536,5 +598,7 @@ shape — each of which is a separate fix.
 3. `_lifecycle.md` — structural picture of the four moving parts (10 min).
 4. `_owners.md` — topic→owner map (3 min).
 5. **This doc** — deeper choices + bright lines + open questions (20 min).
-6. `experiments/004-offline-processor-prototype/PLAN.md` — the next
-   thing we'd build to close the biggest gap.
+6. `experiments/004-offline-processor-prototype/PLAN.md` — does the
+   offline reconciler produce wiki-correct proposals automatically?
+7. `experiments/005-effi-wiki-tool/PLAN.md` — does the wiki help Effi
+   at runtime? (the eval that decides whether to keep building.)
