@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { parseFindArgs, parseListArgs, parsePickArgs, parseFetchArgs, parseResumeArgs } from "./cli-args";
+import { parseFindArgs, parseListArgs, parsePickArgs, parseFetchArgs, parseResumeArgs, parseSearchArgs } from "./cli-args";
 import { parseMainArgs, buildIssuesCommand } from "./cli-args-main";
 
 describe("parseFindArgs", () => {
@@ -190,6 +190,34 @@ describe("parseListArgs", () => {
       expect(result.remote).toBe(true);
       expect(result.limit).toBe(20);
       expect(result.since).toBe("3d");
+    });
+  });
+
+  describe("--profile flag", () => {
+    it("defaults profile to undefined", () => {
+      const result = parseListArgs([]);
+      expect(result.profile).toBeUndefined();
+    });
+
+    it("captures the value after --profile", () => {
+      const result = parseListArgs([
+        "--remote",
+        "--profile",
+        "lihu-staging.owner@askeffi.ai:staging",
+      ]);
+      expect(result.profile).toBe("lihu-staging.owner@askeffi.ai:staging");
+    });
+
+    it("throws when --profile has no value", () => {
+      expect(() => parseListArgs(["--profile"])).toThrow(
+        "Missing value for --profile",
+      );
+    });
+
+    it("throws when --profile is followed by another flag", () => {
+      expect(() => parseListArgs(["--profile", "--remote"])).toThrow(
+        "Missing value for --profile",
+      );
     });
   });
 
@@ -996,5 +1024,36 @@ describe("parseResumeArgs", () => {
   it("ignores unknown flags gracefully", () => {
     const result = parseResumeArgs(["--unknown", "159b7095"]);
     expect(result.sessionId).toBe("159b7095");
+  });
+});
+
+describe("parseSearchArgs", () => {
+  describe("--profile flag", () => {
+    it("defaults profile to undefined", () => {
+      const result = parseSearchArgs(["--remote", "needle"]);
+      expect(result.profile).toBeUndefined();
+    });
+
+    it("captures the value after --profile", () => {
+      const result = parseSearchArgs([
+        "--remote",
+        "needle",
+        "--profile",
+        "lihu-staging.owner@askeffi.ai:staging",
+      ]);
+      expect(result.profile).toBe("lihu-staging.owner@askeffi.ai:staging");
+    });
+
+    it("throws when --profile has no value", () => {
+      expect(() => parseSearchArgs(["--remote", "q", "--profile"])).toThrow(
+        "Missing value for --profile",
+      );
+    });
+
+    it("throws when --profile is followed by another flag", () => {
+      expect(() =>
+        parseSearchArgs(["--remote", "q", "--profile", "--limit", "5"]),
+      ).toThrow("Missing value for --profile");
+    });
   });
 });

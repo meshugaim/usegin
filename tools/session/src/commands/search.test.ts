@@ -173,6 +173,42 @@ describe("runSearch — --remote path (AC 35)", () => {
     });
     expect(semanticCalls).toBe(0);
   });
+
+  test("--profile threads profileName into apiOptions", async () => {
+    const profileNames: (string | undefined)[] = [];
+    await runSearch(
+      [
+        "--remote",
+        "needle",
+        "--profile",
+        "lihu-staging.owner@askeffi.ai:staging",
+      ],
+      {
+        findRemoteSessionsViaApiFn: async (options) => {
+          profileNames.push(options.profileName);
+          return [apiItem()];
+        },
+        log: () => {},
+        errorLog: () => {},
+      },
+    );
+    expect(profileNames).toEqual([
+      "lihu-staging.owner@askeffi.ai:staging",
+    ]);
+  });
+
+  test("absent --profile leaves apiOptions.profileName undefined", async () => {
+    const profileNames: (string | undefined)[] = [];
+    await runSearch(["--remote", "q"], {
+      findRemoteSessionsViaApiFn: async (options) => {
+        profileNames.push(options.profileName);
+        return [apiItem()];
+      },
+      log: () => {},
+      errorLog: () => {},
+    });
+    expect(profileNames).toEqual([undefined]);
+  });
 });
 
 // ---------------------------------------------------------------------------

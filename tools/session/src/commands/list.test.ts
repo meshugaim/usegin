@@ -178,6 +178,43 @@ describe("runList — --remote path (AC 32)", () => {
     });
     expect(extractCalls).toBe(0);
   });
+
+  test("--profile threads profileName into apiOptions", async () => {
+    const profileNames: (string | undefined)[] = [];
+    await runList(
+      [
+        "--remote",
+        "--profile",
+        "lihu-staging.owner@askeffi.ai:staging",
+      ],
+      {
+        discoverSessionsFn: async () => [],
+        findRemoteSessionsViaApiFn: async (options) => {
+          profileNames.push(options.profileName);
+          return [apiItem()];
+        },
+        log: () => {},
+        errorLog: () => {},
+      },
+    );
+    expect(profileNames).toEqual([
+      "lihu-staging.owner@askeffi.ai:staging",
+    ]);
+  });
+
+  test("absent --profile leaves apiOptions.profileName undefined", async () => {
+    const profileNames: (string | undefined)[] = [];
+    await runList(["--remote"], {
+      discoverSessionsFn: async () => [],
+      findRemoteSessionsViaApiFn: async (options) => {
+        profileNames.push(options.profileName);
+        return [apiItem()];
+      },
+      log: () => {},
+      errorLog: () => {},
+    });
+    expect(profileNames).toEqual([undefined]);
+  });
 });
 
 describe("runList — merged list (AC 33)", () => {
