@@ -634,6 +634,71 @@ describe("gate-edit-by-phase", () => {
     expect(r.reason).toContain("edit-applied");
   });
 
+  // ---- Director state-file carve-out ----------------------------------
+  //
+  // The Director's own state.json and events.jsonl are not source paths; the
+  // hook must always allow edits to them so the Director can record
+  // `kind: edit-applied`, advance phases, etc. regardless of current phase.
+
+  test("allow: Bash redirect to .tdd-execute/<slice>/state.json in phase=red", async () => {
+    writeState(makeState({ phase: "red" }));
+    const stateFile = join(workspace, ".tdd-execute/ENG-5952/state.json");
+    const r = await runHook(
+      {
+        tool_name: "Bash",
+        tool_input: { command: `echo '{}' > ${stateFile}` },
+      },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.decision).toBe("allow");
+  });
+
+  test("allow: Bash redirect to .tdd-execute/<slice>/events.jsonl in phase=green", async () => {
+    writeState(makeState({ phase: "green" }));
+    const eventsFile = join(workspace, ".tdd-execute/ENG-5952/events.jsonl");
+    const r = await runHook(
+      {
+        tool_name: "Bash",
+        tool_input: {
+          command: `echo '{"kind":"edit-applied"}' >> ${eventsFile}`,
+        },
+      },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.decision).toBe("allow");
+  });
+
+  test("allow: Edit on .tdd-execute/<slice>/state.json in phase=pre-red without allowed_paths", async () => {
+    // pre-red with empty allowed_paths normally denies any prod-path edit,
+    // but the Director's own state.json must always be writable.
+    writeState(makeState({ phase: "pre-red", pre_red: { allowed_paths: [] } }));
+    const stateFile = join(workspace, ".tdd-execute/ENG-5952/state.json");
+    const r = await runHook(
+      { tool_name: "Edit", tool_input: { file_path: stateFile } },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.decision).toBe("allow");
+  });
+
+  test("deny: state.json NOT inside .tdd-execute/<slice>/ is gated normally (carve-out is path-shape specific)", async () => {
+    // A file named state.json that happens to sit outside the
+    // .tdd-execute/<slice>/ shape (e.g. a project-root config file) must
+    // still be gated like any other production path. This is the regression
+    // guard against a name-only carve-out.
+    writeState(makeState({ phase: "red" }));
+    const lookalike = join(workspace, "config/state.json");
+    const r = await runHook(
+      { tool_name: "Edit", tool_input: { file_path: lookalike } },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.decision).toBe("deny");
+    expect(r.reason).toContain("RED phase");
+  });
+
   // ---- F-HOOK-5: configurable freshness window ------------------------
 
   test("deny: phase=refactor + stale by N seconds in deny reason", async () => {

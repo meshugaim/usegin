@@ -513,6 +513,24 @@ function isVerifierExempt(shape: string): boolean {
   return VERIFIER_ALLOWED_SHAPES.has(shape);
 }
 
+// ---- Director state-file carve-out --------------------------------------
+//
+// The Director itself appends to events.jsonl and rewrites state.json as it
+// drives the loop. Those files are the audit trail and cursor — not source
+// paths under test — so phase gating doesn't apply. Without this carve-out
+// the Director cannot record `kind: edit-applied`, advance phases, or
+// otherwise progress once a slice is in a restrictive phase. The match is
+// path-suffix based to tolerate absolute, repo-relative, and worktree-
+// relative inputs uniformly (same posture as matchesAllowedPath).
+
+function isTddExecuteStateFile(filePath: string): boolean {
+  const norm = filePath.replace(/\\/g, "/");
+  return (
+    /\.tdd-execute\/[^/]+\/state\.json$/.test(norm) ||
+    /\.tdd-execute\/[^/]+\/events\.jsonl$/.test(norm)
+  );
+}
+
 // ---- Phase decision -----------------------------------------------------
 
 function decideForPath(
@@ -521,6 +539,10 @@ function decideForPath(
   state: State,
   workspaceDir: string,
 ): { allow: true } | { allow: false; reason: string } {
+  // Director's own state/audit files are never source paths — always allow,
+  // regardless of phase, so the Director can drive the loop.
+  if (isTddExecuteStateFile(filePath)) return { allow: true };
+
   switch (phase) {
     case "pre-red": {
       // Test-path edits flow through unchanged (red is implicit during
