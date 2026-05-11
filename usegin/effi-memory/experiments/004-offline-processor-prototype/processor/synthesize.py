@@ -181,8 +181,14 @@ def synthesize(
         input=prompt,
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
     )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"effi ask exited {proc.returncode}\n"
+            f"stderr:\n{proc.stderr[-2000:]}\n"
+            f"stdout (tail):\n{proc.stdout[-2000:]}"
+        )
     events = json.loads(proc.stdout)
     content_parts = [e["content"] for e in events if e.get("type") == "content"]
     raw_response = "".join(content_parts)
