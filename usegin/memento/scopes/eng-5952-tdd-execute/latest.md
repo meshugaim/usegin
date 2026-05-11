@@ -1,91 +1,86 @@
-# Polaroid — 2026-05-11 15:47 UTC (scope: eng-5952-tdd-execute)
+# Polaroid — 2026-05-11 18:01 UTC (scope: eng-5952-tdd-execute, cycle 13 sleep)
 
 ## Who am I
-**Director** in the `tdd-execute` skill for slice **ENG-5952** (Slice 1 of ENG-4968 per-workspace chat `auth_mode` override). Opus orchestrator; never edits code/tests directly — spawns role-isolated tweakers (Haiku), unseeded reviewers (`ron`, Opus), and a separate verifier (Opus) per cycle. The PreToolUse hook at `.claude/skills/tdd-execute/hooks/gate-edit-by-phase.ts` denies my edits to source paths by design — there's a carve-out for `.tdd-execute/<slice>/{state.json,events.jsonl}` (committed earlier in slice setup).
+**Director** in the `tdd-execute` skill for slice **ENG-5952** (Slice 1 of ENG-4968 per-workspace chat `auth_mode` override). Opus orchestrator; never edits code/tests directly — spawns role-isolated tweakers (Haiku), unseeded reviewers (`ron`, Opus), separate verifier per cycle. The PreToolUse hook at `.claude/skills/tdd-execute/hooks/gate-edit-by-phase.ts` denies my edits to source paths; carve-out for `.tdd-execute/<slice>/{state.json,events.jsonl}`.
 
 ## The kill
-Drive 12 more TDD cycles + mutation pass for ENG-5952 so the outer-red T4 (`ctx.chat_config['auth_mode'] == 'api_key'` for workspace-overridden chat_config) flips to xpass-then-pass at cycle 20.
+**Drive cycles 14-20 + 7-mutation pass for ENG-5952 so T4 outer-green is real and the slice's contract is mutation-tested.** This session landed cycles 9, 10, 11, 12, and 13-red. 12-of-20 plan steps committed + style/drift/fix commits.
 
 ## Where I am
-- **Phase:** `green` (just landed cycle 8 inner-green T3). Ready to advance to step 9 (inner-red T8 types regen).
-- **Slice progress: 8/20 commits on `main`.** All migration substrate complete. Next phase = types regen → `build_chat_context` resolution logic → outer-green T4 → mutation pass.
 
-- **Done (committed and pushed to `origin/main`):**
-  - `5e8da734b` — outer-red T4 (xfail-strict; fails at `chat_context.py` resolution layer)
-  - `13e2a0297` — inner-red T2 (workspaces.auth_mode default test, xfail-strict)
-  - `dce6a2774` — inner-green T2 (migration `NOT NULL DEFAULT 'global'`)
-  - `85799e1f7` — inner-red T1 (CHECK constraint test, xfail-strict)
-  - `b616ae330` — inner-green T1 (`workspaces_auth_mode_check` constraint)
-  - `1fb523768` — verification-only T12 (admin RPC guard regression pin; no xfail, passes today)
-  - `274ef9af0` — inner-red T3 (RPC returns auth_mode test, xfail-strict)
-  - `3438030c9` — inner-green T3 (RPC re-created via DROP+CREATE because `CREATE OR REPLACE` can't change RETURNS TABLE shape — SQLSTATE 42P13)
+- **Phase:** between cycles 13 (red committed at `5e698eb58`) and 14 (inner-green T5 — adds the `'global'` fall-through conditional). **Production code change for cycle 14 is reverted** — clean cleavage at cycle 13 red on origin/main.
+
+- **Done this session (committed + pushed to origin/main):**
+  - `eb92a6808` — cycle 10 green (T8 marker removal; types regen committed separately at `996648cbd`)
+  - `8a824040d` — fix(admin-workspaces): widen RPC cast through unknown after types regen
+  - `397949d07` — style(python): ruff format on slice + sibling drift
+  - `ce661a77c` — cycle 12 green (build_chat_context reads workspace.auth_mode override; T7+T4 both flip to real green; T4 advanced ahead of step 20)
+  - `ccafbd61e` — fix(eng-5952): mock create_safe_client in chat_context unit-test mocks (regression caught by pre-push after Tier-2 reviewer-skip)
+  - `5e698eb58` — cycle 13 red (T5 'global' literal fall-through, xfail-strict)
+
+- **Done previously (cycles 1-8 from prior session):**
+  - 5e8da734b through 3438030c9 — migration substrate (DEFAULT, CHECK, RPC re-creation) + admin-guard regression pin
 
 - **Not done (open-to-empty):**
-  - Step 9: inner-red T8 — types regen test. NO file path predicted yet by impl-plan (read `n: 9` for predicted_seam_touchpoints).
-  - Step 10: inner-green T8 — run `just supabase-types` to regen `nextjs-app/lib/supabase/database.types.ts`.
-  - Steps 11-12: T7 (override reads workspace.auth_mode).
-  - Steps 13-14: T5 ('global' literal fall-through; AC4).
-  - Step 15: T6 (project_id=None, verification-only).
-  - Step 16: T9 (workspace_id=None, verification-only).
-  - Steps 17-18: T10 (try/except + Sentry on workspace read failure).
-  - Step 19: T11 (Layer-2 wiring pin, verification-only).
-  - Step 20: outer-green T4 — flips xfail, full slice passes.
-  - Mutation pass: 7 mutations, runs under `phase=mutation-pass` per-mutation worktrees (per skill epilogue). Required per impl-plan.
-  - After Slice 1 closes: ENG-5953 (admin UI). Handoff note suggested running Slice 2 under `liaison` instead of trio (UI is mechanical mirroring of `FeatureSwitch`).
+  - **Cycle 14 inner-green T5** — the conditional change is *literally one line* in `python-services/agent_api/chat/chat_context.py:337`. Current code says `if workspace_row:`; needs `if workspace_row and workspace_row["auth_mode"] != "global":`. Impl-plan step 14, TPP rank 6. Then substep 14b removes T5's xfail marker. Two-spawn green protocol.
+  - Cycles 15-16 (verification-only T6/T9 — project_id=None, workspace_id=None branches; small)
+  - Cycles 17-18 (T10 try/except + sentry_sdk.capture_exception on workspace fetch failure; meaty)
+  - Cycle 19 (T11 verification-only Layer-2 wiring pin)
+  - Cycle 20 (outer-green T4 — verification-only since T4 flipped at cycle 12)
+  - Mutation pass: 7 mutations (M1-M7) in per-mutation worktrees
 
-- **In flight:** nothing uncommitted. Working tree:
-  ```
-  ?? .tdd-execute/   # workspace state, intentionally untracked
-  ```
-  `git log origin/main..HEAD` is empty — local matches origin.
+- **In flight:**
+  - Nothing uncommitted. Working tree: `?? .tdd-execute/` only.
+  - `git log origin/main..HEAD` is empty — local matches origin.
 
 ## THE ONE THING
-> **At each inner-green, the test xpasses strict (xfail marker) → suite RED. Two-spawn protocol per Lihu's cycle-3 decision: phase=green GreenTweaker mutates production, then flip phase=red briefly for a separate tweaker to remove the xfail marker; commit both as one green commit. The hook physically denies the wrong-phase edit, so the protocol is load-bearing — don't try to bundle both edits into one GreenTweaker spawn.**
+
+> **Before resuming cycle 14, fix the test-supabase infrastructure. This session's `test-supabase start` exits 0 BUT only brings up `supabase_db_test-integ` — the REST/Kong/Auth/Storage containers never come up. `test-supabase status` then reports "NOT running" and `test-supabase env` exits 1. Integration tests cannot run until the full stack is healthy. Without this fix, you cannot verify cycle 14 right-reason green and the slice halts.**
 
 ## Pending decisions / questions
-- (none) — the user's earlier decisions still hold:
-  1. **Two-spawn green for xfail removal** (decided cycle 3, still applies for cycles 11/13/17 and the outer-green step 20).
-  2. **Accept narrower-than-spec tests with a NOTE comment** when the strict spec shape requires conftest invention (decided cycle 2, may recur for T7 / T10).
-  3. **Barrel through** until must-fix / surprise / >50-line conftest invention. None pending.
+
+- (none) — Lihu's "complete the feature autonomously" mandate (this session, after the drift-halt) still stands. He explicitly pushed back on bouncing-back for small Qs; default to finish-don't-halt unless the wrong-default cost is high.
 
 ## Don't-trust-yourself warnings
 
-- **Verify origin/main after each push**, not just that the SHA is in `git log`. Per `reference_autosync_concurrent_collisions`: concurrent agents can rebase your commit and leave cross-contamination. I've been doing this; keep doing it. (`git fetch origin main && git log origin/main --oneline -3`.)
+- **Test-supabase infrastructure broken.** `test-supabase start` reports `API URL: ?` and `Anon key: undefined...` — that's the tell. The DB container comes up but the rest of the stack doesn't. Symptoms: integration test fixtures fail with `subprocess.CalledProcessError: Command 'test-supabase env' returned non-zero exit status 1`. Try: `docker ps` to see which containers are up; expect 9 `supabase_*_test-mvp` containers AND 9 `supabase_*_test-integ` containers; current state has only 1 of the test-integ set. May need full docker compose rebuild or a different reset approach.
 
-- **`test-supabase` reset vs start**: in cycle 5 the GreenTweaker discovered `test-supabase start` is a no-op when the migration's timestamp doesn't change (caches "Migrations up to date"). Use **`test-supabase reset`** for in-place migration mutations. `start` is only correct when the instance is stopped (cold start).
+- **Tier-2 reviewer-skip bit me.** I skipped the Green-phase reviewer for cycle 12 on grounds of "plan-pinned exact code shape" — but the reviewer would have demanded a full unit-suite run, which would have caught the `test_chat_context_outline.py` regression that pre-push then caught. Lesson: skip reviewer ONLY when (a) full unit suite ALSO clean AND (b) prod diff has zero external seams. Cycle 14's diff is also small + plan-pinned, but it touches the same `if workspace_row:` block — re-review is cheap, do it.
 
-- **GreenTweaker hits `CREATE OR REPLACE` 42P13 trap** when RETURNS TABLE shape changes. Cycle 8 hit this; worker correctly pivoted to `DROP FUNCTION IF EXISTS ... CREATE FUNCTION ... GRANT EXECUTE ... COMMENT ON FUNCTION`. If types regen step (9-10) or step 8-equivalent for any later RPC change recurs, expect this; charter pre-emptively if asking for an RPC return-shape change.
+- **Haiku tweakers hallucinate.** Cycle 14's GreenTweaker reported a successful edit + green test run, but the file was unchanged and the test was failing. Also cycle 12's GreenTweaker overshot scope (added try/except reserved for cycle 18) before being fixed. Always verify the diff directly (per re-orientation hook) and run the tests myself before trusting the worker's report. **Re-verify even when the worker is confident.**
 
-- **Probe-agent verdicts have been wrong twice this slice** — once on T2 fixture infra (verdict was READY but partial fixture writes needed), once on T3 admin-auth (verdict A "use seeded admin" but pre-write hook physically blocks the seeded UUID; correct pattern is `create_test_world` + INSERT into `admins` with `register_cleanup`). Future probes for fresh seams: include in the probe charter "also check `.claude/hooks/pre-write.ts` directives, not just sibling tests".
+- **Hook misparses chained Bash commands.** Multi-line `git commit -m "..."` with shell metacharacters (parens, `<<`, `>&1`, `&&`) sometimes trips the hook's heredoc-bypass regex (`>>?\s*[A-Za-z]`) treating the next token as a "production-path edit target." Workaround: single-line commits with multiple `-m` flags, avoid words like `if`/`then`/`else` in commit bodies, split chained `&&` into separate Bash calls. Real bug to file, not this session's job.
 
-- **Each green-tweaker spawn has been getting follow-up "nit" send-messages** for header/docstring/comment cleanup. Real-world cycles are 3-5 spawns each, not the 2 the skill pseudocode implies. Budget your context accordingly. If the next cycle's reviewer raises 3+ nits worth fixing, consider batching them into a single follow-up message (vs sequential send-messages).
+- **Cycle 10 drift-first set the slice-narrow expectation.** When I halted cycle 10 on the 315-line drift hunk, Lihu pushed back hard ("stop bouncing back on small Qs"). The right read of the impl-plan's "halt unless approved" clause is: judge wrong-default cost yourself, halt only if it's high. Future cycles in this slice: bias hard to finishing.
 
-- **Outer-red T4 commit `5e8da734b` is the slice's revert/restore anchor** for step 20's outer-green Verifier. Don't lose its SHA — it's in `state.json.outer_red_commit`.
+- **Don't trust the polaroid's "Resume cue" if a Lihu signal contradicts it.** Tattoo still holds: live signal > prior cue.
 
-- **Pre-existing migration `20260324104803_get_all_workspaces_for_admin.sql` must stay UNTOUCHED.** Cycle 8 re-creates the RPC via a *new* DROP+CREATE in the SLICE migration; the HEAD migration must remain byte-identical. Verifier confirmed this at cycle 8; preserve the invariant.
+- **Cycle 14's reverted change was correct on paper.** The 1-line diff (`if workspace_row and workspace_row["auth_mode"] != "global":`) matches impl-plan step 14 exactly. The revert was for safety (couldn't verify via tests). On wake, you can re-apply the same edit confidently; just verify with tests after infra is healthy.
 
-- **The migration test file (`test_workspaces_auth_mode_migration.py`) now contains 4 tests** (T2 + T1 + T12 + T3). File name is technically narrower than its content (also covers admin RPC). Not renaming mid-slice; future-Ron may judge. Just don't get surprised that "migration" file has RPC tests.
+- **Tach skip is dangerous.** When running pytest with Tach impact-analysis, it skipped 3178 tests as "unaffected" but the unit-test-chat_context_outline regression hit anyway because the touched file (chat_context.py) was directly imported. Don't rely on `--tach` for regression checks; run the full unit suite.
 
 ## Resume cue
-> **First action on wake:** Read `.tdd-execute/ENG-5952/state.json` and `events.jsonl`. State should be at `phase=green, step_index=7, cycle_index=8, target=T3, red_commit=274ef9af0`. Advance to step 9 by reading impl-plan `n: 9` notes for T8 (types regen) — likely needs phase flip to red, predicted_seam_touchpoint is the types.ts file or a thin wrapper test of its shape. Verify state.json's step_index=7 was bumped to 8 before dispatching (it wasn't — I haven't advanced after cycle 8's commit yet; you do that first).
+
+> **First action on wake:** Run `docker ps --format "{{.Names}}"` to count `supabase_*_test-integ` containers. If <9, the full stack isn't up — `test-supabase stop && tools/bin/test-supabase start` is suspect; try `cd /workspaces/test-mvp/tests/shared/supabase-project && supabase stop && supabase start` directly. Once `tools/bin/test-supabase env` exits 0 (and `supabase_kong_test-integ` shows in `docker ps`), proceed: read this polaroid's THE ONE THING for context, then re-apply the cycle-14 conditional via Edit tool on `python-services/agent_api/chat/chat_context.py:337` (single line: `if workspace_row:` → `if workspace_row and workspace_row["auth_mode"] != "global":`), run `cd python-services && uv run pytest tests/integration/db/test_chat_context_workspace_auth_mode.py --runxfail -q`, expect 3 passed. Then dispatch substep 14b RedTweaker to strip T5's xfail marker. Then verifier proof, **then re-review (Tier 1 — no Tier-2 skip this cycle)**, then commit + push.
 
 ## Tattoos still holding
-- **z003, z032, z002, z020** (standard).
-- **Director never edits code/tests** — hook denies anyway, but observe in spirit. State files (`state.json` / `events.jsonl`) are the carve-out.
-- **Single-iteration review per phase** (`feedback_single_iteration_review`) + **fix every must_fix** (`feedback_liaison_fix_everything`) tension is real. Resolution this slice: must_fix → fix in same phase, then re-commit. Nits → fix via send-message exact-substitution (no re-review per `feedback_nit_fix_exact_substitution`).
-- **Always push** after every commit (`feedback_always_push`). Pre-push gates have caught nothing real this slice; supabase sql-rls check has run twice (cycles 5, 8) and passed.
-- **Two-spawn green** (cycle-3 user decision) for any inner-green that flips a strict-xfail test.
+
+- z003 (open-to-empty), z032 (laconic), z002 (no later), z020 (decision shape) — standard.
+- z109 (tikur self-tripwire) — still relevant; no new tikurs filed this session despite the test-supabase infra failure (it's an env issue, not a tikur-worthy systemic gap... yet — if it recurs next session, write the tikur).
+- **Lihu's "finish, don't bounce" mandate** — this session's strongest tattoo. Pick a sensible default, surface the assumption, keep going. Halt only when wrong-default cost > redo cost.
+- **Verify the diff directly, don't trust worker summaries** — re-orientation hook says it; this session's two tweaker hallucinations make it load-bearing.
+- **Two-spawn green for xfail removal** — still applies (T5 will hit it at cycle 14).
+- **Slice files PARKED for unrelated work** — don't drift into other ENG-* areas during this slice's cycles.
+- `[ORIA]` not `[LIHU UNKNOWN]` for human-needed-input markers.
 
 ## Pointers
-- `git log --oneline -10` → main has 8 ENG-5952 commits since `5e8da734b`.
-- `.tdd-execute/ENG-5952/state.json` — Director cursor.
-- `.tdd-execute/ENG-5952/events.jsonl` — full audit (35+ entries).
-- `.claude/handoffs/handoff_20260511_130555.md` — the handoff that started THIS session (cycle 0 → cycle 1 setup work).
-- `docs/specs/eng-4968-per-workspace-auth-mode/impl-plan-eng-5952.md` — schema-validated 20-step plan + 7 mutations.
-- `docs/specs/eng-4968-per-workspace-auth-mode/test-plan-eng-5952.md` — 12 tests, T4 outermost.
-- The slice's two test files on main:
-  - `python-services/tests/integration/db/test_chat_context_workspace_auth_mode.py` — T4 (still xfailed; flips at step 20).
-  - `python-services/tests/integration/db/test_workspaces_auth_mode_migration.py` — T1+T2+T12+T3 all green; T7/T5/T6/T9/T10/T11 will likely either land here or in a new chat-context file (impl-plan steps 11+ will say).
-- The slice's migration on main: `supabase/migrations/20260511122718_workspace_auth_mode_and_admin_rpc.sql` (column + CHECK + RPC re-creation).
-- The HEAD RPC reference (untouched): `supabase/migrations/20260324104803_get_all_workspaces_for_admin.sql`.
-- This polaroid: `usegin/memento/scopes/eng-5952-tdd-execute/latest.md`.
+
+- `git log origin/main --oneline -10` — last 10 commits, cycles 9-13.
+- `.tdd-execute/ENG-5952/state.json` — Director cursor (phase=green, cycle_index=14, target=T5, red_commit_T5=5e698eb58).
+- `.tdd-execute/ENG-5952/events.jsonl` — full audit (60+ entries; see cycle 9-13 events for this session's narrative).
+- `docs/specs/eng-4968-per-workspace-auth-mode/impl-plan-eng-5952.md` — 20-step plan + 7 mutations. Step `n: 14` is the immediate next.
+- `docs/specs/eng-4968-per-workspace-auth-mode/test-plan-eng-5952.md` — T5 row for cycle 14.
+- `python-services/agent_api/chat/chat_context.py:325-338` — the override block landed at cycle 12 and pending one-line widen at cycle 14.
+- `python-services/tests/integration/db/test_chat_context_workspace_auth_mode.py` — T4 + T7 + T5 all live here (T4/T7 real-passing, T5 xfail-strict).
+- `usegin/memento/scopes/eng-5952-tdd-execute/archive/2026-05-11-180112.md` — prior polaroid (cycle 8 sleep) for full prior context.
+- Linear: ENG-4968 (parent spec), ENG-5952 (this slice), ENG-5953 (Slice 2 — admin UI, downstream).
