@@ -23,7 +23,7 @@ Update all dependencies across the monorepo. Every package manager, every sub-pa
 
 4. **Build a plan.** Group what you found into logical stages (e.g., by app, by package manager, by risk level). Patches and in-range bumps first, majors later.
 
-5. **Present the plan to the user.** Lead with two tables — never a prose summary. Wait for approval before executing.
+5. **Present the plan to the user via `/html`.** Wait for approval before executing.
 
    **Table 1 — Will bump.** One row per (package, component) pair. Columns:
 
