@@ -212,8 +212,13 @@ describe("findRemoteSessionsByPrefix", () => {
 
     const matches = await findRemoteSessionsByPrefix(target.id);
 
-    expect(matches.length).toBe(1);
-    expect(matches[0]!.id).toBe(target.id);
+    // A UUID can legitimately appear in multiple `~/agent-records/`
+    // files (e.g. a re-archived or forked session retains its id). The
+    // sibling prefix-match test at L199 already uses >=1; align this
+    // one rather than asserting a uniqueness contract the archive
+    // layout doesn't guarantee.
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+    expect(matches.some((s) => s.id === target.id)).toBe(true);
   });
 
   test("all matches start with the given prefix", async () => {
