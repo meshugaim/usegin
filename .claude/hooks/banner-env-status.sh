@@ -11,14 +11,14 @@
 # agent has the env id at hand for the rest of the session.
 #
 # Detection mirrors .claude/skills/serve-static/scripts/serve.sh:
-#   Gitpod/Ona : GITPOD_API_URL || GITPOD_WORKSPACE_ID + `gitpod` CLI
+#   Gitpod/Ona : GITPOD_API_URL || GITPOD_WORKSPACE_ID + `ona` CLI
 #   Codespaces : CODESPACES == "true" + CODESPACE_NAME
 #   else       : local
 #
-# Env id resolution on Gitpod is via `gitpod environment list` (~500ms), cached
-# to /tmp/banner-env-id-$$ for the lifetime of the devcontainer (regenerated if
-# missing). Hook is silent on any unexpected error — this is a nice-to-have, not
-# a gate.
+# Env id resolution on Gitpod/Ona is via `ona environment list` (~500ms),
+# cached to /tmp/banner-env-id-$$ for the lifetime of the devcontainer
+# (regenerated if missing). Hook is silent on any unexpected error — this is
+# a nice-to-have, not a gate.
 
 set -u
 
@@ -29,15 +29,15 @@ REPO_ROOT="${CLAUDE_PROJECT_DIR:-/workspaces/test-mvp}"
 host=""
 host_detail=""
 
-if { [ -n "${GITPOD_API_URL:-}" ] || [ -n "${GITPOD_WORKSPACE_ID:-}" ]; } && command -v gitpod >/dev/null 2>&1; then
+if { [ -n "${GITPOD_API_URL:-}" ] || [ -n "${GITPOD_WORKSPACE_ID:-}" ]; } && command -v ona >/dev/null 2>&1; then
   host="Gitpod/Ona"
   cache=/tmp/banner-env-id
   if [ -s "$cache" ]; then
     env_id=$(cat "$cache")
   else
-    # `gitpod environment list` prints the running envs for this account; in
+    # `ona environment list` prints the running envs for this account; in
     # practice that's just this one. Take the first id, short-form.
-    env_id=$(gitpod environment list --field id 2>/dev/null | awk 'NR==1 && $1 ~ /^[0-9a-f]{8}-/ {print substr($1,1,8); exit}')
+    env_id=$(ona environment list --field id 2>/dev/null | awk 'NR==1 && $1 ~ /^[0-9a-f]{8}-/ {print substr($1,1,8); exit}')
     [ -n "$env_id" ] && echo "$env_id" > "$cache"
   fi
   host_detail="env ${env_id:-unknown}"

@@ -2,7 +2,7 @@
 # Serve a file or directory over HTTP on a free port and expose it to the
 # user in whatever way makes sense for the current host:
 #
-#   - Gitpod / Ona   -> `gitpod environment port open <port>` -> public URL
+#   - Gitpod / Ona   -> `ona environment port open <port>` -> public URL
 #   - GitHub Codespaces -> `gh codespace ports visibility`    -> forwarded URL
 #   - Local / devcontainer / anything else -> plain http://localhost:<port>
 #
@@ -58,7 +58,7 @@ fi
 # --- Detect host ------------------------------------------------------------
 
 detect_host() {
-  if [[ -n "${GITPOD_API_URL:-}" || -n "${GITPOD_WORKSPACE_ID:-}" ]] && command -v gitpod >/dev/null 2>&1; then
+  if [[ -n "${GITPOD_API_URL:-}" || -n "${GITPOD_WORKSPACE_ID:-}" ]] && command -v ona >/dev/null 2>&1; then
     echo "gitpod"; return
   fi
   if [[ "${CODESPACES:-}" == "true" && -n "${CODESPACE_NAME:-}" ]]; then
@@ -102,7 +102,7 @@ sleep 0.3
 
 case "$host" in
   gitpod)
-    base=$(gitpod environment port open "$port" --name "$name" --admission "$admission")
+    base=$(ona environment port open "$port" --name "$name" --admission "$admission")
     ;;
   codespaces)
     # Make the port visible. `gh codespace ports visibility` requires a codespace
@@ -139,7 +139,7 @@ fi
 # Stderr hint for later cleanup.
 stop_hint="kill \$(cat $pidfile)"
 case "$host" in
-  gitpod)     stop_hint="$stop_hint && gitpod environment port close $port";;
+  gitpod)     stop_hint="$stop_hint && ona environment port close $port";;
   codespaces) stop_hint="$stop_hint && gh codespace ports visibility ${port}:private -c \$CODESPACE_NAME";;
 esac
 echo "[serve-static] host=$host port=$port pid=$(cat "$pidfile") stop: $stop_hint" >&2
