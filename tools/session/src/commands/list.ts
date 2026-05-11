@@ -70,13 +70,36 @@ function sinceToIso(since: string | undefined): string | undefined {
  * Adapt an `ApiSessionItem` (server row) to a `SessionInfo` (local-shape
  * row the renderer already knows). The renderer reads `meta` first, so
  * `path` can be `""` — see SessionInfo JSDoc.
+ *
+ * Exported for direct unit-testing of boundary cases (empty
+ * `display_title`, empty `first_user_message`, malformed `last_synced_at`).
+ * Returns `null` when the row can't be safely adapted — the caller filters
+ * those out before merging.
  */
-function apiItemToSessionInfo(item: ApiSessionItem): SessionInfo {
+export function apiItemToSessionInfo(item: ApiSessionItem): SessionInfo | null {
+  // Defense-in-depth: the server contract types `last_synced_at` as
+  // non-null ISO, but `mergeSessionLists` sorts by `mtime.getTime()` and a
+  // single NaN poisons the entire ordering. If the server ever returns a
+  // null/malformed value, drop the row rather than default-to-now —
+  // defaulting would inject a row at the top of the list with no signal
+  // that its true age is unknown, hiding the bug. Dropping + stderr warn
+  // surfaces it.
+  const mtime = new Date(item.last_synced_at);
+  if (Number.isNaN(mtime.getTime())) {
+    console.error(
+      `Warning: dropping API session ${item.session_id}: invalid last_synced_at (${JSON.stringify(item.last_synced_at)})`,
+    );
+    return null;
+  }
+
   const meta: SessionMeta = {
     // `display_title` is the server-coalesced one-liner the spec promised
-    // (AC 42): summary → first_user_message → "(untitled)". Feeding it via
-    // `summary` makes `formatListLine` pick it as the preview text without
-    // the renderer needing to learn about API rows.
+    // (AC 42): summary → first_user_message → "(untitled)". The server
+    // guarantees a non-empty string (it coalesces empty to "(untitled)"),
+    // so `|| null` here is defensive — a future server bug that returns
+    // `""` falls back to the renderer's own placeholder rather than
+    // showing a blank line. Don't tighten or weaken this without
+    // re-reading AC 42.
     summary: item.display_title || null,
     messages: item.first_user_message ? [item.first_user_message] : [],
     turnCount: item.turn_count,
@@ -87,8 +110,15 @@ function apiItemToSessionInfo(item: ApiSessionItem): SessionInfo {
   return {
     path: "",
     id: item.session_id,
-    mtime: new Date(item.last_synced_at),
-    project: "", // API rows don't carry project_hash; project_path is a string the renderer doesn't need
+    mtime,
+    /**
+     * API rows don't carry `project_hash` (the `~/.claude/projects/<hash>/`
+     * directory name local rows are indexed by); the server only exposes
+     * `project_path` (a free-form workspace path) which the renderer
+     * doesn't consume. Setting `project: ""` keeps the type happy without
+     * pretending we have hash-equivalent grouping for API rows.
+     */
+    project: "",
     source: "remote",
     username: item.username,
     meta,
@@ -190,7 +220,9 @@ export async function runList(
       },
       deps.apiDeps ?? {},
     );
-    const remoteSessions = apiItems.map(apiItemToSessionInfo);
+    const remoteSessions = apiItems
+      .map(apiItemToSessionInfo)
+      .filter((s): s is SessionInfo => s !== null);
     sessions = mergeSessionLists(localSessions, remoteSessions);
   }
 
