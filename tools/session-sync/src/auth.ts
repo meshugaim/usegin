@@ -15,6 +15,14 @@ import {
 	readCredentials as defaultReadCredentials,
 } from "../../effi-cli/src/lib/credentials.ts";
 import { decodeJwtExp } from "../../effi-cli/src/lib/jwt.ts";
+import { ensureFreshToken as defaultEnsureFreshToken } from "../../effi-cli/src/lib/token-refresh.ts";
+
+/**
+ * Refresh the token when fewer than this many seconds remain. Matches
+ * the buffer used inside `ensureFreshToken` itself — we duplicate the
+ * check here so we skip the disk read entirely on the hot path.
+ */
+const REFRESH_BUFFER_SECONDS = 5 * 60;
 
 export interface AuthContext {
 	/** The dev-login JWT — sent as `Authorization: Bearer <token>`. */
@@ -59,9 +67,10 @@ export function isTokenExpired(token: string, now: Date): boolean {
 
 /**
  * Decode the `sub` claim (user UUID) from a JWT body. Returns null on any
- * decode failure or if `sub` is missing/non-string.
+ * decode failure or if `sub` is missing/non-string. Used by both
+ * `loadAuth` (startup) and `refreshAuthIfNeeded` (rotation).
  */
-function decodeJwtSub(token: string): string | null {
+export function decodeJwtSub(token: string): string | null {
 	try {
 		const part = token.split(".")[1];
 		if (!part) return null;
@@ -73,6 +82,64 @@ function decodeJwtSub(token: string): string | null {
 	} catch {
 		return null;
 	}
+}
+
+export interface RefreshAuthOptions {
+	/** Profile to read/write — must match what `loadAuth` was called with. */
+	profileName?: string;
+	/** Now-clock — injected for tests. */
+	now?: Date;
+	/**
+	 * Override the refresh primitive; defaults to `ensureFreshToken` from
+	 * `effi-cli/lib/token-refresh.ts`. The override receives the api-url
+	 * + an options bag with `profileName` so credentials I/O stays scoped
+	 * to the daemon's profile.
+	 */
+	refreshFn?: (
+		apiUrl: string,
+		opts: { profileName?: string },
+	) => Promise<string>;
+}
+
+/**
+ * Keep the daemon's `AuthContext` fresh across the JWT's ~1h lifetime.
+ *
+ * Hot-path contract: if the current token has more than `REFRESH_BUFFER_SECONDS`
+ * remaining, returns the input context unchanged (no I/O). Otherwise calls
+ * the refresh primitive — which reads/writes the profile's credentials.json
+ * and rotates against Supabase — then re-derives `userId` from the new token's
+ * `sub` claim.
+ *
+ * If the refresh succeeds but the new token is unchanged (already-fresh path
+ * inside `ensureFreshToken`), we still re-decode `sub` so a caller mutating a
+ * shared context stays consistent.
+ *
+ * Refresh failures (revoked refresh_token, network blip, supabase outage)
+ * propagate so the caller can decide whether to skip-and-retry or surface.
+ * For the daemon the policy is skip-and-retry — see `cli.ts:fireSync`.
+ */
+export async function refreshAuthIfNeeded(
+	auth: AuthContext,
+	opts: RefreshAuthOptions = {},
+): Promise<AuthContext> {
+	const now = opts.now ?? new Date();
+	const exp = decodeJwtExp(auth.token);
+	const nowSec = Math.floor(now.getTime() / 1000);
+	if (exp !== null && exp - nowSec > REFRESH_BUFFER_SECONDS) {
+		return auth;
+	}
+	const refreshFn = opts.refreshFn ?? defaultEnsureFreshToken;
+	const newToken = await refreshFn(auth.apiUrl, {
+		profileName: opts.profileName,
+	});
+	if (newToken === auth.token) return auth;
+	const sub = decodeJwtSub(newToken);
+	if (!sub) {
+		throw new Error(
+			"session-sync: refreshed token is missing `sub` claim — refusing to use.",
+		);
+	}
+	return { token: newToken, apiUrl: auth.apiUrl, userId: sub };
 }
 
 export async function loadAuth(

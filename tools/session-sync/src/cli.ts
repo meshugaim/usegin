@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { type AuthContext, loadAuth } from "./auth.ts";
+import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
 import { Coalescer } from "./coalescer.ts";
 import { detectEnvironment } from "./env-detect.ts";
 import { getOrCreateInstallId } from "./install-id.ts";
@@ -301,6 +301,24 @@ async function fireSync(
 	const uploadId = `${sessionId}:${Date.now()}`;
 	d.pending.set(uploadId, { uploadId, estimatedRemainingMs: 500 });
 	try {
+		// Keep the JWT fresh before every upload. Hot-path no-op when the
+		// existing token still has >5min of life. On refresh failure
+		// (revoked refresh_token, transient network), log + skip this
+		// upload — the next tick re-tries. We deliberately don't crash:
+		// a steady stream of warnings is louder than a dead daemon.
+		try {
+			d.auth = await refreshAuthIfNeeded(d.auth, {
+				profileName: d.config.profileName,
+			});
+		} catch (err) {
+			console.warn(
+				"[session-sync] token refresh failed; skipping upload for",
+				sessionId,
+				"-",
+				(err as Error).message,
+			);
+			return;
+		}
 		const projectPath = projectPathFromFile(path, d.config.projectsDir);
 		const outcome = await syncSession({
 			parentPath: path,
