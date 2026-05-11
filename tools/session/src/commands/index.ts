@@ -6,6 +6,7 @@ export { runResume } from "./resume";
 export { runFork } from "./fork";
 export { runRm } from "./rm";
 export { runBash } from "./bash";
+export { runSearch } from "./search";
 export { runSearchIn } from "./search-in";
 export { runDocs } from "./docs";
 export { runParse } from "./parse";

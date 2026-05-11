@@ -26,6 +26,7 @@ import {
   runFork,
   runRm,
   runBash,
+  runSearch,
   runSearchIn,
   runDocs,
   runParse,
@@ -49,6 +50,8 @@ USAGE:
   session rm <id> [--yes]   Delete a session and its subagent files
   session delete <id>       Alias for 'rm'
   session bash [id] [--grep <p>]  Browse Bash commands from sessions
+  session search <query> [-k N]   Semantic search across all sessions
+  session search --index          Build / refresh the semantic index
   session search-in <id> <query>  Search within a session's turns
   session code-history <file>:<line>  Show commit context for a line
   session docs [list|show]  Browse embedded documentation
@@ -233,6 +236,12 @@ async function main() {
   // Check for 'bash' subcommand
   if (rawArgs[0] === "bash") {
     await runBash(rawArgs.slice(1));
+    return;
+  }
+
+  // Check for 'search' subcommand (semantic, across all sessions)
+  if (rawArgs[0] === "search") {
+    await runSearch(rawArgs.slice(1));
     return;
   }
 
