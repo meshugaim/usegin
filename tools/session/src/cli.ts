@@ -52,6 +52,8 @@ USAGE:
   session bash [id] [--grep <p>]  Browse Bash commands from sessions
   session search <query> [-k N]   Semantic search across all sessions
   session search --index          Build / refresh the semantic index
+  session search --remote <q> [--user --since --until --status --limit --output]
+                                  Postgres full-text search via /api/v1/dev-sessions (AC 35)
   session search-in <id> <query>  Search within a session's turns
   session code-history <file>:<line>  Show commit context for a line
   session docs [list|show]  Browse embedded documentation

@@ -52,11 +52,12 @@ import { apiItemToSessionInfo } from "./list";
  * Convert `Nd` / `Nw` / `YYYY-MM-DD` to an ISO timestamp the API's
  * `since`/`until` filters expect.
  *
- * Duplicated from `commands/list.ts` (3 lines, intentional). Lifting to a
- * shared helper for two callers crosses the "tiny abstraction" threshold;
- * if a third caller arrives, promote.
+ * Verbatim copy of `commands/list.ts`'s `sinceToIso` (3 lines, intentional).
+ * Same name so the duplication is visually obvious; lifting to a shared
+ * helper for two callers crosses the "tiny abstraction" threshold — if a
+ * third caller arrives, promote then.
  */
-function relToIso(rel: string | undefined): string | undefined {
+function sinceToIso(rel: string | undefined): string | undefined {
   if (!rel) return undefined;
   const d = parseSinceFilter(rel);
   return d ? d.toISOString() : undefined;
@@ -136,8 +137,8 @@ async function runRemoteSearch(
     {
       q: searchArgs.query,
       limit: searchArgs.limit,
-      since: relToIso(searchArgs.since),
-      until: relToIso(searchArgs.until),
+      since: sinceToIso(searchArgs.since),
+      until: sinceToIso(searchArgs.until),
       user_id: searchArgs.user,
       status: searchArgs.status,
     },
