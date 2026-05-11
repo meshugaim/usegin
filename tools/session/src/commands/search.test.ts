@@ -377,4 +377,26 @@ describe("runSearch — argv validation", () => {
     ).rejects.toThrow(/Invalid --status/);
     expect(apiCalls).toBe(0);
   });
+
+  test("--remote --index is rejected (would silently drop --index otherwise)", async () => {
+    // --index is the semantic-shim's "rebuild the local vector index"
+    // trigger. On the API path it has no meaning; without this guard it
+    // lands in `semanticRest` and gets quietly dropped, which looks like
+    // the rebuild was accepted but did nothing.
+    let apiCalls = 0;
+    const errors: string[] = [];
+    await expect(
+      runSearch(["--remote", "--index"], {
+        findRemoteSessionsViaApiFn: async () => {
+          apiCalls++;
+          return [];
+        },
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      }),
+    ).rejects.toThrow(/__test_exit_1__/);
+    expect(apiCalls).toBe(0);
+    expect(errors.some((e) => /--index.*--remote/i.test(e))).toBe(true);
+    expect(exitCalls).toEqual([1]);
+  });
 });

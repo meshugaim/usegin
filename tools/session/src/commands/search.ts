@@ -227,6 +227,19 @@ export async function runSearch(
   const searchArgs = parseSearchArgs(args);
 
   if (searchArgs.remote) {
+    // `--index` is a semantic-shim flag that triggers index rebuild — it has
+    // no meaning on the API path. Without this guard it would silently land
+    // in `semanticRest` and be dropped, which looks like "the build flag was
+    // accepted but did nothing." Reject explicitly.
+    if (searchArgs.semanticRest.includes("--index")) {
+      const errorLog =
+        deps.errorLog ?? ((line: string) => console.error(line));
+      errorLog(
+        "Error: --index is incompatible with --remote (it builds the local semantic index).",
+      );
+      process.exit(1);
+      return;
+    }
     await runRemoteSearch(searchArgs, deps);
     return;
   }
