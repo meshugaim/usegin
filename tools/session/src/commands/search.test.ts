@@ -378,6 +378,34 @@ describe("runSearch — argv validation", () => {
     expect(apiCalls).toBe(0);
   });
 
+  test("flag-first shape `[-k 5 \"my query\"]` rejects (was silently misclassified)", async () => {
+    // The pre-fix parser was positional-first-bare-arg-wins:
+    // `["-k", "5", "my query"]` would bind `query="5"` (because `5` is
+    // bare and arrives before "my query") and shove `-k` + "my query"
+    // into semanticRest — so the shim saw `search.py -k my query` with
+    // no query argument and the user's actual query was thrown away.
+    // We can't know `-k`'s arity (the shim's argparse owns that), so
+    // we reject rather than guess.
+    let apiCalls = 0;
+    let semanticCalls = 0;
+    await expect(
+      runSearch(["-k", "5", "my query"], {
+        findRemoteSessionsViaApiFn: async () => {
+          apiCalls++;
+          return [];
+        },
+        runSemanticFn: async () => {
+          semanticCalls++;
+          return 0;
+        },
+        log: () => {},
+        errorLog: () => {},
+      }),
+    ).rejects.toThrow(/positional.*before unknown flags/i);
+    expect(apiCalls).toBe(0);
+    expect(semanticCalls).toBe(0);
+  });
+
   test("--remote --index is rejected (would silently drop --index otherwise)", async () => {
     // --index is the semantic-shim's "rebuild the local vector index"
     // trigger. On the API path it has no meaning; without this guard it

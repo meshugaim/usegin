@@ -255,6 +255,20 @@ export function parseSearchArgs(args: string[]): SearchArgs {
     semanticRest: [],
   };
 
+  // Positional-first contract: the bare query must appear before any
+  // unknown (semanticRest-bound) flag. This rules out the silent
+  // misclassification where `["-k", "5", "my query"]` was bound as
+  // `query="5"` and `semanticRest=["-k", "my query"]` — the user meant
+  // `-k 5` as the shim's "top-k" flag with `my query` as the search
+  // text. We can't know unknown-flag arities (the shim's argparse
+  // owns those), so we can't safely consume a positional that appears
+  // after one — reject instead of guess.
+  //
+  // Known no-value flags (--remote) and known value-bearing flags
+  // (--limit, --since, …) don't set this gate, so the dominant
+  // `--remote "<query>"` shape works.
+  let unknownFlagSeen = false;
+
   // Two-pass: collect the positional query + classify known flags. Anything
   // unknown is forwarded to `semanticRest` so the semantic shim sees its
   // native argv. Positional comes first too (existing semantic CLI: e.g.
@@ -293,6 +307,13 @@ export function parseSearchArgs(args: string[]): SearchArgs {
       result.output = validateEnum(value, VALID_OUTPUT_FORMATS, "--output");
       i++;
     } else if (!arg.startsWith("-") && result.query === "") {
+      if (unknownFlagSeen) {
+        // Positional after an unknown flag — likely the unknown flag's
+        // value, not a query. Don't guess; surface the ambiguity.
+        throw new Error(
+          `session search: positional query must come before unknown flags; got "${arg}" after a flag the parser doesn't recognize. Put the query first: \`session search "<query>" --remote ...\` or \`session search "<query>" -k 5\`.`,
+        );
+      }
       // First bare positional is the query. Subsequent bare positionals
       // fall into semanticRest (the shim handles repeats how it wants).
       result.query = arg;
@@ -303,6 +324,9 @@ export function parseSearchArgs(args: string[]): SearchArgs {
       // pass-through is enough. The cost: a stray `--remote-ish-typo`
       // lands in semanticRest and the shim will complain. That's fine —
       // surfaces the typo at the layer that knows its own flag set.
+      if (arg.startsWith("-")) {
+        unknownFlagSeen = true;
+      }
       result.semanticRest.push(arg);
     }
   }
