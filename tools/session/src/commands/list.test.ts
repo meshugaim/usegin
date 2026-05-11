@@ -26,7 +26,7 @@ import type {
   ApiSessionItem,
   SessionInfo,
 } from "../finder";
-import { runList } from "./list";
+import { apiItemToSessionInfo, runList } from "./list";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -116,7 +116,16 @@ describe("runList — --remote path (AC 32)", () => {
       discoverSessionsFn: async () => [],
       findRemoteSessionsViaApiFn: async (options, filters, deps) => {
         calls.push({ options, filters, deps });
-        return [apiItem()];
+        // Differentiate `display_title` from `first_user_message` so a
+        // regression that reads the wrong field can't accidentally pass.
+        // AC 42's contract is "render display_title" — the renderer must
+        // pick the server-coalesced summary, not the raw first user line.
+        return [
+          apiItem({
+            display_title: "summary text from server",
+            first_user_message: "raw first user message",
+          }),
+        ];
       },
       log: (line) => lines.push(line),
       errorLog: () => {},
@@ -135,10 +144,12 @@ describe("runList — --remote path (AC 32)", () => {
     expect(sinceMs).toBeLessThan(Date.now());
 
     // The rendered line should mention the short id + the API row's
-    // display_title (carried via meta.summary) — proving the adapter
-    // wired the server-coalesced title into the renderer.
+    // display_title (the server-coalesced summary). Crucially, the raw
+    // `first_user_message` must NOT appear — the renderer reads
+    // `meta.summary` (= display_title), not the message string.
     expect(lines.some((l) => l.includes("22222222"))).toBe(true);
-    expect(lines.some((l) => l.includes("hello from oria"))).toBe(true);
+    expect(lines.some((l) => l.includes("summary text from server"))).toBe(true);
+    expect(lines.some((l) => l.includes("raw first user message"))).toBe(false);
   });
 
   test("renders API rows with [R] remote prefix", async () => {
@@ -231,5 +242,72 @@ describe("runList — empty result", () => {
     ).rejects.toThrow(/__test_exit_1__/);
     expect(exitCalls).toEqual([1]);
     expect(errors.some((e) => e.startsWith("Error: "))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `apiItemToSessionInfo` — direct adapter unit tests
+//
+// Today the adapter is covered transitively through the runList tests, but
+// the boundary cases (empty title, empty first-user-message, malformed
+// timestamp) deserve focused assertions so a regression doesn't have to
+// trip a higher-level test to show up.
+// ---------------------------------------------------------------------------
+
+describe("apiItemToSessionInfo", () => {
+  test("empty `display_title` → meta.summary is null", () => {
+    const result = apiItemToSessionInfo(apiItem({ display_title: "" }));
+    expect(result).not.toBeNull();
+    expect(result!.meta?.summary).toBeNull();
+  });
+
+  test("empty `first_user_message` → hasUserMessages false, messages empty", () => {
+    const result = apiItemToSessionInfo(
+      apiItem({ first_user_message: null }),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.meta?.hasUserMessages).toBe(false);
+    expect(result!.meta?.messages).toEqual([]);
+  });
+
+  test("populated `first_user_message` → hasUserMessages true, messages carries the line", () => {
+    const result = apiItemToSessionInfo(
+      apiItem({ first_user_message: "hi there" }),
+    );
+    expect(result).not.toBeNull();
+    expect(result!.meta?.hasUserMessages).toBe(true);
+    expect(result!.meta?.messages).toEqual(["hi there"]);
+  });
+
+  test("ISO `last_synced_at` parses to the expected Date", () => {
+    const iso = "2026-05-11T09:00:00.000Z";
+    const result = apiItemToSessionInfo(apiItem({ last_synced_at: iso }));
+    expect(result).not.toBeNull();
+    expect(result!.mtime).toBeInstanceOf(Date);
+    expect(result!.mtime.toISOString()).toBe(iso);
+  });
+
+  test("malformed `last_synced_at` → drops the row (returns null)", () => {
+    // Suppress the stderr warning the adapter emits — we only care that
+    // the row is dropped, not how the warning is printed.
+    const realError = console.error;
+    console.error = () => {};
+    try {
+      const result = apiItemToSessionInfo(
+        apiItem({ last_synced_at: "not-a-date" }),
+      );
+      expect(result).toBeNull();
+    } finally {
+      console.error = realError;
+    }
+  });
+
+  test("returns SessionInfo shape with source=remote and path empty", () => {
+    const result = apiItemToSessionInfo(apiItem());
+    expect(result).not.toBeNull();
+    expect(result!.source).toBe("remote");
+    expect(result!.path).toBe("");
+    expect(result!.project).toBe("");
+    expect(result!.id).toBe("22222222-2222-2222-2222-222222222222");
   });
 });
