@@ -10,15 +10,52 @@
 // =============================================================================
 
 /**
- * Information about a discovered session file.
+ * Information about a discovered session.
+ *
+ * **Dual-source nature (ENG-5861).** `SessionInfo` covers two surfaces:
+ *
+ *   - **Local / legacy-remote** (`source` absent or `"remote"` from
+ *     `~/agent-records/`): `path` is a real filesystem path. Callers that
+ *     need full metadata (turn count, summary, first message) read the file
+ *     and extract on demand via `extractSessionMeta(path)`.
+ *   - **API-remote** (`source: "remote"` with `meta` populated): the row
+ *     came from `/api/v1/dev-sessions`, where the daemon has already
+ *     uploaded summarized fields. There's no local file to open, so `path`
+ *     is the empty string and `meta` carries pre-extracted display data
+ *     (`display_title` → `summary`, `turn_count`, etc.). Callers MUST
+ *     check `meta` first and only fall back to filesystem extraction when
+ *     it's absent — opening `""` as a path is an obvious crash. The list
+ *     renderer (`commands/list.ts`) is the load-bearing consumer; other
+ *     surfaces (`fzf.ts`, `pickers.ts`) only see local sessions in
+ *     slice 1, so the `path = ""` invariant is local to the API-list flow.
+ *
+ * This shape is deliberately a thin adaptor over the API row rather than
+ * a `SessionInfo.path?` ripple — `path` is read by ~half a dozen non-list
+ * call sites that have no business knowing about the API surface, and
+ * widening their accepted type to handle "remote with no path" would push
+ * the dual-source concern into modules that should stay local-only.
  */
 export interface SessionInfo {
+  /**
+   * Filesystem path to the session file. **Empty string** when the row
+   * came from `/api/v1/dev-sessions` and only metadata is available; the
+   * file would have to be downloaded via signed URL before it could be
+   * read. Slice-1 callers that hit this case use `meta` instead.
+   */
   path: string;
   id: string;
   mtime: Date;
   project: string; // Project hash (directory name)
   source?: "local" | "remote"; // Where this session was discovered
   username?: string; // agent-records username directory (remote sessions only)
+  /**
+   * Pre-extracted metadata for API-remote rows. When set, the list
+   * renderer uses these fields directly instead of calling
+   * `extractSessionMeta(path)` — that call would `readJsonlContent("")`
+   * and crash. Absent for local + legacy-remote rows; set only by the
+   * API adapter in `commands/list.ts` (and any future API consumer).
+   */
+  meta?: SessionMeta;
 }
 
 /**
