@@ -699,6 +699,84 @@ describe("gate-edit-by-phase", () => {
     expect(r.reason).toContain("RED phase");
   });
 
+  test("deny: suffix-spoof state.json.bak / state.json~ in phase=red falls through to gating", async () => {
+    // The carve-out regex anchors at end-of-string, so suffixes like .bak
+    // or ~ must NOT match. Regression guard against a loose match that
+    // would let any state.json-prefixed lookalike past the gate.
+    writeState(makeState({ phase: "red" }));
+    const bak = join(workspace, ".tdd-execute/ENG-5952/state.json.bak");
+    const tilde = join(workspace, ".tdd-execute/ENG-5952/state.json~");
+
+    const rBak = await runHook(
+      { tool_name: "Edit", tool_input: { file_path: bak } },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(rBak.exitCode).toBe(0);
+    expect(rBak.decision).toBe("deny");
+    expect(rBak.reason).toContain("RED phase");
+
+    const rTilde = await runHook(
+      { tool_name: "Edit", tool_input: { file_path: tilde } },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(rTilde.exitCode).toBe(0);
+    expect(rTilde.decision).toBe("deny");
+    expect(rTilde.reason).toContain("RED phase");
+  });
+
+  test("allow: phase=complete + Bash append to events.jsonl (terminal-event contract)", async () => {
+    // After setting phase=complete, the Director still needs to log the
+    // slice's terminal `slice-complete` event. The carve-out must win over
+    // complete's catch-all deny.
+    writeState(makeState({ phase: "complete" }));
+    const eventsFile = join(workspace, ".tdd-execute/ENG-5952/events.jsonl");
+    const r = await runHook(
+      {
+        tool_name: "Bash",
+        tool_input: {
+          command: `echo '{"kind":"slice-complete"}' >> ${eventsFile}`,
+        },
+      },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.decision).toBe("allow");
+  });
+
+  test("allow: phase=refactor (stale, no last_test_run) + Edit on state.json", async () => {
+    // refactor without a fresh last_test_run normally denies any edit. The
+    // Director must still be able to record edits to its own state.json
+    // while the suite is stale.
+    writeState(makeState({ phase: "refactor" }));
+    const stateFile = join(workspace, ".tdd-execute/ENG-5952/state.json");
+    const r = await runHook(
+      { tool_name: "Edit", tool_input: { file_path: stateFile } },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.decision).toBe("allow");
+  });
+
+  test("allow: phase=mutation-pass + Edit on events.jsonl", async () => {
+    // mutation-pass restricts edits to allowed_paths[]. The Director's
+    // events.jsonl is not a target file and must remain writable.
+    writeState(
+      makeState({
+        phase: "mutation-pass",
+        mutation_pass: {
+          allowed_paths: [join(workspace, "lib/csv/parse.ts")],
+        },
+      }),
+    );
+    const eventsFile = join(workspace, ".tdd-execute/ENG-5952/events.jsonl");
+    const r = await runHook(
+      { tool_name: "Edit", tool_input: { file_path: eventsFile } },
+      { TDD_WORKSPACE: workspace },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.decision).toBe("allow");
+  });
+
   // ---- F-HOOK-5: configurable freshness window ------------------------
 
   test("deny: phase=refactor + stale by N seconds in deny reason", async () => {

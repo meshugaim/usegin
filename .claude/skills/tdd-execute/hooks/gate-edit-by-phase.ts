@@ -541,6 +541,10 @@ function decideForPath(
 ): { allow: true } | { allow: false; reason: string } {
   // Director's own state/audit files are never source paths — always allow,
   // regardless of phase, so the Director can drive the loop.
+  // Always allow regardless of phase — including `complete`. The Director's
+  // own audit trail and cursor are not source paths; gating them would
+  // prevent recording the slice's terminal events. findWorkspaceDir() is
+  // the real workspace-boundary check; this regex is suffix-shape only.
   if (isTddExecuteStateFile(filePath)) return { allow: true };
 
   switch (phase) {
