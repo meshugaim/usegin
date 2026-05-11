@@ -176,6 +176,142 @@ export function parseListArgs(args: string[]): ListArgs {
   return result;
 }
 
+// =============================================================================
+// SEARCH ARGS
+// =============================================================================
+
+/**
+ * Validate --status: server accepts "active" or "completed" (see
+ * `ApiListOptions.status` in `finder/api-client.ts`). Anything else would
+ * silently 400 at the API layer; reject at the CLI to surface the typo.
+ */
+const VALID_SEARCH_STATUSES: readonly ("active" | "completed")[] = [
+  "active",
+  "completed",
+] as const;
+
+export interface SearchArgs {
+  /** Positional query string. Required for `--remote` and for semantic mode. */
+  query: string;
+  /**
+   * When true, dispatch to the API full-text path (`/api/v1/dev-sessions?q=`).
+   * When false (default), dispatch to the day-old semantic-search shim
+   * (`experiments/session-semantic-search/`). See `commands/search.ts`.
+   *
+   * Both surfaces share one verb because they're "search across sessions" at
+   * the user-intent level; the flag picks the substrate. Director decision —
+   * not to be relitigated here.
+   */
+  remote: boolean;
+  /** Server cap is 100; default mirrors `parseListArgs` at 20. */
+  limit: number;
+  /** Same shape as `parseListArgs`'s `--since`: Nd / Nw / YYYY-MM-DD. */
+  since?: string;
+  /** Same shape as `--since`, applied as an upper bound. */
+  until?: string;
+  /** Filter by owning user_id (UUID). Forwarded to `ApiListOptions.user_id`. */
+  user?: string;
+  /** Forwarded to `ApiListOptions.status`. */
+  status?: "active" | "completed";
+  /** path / id / json — same union as `ListArgs`; same renderer. */
+  output: OutputFormat;
+  /**
+   * Forwarded verbatim to the semantic-search shim when `--remote` is unset.
+   * Captured here so the API path can ignore them and the shim sees its
+   * native argv shape — keeps the legacy path byte-identical.
+   */
+  semanticRest: string[];
+}
+
+/**
+ * Parse arguments for `session search "<query>" [...]`.
+ *
+ * Two consumers, two argv-shapes:
+ *
+ *   - `--remote` path → uses `query`, `limit`, `since`, `until`, `user`,
+ *     `status`, `output`. Renders through `formatListLine` / `formatOutput`
+ *     same as `parseListArgs`.
+ *   - Default (semantic) path → passes the positional + any unrecognized
+ *     flags through to `experiments/session-semantic-search/search.py`
+ *     unchanged. `semanticRest` carries the un-consumed args so the shim
+ *     sees its native CLI surface.
+ *
+ * Why one parser instead of "if --remote then parse otherwise pass-through":
+ * the shim and the API path share the `--limit` and `--since` semantics;
+ * keeping a single parser avoids the trap where a future contributor adds
+ * `--limit` to one branch but not the other.
+ *
+ * The semantic path's pre-existing flags (`-k <n>`, `--index`) are NOT
+ * recognized here — they fall into `semanticRest` and the shim handles them
+ * as before. `--remote --index` is undefined behavior; not in scope for
+ * AC 35.
+ */
+export function parseSearchArgs(args: string[]): SearchArgs {
+  const result: SearchArgs = {
+    query: "",
+    remote: false,
+    limit: 20,
+    output: "path",
+    semanticRest: [],
+  };
+
+  // Two-pass: collect the positional query + classify known flags. Anything
+  // unknown is forwarded to `semanticRest` so the semantic shim sees its
+  // native argv. Positional comes first too (existing semantic CLI: e.g.
+  // `session search "rls policy" -k 5`).
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+    if (arg === "--remote") {
+      result.remote = true;
+    } else if (arg === "--limit" || arg === "-n") {
+      const value = requireArgValue(args, i, arg);
+      result.limit = validatePositiveInteger(value, arg);
+      i++;
+    } else if (arg === "--since") {
+      const value = requireArgValue(args, i, "--since");
+      result.since = validateSince(value, "--since");
+      i++;
+    } else if (arg === "--until") {
+      const value = requireArgValue(args, i, "--until");
+      result.until = validateSince(value, "--until");
+      i++;
+    } else if (arg === "--user") {
+      const value = requireArgValue(args, i, "--user");
+      result.user = value;
+      i++;
+    } else if (arg === "--status") {
+      const value = requireArgValue(args, i, "--status");
+      result.status = validateEnum(
+        value,
+        VALID_SEARCH_STATUSES,
+        "--status",
+      );
+      i++;
+    } else if (arg === "--output") {
+      const value = requireArgValue(args, i, "--output");
+      result.output = validateEnum(value, VALID_OUTPUT_FORMATS, "--output");
+      i++;
+    } else if (!arg.startsWith("-") && result.query === "") {
+      // First bare positional is the query. Subsequent bare positionals
+      // fall into semanticRest (the shim handles repeats how it wants).
+      result.query = arg;
+    } else {
+      // Unknown flag (or its consumed value). Forward to the semantic shim.
+      // We deliberately don't try to consume value-bearing unknown flags
+      // here — the shim re-parses semanticRest with its own argparse so a
+      // pass-through is enough. The cost: a stray `--remote-ish-typo`
+      // lands in semanticRest and the shim will complain. That's fine —
+      // surfaces the typo at the layer that knows its own flag set.
+      result.semanticRest.push(arg);
+    }
+  }
+
+  return result;
+}
+
+// =============================================================================
+
 export function parsePickArgs(args: string[]): PickArgs {
   const result: PickArgs = {
     allProjects: false,
