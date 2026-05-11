@@ -117,6 +117,16 @@ async function renderRemote(
   }
 }
 
+/**
+ * Empty-result handling note: this returns a different stderr message
+ * than `commands/list.ts`'s `NoSessionsFoundError` (we say
+ * `No sessions matched "<query>"`, list says "no sessions found" with
+ * filter context). Both still exit 1, so scripting doesn't care. The
+ * messages diverge on purpose: a search returning zero is a user-typed-
+ * this-query negative result (echo the query back so they see exactly
+ * what we looked for); list returning zero is a discovery-found-nothing
+ * result (echo the filters back so they see what we scanned).
+ */
 async function runRemoteSearch(
   searchArgs: SearchArgs,
   deps: RunSearchDeps,
