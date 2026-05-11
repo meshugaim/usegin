@@ -14,9 +14,20 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import time
 from dataclasses import dataclass
 
 from .filter import AnnotatedItem
+
+
+# Known transient failures from `effi ask` — socket drops mid-stream, etc.
+# All survive a retry with the same prompt (per handoff observations).
+_TRANSIENT_STDERR_MARKERS = (
+    "socket connection was closed unexpectedly",
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "fetch failed",
+)
 
 
 PROMPT_TEMPLATE = """You are reconciling a curated team-activity wiki note against \
@@ -168,27 +179,42 @@ def _extract_json(text: str) -> dict:
     return json.loads(m.group(1))
 
 
+def _is_transient(stderr: str) -> bool:
+    return any(m in stderr for m in _TRANSIENT_STDERR_MARKERS)
+
+
 def synthesize(
     note_text: str,
     watermark: str,
     annotated: list[AnnotatedItem],
     profile: str = "dogfooding",
+    max_attempts: int = 3,
 ) -> SynthesisResult:
     prompt = build_prompt(note_text, watermark, annotated)
     cmd = ["effi", "--profile", profile, "ask", "--new", "--json"]
-    proc = subprocess.run(
-        cmd,
-        input=prompt,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            f"effi ask exited {proc.returncode}\n"
+    last_err: str | None = None
+    for attempt in range(1, max_attempts + 1):
+        proc = subprocess.run(
+            cmd,
+            input=prompt,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0:
+            break
+        last_err = (
+            f"effi ask exited {proc.returncode} on attempt {attempt}/{max_attempts}\n"
             f"stderr:\n{proc.stderr[-2000:]}\n"
             f"stdout (tail):\n{proc.stdout[-2000:]}"
         )
+        if attempt < max_attempts and _is_transient(proc.stderr):
+            print(f"  [synth] transient error on attempt {attempt}, retrying...")
+            time.sleep(2 * attempt)  # 2s, 4s
+            continue
+        raise RuntimeError(last_err)
+    else:
+        raise RuntimeError(last_err or "synthesize: exhausted retries")
     events = json.loads(proc.stdout)
     content_parts = [e["content"] for e in events if e.get("type") == "content"]
     raw_response = "".join(content_parts)
