@@ -75,8 +75,13 @@ export {
 } from "./discovery";
 
 // =============================================================================
-// REMOTE DISCOVERY
+// REMOTE DISCOVERY (LEGACY — ~/agent-records/)
 // =============================================================================
+//
+// AC 43 (slice 3) deletes this path once the API-driven discovery below has
+// proven itself in production. Until then, both surfaces coexist: callers
+// migrated to the API helpers use `findRemoteSessionsViaApi` etc.; the
+// legacy `~/agent-records/` scanner remains for the unmigrated callers.
 
 export {
   AGENT_RECORDS_DIR,
@@ -85,6 +90,35 @@ export {
   findRemoteSessionsByPrefix,
   mergeSessionLists,
 } from "./remote";
+
+// =============================================================================
+// REMOTE DISCOVERY (API — /api/v1/dev-sessions)
+// =============================================================================
+//
+// Step 5a of ENG-5861 added the HTTP client + credential-aware finder; this
+// section makes the public surface reachable from the canonical
+// `from "../finder"` import path that `commands/*.ts` already uses.
+
+export {
+  type ApiAuthContext,
+  type ApiClientError,
+  type ApiErrorKind,
+  type ApiListOptions,
+  type ApiListResponse,
+  type ApiSessionItem,
+  type FetchLike,
+  getSession,
+  listSessions,
+} from "./api-client";
+
+export {
+  type ApiFinderDeps,
+  type ApiFinderOptions,
+  findRemoteSessionsViaApi,
+  resolveRemoteSessionViaApi,
+} from "./api-finder";
+
+export { downloadSessionJsonl } from "./api-download";
 
 // =============================================================================
 // METADATA
