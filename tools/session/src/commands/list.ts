@@ -212,8 +212,14 @@ export async function runList(
   // API stores gzipped bytes + summarized metadata).
   let sessions = localSessions;
   if (listArgs.remote) {
+    // `deps.apiOptions` is the test-only DI override. In production it's
+    // unset; we derive `profileName` from the parsed `--profile` flag so
+    // multi-env verification doesn't need to mutate `~/.effi/current_profile`.
+    const apiOptions: ApiFinderOptions =
+      deps.apiOptions ??
+      (listArgs.profile ? { profileName: listArgs.profile } : {});
     const apiItems = await findRemoteFn(
-      deps.apiOptions ?? {},
+      apiOptions,
       {
         limit: listArgs.limit,
         since: sinceToIso(listArgs.since),

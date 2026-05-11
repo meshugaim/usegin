@@ -138,6 +138,13 @@ export interface ListArgs {
   since?: string;
   limit: number;
   remote: boolean;
+  /**
+   * Effi CLI profile name (e.g. `lihu-staging.owner@askeffi.ai:staging`).
+   * When set under `--remote`, the API finder reads credentials from that
+   * profile instead of the active `~/.effi/current_profile`. No-op when
+   * `--remote` is unset — the local path doesn't have a profile concept.
+   */
+  profile?: string;
 }
 
 export function parseListArgs(args: string[]): ListArgs {
@@ -170,6 +177,10 @@ export function parseListArgs(args: string[]): ListArgs {
       i++;
     } else if (arg === "--remote") {
       result.remote = true;
+    } else if (arg === "--profile") {
+      const value = requireArgValue(args, i, "--profile");
+      result.profile = value;
+      i++;
     }
   }
 
@@ -215,6 +226,12 @@ export interface SearchArgs {
   status?: "active" | "completed";
   /** path / id / json — same union as `ListArgs`; same renderer. */
   output: OutputFormat;
+  /**
+   * Effi CLI profile name. Same semantics as `ListArgs.profile` — applies
+   * to the `--remote` path only; semantic-shim path doesn't have a profile
+   * concept.
+   */
+  profile?: string;
   /**
    * Forwarded verbatim to the semantic-search shim when `--remote` is unset.
    * Captured here so the API path can ignore them and the shim sees its
@@ -305,6 +322,10 @@ export function parseSearchArgs(args: string[]): SearchArgs {
     } else if (arg === "--output") {
       const value = requireArgValue(args, i, "--output");
       result.output = validateEnum(value, VALID_OUTPUT_FORMATS, "--output");
+      i++;
+    } else if (arg === "--profile") {
+      const value = requireArgValue(args, i, "--profile");
+      result.profile = value;
       i++;
     } else if (!arg.startsWith("-") && result.query === "") {
       if (unknownFlagSeen) {

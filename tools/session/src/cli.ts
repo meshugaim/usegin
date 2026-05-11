@@ -52,7 +52,7 @@ USAGE:
   session bash [id] [--grep <p>]  Browse Bash commands from sessions
   session search <query> [-k N]   Semantic search across all sessions
   session search --index          Build / refresh the semantic index
-  session search --remote <q> [--user --since --until --status --limit --output]
+  session search --remote <q> [--user --since --until --status --limit --output --profile]
                                   Postgres full-text search via /api/v1/dev-sessions (AC 35)
   session search-in <id> <query>  Search within a session's turns
   session code-history <file>:<line>  Show commit context for a line
@@ -76,7 +76,10 @@ LIST OPTIONS:
   --all-projects     Show sessions from all projects
   --output <format>  Output format: path, id, json (default: path)
   --since <filter>   Filter sessions by date (e.g., 1d, 2w, 2024-01-15)
-  --remote           Include remote sessions from ~/agent-records/
+  --remote           Include remote sessions from /api/v1/dev-sessions
+  --profile <name>   Effi CLI profile to authenticate the --remote call
+                     (default: ~/.effi/current_profile). Useful for
+                     multi-env verification without mutating current_profile.
 
 FIND OPTIONS:
   --project <hash>   Filter to specific project (default: current project)

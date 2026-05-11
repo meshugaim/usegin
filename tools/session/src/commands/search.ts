@@ -142,8 +142,14 @@ async function runRemoteSearch(
     return;
   }
 
+  // `deps.apiOptions` is the test-only DI override. In production it's
+  // unset; we derive `profileName` from the parsed `--profile` flag so
+  // multi-env verification doesn't need to mutate `~/.effi/current_profile`.
+  const apiOptions: ApiFinderOptions =
+    deps.apiOptions ??
+    (searchArgs.profile ? { profileName: searchArgs.profile } : {});
   const apiItems = await findRemoteFn(
-    deps.apiOptions ?? {},
+    apiOptions,
     {
       q: searchArgs.query,
       limit: searchArgs.limit,
