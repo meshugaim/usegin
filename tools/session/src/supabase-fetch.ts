@@ -34,12 +34,13 @@
  *
  * - `auth_missing`: no credentials file present (or unreadable). The user
  *   has never run `effi auth login` on this machine. `fetchSession`
- *   surfaces an error that directs them to run it.
+ *   surfaces an `AuthRequiredError` (cause: "missing") that directs them
+ *   to run it.
  *
  * - `auth_expired`: credentials present but the server returned 401.
  *   Token has aged out (or been revoked). Same remediation — re-login —
- *   but a different error string so the user knows it isn't a first-time
- *   setup problem.
+ *   but `AuthRequiredError` carries cause: "expired" so the user knows
+ *   it isn't a first-time setup problem.
  *
  * - `transport_error`: anything else from the network/server (5xx,
  *   unexpected 4xx, body shape mismatch, signed-URL download failure).
@@ -78,15 +79,12 @@ export type SupabaseFetchResult =
  * RED PHASE: not implemented. Returns `{ ok: false, error: {
  * kind: "auth_missing" } }` so `fetchSession`'s tests for the cross-env
  * fallback fail at their disk-side assertions (the expected behavior
- * isn't yet wired) while the existing pre-step-7 tests that exercise
- * "session is just plain not anywhere" still pass — `translateSupabaseError`
- * maps `auth_missing` back to `SessionNotFoundError` so an unauthed
- * caller sees the same shape they always have.
- *
- * The discriminated `kind: "auth_missing"` shape is the Green design
- * call too: a no-credentials machine can't reach Supabase, so the
- * user-facing message stays "session not found" rather than introducing
- * a brand-new auth error class on a path that used to be terminal.
+ * isn't yet wired). The translation in `fetchSession` maps
+ * `auth_missing` to `AuthRequiredError` (cause: "missing"), which
+ * carries the `effi auth login` remediation hint a no-credentials
+ * machine actually needs — distinct from the legacy "session not found"
+ * shape, which would mislead a fresh-devcontainer teammate into thinking
+ * the session is gone rather than that they haven't authed yet.
  *
  * GREEN PHASE will replace this body with the four-step wire described
  * in the file docstring. The return contract — `SupabaseFetchResult` —

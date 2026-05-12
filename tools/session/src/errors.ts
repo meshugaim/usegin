@@ -60,6 +60,55 @@ export class SessionNotFoundError extends SessionError {
 }
 
 // =============================================================================
+// AUTH REQUIRED
+// =============================================================================
+
+export type AuthRequiredCause = "missing" | "expired";
+
+export interface AuthRequiredOptions {
+  cause: AuthRequiredCause;
+}
+
+/**
+ * Thrown when a cross-environment session fetch (`fetchSession` →
+ * Supabase) can't proceed because Effi credentials are absent or stale.
+ *
+ * Distinct from `SessionNotFoundError`: the session might exist in
+ * another env; we just can't ask. The remediation is always the same —
+ * run `effi auth login` — but the message tailors the prose so the user
+ * knows whether this is a first-time setup or a refresh.
+ *
+ * Part of: ENG-5862 step 7
+ */
+export class AuthRequiredError extends SessionError {
+  public readonly sessionId: string;
+  public override readonly cause: AuthRequiredCause;
+
+  constructor(sessionId: string, options: AuthRequiredOptions) {
+    const { cause } = options;
+
+    let message: string;
+    if (cause === "missing") {
+      // First-time setup framing — the user has never authed on this
+      // machine. Naming the session_id lets them paste it into a bug
+      // report; naming `effi auth login` is the load-bearing remedy hint.
+      message = `Session ${sessionId} requires authentication to fetch from Supabase.
+Run \`effi auth login\` to set up credentials, then retry.`;
+    } else {
+      // Refresh framing — distinct prose so the user knows it isn't a
+      // first-time setup problem (their token aged out or was revoked).
+      message = `Session ${sessionId} credentials expired.
+Run \`effi auth login\` to refresh, then retry.`;
+    }
+
+    super(message);
+    this.name = "AuthRequiredError";
+    this.sessionId = sessionId;
+    this.cause = cause;
+  }
+}
+
+// =============================================================================
 // NO SESSIONS FOUND
 // =============================================================================
 

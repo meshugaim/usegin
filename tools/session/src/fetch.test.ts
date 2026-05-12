@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, rmSync, statSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 import { fetchSession, formatFetchResult, type FetchResult } from "./fetch";
-import { SessionNotFoundError } from "./errors";
+import { AuthRequiredError } from "./errors";
 import { discoverSessions, getCurrentProjectHash, getClaudeProjectsDir } from "./finder";
 import { discoverRemoteSessions } from "./finder/remote";
 
@@ -149,7 +149,15 @@ describe("fetchSession - local sessions", () => {
     expect(result.sessionId).toBe(target.id);
   });
 
-  test("throws SessionNotFoundError for non-existent session", async () => {
+  test("throws AuthRequiredError for non-existent session in an unauthed env", async () => {
+    // In a fresh test environment (no `effi auth login` run) the
+    // resolution chain reaches the Supabase fallback, the stub returns
+    // `auth_missing`, and `fetchSession` translates that to
+    // `AuthRequiredError`. This is the load-bearing first-time-setup
+    // contract restored by ENG-5862 step 7 Red tidy: a no-credentials
+    // teammate must see the `effi auth login` remediation hint, not a
+    // misleading "session not found" (the session might exist in
+    // another env — we just can't ask without creds).
     const fakeId = "00000000-0000-0000-0000-000000000000";
 
     try {
@@ -157,8 +165,8 @@ describe("fetchSession - local sessions", () => {
       // Should not reach here
       expect(true).toBe(false);
     } catch (error) {
-      expect(error).toBeInstanceOf(SessionNotFoundError);
-      expect((error as SessionNotFoundError).message).toContain("Session not found");
+      expect(error).toBeInstanceOf(AuthRequiredError);
+      expect((error as AuthRequiredError).message).toContain("effi auth login");
     }
   });
 });

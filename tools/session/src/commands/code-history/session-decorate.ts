@@ -10,10 +10,17 @@
  *      (`extractIntent` / `extractTrigger` / `extractOutcome`).
  *   4. Returns a copy of the commit with `commit.session` populated.
  *
- * On `SessionNotFoundError` from the local+remote search: degrades
- * gracefully — returns `commit.session = { id, sinceTimestampCmd }` with
- * no extractors (AC 13). Other errors propagate so real failures (a
- * corrupted JSONL, permission denied, etc.) remain visible.
+ * On `SessionNotFoundError` from the local+remote search OR
+ * `AuthRequiredError` from the cross-env Supabase fallback (ENG-5862
+ * step 7): degrades gracefully — returns `commit.session = { id,
+ * sinceTimestampCmd }` with no extractors (AC 13). The auth case is
+ * grouped here because from `code-history`'s POV both mean "we can't
+ * inspect this session's JSONL" — propagating an auth error would
+ * crash the whole command for a no-creds teammate; the
+ * `sinceTimestampCmd` hint already points them at running
+ * `session <id>` directly, where the auth-required prose surfaces.
+ * Other errors propagate so real failures (a corrupted JSONL,
+ * permission denied, etc.) remain visible.
  *
  * Dependency injection shape (the `DecorateSessionDeps` arg) exists for testing:
  * integration tests stub `fetchSession` to throw `SessionNotFoundError`
@@ -25,7 +32,7 @@
 
 import type { ParsedSession } from "../../types";
 import type { FetchResult } from "../../fetch";
-import { SessionNotFoundError } from "../../errors";
+import { AuthRequiredError, SessionNotFoundError } from "../../errors";
 import { extractIntent, extractTrigger, extractOutcome } from "./context";
 import { formatSinceTimestamp } from "./format";
 import { extractClaudeSessionTrailer } from "./trailers";
@@ -87,11 +94,19 @@ export async function decorateCommitWithSession(
     const fetchResult = await deps.fetchSession(uuid);
     parsed = await deps.parseSession(fetchResult.localPath);
   } catch (error) {
-    if (error instanceof SessionNotFoundError) {
-      // AC 13 — session JSONL not available locally or in the archive.
-      // Degrade to `{id, sinceTimestampCmd}` without extractors so the
-      // session line + hint still render. Any OTHER error (malformed
-      // JSONL, permission denied, etc.) propagates unmodified.
+    if (
+      error instanceof SessionNotFoundError ||
+      error instanceof AuthRequiredError
+    ) {
+      // AC 13 — session JSONL not available locally or in the archive,
+      // OR the cross-env Supabase fallback (ENG-5862 step 7) refused
+      // because credentials are missing/expired. Both degrade to
+      // `{id, sinceTimestampCmd}` without extractors so the session
+      // line + hint still render. The user can then run
+      // `session <id> --since-timestamp <ts>` directly, which will
+      // surface the auth-required remediation prose. Any OTHER error
+      // (malformed JSONL, permission denied, etc.) propagates
+      // unmodified.
       return {
         ...commit,
         session: { id: uuid, sinceTimestampCmd },
@@ -130,4 +145,4 @@ export async function decorateCommitWithSession(
 // re-export co-located with the decorate function means consumers
 // importing from this module see the full contract (function +
 // exceptions) without reaching into `../../errors`.
-export { SessionNotFoundError };
+export { AuthRequiredError, SessionNotFoundError };

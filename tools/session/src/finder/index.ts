@@ -19,6 +19,7 @@
 export {
   SessionError,
   SessionNotFoundError,
+  AuthRequiredError,
   NoSessionsFoundError,
   TmuxNotAvailableError,
   ParsingTimeoutError,

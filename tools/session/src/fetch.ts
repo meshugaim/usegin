@@ -11,7 +11,7 @@
 import { Glob } from "bun";
 import { mkdirSync } from "fs";
 import { basename, dirname, join } from "path";
-import { SessionNotFoundError } from "./errors";
+import { AuthRequiredError, SessionNotFoundError } from "./errors";
 import {
   findSessionById,
   findSessionsByPrefix,
@@ -266,21 +266,26 @@ export async function fetchSession(input: string): Promise<FetchResult> {
         subagentCount: 0,
       };
     }
-    // Discriminated error → user-facing error. `not_found` and
-    // `auth_missing` both surface as `SessionNotFoundError`:
-    //   - `not_found`: server confirmed the row is nowhere.
-    //   - `auth_missing`: no credentials means cross-env is unreachable,
-    //     so from the caller's POV the session simply isn't available.
-    //     Mapping this to a brand-new "Cannot fetch from Supabase: not
-    //     authenticated" error would change the failure shape for every
-    //     unauthed `session resume <missing-id>` call site that exists
-    //     today.
-    // `auth_expired` and `transport_error` are reserved for Green — they
-    // need distinct user-facing strings because the remedy is different
-    // (re-login / retry / file a ticket).
+    // Discriminated error → user-facing error. Each `kind` maps to a
+    // distinct error class so callers (and users) can route on the
+    // remedy, not just the shape:
+    //   - `not_found`: server confirmed the row is nowhere → keep the
+    //     `SessionNotFoundError` "not found in any environment" prose,
+    //     which distinguishes the cross-env path from the legacy
+    //     local-only error.
+    //   - `auth_missing` / `auth_expired`: cross-env is unreachable
+    //     because we have no usable credentials. Both throw
+    //     `AuthRequiredError` so the user sees the `effi auth login`
+    //     remediation — the original Red phase pinned this contract
+    //     explicitly; a no-cred fresh-devcontainer teammate running
+    //     `session resume <id>` should be told to log in, not that the
+    //     session is missing.
+    //   - `transport_error`: anything else from the wire (5xx, body
+    //     shape mismatch, signed-URL download failure) surfaces the
+    //     status and a body excerpt so the user can pattern-match or
+    //     file a ticket.
     switch (supa.error.kind) {
-      case "not_found":
-      case "auth_missing": {
+      case "not_found": {
         // The "not found in any environment" phrasing is what distinguishes
         // the cross-env path from the legacy local-only "Session not found"
         // error. It's part of the user-facing contract — a refactor that
@@ -294,10 +299,10 @@ export async function fetchSession(input: string): Promise<FetchResult> {
           searchedLocation: `all three sources (${localScope}, ~/agent-records/, and Supabase) — not found in any environment`,
         });
       }
+      case "auth_missing":
+        throw new AuthRequiredError(input, { cause: "missing" });
       case "auth_expired":
-        throw new Error(
-          `Cannot fetch session ${input} from Supabase: authentication failed (token expired or revoked). Run \`effi auth login\` to refresh.`,
-        );
+        throw new AuthRequiredError(input, { cause: "expired" });
       case "transport_error": {
         const bodyPreview = supa.error.body.length > 200
           ? `${supa.error.body.slice(0, 200)}…`

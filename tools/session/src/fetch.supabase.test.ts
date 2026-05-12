@@ -42,7 +42,7 @@ import { mkdirSync, rmSync, writeFileSync, existsSync } from "fs";
 import { dirname } from "path";
 
 import type { SessionInfo } from "./finder/types";
-import { SessionNotFoundError } from "./errors";
+import { AuthRequiredError, SessionNotFoundError } from "./errors";
 import * as supabaseFetchModule from "./supabase-fetch";
 import * as RealFinder from "./finder";
 import type { SupabaseFetchResult } from "./supabase-fetch";
@@ -301,16 +301,19 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
   });
 
   // ===========================================================================
-  // Test 5a — Missing credentials → SessionNotFoundError (legacy shape)
+  // Test 5a — Missing credentials → AuthRequiredError with first-time-setup prose
   // ===========================================================================
   //
-  // `auth_missing` deliberately maps to `SessionNotFoundError`, NOT a
-  // new auth-error class: a no-credentials machine can't reach Supabase,
-  // so from the caller's POV the session simply isn't available. This
-  // preserves the failure shape for every pre-step-7 `session resume
-  // <missing-id>` call site that exists today.
+  // `auth_missing` maps to `AuthRequiredError` (cause: "missing"), NOT
+  // `SessionNotFoundError`. A no-credentials machine can't reach
+  // Supabase, but the session might exist there — we just can't ask. A
+  // fresh-devcontainer teammate running `session resume <id>` without
+  // prior `effi auth login` needs the remediation hint, not a misleading
+  // "not found in any environment". This contract was pinned in the
+  // original Red phase and is restored here after a tidy collapsed it
+  // into the not_found branch (Ron-7-red-tidy S1).
 
-  test("auth_missing → SessionNotFoundError (preserves legacy unauthed shape)", async () => {
+  test("auth_missing → AuthRequiredError directing user to `effi auth login`", async () => {
     mockFinder({ local: null, remote: null });
     mockSupabaseFetch({ ok: false, error: { kind: "auth_missing" } });
 
@@ -323,10 +326,15 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
       caught = err;
     }
 
-    expect(caught).toBeInstanceOf(SessionNotFoundError);
+    expect(caught).toBeInstanceOf(AuthRequiredError);
+    expect(caught).not.toBeInstanceOf(SessionNotFoundError);
     const message = (caught as Error).message;
     expect(message).toContain(FULL_UUID);
-    expect(message.toLowerCase()).toContain("not found");
+    // The load-bearing anchor: the remediation hint a first-time user
+    // needs to actually fix their setup. The tidy that dropped this
+    // string is exactly what this test guards against re-occurring.
+    expect(message).toContain("effi auth login");
+    expect((caught as AuthRequiredError).cause).toBe("missing");
   });
 
   // ===========================================================================
@@ -347,12 +355,16 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
     }
 
     // Distinct from auth_missing: the user HAS credentials, they just
-    // don't work anymore. Same remediation (`effi auth login`), but the
-    // prefix should make clear it's a refresh, not a first-time setup.
-    expect(caught).toBeInstanceOf(Error);
+    // don't work anymore. Same remediation (`effi auth login`), but
+    // `cause: "expired"` lets the message frame it as a refresh, not a
+    // first-time setup. Both branches share the AuthRequiredError class
+    // so callers can route on `instanceof` and inspect `cause` for the
+    // finer-grained UX choice.
+    expect(caught).toBeInstanceOf(AuthRequiredError);
     const message = (caught as Error).message;
-    expect(message.toLowerCase()).toMatch(/auth/);
     expect(message).toContain("effi auth login");
+    expect(message.toLowerCase()).toMatch(/expired/);
+    expect((caught as AuthRequiredError).cause).toBe("expired");
   });
 
   // ===========================================================================
