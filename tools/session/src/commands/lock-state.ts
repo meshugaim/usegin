@@ -103,18 +103,64 @@ export interface QueryLockStateParams {
 }
 
 /**
- * Red-phase stub. Throws so accidental wire-up surfaces loudly; the test
- * file installs a `mock.module("./lock-state", …)` per scenario.
+ * Probe the server for current lock state on `sessionId`.
  *
- * Green will:
- *   - Read credentials via `tools/lib/auth/credentials` (same path as
- *     `supabase-fetch.ts`).
- *   - GET `/api/v1/dev-sessions/{id}/lock` (route added in the Green phase).
- *   - Translate the response into a `LockState`. 404 → `{ held: false }`
- *     (no session, no lock).
+ * Wire shape:
+ *   GET `${apiUrl}/api/v1/dev-sessions/{sessionId}/lock
+ *        ?environment_kind=<kind>&environment_id=<id>`
+ *   Authorization: Bearer <token>
+ *
+ * Response → `LockState`:
+ *   - 200 `{held:false}`                → `{ held: false }`
+ *   - 200 `{held:true, holder, ours}`   → `{ held: true, holder, ours }`
+ *   - 404                                → `{ held: false }`   (no row)
+ *   - Anything else                      → throws — the caller (resume.ts)
+ *     decides fail-open policy (treat as not-held so a transient server
+ *     hiccup doesn't block legitimate resumes).
+ *
+ * Side-effect-free at both ends — the GET endpoint does not touch the lock
+ * row, so a probe can never accidentally take or release the lock.
  */
 export async function queryLockState(
-  _params: QueryLockStateParams,
+  params: QueryLockStateParams,
 ): Promise<LockState> {
-  throw new Error("Not implemented (ENG-5862 step 8 Red)");
+  const base = params.apiUrl.replace(/\/+$/, "");
+  const qs = new URLSearchParams({
+    environment_kind: params.environmentKind,
+    environment_id: params.environmentId,
+  }).toString();
+  const url = `${base}/api/v1/dev-sessions/${params.sessionId}/lock?${qs}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${params.token}`,
+    },
+  });
+
+  if (res.status === 404) {
+    return { held: false };
+  }
+  if (res.status !== 200) {
+    throw new Error(
+      `lock-state probe failed: HTTP ${res.status} from ${url}`,
+    );
+  }
+
+  const body = (await res.json()) as
+    | { held: false }
+    | {
+        held: true;
+        holder: LockStateHolder;
+        ours: boolean;
+      };
+
+  if (body.held === false) {
+    return { held: false };
+  }
+  return {
+    held: true,
+    holder: body.holder,
+    ours: body.ours,
+  };
 }

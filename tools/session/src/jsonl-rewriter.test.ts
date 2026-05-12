@@ -24,7 +24,7 @@ const SOURCE_ID = "159b7095-3f96-4de5-a8a5-7cf445849bd6";
 const NEW_ID = "abcdef01-2345-6789-abcd-ef0123456789";
 
 describe("rewriteJsonlSessionId — top-level sessionId rewrite", () => {
-	test.failing(
+	test(
 		"ENG-5862 AC 36 (rewriter-1): rewrites top-level sessionId on a single line",
 		() => {
 			const line = JSON.stringify({
@@ -43,7 +43,7 @@ describe("rewriteJsonlSessionId — top-level sessionId rewrite", () => {
 });
 
 describe("rewriteJsonlSessionId — byte-identical pass-through", () => {
-	test.failing(
+	test(
 		"ENG-5862 AC 36 (rewriter-2): line without sessionId is preserved byte-equal",
 		() => {
 			// A file-history-snapshot entry — no sessionId field. Includes
@@ -60,7 +60,7 @@ describe("rewriteJsonlSessionId — byte-identical pass-through", () => {
 });
 
 describe("rewriteJsonlSessionId — multi-line mixed entry types", () => {
-	test.failing(
+	test(
 		"ENG-5862 AC 36 (rewriter-3): 30-line fixture — sessionId lines rewritten, others byte-identical",
 		() => {
 			// Build a mixed fixture: 6 entry types × 5 each = 30 lines.
@@ -116,7 +116,7 @@ describe("rewriteJsonlSessionId — multi-line mixed entry types", () => {
 });
 
 describe("rewriteJsonlSessionId — nested UUID preservation", () => {
-	test.failing(
+	test(
 		"ENG-5862 AC 36 (rewriter-4): nested uuid/parentUuid/leafUuid preserved verbatim",
 		() => {
 			// A realistic assistant entry: top-level sessionId AND nested
@@ -149,7 +149,7 @@ describe("rewriteJsonlSessionId — nested UUID preservation", () => {
 });
 
 describe("rewriteJsonlSessionId — malformed JSON tolerance", () => {
-	test.failing(
+	test(
 		"ENG-5862 AC 36 (rewriter-5): line that isn't valid JSON is passed through byte-identical",
 		() => {
 			// A corrupted entry (truncated mid-string). The rewriter must not
@@ -175,7 +175,7 @@ describe("rewriteJsonlSessionId — malformed JSON tolerance", () => {
 });
 
 describe("rewriteJsonlSessionId — empty input", () => {
-	test.failing(
+	test(
 		"ENG-5862 AC 36 (rewriter-6): empty input returns empty string",
 		() => {
 			expect(rewriteJsonlSessionId("", NEW_ID)).toBe("");

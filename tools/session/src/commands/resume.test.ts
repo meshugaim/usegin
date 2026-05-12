@@ -150,6 +150,18 @@ afterEach(() => {
   (Bun as { spawn: unknown }).spawn = realSpawn as never;
 });
 
+// Ron-8-red S3 belt-and-braces: if a `beforeEach` throws between capturing
+// the realExit/realSpawn snapshots and installing the per-test stubs, the
+// matching `afterEach` may not run — leaving `process.exit` / `Bun.spawn`
+// patched for downstream test files in the same `bun test` invocation.
+// This `afterAll` unconditionally restores the real surfaces, mirroring
+// the `afterAll` above that restores `mock.module`.
+afterAll(() => {
+  process.exit = realExit;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (Bun as { spawn: unknown }).spawn = realSpawn as never;
+});
+
 // =============================================================================
 // Module mocking helpers
 // =============================================================================
@@ -243,7 +255,7 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
   // Test 1 — lock held, no --fork → exit non-zero with holder + --fork hint
   // ===========================================================================
 
-  test.failing(
+  test(
     "lock held by another env without --fork → exits non-zero with holder identity + --fork hint",
     async () => {
       installMocks({
@@ -289,7 +301,7 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
   // Test 2 — lock held, --fork → initial sync metadata carries parent linkage
   // ===========================================================================
 
-  test.failing(
+  test(
     "lock held + --fork → initial-sync metadata includes parent_session_id + forked_at_turn",
     async () => {
       const forkCallSink: { params?: PerformForkParams } = {};
@@ -349,7 +361,7 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
   // Test 3 — fork mints a new UUIDv4 distinct from the original
   // ===========================================================================
 
-  test.failing(
+  test(
     "--fork mints a fresh UUIDv4 (not reusing the original session id)",
     async () => {
       installMocks({
@@ -399,7 +411,7 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
   // Test 4 — subagent-fork refused with v1 message
   // ===========================================================================
 
-  test.failing(
+  test(
     "--fork on a session with subagents refuses with 'subagent-fork not supported in v1'",
     async () => {
       installMocks({

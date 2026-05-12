@@ -41,16 +41,54 @@
  */
 
 /**
+ * Matches the top-level `"sessionId":"<value>"` field shape that JSON.stringify
+ * produces. `[^"]*` is safe inside the value position: JSON escapes literal `"`
+ * inside string values as `\"`, so the closing `"` is always the next
+ * unescaped quote. Without the `g` flag, `.replace` substitutes only the
+ * FIRST match per line — and the top-level sessionId is structurally first
+ * (depth-0 keys serialize before nested objects), so any later occurrence is
+ * transcript content, not structure, and stays verbatim.
+ *
+ * The pattern intentionally does NOT match `"sessionId"` on a malformed line
+ * that lacks the closing quote (e.g. an unterminated string value) — those
+ * lines fall through the regex and pass byte-identical, matching the spec's
+ * "corrupted line never throws" rule.
+ */
+const SESSION_ID_FIELD = /"sessionId":"[^"]*"/;
+
+/**
  * Rewrite the top-level `sessionId` field on every JSONL entry to `newId`.
+ *
+ * Strategy:
+ *   - Empty input → empty output.
+ *   - Split on `\n`. For each line:
+ *     - No `"sessionId"` substring → byte-identical pass-through.
+ *     - Otherwise → `.replace` the first `"sessionId":"<value>"` match.
+ *   - Rejoin on `\n`.
+ *
+ * Lines without a sessionId field and lines whose sessionId substring is
+ * malformed (no closing quote) both pass through byte-identical — neither
+ * matches the regex.
  *
  * @param content    Raw JSONL content (newline-delimited JSON objects).
  * @param newId      The fresh session UUID (typically `crypto.randomUUID()`).
- * @returns          Rewritten content. Lines without `sessionId` are passed
- *                   through byte-identical. Malformed lines are passed
- *                   through byte-identical too.
+ * @returns          Rewritten content with byte-identical pass-through for
+ *                   sessionId-less and malformed lines.
  */
 export function rewriteJsonlSessionId(content: string, newId: string): string {
-	throw new Error(
-		"rewriteJsonlSessionId: not implemented (ENG-5862 step 8 Red)",
-	);
+	if (content === "") return "";
+
+	const replacement = `"sessionId":"${newId}"`;
+
+	return content
+		.split("\n")
+		.map((line) => {
+			// Hot-path short-circuit: file-history-snapshot, last-prompt,
+			// permission-mode, and the trailing empty line never carry a
+			// `"sessionId"` substring. Skipping them here saves a regex scan
+			// per line on a megabyte-scale transcript.
+			if (!line.includes('"sessionId"')) return line;
+			return line.replace(SESSION_ID_FIELD, replacement);
+		})
+		.join("\n");
 }
