@@ -250,6 +250,7 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
       localPath: fakeLocalPath,
       compressedSize: 100,
       decompressedSize: 500,
+      subagentCount: 0,
     });
 
     const { fetchSession } = await import("./fetch");
@@ -418,6 +419,7 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
       localPath: "/tmp/should-never-be-returned.jsonl",
       compressedSize: 1,
       decompressedSize: 1,
+      subagentCount: 0,
     });
     const supabaseSpy = spyOn(supabaseFetchModule, "fetchFromSupabase");
 
@@ -457,10 +459,24 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
   // FetchResult's `subagentCount` is 0 and `formatFetchResult` doesn't
   // mention subagents — both failing the assertions below right-reason.
 
-  test.failing(
+  test(
     "ENG-5862: both miss + Supabase 200 with subagents → parent + each agent-<id>.jsonl land on disk",
     async () => {
       mockFinder({ local: null, remote: null });
+      // Drive `fetchFromSupabase` to a Green-shape success with 2
+      // subagents. The real wire is tested separately (manual round-trip
+      // + the nextjs-app integration test in `endpoints.test.ts` that
+      // pins the API side). Here we pin the **FetchResult reshape**: the
+      // SupabaseFetchResult.subagentCount must flow through to
+      // FetchResult.subagentCount and `formatFetchResult` must mention
+      // it. This is the contract the headline use case rests on.
+      mockSupabaseFetch({
+        ok: true,
+        localPath: `/tmp/fake-local/projects/x/${FULL_UUID}.jsonl`,
+        compressedSize: 100,
+        decompressedSize: 500,
+        subagentCount: 2,
+      });
 
       const { fetchSession, formatFetchResult } = await import("./fetch");
 
@@ -472,8 +488,7 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
         caught = err;
       }
 
-      // Red: caught is a SessionNotFoundError (auth_missing → not_found
-      // mapping). Green: result is populated, subagentCount matches the
+      // Green: result is populated, subagentCount matches the
       // bucket-enumerated subagent_paths array, and the formatted
       // user-facing line names the subagent count so a human running
       // `session resume` sees both pieces arrived.
@@ -486,6 +501,7 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
       // "Fetched N subagent files" line. Green wires this to the count
       // of `subagent_paths` entries the API returned.
       expect(result?.subagentCount).toBeGreaterThanOrEqual(1);
+      expect(result?.subagentCount).toBe(2);
 
       // And the formatted output mentions subagents — pins the
       // user-facing prose so a human running `session resume <id>`

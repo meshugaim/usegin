@@ -263,7 +263,12 @@ export async function fetchSession(input: string): Promise<FetchResult> {
         source: "supabase",
         compressedSize: supa.compressedSize,
         decompressedSize: supa.decompressedSize,
-        subagentCount: 0,
+        // ENG-5862 step 7 Green: the Supabase fallback now downloads
+        // parent + every subagent in one round-trip; the SDK carries
+        // the count back so `formatFetchResult` can emit the
+        // "Fetched N subagent files" line. Pre-Green this was hardcoded
+        // to 0 — see the Green diff for the wire.
+        subagentCount: supa.subagentCount,
       };
     }
     // Discriminated error → user-facing error. Each `kind` maps to a

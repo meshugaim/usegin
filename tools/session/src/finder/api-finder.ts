@@ -27,6 +27,7 @@ import {
 } from "../../../lib/auth/credentials";
 import {
   type ApiListOptions,
+  type ApiSessionGetResponse,
   type ApiSessionItem,
   type FetchLike,
   getSession,
@@ -103,7 +104,7 @@ export async function resolveRemoteSessionViaApi(
   options: ApiFinderOptions,
   sessionId: string,
   deps: ApiFinderDeps = {},
-): Promise<{ session: ApiSessionItem; signed_url: string } | null> {
+): Promise<ApiSessionGetResponse | null> {
   const auth = await resolveAuth(options, deps);
   const fetchImpl = deps.fetchImpl ?? fetch;
   return getSession(auth, sessionId, fetchImpl);

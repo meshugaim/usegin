@@ -111,6 +111,33 @@ export interface ApiListResponse {
   has_more: boolean;
 }
 
+/**
+ * One subagent's pointer to bucket bytes, as returned by GET
+ * `/api/v1/dev-sessions/{id}` (ENG-5862 step 7, AC 34).
+ *
+ * Mirrors the server-side `SubagentSignedPath` in
+ * `nextjs-app/lib/services/dev-sessions.ts`. The CLI's cross-env fetch
+ * uses `agent_id` to derive the local placement path
+ * (`~/.claude/projects/<encoded>/agent-<agent_id>.jsonl`) flat-co-located
+ * with the parent — matches `parse-subagents.ts`'s discovery convention.
+ */
+export interface ApiSubagentSignedPath {
+  agent_id: string;
+  signed_url: string;
+}
+
+/**
+ * GET `/api/v1/dev-sessions/{id}` response envelope.
+ *
+ * `subagent_paths` is always present (empty array when no subagents) so
+ * the CLI's iteration loop doesn't need to null-guard.
+ */
+export interface ApiSessionGetResponse {
+  session: ApiSessionItem;
+  signed_url: string;
+  subagent_paths: ApiSubagentSignedPath[];
+}
+
 export type ApiErrorKind =
   | "auth_failed"
   | "not_found"
@@ -235,7 +262,7 @@ export async function getSession(
   auth: ApiAuthContext,
   sessionId: string,
   fetchImpl: FetchLike = fetch,
-): Promise<{ session: ApiSessionItem; signed_url: string } | null> {
+): Promise<ApiSessionGetResponse | null> {
   const url = buildGetUrl(auth.apiUrl, sessionId);
   const res = await fetchImpl(url, {
     method: "GET",
@@ -248,7 +275,18 @@ export async function getSession(
     if (!body || typeof body !== "object") {
       throw makeError("malformed 200 body", "other", 200);
     }
-    return body as { session: ApiSessionItem; signed_url: string };
+    // Defensive: server contract guarantees `subagent_paths` is present
+    // as an array (always-defined empty array when no subagents). Coerce
+    // a missing field to `[]` so a downlevel server (or a future spec
+    // drift) doesn't crash the CLI's iteration loop.
+    const parsed = body as Partial<ApiSessionGetResponse>;
+    return {
+      session: parsed.session as ApiSessionItem,
+      signed_url: parsed.signed_url as string,
+      subagent_paths: Array.isArray(parsed.subagent_paths)
+        ? parsed.subagent_paths
+        : [],
+    };
   }
   if (res.status === 404) {
     return null;
