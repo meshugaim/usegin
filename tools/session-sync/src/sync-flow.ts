@@ -31,6 +31,15 @@ import type { EnvironmentKind, SyncMetadata } from "./sync-metadata.ts";
 
 const KILL_SWITCH_BACKOFF_MS = 5 * 60 * 1000;
 
+/**
+ * Clock-skew buffer added to `holder.expires_at` when scheduling a retry
+ * after a 409 lock_held (AC 15). 5s is large enough to swallow modest
+ * skew between this daemon's clock and the server's lock_expires_at
+ * timestamp, small enough that the loser environment picks up the work
+ * promptly once the holder really has expired.
+ */
+export const LOCK_BACKOFF_BUFFER_MS = 5_000;
+
 export interface EnvIdentity {
 	kind: string;
 	id: string;
@@ -60,6 +69,17 @@ export type SyncFileOutcome =
 	| { kind: "skipped_hash" }
 	| { kind: "skipped_backoff"; nextRetryAt: string }
 	| { kind: "kill_switch"; updatedState: PerFileState }
+	/**
+	 * AC 15: another environment holds the dev-session lock. State row is
+	 * updated with `nextRetryAt = holder.expires_at + LOCK_BACKOFF_BUFFER_MS`
+	 * so the safety-net picks the file up once the lock should have
+	 * expired. `holder` is surfaced so cli.ts can log who is winning.
+	 */
+	| {
+			kind: "lock_held";
+			updatedState: PerFileState;
+			holder: import("./sync-client.ts").LockHolder;
+	  }
 	| { kind: "transient_error"; error: Error }
 	| { kind: "fatal_error"; error: Error };
 
@@ -180,7 +200,26 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		return { kind: "uploaded", updatedState, sessionRow: session };
 	}
 
-	if (response.syncDisabled) {
+	if ("kind" in response && response.kind === "lock-held") {
+		// AC 15: another environment holds the lock. Green implements:
+		//   - log a warning naming holder.{kind, env_id, username, expires_at}
+		//   - set state.nextRetryAt = holder.expires_at + LOCK_BACKOFF_BUFFER_MS
+		//   - preserve prior contentHash / storagePath when present
+		// Red: throw so the caller (and tests) see a clean
+		// behavior-missing failure rather than a silent fallthrough.
+		throw new Error(
+			"Not implemented (ENG-5862 step 5 Red): 409 lock-held handling",
+		);
+	}
+
+	// At this point only the legacy {ok:false, status, body, syncDisabled}
+	// variant remains in the union; narrow explicitly for tsgo.
+	const errResp = response as Exclude<
+		typeof response,
+		{ kind: "lock-held" } | { ok: true }
+	>;
+
+	if (errResp.syncDisabled) {
 		// AC 45: set nextRetryAt = now + 5min, preserve prior fields where we
 		// have them, otherwise emit a usable placeholder so caller can persist
 		// the row uniformly.
@@ -197,11 +236,11 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		return { kind: "kill_switch", updatedState };
 	}
 
-	if (response.status >= 500) {
+	if (errResp.status >= 500) {
 		return {
 			kind: "transient_error",
 			error: new Error(
-				`session-sync: HTTP ${response.status} from sync endpoint`,
+				`session-sync: HTTP ${errResp.status} from sync endpoint`,
 			),
 		};
 	}
@@ -209,8 +248,8 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 	return {
 		kind: "fatal_error",
 		error: new Error(
-			`session-sync: HTTP ${response.status} from sync endpoint: ${
-				JSON.stringify(response.body) ?? "<no body>"
+			`session-sync: HTTP ${errResp.status} from sync endpoint: ${
+				JSON.stringify(errResp.body) ?? "<no body>"
 			}`,
 		),
 	};

@@ -43,11 +43,33 @@ export interface SyncRequest {
 	metadata: SyncMetadata;
 }
 
+/**
+ * Identifying fields about the current lock holder when the server rejects a
+ * sync attempt with HTTP 409 (AC 15). Mirrors the `holder` payload the
+ * Next.js sync endpoint emits when another environment owns the dev-session
+ * lock. The daemon uses these to log a useful warning and to schedule the
+ * 409 backoff (`holder.expires_at + LOCK_BACKOFF_BUFFER_MS`).
+ */
+export interface LockHolder {
+	environment_kind: string;
+	environment_id: string;
+	/** Server may return null when the holder's username is unknown. */
+	username: string | null;
+	expires_at: string;
+}
+
 export type SyncResponse =
 	| {
 			ok: true;
 			status: 200;
 			body: { session: Record<string, unknown> };
+	  }
+	| {
+			/** AC 15: another environment owns the dev-session lock. */
+			ok: false;
+			status: 409;
+			kind: "lock-held";
+			holder: LockHolder;
 	  }
 	| {
 			ok: false;
@@ -119,6 +141,31 @@ export async function postSync(
 			ok: true,
 			status: 200,
 			body: parsed as { session: Record<string, unknown> },
+		};
+	}
+
+	if (res.status === 409) {
+		// AC 15: lock_held. Parse `holder` from the body so the caller can
+		// log holder details and schedule backoff via `holder.expires_at`.
+		// Body shape: `{ error: "lock_held", holder: LockHolder }`.
+		const holderRaw =
+			parsed && typeof parsed === "object"
+				? (parsed as { holder?: unknown }).holder
+				: undefined;
+		const holder =
+			holderRaw && typeof holderRaw === "object"
+				? (holderRaw as LockHolder)
+				: ({
+						environment_kind: "",
+						environment_id: "",
+						username: null,
+						expires_at: "",
+					} as LockHolder);
+		return {
+			ok: false,
+			status: 409,
+			kind: "lock-held",
+			holder,
 		};
 	}
 

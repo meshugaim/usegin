@@ -139,6 +139,7 @@ describe("postSync — response classification", () => {
 		const out = await postSync(baseReq(), fetchImpl);
 		expect(out.ok).toBe(false);
 		if (out.ok) throw new Error("expected !ok");
+		if (!("syncDisabled" in out)) throw new Error("not 409");
 		expect(out.status).toBe(503);
 		expect(out.syncDisabled).toBe(true);
 	});
@@ -149,6 +150,7 @@ describe("postSync — response classification", () => {
 		const out = await postSync(baseReq(), fetchImpl);
 		expect(out.ok).toBe(false);
 		if (out.ok) throw new Error("expected !ok");
+		if (!("syncDisabled" in out)) throw new Error("not 409");
 		expect(out.syncDisabled).toBe(false);
 		expect(out.status).toBe(503);
 	});
@@ -159,6 +161,7 @@ describe("postSync — response classification", () => {
 		const out = await postSync(baseReq(), fetchImpl);
 		expect(out.ok).toBe(false);
 		if (out.ok) throw new Error("expected !ok");
+		if (!("syncDisabled" in out)) throw new Error("not 409");
 		expect(out.status).toBe(401);
 		expect(out.syncDisabled).toBe(false);
 	});
@@ -178,6 +181,7 @@ describe("postSync — response classification", () => {
 		const out = await postSync(baseReq(), fetchImpl);
 		expect(out.ok).toBe(false);
 		if (out.ok) throw new Error("expected !ok");
+		if (!("syncDisabled" in out)) throw new Error("not 409");
 		expect(out.status).toBe(500);
 		expect(out.syncDisabled).toBe(false);
 	});

@@ -1,0 +1,87 @@
+/**
+ * Heartbeat loop for the session-sync daemon (AC 40, AC 41).
+ *
+ * A claude session can sit "active" for minutes between JSONL writes —
+ * the user is reading, thinking, or the model is generating without
+ * appending new turns. We don't want those sessions to look stale on
+ * the dashboard, and we don't want to lose the dev-session lock to a
+ * peer environment just because no fs.watch event fired. The heartbeat
+ * pings the server on a fixed interval whenever there are unflushed
+ * bytes for a session, which both renews `lock_expires_at` and keeps
+ * the row's `last_activity_at` honest.
+ *
+ * Trigger predicate is split off as `shouldHeartbeat(state, mtimeMs, now)`
+ * — a pure function with no I/O — so we can unit-test the decision
+ * without spinning up timers or touching the file system. The
+ * `heartbeatLoop` factory wraps it in a `setInterval` (60s) and is the
+ * shape cli.ts wires into the daemon alongside the safety-net tick.
+ *
+ * "Unflushed bytes" is derived from the file's mtime vs the per-file
+ * state's `lastUploadedAt`: if the JSONL has been written to since the
+ * last successful upload, there are bytes the server hasn't seen yet.
+ * No hash recomputation, no extra syscalls beyond the stat the caller
+ * already does.
+ */
+
+import type { PerFileState } from "./state.ts";
+
+/**
+ * Heartbeat interval — 60s. Aligns with AC 41's "heartbeat every 60s
+ * while bytes are unflushed" wording from the spec.
+ */
+export const HEARTBEAT_INTERVAL_MS = 60_000;
+
+/**
+ * Pure predicate: should this session be heartbeated right now?
+ *
+ * Returns true when both:
+ *   - the JSONL has unflushed bytes (`mtimeMs > parseIso(lastUploadedAt)`)
+ *   - the last upload is at least `HEARTBEAT_INTERVAL_MS` old
+ *
+ * Returns false when there's nothing to heartbeat or we already
+ * uploaded within the interval window (a real upload obviates the
+ * heartbeat).
+ *
+ * @param state    Per-file state row for this session.
+ * @param mtimeMs  Current `mtimeMs` of the session's JSONL on disk.
+ * @param now      Wall-clock "now"; injected for deterministic tests.
+ */
+export function shouldHeartbeat(
+	_state: PerFileState,
+	_mtimeMs: number,
+	_now: Date,
+): boolean {
+	throw new Error(
+		"Not implemented (ENG-5862 step 5 Red): shouldHeartbeat",
+	);
+}
+
+export interface HeartbeatLoopDeps {
+	/** Returns the current per-file state snapshot. */
+	getState: () => Record<string, PerFileState>;
+	/** Returns `mtimeMs` for a session file, or null if it no longer exists. */
+	getMtimeMs: (path: string) => Promise<number | null>;
+	/** Fires the actual heartbeat POST for one session. */
+	sendHeartbeat: (
+		path: string,
+		state: PerFileState,
+	) => Promise<void>;
+	/** Wall-clock source; injected for tests. */
+	now?: () => Date;
+	/** Interval override for tests; defaults to `HEARTBEAT_INTERVAL_MS`. */
+	intervalMs?: number;
+}
+
+export interface HeartbeatLoopHandle {
+	stop: () => void;
+}
+
+/**
+ * Factory: start the heartbeat loop. Returns a handle whose `stop()`
+ * clears the interval — caller (cli.ts) calls it from shutdown().
+ */
+export function heartbeatLoop(_deps: HeartbeatLoopDeps): HeartbeatLoopHandle {
+	throw new Error(
+		"Not implemented (ENG-5862 step 5 Red): heartbeatLoop",
+	);
+}
