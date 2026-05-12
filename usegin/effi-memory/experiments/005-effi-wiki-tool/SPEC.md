@@ -166,10 +166,12 @@ The experiment scaffolds a `memory_lookup` tool and a wiki-section system-prompt
 - New `usegin/effi-memory/experiments/005-effi-wiki-tool/harness/run.ts`:
   - Reads `eval-questions.md` (one question per `## ` header).
   - For each question:
-    - Run wiki-off: `effi chat "<q>" --profile agent-dev --trace-jsonl runs/<ts>/<n>-off.jsonl` with `EFFI_WIKI_PROJECT_ID` unset in the spawned env.
+    - Run wiki-off: `effi ask "<q>" --profile agent-dev --trace-jsonl runs/<ts>/<n>-off.jsonl` with `EFFI_WIKI_PROJECT_ID` unset in the spawned env.
     - Run wiki-on: same, `EFFI_WIKI_PROJECT_ID` set to dogfooding UUID.
     - Persist both transcripts + traces to `runs/<timestamp>/<n>-{off,on}.jsonl` plus an `index.md` listing the pairs with one-line tool-call summary per side.
   - Writes empty `runs/<timestamp>/RESULTS.md` skeleton for scoring.
+
+**Note**: SPEC originally said `effi chat`; corrected to `effi ask` after the 2a Ron review found that chat lacks a positional argument and headless-exits, while ask is the headless one-shot command. Trace-flag plumbing was added to both in 2a; the Commander option lives on ask (added in 2a-followup).
 
 **Tests:** smoke run is the test (step 3 below).
 
