@@ -57,6 +57,8 @@ import {
   afterEach,
   afterAll,
 } from "bun:test";
+import { writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { dirname } from "node:path";
 
 import * as RealLockState from "./lock-state";
 import * as RealResumeFork from "./resume-fork";
@@ -100,6 +102,33 @@ const HOLDER_FIXTURE = {
   expires_at: "2026-05-12T20:00:00.000Z",
 };
 
+/**
+ * Number of user/assistant turns the source-fixture JSONL contains.
+ * `extractMetadata` counts each user/assistant line. resume.ts now
+ * extracts metadata from this file inline (no try/catch fallback) and
+ * threads the whole struct through to the fork orchestrator. Pinning
+ * the expected value here lets test 2 assert the EXACT number flowing
+ * through the seam — Ron-8-green N5 flagged the prior assertion
+ * (`typeof === "number"`) as too weak: a regression that landed
+ * `forkedAtTurn = 0` via the dead-code fallback would have passed.
+ */
+const FIXTURE_TURN_COUNT = 7;
+
+function fixtureJsonl(sessionId: string): string {
+  // 4 user + 3 assistant = 7 turns; trailing blank line mirrors how
+  // claude code writes the file in practice.
+  return [
+    JSON.stringify({ sessionId, type: "user", text: "u1" }),
+    JSON.stringify({ sessionId, type: "assistant" }),
+    JSON.stringify({ sessionId, type: "user", text: "u2" }),
+    JSON.stringify({ sessionId, type: "assistant" }),
+    JSON.stringify({ sessionId, type: "user", text: "u3" }),
+    JSON.stringify({ sessionId, type: "assistant" }),
+    JSON.stringify({ sessionId, type: "user", text: "u4" }),
+    "",
+  ].join("\n");
+}
+
 function makeFetchResult(sessionId: string) {
   return {
     sessionId,
@@ -108,6 +137,26 @@ function makeFetchResult(sessionId: string) {
     alreadyLocal: true,
     subagentCount: 0,
   };
+}
+
+/**
+ * Source-fixture writer for the `--fork` branch tests. resume.ts now
+ * reads + extracts from `result.localPath` directly (no dead-code
+ * `forkedAtTurn = 0` fallback), so the read MUST succeed. Writing a
+ * fixture once per test keeps the contract honest: a regression that
+ * drops the read would fail loudly through the outer catch, not a
+ * silent fallback.
+ */
+function writeSourceFixture(sessionId: string): string {
+  const path = `/tmp/fake/${sessionId}.jsonl`;
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, fixtureJsonl(sessionId));
+  return path;
+}
+
+function removeSourceFixture(sessionId: string) {
+  const path = `/tmp/fake/${sessionId}.jsonl`;
+  if (existsSync(path)) rmSync(path);
 }
 
 // =============================================================================
@@ -304,43 +353,53 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
   test(
     "lock held + --fork → initial-sync metadata includes parent_session_id + forked_at_turn",
     async () => {
-      const forkCallSink: { params?: PerformForkParams } = {};
-      installMocks({
-        lockState: { held: true, ours: false, holder: HOLDER_FIXTURE },
-        forkOutcome: {
-          ok: true,
-          result: {
-            newSessionId: NEW_FORK_UUID,
-            newLocalPath: `/tmp/fake/${NEW_FORK_UUID}.jsonl`,
-            syncedAt: "2026-05-12T20:00:00.000Z",
-          },
-        },
-        forkCallSink,
-      });
-
-      const { runResume } = await import("./resume");
-
+      writeSourceFixture(ORIGINAL_UUID);
       try {
-        await runResume([ORIGINAL_UUID, "--fork"]);
-      } catch {
-        // process.exit at the end of the spawn path is expected.
+        const forkCallSink: { params?: PerformForkParams } = {};
+        installMocks({
+          lockState: { held: true, ours: false, holder: HOLDER_FIXTURE },
+          forkOutcome: {
+            ok: true,
+            result: {
+              newSessionId: NEW_FORK_UUID,
+              newLocalPath: `/tmp/fake/${NEW_FORK_UUID}.jsonl`,
+              syncedAt: "2026-05-12T20:00:00.000Z",
+            },
+          },
+          forkCallSink,
+        });
+
+        const { runResume } = await import("./resume");
+
+        try {
+          await runResume([ORIGINAL_UUID, "--fork"]);
+        } catch {
+          // process.exit at the end of the spawn path is expected.
+        }
+
+        // The fork orchestrator was called with the original session id
+        // — that's what threads through to `parent_session_id` on the
+        // initial-sync metadata. Pin the parameter here.
+        expect(forkCallSink.params).toBeDefined();
+        expect(forkCallSink.params?.originalSessionId).toBe(ORIGINAL_UUID);
+
+        // AC 36 (d): `forked_at_turn = <last turn in source>`.
+        // resume.ts now extracts metadata from the source JSONL inline
+        // (option (c) — no dead-code fallback) and threads the whole
+        // ExtractedMetadata struct into the orchestrator. We pin the
+        // EXACT turn_count flowing through the seam against
+        // `FIXTURE_TURN_COUNT`, not just the type — Ron-8-green N5
+        // flagged the prior `typeof === "number"` assertion as too
+        // weak: it passed even when the dead-code catch landed
+        // `forkedAtTurn = 0` on the row, silently corrupting lineage.
+        // An exact-value assertion catches that regression on the spot.
+        expect(forkCallSink.params?.sourceMetadata).toBeDefined();
+        expect(forkCallSink.params?.sourceMetadata.turn_count).toBe(
+          FIXTURE_TURN_COUNT,
+        );
+      } finally {
+        removeSourceFixture(ORIGINAL_UUID);
       }
-
-      // The fork orchestrator was called with the original session id
-      // — that's what threads through to `parent_session_id` on the
-      // initial sync (Green wires it into ForkInitialSyncMetadata
-      // inside performForkAndInitialSync). Pin the parameter here.
-      expect(forkCallSink.params).toBeDefined();
-      expect(forkCallSink.params?.originalSessionId).toBe(ORIGINAL_UUID);
-
-      // The initial-sync POST is INSIDE performForkAndInitialSync —
-      // that's Green's wire. From outside, we pin the contract by
-      // asserting on the **forked_at_turn** value we expect resume.ts
-      // to source from the JSONL and thread through. AC 36 (d):
-      // "forked_at_turn = <last turn in source>".
-      const params = forkCallSink.params;
-      expect(params?.forkedAtTurn).toBeDefined();
-      expect(typeof params?.forkedAtTurn).toBe("number");
     },
   );
 
@@ -351,46 +410,49 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
   test(
     "--fork mints a fresh UUIDv4 (not reusing the original session id)",
     async () => {
-      installMocks({
-        lockState: { held: true, ours: false, holder: HOLDER_FIXTURE },
-        forkOutcome: {
-          ok: true,
-          result: {
-            newSessionId: NEW_FORK_UUID,
-            newLocalPath: `/tmp/fake/${NEW_FORK_UUID}.jsonl`,
-            syncedAt: "2026-05-12T20:00:00.000Z",
-          },
-        },
-      });
-
-      const { runResume } = await import("./resume");
-
+      writeSourceFixture(ORIGINAL_UUID);
       try {
-        await runResume([ORIGINAL_UUID, "--fork"]);
-      } catch {
-        // expected exit
+        installMocks({
+          lockState: { held: true, ours: false, holder: HOLDER_FIXTURE },
+          forkOutcome: {
+            ok: true,
+            result: {
+              newSessionId: NEW_FORK_UUID,
+              newLocalPath: `/tmp/fake/${NEW_FORK_UUID}.jsonl`,
+              syncedAt: "2026-05-12T20:00:00.000Z",
+            },
+          },
+        });
+
+        const { runResume } = await import("./resume");
+
+        try {
+          await runResume([ORIGINAL_UUID, "--fork"]);
+        } catch {
+          // expected exit
+        }
+
+        // `claude --resume` MUST be invoked with the NEW id, not the
+        // original. Without this check a regression could spawn the
+        // parent (re-racing the peer's lock) and the spec contract
+        // collapses.
+        expect(spawnCalls.length).toBe(1);
+        const spawnArgs = spawnCalls[0]!;
+        const resumeIdx = spawnArgs.indexOf("--resume");
+        expect(resumeIdx).toBeGreaterThan(-1);
+        const resumedId = spawnArgs[resumeIdx + 1]!;
+
+        // (a) Distinct from original.
+        expect(resumedId).not.toBe(ORIGINAL_UUID);
+
+        // (b) Valid UUIDv4 shape (`crypto.randomUUID()` in the
+        // orchestrator).
+        const uuidV4Regex =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        expect(resumedId).toMatch(uuidV4Regex);
+      } finally {
+        removeSourceFixture(ORIGINAL_UUID);
       }
-
-      // `claude --resume` MUST be invoked with the NEW id, not the
-      // original. Without this check a regression could spawn the
-      // parent (re-racing the peer's lock) and the spec contract
-      // collapses.
-      expect(spawnCalls.length).toBe(1);
-      const spawnArgs = spawnCalls[0]!;
-      const resumeIdx = spawnArgs.indexOf("--resume");
-      expect(resumeIdx).toBeGreaterThan(-1);
-      const resumedId = spawnArgs[resumeIdx + 1]!;
-
-      // (a) Distinct from original.
-      expect(resumedId).not.toBe(ORIGINAL_UUID);
-
-      // (b) Valid UUIDv4 shape. The Red phase plumbs the mock's literal
-      // UUID through, but the contract this test pins is "the resumed
-      // id is itself a UUIDv4" — which is what Green's
-      // `crypto.randomUUID()` will satisfy.
-      const uuidV4Regex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      expect(resumedId).toMatch(uuidV4Regex);
     },
   );
 
@@ -401,39 +463,44 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
   test(
     "--fork on a session with subagents refuses with 'subagent-fork not supported in v1'",
     async () => {
-      installMocks({
-        lockState: { held: true, ours: false, holder: HOLDER_FIXTURE },
-        forkOutcome: {
-          ok: false,
-          error: { kind: "subagent_fork_not_supported", subagentCount: 2 },
-        },
-      });
-
-      const { runResume } = await import("./resume");
-
-      let caught: unknown;
+      writeSourceFixture(ORIGINAL_UUID);
       try {
-        await runResume([ORIGINAL_UUID, "--fork"]);
-      } catch (err) {
-        caught = err;
+        installMocks({
+          lockState: { held: true, ours: false, holder: HOLDER_FIXTURE },
+          forkOutcome: {
+            ok: false,
+            error: { kind: "subagent_fork_not_supported", subagentCount: 2 },
+          },
+        });
+
+        const { runResume } = await import("./resume");
+
+        let caught: unknown;
+        try {
+          await runResume([ORIGINAL_UUID, "--fork"]);
+        } catch (err) {
+          caught = err;
+        }
+
+        // Exit non-zero — refusal is hard.
+        expect(caught).toBeInstanceOf(Error);
+        expect(exitCalls.length).toBeGreaterThan(0);
+        expect(exitCalls[0]).not.toBe(0);
+
+        // Message names the v1 limitation explicitly — a user staring at
+        // "fork failed" with no reason has nothing to do; pinning the
+        // exact phrase per spec line 537 ("subagent-fork is deferred")
+        // means the same string appears in the spec doc and in stderr.
+        const err = stderr();
+        expect(err.toLowerCase()).toContain("subagent");
+        expect(err.toLowerCase()).toContain("not supported");
+        expect(err).toContain("v1");
+
+        // No spawn — refusal short-circuits before resume.
+        expect(spawnCalls.length).toBe(0);
+      } finally {
+        removeSourceFixture(ORIGINAL_UUID);
       }
-
-      // Exit non-zero — refusal is hard.
-      expect(caught).toBeInstanceOf(Error);
-      expect(exitCalls.length).toBeGreaterThan(0);
-      expect(exitCalls[0]).not.toBe(0);
-
-      // Message names the v1 limitation explicitly — a user staring at
-      // "fork failed" with no reason has nothing to do; pinning the
-      // exact phrase per spec line 537 ("subagent-fork is deferred")
-      // means the same string appears in the spec doc and in stderr.
-      const err = stderr();
-      expect(err.toLowerCase()).toContain("subagent");
-      expect(err.toLowerCase()).toContain("not supported");
-      expect(err).toContain("v1");
-
-      // No spawn — refusal short-circuits before resume.
-      expect(spawnCalls.length).toBe(0);
     },
   );
 

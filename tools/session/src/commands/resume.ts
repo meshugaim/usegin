@@ -123,30 +123,36 @@ export async function runResume(args: string[]) {
           process.exit(1);
         }
 
-        // --fork path. Read the source JSONL to derive `forked_at_turn`
-        // from extractMetadata's turn_count — the spec pins this as
-        // "the last turn count of the source at fork time" (AC 36 (d)).
-        // If the source file isn't readable here (e.g. the daemon raced
-        // and removed it, or the fetch step put it somewhere we can't
-        // re-read), fall back to turn 0 and let performForkAndInitialSync
-        // re-attempt the read against the same path; that way the lineage
-        // field is always present in the metadata even when extraction
-        // races a parallel writer.
-        let forkedAtTurn = 0;
-        try {
-          const sourceContent = await Bun.file(result.localPath).text();
-          forkedAtTurn = extractMetadata(sourceContent).turn_count;
-        } catch {
-          // Leave forkedAtTurn at 0; the orchestrator will surface a clean
-          // sync_failed if the file is truly unreadable.
-        }
+        // --fork path. Read the source JSONL ONCE and extract its full
+        // metadata here; thread the whole `ExtractedMetadata` struct
+        // into the orchestrator (AC 36 (d): `forked_at_turn = <last
+        // turn in source>`).
+        //
+        // Ron-8-green flagged the prior shape — a try/catch that fell
+        // back to `forkedAtTurn = 0` — as a silent-corruption path. The
+        // fallback was effectively dead code (the orchestrator re-read
+        // the same file via its own `extractMetadata` call and would
+        // throw on the same failure mode), AND on the rare path where
+        // it DID land, `0` is a valid value (passes `isNonNegativeInt`
+        // and the endpoint-side positive-int validation) that would
+        // write a wrong lineage onto the `dev_sessions` row. Letting
+        // extraction throw to the outer catch instead means the user
+        // sees a real error, not a silently corrupted lineage.
+        //
+        // Threading the whole struct (rather than just `forkedAtTurn`)
+        // also eliminates the orchestrator's separate
+        // `extractMetadata(rewritten)` call — one read, one extraction,
+        // one source-of-truth for the turn_count flowing into the
+        // initial-sync POST.
+        const sourceContent = await Bun.file(result.localPath).text();
+        const sourceMetadata = extractMetadata(sourceContent);
 
         const forkOutcome = await performForkAndInitialSync({
           apiUrl,
           token: creds.access_token,
           originalSessionId: result.sessionId,
           originalLocalPath: result.localPath,
-          forkedAtTurn,
+          sourceMetadata,
           environmentKind: env.kind,
           environmentId: env.id,
           username: creds.email,

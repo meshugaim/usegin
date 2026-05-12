@@ -30,7 +30,7 @@
 import { dirname, join } from "node:path";
 import { readdir } from "node:fs/promises";
 
-import { extractMetadata } from "../../../session-sync/src/extractor.ts";
+import type { ExtractedMetadata } from "../../../session-sync/src/extractor.ts";
 import { postSync } from "../../../session-sync/src/sync-client.ts";
 import type {
   EnvironmentKind,
@@ -95,18 +95,35 @@ export type ForkOutcome =
  * Parameters for the orchestrator. `apiUrl` + `token` go to the initial
  * sync POST; `originalSessionId` + `originalLocalPath` describe the
  * source to copy from; `environment*` identify the caller for the lock
- * taken implicitly by the sync route. `forkedAtTurn` is the source's
- * turn_count at fork time (derived by runResume from extractMetadata on
- * the source JSONL) — passed as a typed field rather than re-computed
- * here so the caller controls the extraction surface.
+ * taken implicitly by the sync route.
+ *
+ * `sourceMetadata` is the result of `extractMetadata` called by the
+ * caller (`resume.ts`) on the source JSONL. The orchestrator threads
+ * `sourceMetadata.turn_count` into `forked_at_turn` and reuses the
+ * other extracted fields verbatim — no second disk read, no second
+ * extraction pass. Ron-8-green flagged the prior shape (caller passed
+ * just `forkedAtTurn: number`, orchestrator re-extracted everything
+ * else from the rewritten JSONL) as load-bearing for a silent-
+ * corruption path: if the caller's extract failed and fell back to
+ * `forkedAtTurn = 0`, the dev_sessions row landed with a wrong
+ * lineage. Passing the whole struct in makes the contract:
+ *   - one read, one extraction
+ *   - if extraction fails, it fails BEFORE the orchestrator is
+ *     entered (no rewrite, no upload, no side effects)
+ *   - the value flowing into `forked_at_turn` is, by construction,
+ *     the same value the caller saw — no parallel-extraction drift.
  */
 export interface PerformForkParams {
   apiUrl: string;
   token: string;
   originalSessionId: string;
   originalLocalPath: string;
-  /** AC 36 (d): source's turn_count at fork time. */
-  forkedAtTurn: number;
+  /**
+   * AC 36 (d): metadata extracted from the source JSONL by the caller.
+   * `turn_count` is threaded into `forked_at_turn`; the other fields
+   * feed the initial-sync POST.
+   */
+  sourceMetadata: ExtractedMetadata;
   environmentKind: EnvironmentKind;
   environmentId: string;
   username: string;
@@ -234,7 +251,7 @@ export async function performForkAndInitialSync(
     token,
     originalSessionId,
     originalLocalPath,
-    forkedAtTurn,
+    sourceMetadata,
     environmentKind,
     environmentId,
     username,
@@ -269,31 +286,36 @@ export async function performForkAndInitialSync(
   const gzipped = Bun.gzipSync(rewrittenBytes);
   const contentHash = await hashBytes(rewrittenBytes);
 
-  // Build metadata using the same shape the daemon produces. We extract
-  // turn_count / line_count / preview_* from the rewritten content
-  // (identical to source modulo the sessionId rewrite, which doesn't
-  // affect turn counting). environment_*, username, project_path come
-  // from the caller. file_size_bytes / gzipped_size_bytes from this
-  // function's compression.
-  const extracted = extractMetadata(rewritten);
+  // Build metadata using the same shape the daemon produces.
+  // turn_count / line_count / preview_* / git_* / claude_model / status /
+  // first_user_message come from the caller's `sourceMetadata` —
+  // threading it through (rather than re-extracting from `rewritten`)
+  // eliminates a redundant extraction pass and the prior silent-
+  // corruption path where a caller-side extract fallback could land a
+  // wrong `forked_at_turn` on the server row. Rewriting only the top-
+  // level sessionId leaves all of these fields unchanged, so source-
+  // extraction is equivalent to a re-extraction of `rewritten`.
+  // environment_*, username, project_path come from the caller.
+  // file_size_bytes / gzipped_size_bytes from this function's
+  // compression.
   const metadata: ForkInitialSyncMetadata = {
-    turn_count: extracted.turn_count,
-    line_count: extracted.line_count,
+    turn_count: sourceMetadata.turn_count,
+    line_count: sourceMetadata.line_count,
     project_path: projectPath,
-    git_branch: extracted.git_branch,
-    git_sha: extracted.git_sha,
-    claude_model: extracted.claude_model,
+    git_branch: sourceMetadata.git_branch,
+    git_sha: sourceMetadata.git_sha,
+    claude_model: sourceMetadata.claude_model,
     environment_kind: environmentKind,
     environment_id: environmentId,
     username,
-    status: extracted.status,
-    preview_first: extracted.preview_first,
-    preview_last: extracted.preview_last,
-    first_user_message: extracted.first_user_message,
+    status: sourceMetadata.status,
+    preview_first: sourceMetadata.preview_first,
+    preview_last: sourceMetadata.preview_last,
+    first_user_message: sourceMetadata.first_user_message,
     file_size_bytes: rewrittenBytes.byteLength,
     gzipped_size_bytes: gzipped.byteLength,
     parent_session_id: originalSessionId,
-    forked_at_turn: forkedAtTurn,
+    forked_at_turn: sourceMetadata.turn_count,
   };
 
   const syncRes = await postSync({

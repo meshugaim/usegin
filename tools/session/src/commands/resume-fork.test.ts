@@ -22,6 +22,8 @@ import { writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+import { extractMetadata } from "../../../session-sync/src/extractor.ts";
+
 const ORIGINAL_ID = "11111111-2222-3333-4444-555555555555";
 
 const realFetch = globalThis.fetch;
@@ -35,14 +37,25 @@ describe("performForkAndInitialSync wire shape (Ron-8-red S1)", () => {
 		const sourceDir = join(tmpdir(), `fork-wire-test-${crypto.randomUUID()}`);
 		await mkdir(sourceDir, { recursive: true });
 		const sourcePath = join(sourceDir, `${ORIGINAL_ID}.jsonl`);
-		await writeFile(
-			sourcePath,
-			[
-				JSON.stringify({ sessionId: ORIGINAL_ID, type: "user", text: "hi" }),
-				JSON.stringify({ sessionId: ORIGINAL_ID, type: "assistant" }),
-				"",
-			].join("\n"),
-		);
+		// 4 user + 3 assistant = 7 turns. The orchestrator threads
+		// `sourceMetadata.turn_count` into `forked_at_turn`, so this
+		// fixture's turn shape is what the wire-field pin below asserts.
+		const sourceLines = [
+			JSON.stringify({ sessionId: ORIGINAL_ID, type: "user", text: "u1" }),
+			JSON.stringify({ sessionId: ORIGINAL_ID, type: "assistant" }),
+			JSON.stringify({ sessionId: ORIGINAL_ID, type: "user", text: "u2" }),
+			JSON.stringify({ sessionId: ORIGINAL_ID, type: "assistant" }),
+			JSON.stringify({ sessionId: ORIGINAL_ID, type: "user", text: "u3" }),
+			JSON.stringify({ sessionId: ORIGINAL_ID, type: "assistant" }),
+			JSON.stringify({ sessionId: ORIGINAL_ID, type: "user", text: "u4" }),
+			"",
+		];
+		await writeFile(sourcePath, sourceLines.join("\n"));
+		const sourceMetadata = extractMetadata(sourceLines.join("\n"));
+		// Sanity-pin the fixture: any drift in the line shape that breaks
+		// turn-count extraction is caught here, not in the wire-field
+		// assertion below where the failure mode would be more confusing.
+		expect(sourceMetadata.turn_count).toBe(7);
 
 		let capturedMetadataJson: string | null = null;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,7 +83,7 @@ describe("performForkAndInitialSync wire shape (Ron-8-red S1)", () => {
 			token: "test-token",
 			originalSessionId: ORIGINAL_ID,
 			originalLocalPath: sourcePath,
-			forkedAtTurn: 7,
+			sourceMetadata,
 			environmentKind: "local-devcontainer",
 			environmentId: "env-test",
 			username: "tester@askeffi.ai",
