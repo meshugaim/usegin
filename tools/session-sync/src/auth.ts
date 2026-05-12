@@ -13,8 +13,8 @@
 import {
 	getApiUrl as defaultGetApiUrl,
 	readCredentials as defaultReadCredentials,
-} from "../../effi-cli/src/lib/credentials.ts";
-import { decodeJwtExp } from "../../effi-cli/src/lib/jwt.ts";
+} from "../../lib/auth/credentials.ts";
+import { decodeJwtExp } from "../../lib/auth/jwt.ts";
 import { ensureFreshToken as defaultEnsureFreshToken } from "../../effi-cli/src/lib/token-refresh.ts";
 
 /**

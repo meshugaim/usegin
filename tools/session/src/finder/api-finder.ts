@@ -4,7 +4,7 @@
  * Wraps `api-client.ts` with credential resolution from the Effi CLI's
  * profile-aware store, so callers don't need to pass an `ApiAuthContext`
  * directly. Mirrors the daemon's `auth.ts` shape (DI'd readers + reading from
- * `tools/effi-cli/src/lib/credentials.ts`).
+ * `tools/lib/auth/credentials.ts`).
  *
  * Step 5b will migrate `tools/session/src/commands/{list,find,resume}.ts` to
  * call these helpers. The current `tools/session/src/finder/remote.ts` (the
@@ -24,7 +24,7 @@
 import {
   getApiUrl as defaultGetApiUrl,
   readCredentials as defaultReadCredentials,
-} from "../../../effi-cli/src/lib/credentials";
+} from "../../../lib/auth/credentials";
 import {
   type ApiListOptions,
   type ApiSessionItem,
@@ -47,7 +47,7 @@ export interface ApiFinderOptions {
 
 /**
  * Dependency-injection seam for tests. Production callers pass nothing and
- * the defaults from `effi-cli/credentials.ts` and global `fetch` are used.
+ * the defaults from `tools/lib/auth/credentials.ts` and global `fetch` are used.
  */
 export interface ApiFinderDeps {
   fetchImpl?: FetchLike;
