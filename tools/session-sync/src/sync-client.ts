@@ -269,6 +269,81 @@ export type HeartbeatResponse =
 			syncDisabled: boolean;
 	  };
 
+/**
+ * DELETE `/api/v1/dev-sessions/{session_id}/lock` (AC 18 extension, slice 2).
+ *
+ * Called by the daemon after a successful upload of a JSONL whose
+ * metadata.status is `"completed"` — i.e. claude code emitted a
+ * `{type:"result"}` line so the session is finalized. The DELETE tells
+ * the server to drop the dev-session lock immediately so a different
+ * environment can take over without waiting for the 2-minute lease to
+ * lapse.
+ *
+ * Best-effort: the daemon does NOT fail the sync outcome when this call
+ * fails. The 60s heartbeat tick and the 5-minute safety-net scan re-issue
+ * the release; worst case the lease naturally lapses at `expires_at`.
+ *
+ * Body: none. Identity travels as query params (`environment_kind`,
+ * `environment_id`) for the same reasons step 4 used query params on the
+ * server side — DELETE-with-body is poorly supported by intermediaries,
+ * the two fields aren't secrets, and they're already URL-loggable
+ * everywhere else in the daemon.
+ *
+ * Response classification (mirrors `postSync` / `postHeartbeat`):
+ *   - 204 → `{kind:"released"}`. The lock row is gone (or was already
+ *     gone — server treats absence as idempotent success).
+ *   - 403 → `{kind:"not_holder"}`. A different env now holds the lock
+ *     (it was stolen between our sync 200 and our release; rare race).
+ *     Daemon logs and treats the session as done — the new holder will
+ *     manage from here.
+ *   - Anything else (4xx, 5xx, network failure caught by caller) →
+ *     `{kind:"transport_error"}`. Daemon logs; safety-net retries.
+ *
+ * Step 6 Red: stub throws "Not implemented" so production reaching this
+ * code path before Green wires the real fetch surfaces loud.
+ */
+export interface DeleteLockRequest {
+	apiUrl: string;
+	token: string;
+	sessionId: string;
+	environmentKind: string;
+	environmentId: string;
+}
+
+export type DeleteLockResponse =
+	| { ok: true; status: 204; kind: "released" }
+	| {
+			ok: false;
+			status: 403;
+			kind: "not_holder";
+			body: unknown;
+	  }
+	| {
+			/**
+			 * Symmetric with `SyncResponse` / `HeartbeatResponse`: 4xx other
+			 * than 403, all 5xx, and any non-JSON body land here. Network
+			 * throws are NOT caught — the caller wraps the call site in
+			 * try/catch and treats throws as a transport_error outcome too,
+			 * mirroring how `syncFile` already handles `postSync` throws.
+			 */
+			ok: false;
+			kind: "transport_error";
+			status: number;
+			body: unknown;
+	  };
+
+export async function postDeleteLock(
+	_req: DeleteLockRequest,
+	_fetchImpl: FetchLike = fetch,
+): Promise<DeleteLockResponse> {
+	// Step 6 Red stub: the right-reason failure for the new tests fires at
+	// the OUTCOME assertion site (current sync-flow returns
+	// `kind:"uploaded"` on 200, not `kind:"completed_and_released"`).
+	// Throwing here only surfaces if Green starts calling this function
+	// before swapping the stub for a real fetch — a useful safety belt.
+	throw new Error("Not implemented (ENG-5862 step 6 Red)");
+}
+
 export async function postHeartbeat(
 	req: HeartbeatRequest,
 	fetchImpl: FetchLike = fetch,

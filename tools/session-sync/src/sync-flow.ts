@@ -32,7 +32,12 @@ import { computeContentHash } from "./content-hash.ts";
 import { extractMetadata } from "./extractor.ts";
 import { gzipDeterministic } from "./gzip.ts";
 import type { PerFileState, StateFile } from "./state.ts";
-import { type FetchLike, postSync } from "./sync-client.ts";
+import {
+	type DeleteLockRequest,
+	type DeleteLockResponse,
+	type FetchLike,
+	postSync,
+} from "./sync-client.ts";
 import type { EnvironmentKind, SyncMetadata } from "./sync-metadata.ts";
 
 export interface EnvIdentity {
@@ -53,6 +58,21 @@ export interface SyncFileInput {
 	now: Date;
 	fetchImpl?: FetchLike;
 	readFileFn?: (path: string) => Promise<Uint8Array>;
+	/**
+	 * DI seam for the post-upload DELETE-lock call (AC 18 ext, slice 2,
+	 * step 6). Defaults to `postDeleteLock` from sync-client. Tests pass
+	 * a spy so they can assert call shape AND control the response
+	 * variant (204 / 403 / transport_error) without touching the network.
+	 *
+	 * Only consulted when the upload returns 200 AND `metadata.status`
+	 * is `"completed"` — the trigger condition for the final release.
+	 * Heartbeats keep the lock alive while a session is `active`; the
+	 * DELETE only fires when the session is truly done.
+	 */
+	deleteLockFn?: (
+		req: DeleteLockRequest,
+		fetchImpl?: FetchLike,
+	) => Promise<DeleteLockResponse>;
 }
 
 export type SyncFileOutcome =
@@ -76,7 +96,51 @@ export type SyncFileOutcome =
 			holder: import("./sync-client.ts").LockHolder;
 	  }
 	| { kind: "transient_error"; error: Error }
-	| { kind: "fatal_error"; error: Error };
+	| { kind: "fatal_error"; error: Error }
+	/**
+	 * AC 18 ext (slice 2, step 6): the upload succeeded AND the session
+	 * is `completed` AND the post-upload DELETE-lock returned 204. The
+	 * lock row is gone server-side; the daemon can stop watching this
+	 * session (caller may remove the state-file entry — Green decides
+	 * whether to actually delete the entry or leave it for naturally
+	 * lapse cleanup).
+	 *
+	 * Carries the same `updatedState` shape as `uploaded` so the caller
+	 * can persist the final hash without a special branch — only the
+	 * outcome discriminator differs, not the state payload.
+	 */
+	| {
+			kind: "completed_and_released";
+			updatedState: PerFileState;
+			sessionRow: Record<string, unknown>;
+	  }
+	/**
+	 * AC 18 ext: upload succeeded, session is `completed`, but the
+	 * DELETE-lock returned 403 (a different env now holds the lock —
+	 * rare race where the lock was stolen between our successful sync
+	 * and our release call). The daemon logs and keeps the state-file
+	 * entry around so the safety-net can retry the release; the new
+	 * holder will eventually take over regardless.
+	 */
+	| {
+			kind: "completed_release_denied";
+			updatedState: PerFileState;
+			sessionRow: Record<string, unknown>;
+	  }
+	/**
+	 * AC 18 ext: upload succeeded, session is `completed`, but the
+	 * DELETE-lock failed with a non-204, non-403 status OR threw
+	 * (network failure, 5xx, malformed response). Best-effort contract:
+	 * sync does NOT fail because release failed. The 60s heartbeat and
+	 * 5-min safety-net re-issue the release; worst case the lease lapses
+	 * naturally at `expires_at`.
+	 */
+	| {
+			kind: "completed_release_transport_error";
+			updatedState: PerFileState;
+			sessionRow: Record<string, unknown>;
+			error: Error;
+	  };
 
 async function defaultReadFile(path: string): Promise<Uint8Array> {
 	const arr = await Bun.file(path).bytes();
