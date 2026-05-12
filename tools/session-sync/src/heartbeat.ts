@@ -56,6 +56,17 @@ export function shouldHeartbeat(
 	mtimeMs: number | null,
 	now: Date,
 ): boolean {
+	// AC 18 ext (step 6 follow-up): the lock has already been released
+	// server-side after a completion-sync (`postDeleteLock` returned 204
+	// and sync-flow stamped `releasedAt`). Heartbeating now would hit
+	// `refresh_dev_session_lock` (UPDATE-only, migration 20260512150635),
+	// get 0 rows, and the server would return 409 with all-null holder
+	// fields — which the daemon's existing null-holder handler treats as
+	// "unknown holder, back off 60s" and retries forever in a hot loop.
+	// The cheapest correct fix is to stop heartbeating at the predicate,
+	// before we ever build a request.
+	if (state.releasedAt != null) return false;
+
 	// File deleted between watch event and this tick — nothing to ping.
 	if (mtimeMs === null) return false;
 
@@ -85,8 +96,7 @@ export function shouldHeartbeat(
 	const hasUnflushedBytes = mtimeMs > lastUploadedMs;
 	if (!hasUnflushedBytes) return false;
 
-	const recentActivity =
-		now.getTime() - lastActivityMs < HEARTBEAT_INTERVAL_MS;
+	const recentActivity = now.getTime() - lastActivityMs < HEARTBEAT_INTERVAL_MS;
 	return !recentActivity;
 }
 
@@ -96,10 +106,7 @@ export interface HeartbeatLoopDeps {
 	/** Returns `mtimeMs` for a session file, or null if it no longer exists. */
 	getMtimeMs: (path: string) => Promise<number | null>;
 	/** Fires the actual heartbeat POST for one session. */
-	sendHeartbeat: (
-		path: string,
-		state: PerFileState,
-	) => Promise<void>;
+	sendHeartbeat: (path: string, state: PerFileState) => Promise<void>;
 	/** Wall-clock source; injected for tests. */
 	now?: () => Date;
 	/** Interval override for tests; defaults to `HEARTBEAT_INTERVAL_MS`. */

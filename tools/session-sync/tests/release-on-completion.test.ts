@@ -328,4 +328,86 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 			throw new Error();
 		expect(outThrow.error.message).toContain("ECONNREFUSED");
 	});
+
+	test("ENG-5862 step 6 follow-up: 204 release stamps updatedState.releasedAt AND shouldHeartbeat returns false on the next tick (no-hot-loop integration)", async () => {
+		// End-to-end pin: a completion-sync that releases the lock must
+		// leave the per-file state in a shape that `shouldHeartbeat` skips
+		// on the very next heartbeat tick.
+		//
+		// Without this seam, the daemon would heartbeat a released-lock
+		// session, hit `refresh_dev_session_lock` (UPDATE-only — migration
+		// 20260512150635), get 0 rows, the endpoint would return 409 with
+		// all-null holder fields, and the daemon's null-holder handler
+		// would set `nextRetryAt = now + 60s` and re-attempt every minute
+		// for the lifetime of the daemon.
+		//
+		// The integration crosses two files (sync-flow's release branch
+		// stamps `releasedAt`; heartbeat's `releasedAt` short-circuit
+		// reads it); per-file unit pins in either alone would let the
+		// chain break without a test failing.
+		//
+		// Companion-negative: explicitly assert the sibling outcomes
+		// (`completed_release_denied`, `completed_release_transport_error`)
+		// do NOT stamp `releasedAt` — a regression that always stamps
+		// would break the 403/transport-error retry path (the safety-net
+		// would think the lock was released and stop trying).
+		const { shouldHeartbeat } = await import("../src/heartbeat.ts");
+
+		const spy = makeDeleteLockSpy({
+			ok: true,
+			status: 204,
+			kind: "released",
+		});
+		const out = await syncFile({
+			...baseInput(),
+			fetchImpl: makeOkSyncFetch(),
+			deleteLockFn: spy.fn,
+		});
+
+		expect(out.kind).toBe("completed_and_released");
+		if (out.kind !== "completed_and_released") throw new Error();
+		expect(out.updatedState.releasedAt).toBe(NOW.toISOString());
+
+		// And `shouldHeartbeat` must short-circuit even though every other
+		// "yes, heartbeat" condition is satisfied (unflushed bytes, last
+		// upload > 60s ago — exactly the shape that would trigger the
+		// hot loop without this guard).
+		const futureNow = new Date(NOW.getTime() + 90_000); // 90s later
+		const mtimeMs = futureNow.getTime() - 1_000; // unflushed bytes
+		expect(shouldHeartbeat(out.updatedState, mtimeMs, futureNow)).toBe(false);
+
+		// Companion-negatives: 403 and transport_error must NOT stamp
+		// `releasedAt`. We didn't actually release the lock in those
+		// cases — the safety-net retries release on the next scan, and
+		// `shouldHeartbeat` keeps heartbeating until either the retry
+		// succeeds or the lease lapses naturally.
+		const denySpy = makeDeleteLockSpy({
+			ok: false,
+			status: 403,
+			kind: "not_holder",
+			body: { error: "not_holder" },
+		});
+		const outDeny = await syncFile({
+			...baseInput(),
+			fetchImpl: makeOkSyncFetch(),
+			deleteLockFn: denySpy.fn,
+		});
+		if (outDeny.kind !== "completed_release_denied") throw new Error();
+		expect(outDeny.updatedState.releasedAt ?? null).toBeNull();
+
+		const transportSpy = makeDeleteLockSpy({
+			ok: false,
+			kind: "transport_error",
+			status: 500,
+			body: { error: "internal_server_error" },
+		});
+		const outTransport = await syncFile({
+			...baseInput(),
+			fetchImpl: makeOkSyncFetch(),
+			deleteLockFn: transportSpy.fn,
+		});
+		if (outTransport.kind !== "completed_release_transport_error")
+			throw new Error();
+		expect(outTransport.updatedState.releasedAt ?? null).toBeNull();
+	});
 });

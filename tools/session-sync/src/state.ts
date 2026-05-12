@@ -42,6 +42,27 @@ export const PerFileStateSchema = z
 		// keep parsing on next boot — Zod's `.strict()` would otherwise
 		// reject the legacy shape.
 		lastHeartbeatAt: z.string().optional(),
+		// Optional ISO timestamp; set when the daemon successfully releases
+		// the dev-session lock after a completion-sync (AC 18 ext, step 6).
+		// Once set, `shouldHeartbeat` short-circuits to false so the
+		// heartbeat loop stops pinging a session whose lock is already gone
+		// server-side.
+		//
+		// Without this guard, the heartbeat would land on a released-lock
+		// endpoint, the server's `refresh_dev_session_lock` (UPDATE-only —
+		// migration 20260512150635) would return 0 rows, the heartbeat
+		// endpoint would surface a 409 with all-null holder fields, and the
+		// daemon's existing null-holder handler would set
+		// `nextRetryAt = now + LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS = 60s`
+		// and re-attempt every minute for the lifetime of the daemon.
+		//
+		// State-file persistence (not just in-memory) means the next-boot
+		// safety-net scan also skips released sessions — a daemon restart
+		// doesn't re-process a finished one.
+		//
+		// Declared optional so state.json files predating this commit
+		// parse cleanly on next boot under Zod's `.strict()`.
+		releasedAt: z.string().optional(),
 	})
 	.strict();
 

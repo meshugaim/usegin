@@ -300,9 +300,23 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 				};
 			}
 			if (releaseResponse.kind === "released") {
+				// Stamp `releasedAt` ONLY on a 204 — the only outcome where
+				// we know server-side the lock row is gone. `not_holder`
+				// and `transport_error` siblings leave it unset so the
+				// heartbeat continues until the lease naturally lapses
+				// (which keeps a peer env from grabbing the lock for an
+				// extra 2 minutes only when we actually failed to release).
+				// `shouldHeartbeat` short-circuits the moment this is set;
+				// without it the daemon would heartbeat a released-lock
+				// endpoint, hit the UPDATE-only refresh function's empty-
+				// row case, and re-attempt every 60s in a hot loop for the
+				// rest of the daemon's lifetime.
 				return {
 					kind: "completed_and_released",
-					updatedState,
+					updatedState: {
+						...updatedState,
+						releasedAt: now.toISOString(),
+					},
 					sessionRow: session,
 				};
 			}
