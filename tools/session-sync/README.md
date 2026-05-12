@@ -73,8 +73,12 @@ The shared **subagent discovery** (AC 17) lives at
 
 ## Slice 1 out of scope (later commits)
 
-- 409 lock-held branch (AC 15), heartbeat (AC 39-41), fork rewrite (AC 36)
+- Fork rewrite (AC 36)
 - Slice 3: UseGin tool integration, backfill script
+
+Slice 2 status: 409 lock_held branch (AC 15) and heartbeat loop
+(AC 40, 41) shipped in ENG-5862 step 5; heartbeat endpoint (AC 39) in
+step 4.
 
 ## Configuration
 

@@ -37,7 +37,7 @@ function baseState(overrides: Partial<PerFileState> = {}): PerFileState {
 }
 
 describe("shouldHeartbeat (AC 40, AC 41)", () => {
-	test.failing(
+	test(
 		"ENG-5862: unflushed bytes AND last upload > 60s ago → true",
 		() => {
 			const state = baseState({
@@ -50,7 +50,7 @@ describe("shouldHeartbeat (AC 40, AC 41)", () => {
 		},
 	);
 
-	test.failing(
+	test(
 		"ENG-5862: last upload < 60s ago → false (recent upload already refreshed lock)",
 		() => {
 			const state = baseState({
@@ -63,7 +63,7 @@ describe("shouldHeartbeat (AC 40, AC 41)", () => {
 		},
 	);
 
-	test.failing(
+	test(
 		"ENG-5862: no unflushed bytes (mtime <= lastUploadedAt) → false",
 		() => {
 			const lastUploadedAtIso = new Date(NOW_MS - 90_000).toISOString();
@@ -75,7 +75,7 @@ describe("shouldHeartbeat (AC 40, AC 41)", () => {
 		},
 	);
 
-	test.failing(
+	test(
 		"ENG-5862: shouldHeartbeat returns false when mtimeMs is null (file deleted)",
 		() => {
 			// Race: fs.watch fired, but by the time the heartbeat tick reads

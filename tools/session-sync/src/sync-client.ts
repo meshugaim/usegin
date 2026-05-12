@@ -74,11 +74,24 @@ export type SyncResponse =
 			/** AC 15: another environment owns the dev-session lock. */
 			ok: false;
 			status: 409;
-			kind: "lock-held";
+			kind: "lock_held";
 			holder: LockHolder;
 	  }
 	| {
+			/**
+			 * Everything that isn't a 200 or a contract-conforming 409:
+			 *  - non-sync-disabled 5xx and network-level failures,
+			 *  - the 503 sync_disabled kill-switch (AC 45) — distinguished
+			 *    by `syncDisabled: true`,
+			 *  - 4xx (including a 409 whose body violated the holder
+			 *    contract — see `postSync` for the guard).
+			 *
+			 * Carries an explicit `kind: "transport_error"` discriminator so
+			 * callers can `switch` on the union without the awkward
+			 * `"kind" in response` / `Exclude<...>` cast dance.
+			 */
 			ok: false;
+			kind: "transport_error";
 			status: number;
 			body: unknown;
 			/** True iff the response is the kill-switch 503 (AC 45). */
@@ -154,33 +167,170 @@ export async function postSync(
 		// AC 15: lock_held. Parse `holder` from the body so the caller can
 		// log holder details and schedule backoff via `holder.expires_at`.
 		// Body shape: `{ error: "lock_held", holder: LockHolder }`.
-		// Surface nulls as-is — the caller (sync-flow.ts) must decide the
-		// fallback policy when `expires_at` is null, NOT this layer. Writing
-		// `""` here would silently coerce to epoch+5s downstream.
+		//
+		// Two valid 409 shapes the daemon distinguishes:
+		//
+		//   1. `holder` is an object (possibly with null fields) — the
+		//      contract is honored, even when `lockRow` was stale and the
+		//      server filled holder.* with nulls. Surface nulls as-is so
+		//      sync-flow can fall back to a `now + 60s` retry instead of
+		//      doing `new Date(null).getTime() + buffer` (which lands at
+		//      epoch+5s and triggers a retry storm).
+		//   2. `holder` is absent or not an object — the server is
+		//      violating the contract. Don't synthesize an all-null holder
+		//      here: that would mask a server bug as a routine lock_held
+		//      response. Return the transport_error variant so sync-flow
+		//      can route it to `fatal_error` with the parsed body attached
+		//      for diagnostics.
 		const holderRaw =
 			parsed && typeof parsed === "object"
 				? (parsed as { holder?: unknown }).holder
 				: undefined;
-		const holder: LockHolder =
-			holderRaw && typeof holderRaw === "object"
-				? (holderRaw as LockHolder)
-				: {
-						environment_kind: null,
-						environment_id: null,
-						username: null,
-						expires_at: null,
-					};
+		if (holderRaw && typeof holderRaw === "object") {
+			return {
+				ok: false,
+				status: 409,
+				kind: "lock_held",
+				holder: holderRaw as LockHolder,
+			};
+		}
 		return {
 			ok: false,
+			kind: "transport_error",
 			status: 409,
-			kind: "lock-held",
-			holder,
+			body: parsed,
+			syncDisabled: false,
 		};
 	}
 
 	const syncDisabled = res.status === 503 && isSyncDisabledBody(parsed);
 	return {
 		ok: false,
+		kind: "transport_error",
+		status: res.status,
+		body: parsed,
+		syncDisabled,
+	};
+}
+
+/**
+ * POST `/api/v1/dev-sessions/{session_id}/lock/heartbeat` (AC 40).
+ *
+ * Called by the daemon's heartbeat loop on a 60s cadence while session
+ * bytes are unflushed but otherwise idle, so the server-side lease
+ * (default 2min) doesn't lapse and let a peer environment steal the
+ * dev-session lock.
+ *
+ * Body shape is `{ environment_kind, environment_id }` — JSON, NOT
+ * multipart (no JSONL bytes flow through heartbeat).
+ *
+ * Response classification mirrors `postSync` so the daemon can branch
+ * with the same shape:
+ *   - 200 → `{kind:"ok", expiresAt}` — the lease was refreshed.
+ *   - 409 → `{kind:"lock_held", holder}` — peer holds the lock; daemon
+ *     applies AC-15 backoff (sets `nextRetryAt`) the same way sync's
+ *     409 path does. Malformed 409 bodies (missing holder) downgrade to
+ *     the legacy error variant so callers route to `fatal_error`,
+ *     matching `postSync`.
+ *   - 503 with `error:"sync_disabled"` → kill-switch on the
+ *     heartbeat endpoint surface. We don't normally hit this — the daemon
+ *     stops uploading first — but propagate `syncDisabled:true` for
+ *     symmetry with the sync path.
+ *   - Other 4xx/5xx → legacy `{ok:false, status, body, syncDisabled:false}`.
+ */
+export interface HeartbeatRequest {
+	apiUrl: string;
+	token: string;
+	sessionId: string;
+	environmentKind: string;
+	environmentId: string;
+}
+
+export type HeartbeatResponse =
+	| { ok: true; status: 200; kind: "ok"; expiresAt: string | null }
+	| {
+			ok: false;
+			status: 409;
+			kind: "lock_held";
+			holder: LockHolder;
+	  }
+	| {
+			/**
+			 * Symmetric with `SyncResponse`: 4xx, non-sync-disabled 5xx, the
+			 * kill-switch 503, and 409s where the body violated the holder
+			 * contract all land here. The `kind:"transport_error"`
+			 * discriminator means call sites can `switch (res.kind)` without
+			 * an `"in"` check.
+			 */
+			ok: false;
+			kind: "transport_error";
+			status: number;
+			body: unknown;
+			syncDisabled: boolean;
+	  };
+
+export async function postHeartbeat(
+	req: HeartbeatRequest,
+	fetchImpl: FetchLike = fetch,
+): Promise<HeartbeatResponse> {
+	const base = req.apiUrl.replace(/\/+$/, "");
+	const url = `${base}/api/v1/dev-sessions/${req.sessionId}/lock/heartbeat`;
+	const res = await fetchImpl(url, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${req.token}`,
+			"content-type": "application/json",
+		},
+		body: JSON.stringify({
+			environment_kind: req.environmentKind,
+			environment_id: req.environmentId,
+		}),
+	});
+
+	const parsed = await parseBody(res);
+
+	if (res.status === 200) {
+		const expiresAt =
+			parsed && typeof parsed === "object"
+				? (parsed as { expires_at?: unknown }).expires_at
+				: undefined;
+		return {
+			ok: true,
+			status: 200,
+			kind: "ok",
+			expiresAt: typeof expiresAt === "string" ? expiresAt : null,
+		};
+	}
+
+	if (res.status === 409) {
+		// Same contract guard as `postSync`: holder must be an object (the
+		// stale-holder case ships explicit nulls inside the object, which
+		// is still a well-formed contract).
+		const holderRaw =
+			parsed && typeof parsed === "object"
+				? (parsed as { holder?: unknown }).holder
+				: undefined;
+		if (holderRaw && typeof holderRaw === "object") {
+			return {
+				ok: false,
+				status: 409,
+				kind: "lock_held",
+				holder: holderRaw as LockHolder,
+			};
+		}
+		return {
+			ok: false,
+			kind: "transport_error",
+			status: 409,
+			body: parsed,
+			syncDisabled: false,
+		};
+	}
+
+	const syncDisabled = res.status === 503 && isSyncDisabledBody(parsed);
+	return {
+		ok: false,
+		kind: "transport_error",
 		status: res.status,
 		body: parsed,
 		syncDisabled,

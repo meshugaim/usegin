@@ -21,7 +21,13 @@
  */
 
 import type { AuthContext } from "./auth.ts";
-import { computeNextRetryAt, isInBackoff } from "./backoff.ts";
+import {
+	computeNextRetryAt,
+	isInBackoff,
+	KILL_SWITCH_BACKOFF_MS,
+	LOCK_BACKOFF_BUFFER_MS,
+	LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS,
+} from "./backoff.ts";
 import { computeContentHash } from "./content-hash.ts";
 import { extractMetadata } from "./extractor.ts";
 import { gzipDeterministic } from "./gzip.ts";
@@ -29,16 +35,13 @@ import type { PerFileState, StateFile } from "./state.ts";
 import { type FetchLike, postSync } from "./sync-client.ts";
 import type { EnvironmentKind, SyncMetadata } from "./sync-metadata.ts";
 
-const KILL_SWITCH_BACKOFF_MS = 5 * 60 * 1000;
-
-/**
- * Clock-skew buffer added to `holder.expires_at` when scheduling a retry
- * after a 409 lock_held (AC 15). 5s is large enough to swallow modest
- * skew between this daemon's clock and the server's lock_expires_at
- * timestamp, small enough that the loser environment picks up the work
- * promptly once the holder really has expired.
- */
-export const LOCK_BACKOFF_BUFFER_MS = 5_000;
+// Re-exported for callers that want the lock-held constants without
+// reaching across to backoff.ts directly. `backoff.ts` is the source of
+// truth — tests should import from there.
+export {
+	LOCK_BACKOFF_BUFFER_MS,
+	LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS,
+} from "./backoff.ts";
 
 export interface EnvIdentity {
 	kind: string;
@@ -185,7 +188,11 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		return { kind: "transient_error", error: err as Error };
 	}
 
-	// 6. Branch on response.
+	// 6. Branch on response. The `SyncResponse` union has three explicit
+	// discriminators: `ok:true` for 200, `kind:"lock_held"` for a 409
+	// with a contract-conforming holder, and `kind:"transport_error"`
+	// for everything else (4xx, non-sync-disabled 5xx, the kill-switch
+	// 503, and 409s where the server's body violated the holder contract).
 	if (response.ok) {
 		const session = response.body.session;
 		const storagePath =
@@ -200,24 +207,45 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		return { kind: "uploaded", updatedState, sessionRow: session };
 	}
 
-	if ("kind" in response && response.kind === "lock-held") {
-		// AC 15: another environment holds the lock. Green implements:
-		//   - log a warning naming holder.{kind, env_id, username, expires_at}
-		//   - set state.nextRetryAt = holder.expires_at + LOCK_BACKOFF_BUFFER_MS
-		//   - preserve prior contentHash / storagePath when present
-		// Red: throw so the caller (and tests) see a clean
-		// behavior-missing failure rather than a silent fallthrough.
-		throw new Error(
-			"Not implemented (ENG-5862 step 5 Red): 409 lock-held handling",
-		);
+	if (response.kind === "lock_held") {
+		// AC 15: another environment holds the lock. The upload did NOT
+		// happen — preserve every prior field (contentHash, lastUploadedSize,
+		// storagePath, lastUploadedAt) so the next successful sync sees the
+		// same hash-match short-circuit it would have without the 409. We
+		// only mutate `nextRetryAt`.
+		//
+		// The holder warning line is emitted at the cli.ts boundary (where
+		// the outcome is consumed), not here — keeps `syncFile` a pure
+		// returns-an-outcome function and lets cli.ts deduplicate noisy
+		// warnings if a backoff'd file keeps cycling through the watch loop.
+		const { holder } = response;
+		const expiresAtRaw = holder.expires_at;
+		const nextRetryAtMs =
+			typeof expiresAtRaw === "string"
+				? Date.parse(expiresAtRaw) + LOCK_BACKOFF_BUFFER_MS
+				: now.getTime() + LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS;
+		const updatedState: PerFileState = {
+			contentHash: prior?.contentHash ?? "",
+			lastUploadedSize: prior?.lastUploadedSize ?? 0,
+			sessionId,
+			storagePath: prior?.storagePath ?? "",
+			lastUploadedAt: prior?.lastUploadedAt ?? "",
+			...(prior?.lastHeartbeatAt
+				? { lastHeartbeatAt: prior.lastHeartbeatAt }
+				: {}),
+			nextRetryAt: new Date(nextRetryAtMs).toISOString(),
+		};
+		return { kind: "lock_held", updatedState, holder };
 	}
 
-	// At this point only the legacy {ok:false, status, body, syncDisabled}
-	// variant remains in the union; narrow explicitly for tsgo.
-	const errResp = response as Exclude<
-		typeof response,
-		{ kind: "lock-held" } | { ok: true }
-	>;
+	// `response.kind === "transport_error"`: 4xx (including a
+	// 409-with-malformed-holder per sync-client's contract guard),
+	// non-sync-disabled 5xx, and the 503 sync_disabled kill-switch.
+	// The `lock_held` branch above carved off the only other `ok:false`
+	// variant — `response` narrows to the transport_error shape and the
+	// rest of the function can read `.syncDisabled` / `.status` / `.body`
+	// directly. No cast needed.
+	const errResp = response;
 
 	if (errResp.syncDisabled) {
 		// AC 45: set nextRetryAt = now + 5min, preserve prior fields where we

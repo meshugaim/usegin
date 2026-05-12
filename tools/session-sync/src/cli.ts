@@ -15,12 +15,13 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { unlink, writeFile } from "node:fs/promises";
+import { stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
 import { Coalescer } from "./coalescer.ts";
 import { detectEnvironment } from "./env-detect.ts";
+import { type HeartbeatLoopHandle, heartbeatLoop } from "./heartbeat.ts";
 import { getOrCreateInstallId } from "./install-id.ts";
 import {
 	type PendingUpload,
@@ -30,7 +31,12 @@ import {
 } from "./lifecycle.ts";
 import { safetyNetTick } from "./safety-net.ts";
 import { startupScan } from "./startup-scan.ts";
-import { readState, type StateFile, writeState } from "./state.ts";
+import { type PerFileState, readState, type StateFile, writeState } from "./state.ts";
+import { postHeartbeat } from "./sync-client.ts";
+import {
+	LOCK_BACKOFF_BUFFER_MS,
+	LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS,
+} from "./backoff.ts";
 import type { EnvIdentity } from "./sync-flow.ts";
 import { syncSession } from "./sync-session.ts";
 
@@ -149,6 +155,118 @@ interface DaemonState {
 	subdirs: Set<string>;
 	// Track last persisted state hash to throttle disk writes.
 	lastPersistAt: number;
+	// Heartbeat-loop handle (AC 40, 41). `null` until the loop is started
+	// at the bottom of `main()`; shutdown() calls `.stop()` to clear the
+	// 60s interval so the process can exit cleanly.
+	heartbeat: HeartbeatLoopHandle | null;
+}
+
+/**
+ * Read a JSONL file's mtime in milliseconds via async `stat`, returning
+ * null if the file has been deleted between the watch event and this
+ * call. Used by the heartbeat loop (AC 41) — the safety-net's own
+ * `statSync`-based size check stays untouched.
+ *
+ * Async by design: the heartbeat loop already awaits between sessions
+ * and a missed-fd EBADF on shutdown shouldn't surface as a sync error.
+ */
+async function getMtimeMs(path: string): Promise<number | null> {
+	try {
+		const s = await stat(path);
+		return s.mtimeMs;
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+		// Any other stat error (EACCES on rotated dir, etc.) → treat as
+		// "no signal", same as deletion — heartbeat loop skips.
+		return null;
+	}
+}
+
+/**
+ * Wire-layer heartbeat callback: POST one heartbeat for a single
+ * session, then update `d.state[path]` based on the outcome.
+ *
+ * - 200 → bump `lastHeartbeatAt = expires_at ?? new Date().toISOString()`.
+ *   The lease was refreshed; `shouldHeartbeat` will read this on its next
+ *   tick and skip until 60s past it.
+ * - 409 → apply the AC-15 backoff, identical to the sync path's 409
+ *   handling — set `nextRetryAt = holder.expires_at + buffer` (or
+ *   `now + 60s` when the holder is stale-null). The sync loop's
+ *   `isInBackoff` filter then suppresses upload attempts on the same
+ *   marker. One mechanism, two triggers.
+ * - transport_error → log + skip; next heartbeat tick retries.
+ */
+async function sendHeartbeat(
+	d: DaemonState,
+	path: string,
+	perFile: PerFileState,
+): Promise<void> {
+	// Refresh JWT first — heartbeat is far less hot than sync but the
+	// daemon can park overnight and a stale token would silently fail
+	// every tick.
+	try {
+		d.auth = await refreshAuthIfNeeded(d.auth, {
+			profileName: d.config.profileName,
+		});
+	} catch (err) {
+		console.warn(
+			"[session-sync] heartbeat: token refresh failed for",
+			perFile.sessionId,
+			"-",
+			(err as Error).message,
+		);
+		return;
+	}
+	const res = await postHeartbeat({
+		apiUrl: d.auth.apiUrl,
+		token: d.auth.token,
+		sessionId: perFile.sessionId,
+		environmentKind: d.envIdentity.kind,
+		environmentId: d.envIdentity.id,
+	});
+	const now = new Date();
+	if (res.ok) {
+		d.state[path] = {
+			...perFile,
+			lastHeartbeatAt: res.expiresAt ?? now.toISOString(),
+		};
+		await persistStateMaybe(d);
+		return;
+	}
+	if (res.kind === "lock_held") {
+		const { holder } = res;
+		const expiresAtRaw = holder.expires_at;
+		const nextRetryAtMs =
+			typeof expiresAtRaw === "string"
+				? Date.parse(expiresAtRaw) + LOCK_BACKOFF_BUFFER_MS
+				: now.getTime() + LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS;
+		d.state[path] = {
+			...perFile,
+			nextRetryAt: new Date(nextRetryAtMs).toISOString(),
+		};
+		console.warn(
+			`[session-sync] heartbeat 409 lock_held for ${perFile.sessionId}: ` +
+				`holder env=${holder.environment_kind ?? "?"}:${
+					holder.environment_id ?? "?"
+				} user=${holder.username ?? "?"} expires_at=${
+					holder.expires_at ?? "?"
+				}; nextRetryAt=${new Date(nextRetryAtMs).toISOString()}`,
+		);
+		await persistStateMaybe(d);
+		return;
+	}
+	// transport_error — bad response, but the JSONL bytes haven't been
+	// lost (the next sync tick still has them). Log loud and move on.
+	console.warn(
+		"[session-sync] heartbeat:",
+		res.status,
+		"for",
+		perFile.sessionId,
+		"-",
+		typeof res.body === "string"
+			? res.body
+			: JSON.stringify(res.body) ?? "<no body>",
+	);
 }
 
 async function persistStateMaybe(d: DaemonState, force = false): Promise<void> {
@@ -339,6 +457,28 @@ async function fireSync(
 					d.state[o.filePath] = o.outcome.updatedState;
 				} else if (o.outcome.kind === "kill_switch") {
 					d.state[o.filePath] = o.outcome.updatedState;
+				} else if (o.outcome.kind === "lock_held") {
+					// AC 15: 409 from sync. Persist `nextRetryAt` so the next
+					// watch-loop / safety-net tick honors the backoff window
+					// instead of immediately re-uploading. `syncFile` already
+					// preserved prior contentHash / lastUploadedAt — the row
+					// we write here is the same row minus the new marker.
+					d.state[o.filePath] = o.outcome.updatedState;
+					// Surface who is holding the lock so the human can debug a
+					// "why is staging not getting my session" pairing. Emitted
+					// here (not inside `syncFile`) so the pure outcome function
+					// stays log-free and so a future dedupe layer can live in
+					// one place; see the Red-test layering note in
+					// `sync-flow-409.test.ts`.
+					const h = o.outcome.holder;
+					console.warn(
+						`[session-sync] 409 lock_held for ${sessionId}: ` +
+							`holder env=${h.environment_kind ?? "unknown"}:${
+								h.environment_id ?? "unknown"
+							} user=${h.username ?? "unknown"} expires_at=${
+								h.expires_at ?? "unknown"
+							}; nextRetryAt=${o.outcome.updatedState.nextRetryAt ?? "?"}`,
+					);
 				}
 			}
 			await persistStateMaybe(d);
@@ -383,6 +523,12 @@ async function shutdown(d: DaemonState, signal: string): Promise<void> {
 	if (d.stopping) return;
 	d.stopping = true;
 	console.log("[session-sync] received", signal, "- shutting down");
+	// Idempotent — onSig already called stop(), but if shutdown was
+	// invoked by some other path (uncaught exception handler, future
+	// callers) we still want the interval cleared before we walk the
+	// pending uploads.
+	d.heartbeat?.stop();
+	d.heartbeat = null;
 	for (const w of d.watchers) {
 		try {
 			w.close();
@@ -485,6 +631,7 @@ async function main(): Promise<void> {
 		watchers: [],
 		subdirs: new Set(),
 		lastPersistAt: 0,
+		heartbeat: null,
 	};
 
 	// 5. Startup scan.
@@ -527,10 +674,23 @@ async function main(): Promise<void> {
 		void safetyTick(d);
 	}, d.config.safetyNetIntervalMs);
 
-	// 9. Signal handlers.
+	// 9. Heartbeat loop (AC 40, 41). Started AFTER state is loaded and
+	// the sync watchers are attached, so the very first tick has
+	// something to walk. The factory schedules a 60s `setInterval` that
+	// reads the live `d.state` snapshot, calls `shouldHeartbeat` per
+	// entry, and posts via `sendHeartbeat` only on the entries that
+	// match. Shutdown calls `.stop()` to clear the interval.
+	d.heartbeat = heartbeatLoop({
+		getState: () => d.state,
+		getMtimeMs,
+		sendHeartbeat: (path, perFile) => sendHeartbeat(d, path, perFile),
+	});
+
+	// 10. Signal handlers.
 	const onSig = (sig: string) => {
 		clearInterval(tickTimer);
 		clearInterval(safetyTimer);
+		d.heartbeat?.stop();
 		void shutdown(d, sig);
 	};
 	process.on("SIGTERM", () => onSig("SIGTERM"));
@@ -543,7 +703,7 @@ async function main(): Promise<void> {
 			config.tickIntervalMs +
 			"ms safety=" +
 			config.safetyNetIntervalMs +
-			"ms)",
+			"ms heartbeat=60000ms)",
 	);
 }
 

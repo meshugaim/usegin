@@ -20,9 +20,10 @@
  *      (first sync seeds `nextRetryAt`, second sync skips) to keep the
  *      test from accidentally passing on the existing kill-switch wiring.
  *
- * Each assertion is `test.failing` per `.claude/skills/tdd-ci/SKILL.md` —
- * production stubs throw "Not implemented" so the tests fail in Red and
- * Green removes the marker.
+ * Step 5 Green flipped these from `test.failing` (production stubs threw
+ * "Not implemented (ENG-5862 step 5 Red)") to real `test` assertions
+ * after `syncFile` started returning the `lock_held` outcome shape and
+ * `state.nextRetryAt` got the holder-derived backoff.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -95,7 +96,7 @@ function baseInput(state: StateFile = {}) {
 }
 
 describe("syncFile — 409 lock_held (AC 15)", () => {
-	test.failing(
+	test(
 		"ENG-5862: 409 → outcome.kind = lock_held with all four holder fields",
 		async () => {
 			// DATA contract: syncFile surfaces a `lock_held` outcome whose
@@ -117,7 +118,7 @@ describe("syncFile — 409 lock_held (AC 15)", () => {
 		},
 	);
 
-	test.failing(
+	test(
 		"ENG-5862: 409 → outcome.lock_held with nextRetryAt = holder.expires_at + 5s",
 		async () => {
 			const out = await syncFile({
@@ -137,7 +138,7 @@ describe("syncFile — 409 lock_held (AC 15)", () => {
 		},
 	);
 
-	test.failing(
+	test(
 		"ENG-5862: 409 with null holder.expires_at → nextRetryAt = now + 60_000ms",
 		async () => {
 			// Step 4's HTTP 409 returns null fields when `lockRow` is null
@@ -167,7 +168,7 @@ describe("syncFile — 409 lock_held (AC 15)", () => {
 		},
 	);
 
-	test.failing(
+	test(
 		"ENG-5862: subsequent sync while now < nextRetryAt → daemon skips POST",
 		async () => {
 			// Integrated sequence: first sync seeds nextRetryAt via 409,

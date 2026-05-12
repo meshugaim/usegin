@@ -27,9 +27,21 @@ export const PerFileStateSchema = z
 		// entry with no prior upload. Consumers reading this field for time
 		// math must guard against empty-string before parsing as a date.
 		lastUploadedAt: z.string(),
-		// Optional ISO timestamp; set when an upload returns 503 per AC 45,
-		// cleared once the daemon has retried past it.
+		// Optional ISO timestamp; set when an upload returns 503 per AC 45
+		// OR when sync/heartbeat returns 409 lock_held per AC 15. One field,
+		// two triggers — `isInBackoff` and the safety-net "retry-due" branch
+		// both fire on either marker, no special-casing needed downstream.
 		nextRetryAt: z.string().optional(),
+		// Optional ISO timestamp; set by the heartbeat loop (AC 40, 41) on
+		// each successful 200 response, mirroring what `lastUploadedAt`
+		// does for the sync path. `shouldHeartbeat` reads
+		// `max(lastUploadedAt, lastHeartbeatAt ?? epoch)` to decide whether
+		// the lease has already been refreshed inside the 60s window.
+		//
+		// Declared optional so daemons whose state.json predates step 5
+		// keep parsing on next boot — Zod's `.strict()` would otherwise
+		// reject the legacy shape.
+		lastHeartbeatAt: z.string().optional(),
 	})
 	.strict();
 
