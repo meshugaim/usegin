@@ -32,7 +32,7 @@ import {
 import { safetyNetTick } from "./safety-net.ts";
 import { startupScan } from "./startup-scan.ts";
 import { type PerFileState, readState, type StateFile, writeState } from "./state.ts";
-import { postHeartbeat } from "./sync-client.ts";
+import { type LockHolder, postHeartbeat } from "./sync-client.ts";
 import type { EnvIdentity } from "./sync-flow.ts";
 import { syncSession } from "./sync-session.ts";
 
@@ -179,6 +179,39 @@ async function getMtimeMs(path: string): Promise<number | null> {
 }
 
 /**
+ * Single emit-site for the AC-15 lock_held warning, shared between the
+ * sync path (`fireSync`) and the heartbeat path (`sendHeartbeat`). One
+ * placeholder string (`"unknown"`) is used for every null holder field
+ * so log output reads consistently regardless of which trigger emitted
+ * it. The math + state mutation lives in `backoff.ts::applyBackoff` —
+ * this helper is the boundary's *output* side; `applyBackoff` is the
+ * state side. Two helpers, two responsibilities.
+ *
+ * `source` differentiates the prefix ("409 lock_held" vs "heartbeat 409
+ * lock_held") so a human grepping the daemon log can tell whether the
+ * 409 came from a sync POST or a heartbeat POST without parsing
+ * timestamps.
+ */
+function warnLockHeld(opts: {
+	source: "sync" | "heartbeat";
+	sessionId: string;
+	holder: LockHolder;
+	nextRetryAt: string;
+}): void {
+	const prefix =
+		opts.source === "sync" ? "409 lock_held" : "heartbeat 409 lock_held";
+	const h = opts.holder;
+	console.warn(
+		`[session-sync] ${prefix} for ${opts.sessionId}: ` +
+			`holder env=${h.environment_kind ?? "unknown"}:${
+				h.environment_id ?? "unknown"
+			} user=${h.username ?? "unknown"} expires_at=${
+				h.expires_at ?? "unknown"
+			}; nextRetryAt=${opts.nextRetryAt}`,
+	);
+}
+
+/**
  * Wire-layer heartbeat callback: POST one heartbeat for a single
  * session, then update `d.state[path]` based on the outcome.
  *
@@ -238,14 +271,12 @@ async function sendHeartbeat(
 		// The sync loop's `isInBackoff` filter then suppresses upload
 		// attempts on the same marker. One mechanism, three triggers.
 		d.state[path] = applyBackoff(perFile, perFile.sessionId, nextRetryAt);
-		console.warn(
-			`[session-sync] heartbeat 409 lock_held for ${perFile.sessionId}: ` +
-				`holder env=${holder.environment_kind ?? "?"}:${
-					holder.environment_id ?? "?"
-				} user=${holder.username ?? "?"} expires_at=${
-					holder.expires_at ?? "?"
-				}; nextRetryAt=${nextRetryAt}`,
-		);
+		warnLockHeld({
+			source: "heartbeat",
+			sessionId: perFile.sessionId,
+			holder,
+			nextRetryAt,
+		});
 		await persistStateMaybe(d);
 		return;
 	}
@@ -463,16 +494,14 @@ async function fireSync(
 					// here (not inside `syncFile`) so the pure outcome function
 					// stays log-free and so a future dedupe layer can live in
 					// one place; see the Red-test layering note in
-					// `sync-flow-409.test.ts`.
-					const h = o.outcome.holder;
-					console.warn(
-						`[session-sync] 409 lock_held for ${sessionId}: ` +
-							`holder env=${h.environment_kind ?? "unknown"}:${
-								h.environment_id ?? "unknown"
-							} user=${h.username ?? "unknown"} expires_at=${
-								h.expires_at ?? "unknown"
-							}; nextRetryAt=${o.outcome.updatedState.nextRetryAt ?? "?"}`,
-					);
+					// `sync-flow-409.test.ts`. `warnLockHeld` is the single
+					// emit-site; the heartbeat path (sendHeartbeat) uses it too.
+					warnLockHeld({
+						source: "sync",
+						sessionId,
+						holder: o.outcome.holder,
+						nextRetryAt: o.outcome.updatedState.nextRetryAt ?? "unknown",
+					});
 				}
 			}
 			await persistStateMaybe(d);

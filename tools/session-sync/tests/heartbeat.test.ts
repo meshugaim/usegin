@@ -110,4 +110,49 @@ describe("shouldHeartbeat (AC 40, AC 41)", () => {
 			expect(shouldHeartbeat(state, mtimeMs, NOW)).toBe(false);
 		},
 	);
+
+	/**
+	 * Boundary triplet pinning the 60_000ms strict-less-than threshold in
+	 * `now.getTime() - lastActivityMs < HEARTBEAT_INTERVAL_MS`. Three tests
+	 * straddle the edge: 1ms below (still recent → skip), exact threshold
+	 * (no longer recent → heartbeat — load-bearing for the loop catching
+	 * the t=60s tick), and 1ms above (definitely not recent → heartbeat).
+	 *
+	 * A future regression that flips `<` to `<=` would fail the exact-
+	 * threshold case and stop heartbeating at the exact 60s tick the loop
+	 * is designed to land on.
+	 */
+	test(
+		"ENG-5862: shouldHeartbeat returns false at sinceLastUploadMs = 59_999",
+		() => {
+			const state = baseState({
+				lastUploadedAt: new Date(NOW_MS - 59_999).toISOString(),
+			});
+			// Unflushed bytes: mtime newer than lastUploadedAt.
+			const mtimeMs = NOW_MS - 100;
+			expect(shouldHeartbeat(state, mtimeMs, NOW)).toBe(false);
+		},
+	);
+
+	test(
+		"ENG-5862: shouldHeartbeat returns true at sinceLastUploadMs = 60_000",
+		() => {
+			const state = baseState({
+				lastUploadedAt: new Date(NOW_MS - 60_000).toISOString(),
+			});
+			const mtimeMs = NOW_MS - 100;
+			expect(shouldHeartbeat(state, mtimeMs, NOW)).toBe(true);
+		},
+	);
+
+	test(
+		"ENG-5862: shouldHeartbeat returns true at sinceLastUploadMs = 60_001",
+		() => {
+			const state = baseState({
+				lastUploadedAt: new Date(NOW_MS - 60_001).toISOString(),
+			});
+			const mtimeMs = NOW_MS - 100;
+			expect(shouldHeartbeat(state, mtimeMs, NOW)).toBe(true);
+		},
+	);
 });
