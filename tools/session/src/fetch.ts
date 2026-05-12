@@ -312,8 +312,19 @@ export async function fetchSession(input: string): Promise<FetchResult> {
         const bodyPreview = supa.error.body.length > 200
           ? `${supa.error.body.slice(0, 200)}…`
           : supa.error.body;
+        // Partial-success surfacing: if the failure landed mid-subagent-
+        // loop, the parent + N already-downloaded subagents are on disk.
+        // Name them so the user knows what arrived — without this, a
+        // partial fetch looks like a total failure and the user might
+        // re-run blind, not knowing the parent is already cached.
+        let partialNote = "";
+        const partial = supa.error.partialSuccess;
+        if (partial) {
+          const count = partial.subagentPaths.length;
+          partialNote = `\n\nPartial fetch: parent + ${count} subagent file${count === 1 ? "" : "s"} already placed on disk at ${partial.parentPath}. The next \`session resume\` retries from scratch.`;
+        }
         throw new Error(
-          `Cannot fetch session ${input} from Supabase: server returned ${supa.error.status}.\n\n${bodyPreview}`,
+          `Cannot fetch session ${input} from Supabase: server returned ${supa.error.status}.\n\n${bodyPreview}${partialNote}`,
         );
       }
     }

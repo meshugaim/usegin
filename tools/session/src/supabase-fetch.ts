@@ -21,9 +21,15 @@
  *   3. `GET <signed_url>` → gzipped JSONL bytes → `Bun.gunzipSync` → write
  *      to `~/.claude/projects/<project-hash>/<sessionId>.jsonl`.
  *   4. For each `subagent_paths[i]`: download, decompress, write to
- *      `~/.claude/projects/<project-hash>/agent-<agent_id>.jsonl` — FLAT,
- *      co-located with the parent (matches `parse-subagents.ts`'s
- *      discovery convention; verified by `resolve.test.ts:461`).
+ *      `~/.claude/projects/<project-hash>/<sessionId>/subagents/agent-<agent_id>.jsonl`
+ *      — NESTED under a per-parent subdir, matching the agent-records
+ *      branch (`fetch.ts`'s `localSubagentDir = join(localDir, remote.id,
+ *      "subagents")`) and the empirical layout Claude itself writes when
+ *      spawning subagents (every subagent JSONL Claude has written in this
+ *      env lives at `<projects-dir>/<parent-session>/subagents/agent-*.jsonl`).
+ *      The two cross-env paths (agent-records, supabase) must agree or
+ *      `claude --resume <parent-id>` finds the parent in one shape and
+ *      misses the subagents.
  *
  * Failure modes:
  *
@@ -87,7 +93,22 @@ export type SupabaseFetchError =
   | { kind: "not_found" }
   | { kind: "auth_missing" }
   | { kind: "auth_expired" }
-  | { kind: "transport_error"; status: number; body: string };
+  | {
+      kind: "transport_error";
+      status: number;
+      body: string;
+      /**
+       * Present when the failure occurred mid-subagent-loop: the parent
+       * JSONL and zero or more subagent JSONLs already landed on disk
+       * before the failing subagent. `fetchSession`'s translator names
+       * these in the user-facing message so the user knows what landed
+       * (spec line 489 — orphan blobs tolerated, but visibly so).
+       */
+      partialSuccess?: {
+        parentPath: string;
+        subagentPaths: string[];
+      };
+    };
 
 /**
  * Result of a Supabase fetch attempt.
@@ -173,6 +194,21 @@ async function downloadAndWrite(
  * discriminated `kind`s; `fetchSession` maps both to `AuthRequiredError`
  * so the user sees `effi auth login` remediation, distinct from the
  * "not found in any environment" prose for an honest 404.
+ *
+ * **Placement is cwd-relative.** The parent JSONL + subagents land under
+ * the project hash derived from `process.cwd()` at the moment of the
+ * call (via `getCurrentProjectHash()`), NOT under the project hash of
+ * the original env where the session was created. This is deliberate:
+ * `claude --resume <id>` looks in the project dir for the cwd it's
+ * launched from, so writing under env B's project hash is what makes
+ * the cross-env resume actually work.
+ *
+ * Practical consequence for worktrees: if you run `session resume <id>`
+ * from a feature worktree, the file lands in the worktree's project hash,
+ * not the main worktree's. If you want it in the main project dir, run
+ * `session resume <id>` from the main worktree (or `cd` to a path whose
+ * project hash matches before resuming). The hash function maps each
+ * distinct cwd to a distinct projects-dir directory.
  */
 export async function fetchFromSupabase(
   sessionId: string,
@@ -252,20 +288,29 @@ export async function fetchFromSupabase(
     };
   }
 
-  // 5. Subagent loop. FLAT placement — `agent-<agent_id>.jsonl` siblings of
-  // the parent, matching `parse-subagents.ts`'s discovery convention. A
-  // mid-loop failure propagates as `transport_error`; already-written
-  // subagents stay on disk (spec line 489 — orphan blobs tolerated).
+  // 5. Subagent loop. NESTED placement — each subagent lives at
+  //   <projects-dir>/<projectHash>/<sessionId>/subagents/agent-<agent_id>.jsonl
+  // matching the agent-records branch (`fetch.ts`'s `localSubagentDir =
+  // join(localDir, remote.id, "subagents")`) and the empirical layout
+  // Claude itself writes when spawning subagents. The two cross-env paths
+  // must agree, otherwise `claude --resume <parent-id>` finds the parent
+  // in one shape and misses the subagents in the other.
+  //
+  // A mid-loop failure propagates as `transport_error` carrying the list
+  // of paths already on disk in `partialSuccess` so the user-facing
+  // message can name what landed (spec line 489 — orphan blobs tolerated,
+  // but visibly tolerated, not silently).
   //
   // We don't roll back the parent: a user who sees a parent on disk plus
   // a partial-subagent error can retry, and the parent path is idempotent
   // (next call overwrites with the same bytes).
-  let subagentCount = 0;
+  const subagentDir = join(localDir, sessionId, "subagents");
+  const placedSubagentPaths: string[] = [];
   for (const sub of payload.subagent_paths) {
-    const subPath = join(localDir, `agent-${sub.agent_id}.jsonl`);
+    const subPath = join(subagentDir, `agent-${sub.agent_id}.jsonl`);
     try {
       await downloadAndWrite(sub.signed_url, subPath);
-      subagentCount++;
+      placedSubagentPaths.push(subPath);
     } catch (err) {
       return {
         ok: false,
@@ -273,10 +318,15 @@ export async function fetchFromSupabase(
           kind: "transport_error",
           status: 0,
           body: `subagent ${sub.agent_id}: ${(err as Error).message}`,
+          partialSuccess: {
+            parentPath: parentLocalPath,
+            subagentPaths: placedSubagentPaths,
+          },
         },
       };
     }
   }
+  const subagentCount = placedSubagentPaths.length;
 
   return {
     ok: true,

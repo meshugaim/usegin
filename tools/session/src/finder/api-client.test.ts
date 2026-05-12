@@ -439,4 +439,56 @@ describe("getSession — response classification", () => {
     expect(caught?.kind).toBe("other");
     expect(caught?.status).toBe(200);
   });
+
+  // ===========================================================================
+  // subagent_paths defensive coercion
+  // ===========================================================================
+  //
+  // The server contract guarantees `subagent_paths` is always present as
+  // an array (empty when no subagents). `getSession` defensively coerces
+  // a missing or non-array field to `[]` so a downlevel server or future
+  // spec drift doesn't crash the CLI's subagent-loop iteration. These
+  // tests pin that coercion — without them a refactor that drops the
+  // `Array.isArray` guard would silently let `undefined` or `null`
+  // propagate to `for (const sub of payload.subagent_paths)` and throw
+  // an unhelpful TypeError at the point of iteration.
+
+  test("200 without subagent_paths field → returns []", async () => {
+    const fetchImpl: FetchLike = async () =>
+      jsonResponse(200, {
+        session: sampleItem,
+        signed_url: "https://signed.example/abc",
+        // subagent_paths omitted entirely
+      });
+    const out = await getSession(auth, "id", fetchImpl);
+    expect(out).not.toBeNull();
+    expect(out?.subagent_paths).toEqual([]);
+  });
+
+  test("200 with subagent_paths: null → returns []", async () => {
+    const fetchImpl: FetchLike = async () =>
+      jsonResponse(200, {
+        session: sampleItem,
+        signed_url: "https://signed.example/abc",
+        subagent_paths: null,
+      });
+    const out = await getSession(auth, "id", fetchImpl);
+    expect(out).not.toBeNull();
+    expect(out?.subagent_paths).toEqual([]);
+  });
+
+  test("200 with subagent_paths array → returns the array", async () => {
+    const sub = {
+      agent_id: "55555555-5555-5555-5555-555555555555",
+      signed_url: "https://signed.example/sub",
+    };
+    const fetchImpl: FetchLike = async () =>
+      jsonResponse(200, {
+        session: sampleItem,
+        signed_url: "https://signed.example/abc",
+        subagent_paths: [sub],
+      });
+    const out = await getSession(auth, "id", fetchImpl);
+    expect(out?.subagent_paths).toEqual([sub]);
+  });
 });

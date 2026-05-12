@@ -149,41 +149,52 @@ describe("fetchSession - local sessions", () => {
     expect(result.sessionId).toBe(target.id);
   });
 
-  test("non-existent session surfaces a structured error with auth-or-not-found prose", async () => {
+  test("non-existent session + no credentials → AuthRequiredError with effi-auth-login remediation", async () => {
     // Load-bearing contract (ENG-5862 step 7): a fake UUID that doesn't
     // exist locally, in agent-records, or in Supabase must throw a
     // typed error a CLI caller can route on — never a generic Error.
     //
-    // Two valid shapes depending on the test environment:
-    //   - Unauthed runner (no `~/.effi/.../credentials.json`): the
-    //     cross-env wire returns `auth_missing` → `AuthRequiredError`
-    //     with the `effi auth login` remediation a first-time teammate
-    //     needs.
-    //   - Authed dev machine: the wire reaches the API, gets a 404, and
-    //     surfaces `SessionNotFoundError` with the "not found in any
-    //     environment" prose.
+    // Previously this test accepted either `AuthRequiredError` OR
+    // `SessionNotFoundError` depending on whether the test environment
+    // had credentials. That's two contracts in one assertion — a refactor
+    // could break one outcome without the test noticing. We pin to ONE
+    // outcome by forcing the "no credentials" environment via
+    // `EFFI_CONFIG_DIR` pointing at a freshly-made empty tmp dir:
+    // `readCredentials` returns null → `fetchFromSupabase` returns
+    // `auth_missing` → `fetchSession` throws `AuthRequiredError` with
+    // the `effi auth login` remediation a first-time teammate needs.
     //
-    // Both are correct outcomes for their environment. The contract
-    // breach we guard against is a raw `Error` (no class, no
-    // remediation) — which is what would happen if the discriminated
-    // mapping in `fetchSession` regressed.
+    // (The other outcome — authed machine + honest 404 →
+    // `SessionNotFoundError` mentioning "any environment" — is covered
+    // by `fetch.supabase.test.ts`'s Test 4, which mocks the wire to
+    // return `not_found`. Coverage is preserved, contracts are split.)
     const fakeId = "00000000-0000-0000-0000-000000000000";
 
+    const tmpConfigDir = `/tmp/effi-no-creds-${process.pid}-${Date.now()}`;
+    mkdirSync(tmpConfigDir, { recursive: true });
+    const prevConfigDir = process.env.EFFI_CONFIG_DIR;
+    process.env.EFFI_CONFIG_DIR = tmpConfigDir;
+
     try {
-      await fetchSession(fakeId);
-      // Should not reach here
-      expect(true).toBe(false);
-    } catch (error) {
-      const isAuth = error instanceof AuthRequiredError;
-      const isNotFound = error instanceof SessionNotFoundError;
-      expect(isAuth || isNotFound).toBe(true);
-      if (isAuth) {
-        expect((error as AuthRequiredError).message).toContain("effi auth login");
-      } else {
-        expect((error as SessionNotFoundError).message.toLowerCase()).toContain(
-          "any environment",
-        );
+      let caught: unknown;
+      try {
+        await fetchSession(fakeId);
+      } catch (error) {
+        caught = error;
       }
+
+      expect(caught).toBeInstanceOf(AuthRequiredError);
+      // Not SessionNotFoundError — we never reached the 404 branch
+      // because we short-circuit at auth.
+      expect(caught).not.toBeInstanceOf(SessionNotFoundError);
+      expect((caught as AuthRequiredError).message).toContain("effi auth login");
+    } finally {
+      if (prevConfigDir === undefined) {
+        delete process.env.EFFI_CONFIG_DIR;
+      } else {
+        process.env.EFFI_CONFIG_DIR = prevConfigDir;
+      }
+      rmSync(tmpConfigDir, { recursive: true, force: true });
     }
   });
 });

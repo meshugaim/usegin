@@ -444,7 +444,7 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
   });
 
   // ===========================================================================
-  // Test 7 — Subagent fetch + placement (still Red — Green will wire)
+  // Test 7 — Subagent count flows through to FetchResult + formatFetchResult
   // ===========================================================================
   //
   // THE headline use case of slice 2 (per the step-7 charter): when a
@@ -453,23 +453,25 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
   // `claude --resume <parent-id>` finds them — agents have no value if
   // half their conversation history is missing.
   //
-  // Placement convention: subagents live in the SAME projects-dir as the
-  // parent, named `agent-<agent_id>.jsonl`. The Red stub returns
-  // `auth_missing` short-circuiting before any disk write, so the
-  // FetchResult's `subagentCount` is 0 and `formatFetchResult` doesn't
-  // mention subagents — both failing the assertions below right-reason.
+  // Scope of *this* test: pin the **FetchResult reshape** at the
+  // `./supabase-fetch` boundary. Since `mockSupabaseFetch` replaces the
+  // module wholesale and returns a pre-shaped result without touching
+  // disk, this test cannot — and does not try to — validate the on-disk
+  // placement that `fetchFromSupabase` does internally. That validation
+  // lives in `supabase-fetch.test.ts`, which exercises the real
+  // `fetchFromSupabase` with `globalThis.fetch` mocks and asserts the
+  // nested `<projects-dir>/<sessionId>/subagents/agent-<id>.jsonl`
+  // paths actually appear on disk.
+  //
+  // What we pin here: SupabaseFetchResult.subagentCount flows through to
+  // FetchResult.subagentCount, and `formatFetchResult` emits the
+  // "Fetched N subagent files" line. This is the contract `fetchSession`
+  // owes its callers; placement is `fetchFromSupabase`'s contract.
 
   test(
-    "ENG-5862: both miss + Supabase 200 with subagents → parent + each agent-<id>.jsonl land on disk",
+    "ENG-5862: Supabase success with N subagents → FetchResult carries count and format mentions subagents",
     async () => {
       mockFinder({ local: null, remote: null });
-      // Drive `fetchFromSupabase` to a Green-shape success with 2
-      // subagents. The real wire is tested separately (manual round-trip
-      // + the nextjs-app integration test in `endpoints.test.ts` that
-      // pins the API side). Here we pin the **FetchResult reshape**: the
-      // SupabaseFetchResult.subagentCount must flow through to
-      // FetchResult.subagentCount and `formatFetchResult` must mention
-      // it. This is the contract the headline use case rests on.
       mockSupabaseFetch({
         ok: true,
         localPath: `/tmp/fake-local/projects/x/${FULL_UUID}.jsonl`,
@@ -488,10 +490,6 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
         caught = err;
       }
 
-      // Green: result is populated, subagentCount matches the
-      // bucket-enumerated subagent_paths array, and the formatted
-      // user-facing line names the subagent count so a human running
-      // `session resume` sees both pieces arrived.
       expect(caught, "Green must succeed; caught is the Red signal").toBeUndefined();
       expect(result).not.toBeNull();
       expect(result?.source).toBe("supabase");
