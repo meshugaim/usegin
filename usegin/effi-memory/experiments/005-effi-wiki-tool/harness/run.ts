@@ -117,18 +117,18 @@ function parseCliOptions(argv: string[]): CliOptions {
 /**
  * Parse questions from a markdown blob. One question per `## ` heading.
  * Trims whitespace, drops empty headings. Headers like `# ` (single hash)
- * or deeper (`### `) are ignored.
+ * or deeper (`### `, `#### `, …) are ignored.
+ *
+ * The regex `^##\s+(.+)$` rejects `### foo` because `##` is followed by `#`
+ * (not whitespace), so `\s+` fails. Same for any deeper heading. Verified
+ * empirically — don't add a `startsWith("### ")` guard; it would be dead code.
  */
 export function parseQuestions(markdown: string): string[] {
 	const out: string[] = [];
 	for (const rawLine of markdown.split(/\r?\n/)) {
 		const line = rawLine.trimEnd();
-		// Match `## ` followed by content; reject `### ` or deeper.
 		const m = line.match(/^##\s+(.+)$/);
 		if (!m) continue;
-		// Guard against `### `: `##\s+` would still match if we're not careful.
-		// `##\s+(.+)` will match `### foo` as `# foo`, so explicitly reject `###`.
-		if (line.startsWith("### ")) continue;
 		const text = m[1].trim();
 		if (text.length > 0) out.push(text);
 	}
@@ -240,6 +240,14 @@ interface TraceSummary {
 	totalMs: number | null;
 	missing: boolean;
 	parseError: string | null;
+	/**
+	 * What the CLI recorded as the wiki-on/off state for this run. `null` when
+	 * the trace is missing, empty, unparseable, or pre-dates the field. The
+	 * harness cross-checks this against the side it intended to run (see
+	 * `expectedWikiEnabled` on `PairRecord`) so a silently-stripped env var
+	 * doesn't invalidate the experiment.
+	 */
+	wikiEnabled: boolean | null;
 }
 
 function summarizeTrace(tracePath: string): TraceSummary {
@@ -250,6 +258,7 @@ function summarizeTrace(tracePath: string): TraceSummary {
 			totalMs: null,
 			missing: true,
 			parseError: null,
+			wikiEnabled: null,
 		};
 	}
 	let content: string;
@@ -262,6 +271,7 @@ function summarizeTrace(tracePath: string): TraceSummary {
 			totalMs: null,
 			missing: true,
 			parseError: err instanceof Error ? err.message : String(err),
+			wikiEnabled: null,
 		};
 	}
 	const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
@@ -272,6 +282,7 @@ function summarizeTrace(tracePath: string): TraceSummary {
 			totalMs: null,
 			missing: true,
 			parseError: null,
+			wikiEnabled: null,
 		};
 	}
 	// `effi ask` is one-shot so a single line is expected; we read the last
@@ -282,6 +293,7 @@ function summarizeTrace(tracePath: string): TraceSummary {
 			tool_calls?: Array<{ name?: string }>;
 			ttft_ms?: number | null;
 			total_ms?: number | null;
+			wiki_enabled?: boolean | null;
 		};
 		const names = (parsed.tool_calls ?? [])
 			.map((t) => t.name ?? "?")
@@ -293,6 +305,8 @@ function summarizeTrace(tracePath: string): TraceSummary {
 			totalMs: parsed.total_ms ?? null,
 			missing: false,
 			parseError: null,
+			wikiEnabled:
+				typeof parsed.wiki_enabled === "boolean" ? parsed.wiki_enabled : null,
 		};
 	} catch (err) {
 		return {
@@ -301,6 +315,7 @@ function summarizeTrace(tracePath: string): TraceSummary {
 			totalMs: null,
 			missing: false,
 			parseError: err instanceof Error ? err.message : String(err),
+			wikiEnabled: null,
 		};
 	}
 }
@@ -405,6 +420,20 @@ function renderIndex(opts: {
 				`  · ttft ${fmtMs(p.onTrace.ttftMs)}` +
 				` · total ${fmtMs(p.onTrace.totalMs)}${onFail}`,
 		);
+		// Cross-check: the trace's `wiki_enabled` must match the side we ran.
+		// A silently-stripped env var (justfile wrapper, profile shim, etc.)
+		// can land a wiki-on run with wiki_enabled=false (or vice versa) and
+		// invalidate the pair without any other signal.
+		if (p.offTrace.wikiEnabled === true) {
+			lines.push(
+				"  - **WARN**: wiki-off side ran with `wiki_enabled=true` — env strip failed",
+			);
+		}
+		if (p.onTrace.wikiEnabled === false) {
+			lines.push(
+				"  - **WARN**: wiki-on side ran with `wiki_enabled=false` — env var didn't reach the CLI",
+			);
+		}
 		if (p.offTrace.parseError) {
 			lines.push(`  - off trace parse error: ${p.offTrace.parseError}`);
 		}
@@ -559,6 +588,16 @@ async function main(): Promise<void> {
 					`  on:${fmtMs(pair.onTrace.totalMs)}` +
 					` (${pair.onTrace.toolCallChain})\n`,
 			);
+			if (pair.offTrace.wikiEnabled === true) {
+				process.stderr.write(
+					"  WARN: wiki-off side reported wiki_enabled=true (env strip failed)\n",
+				);
+			}
+			if (pair.onTrace.wikiEnabled === false) {
+				process.stderr.write(
+					"  WARN: wiki-on side reported wiki_enabled=false (env var didn't reach CLI)\n",
+				);
+			}
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
 			process.stderr.write(`  ERROR: ${msg}\n`);
@@ -571,6 +610,7 @@ async function main(): Promise<void> {
 					totalMs: null,
 					missing: true,
 					parseError: null,
+					wikiEnabled: null,
 				},
 				onTrace: {
 					toolCallChain: "(skipped due to spawn error)",
@@ -578,6 +618,7 @@ async function main(): Promise<void> {
 					totalMs: null,
 					missing: true,
 					parseError: null,
+					wikiEnabled: null,
 				},
 				offExitCode: -1,
 				onExitCode: -1,
