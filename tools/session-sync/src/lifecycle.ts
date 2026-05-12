@@ -44,6 +44,36 @@ export interface PlanShutdownInput {
 	deadlineMs: number;
 }
 
+// ---------------------------------------------------------------------------
+// Daemon sentinel pidfile (ENG-5862, spec line 488).
+//
+// The daemon owns refresh-token rotation. To let the CLI defer when a daemon
+// is running, the daemon drops a sentinel pidfile at
+// `<stateDir>/daemon.pid` on startup and removes it on graceful shutdown.
+//
+// These two helpers are the testable seams; the wire layer (cli.ts) calls
+// them at the right spots in the start/shutdown sequence.
+// ---------------------------------------------------------------------------
+
+/**
+ * Write the daemon sentinel pidfile (`<stateDir>/daemon.pid`) containing the
+ * current process's PID. Uses `atomicWriteFile` from `tools/lib/auth/fs-utils`
+ * so a torn write can never confuse a CLI's deference check.
+ *
+ * Returns the absolute path written.
+ */
+export async function writePidfile(_stateDir: string): Promise<string> {
+	throw new Error("writePidfile: not implemented (ENG-5862)");
+}
+
+/**
+ * Remove the daemon sentinel pidfile. No-op when the file is already absent
+ * (e.g., a crashed daemon left no pidfile, or a previous shutdown cleaned up).
+ */
+export async function removePidfile(_stateDir: string): Promise<void> {
+	throw new Error("removePidfile: not implemented (ENG-5862)");
+}
+
 export function planShutdown(input: PlanShutdownInput): ShutdownPlan {
 	const steps: ShutdownStep[] = [];
 	let remainingBudget = input.deadlineMs;
