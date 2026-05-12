@@ -88,4 +88,26 @@ describe("shouldHeartbeat (AC 40, AC 41)", () => {
 			expect(shouldHeartbeat(state, null, NOW)).toBe(false);
 		},
 	);
+
+	test(
+		"ENG-5862: lastHeartbeatAt is recent → false even when lastUploadedAt is stale",
+		() => {
+			// Pins the `lastHeartbeatAt` arm of `max(lastUploadedAt,
+			// lastHeartbeatAt)`. The previous 4 tests only flexed the
+			// `lastUploadedAt` arm — a regression that dropped the max() and
+			// just read `lastUploadedAt` would still pass all of them.
+			//
+			// Scenario: the daemon last UPLOADED 5 minutes ago (lease would
+			// have lapsed without intervention), but it HEARTBEATED 30s ago
+			// (lease was renewed inside the 60s window). Unflushed bytes
+			// exist (mtime > lastUploadedAt), but no new heartbeat is owed —
+			// the recent heartbeat already refreshed the lock.
+			const state = baseState({
+				lastUploadedAt: new Date(NOW_MS - 5 * 60_000).toISOString(), // 5min ago
+				lastHeartbeatAt: new Date(NOW_MS - 30_000).toISOString(), // 30s ago
+			});
+			const mtimeMs = NOW_MS - 1_000; // 1s ago, AFTER lastUploadedAt
+			expect(shouldHeartbeat(state, mtimeMs, NOW)).toBe(false);
+		},
+	);
 });

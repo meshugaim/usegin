@@ -30,7 +30,8 @@ import { describe, expect, test } from "bun:test";
 import type { AuthContext } from "../src/auth.ts";
 import type { StateFile } from "../src/state.ts";
 import type { FetchLike, LockHolder } from "../src/sync-client.ts";
-import { LOCK_BACKOFF_BUFFER_MS, syncFile } from "../src/sync-flow.ts";
+import { LOCK_BACKOFF_BUFFER_MS } from "../src/backoff.ts";
+import { syncFile } from "../src/sync-flow.ts";
 
 /**
  * Fallback retry delay when `holder.expires_at` is null. Matches the
@@ -165,6 +166,33 @@ describe("syncFile — 409 lock_held (AC 15)", () => {
 			).toISOString();
 			expect(out.updatedState.nextRetryAt).toBe(expectedRetry);
 			expect(out.holder.expires_at).toBeNull();
+		},
+	);
+
+	test(
+		"ENG-5862: 409 preserves prior lastHeartbeatAt (regression pin)",
+		async () => {
+			// Companion of the 503 kill_switch regression pin in
+			// sync-flow.test.ts. Both backoff triggers route through
+			// `applyBackoff`; `lastHeartbeatAt` survives both.
+			const heartbeatIso = "2026-05-12T11:59:30.000Z";
+			const state: StateFile = {
+				[PARENT_PATH]: {
+					contentHash: "h".repeat(64),
+					lastUploadedSize: 100,
+					sessionId: "sess-1",
+					storagePath: "old/path.jsonl.gz",
+					lastUploadedAt: "2026-05-12T11:00:00.000Z",
+					lastHeartbeatAt: heartbeatIso,
+				},
+			};
+			const out = await syncFile({
+				...baseInput(state),
+				fetchImpl: makeLockHeldFetch(),
+			});
+			expect(out.kind).toBe("lock_held");
+			if (out.kind !== "lock_held") throw new Error();
+			expect(out.updatedState.lastHeartbeatAt).toBe(heartbeatIso);
 		},
 	);
 

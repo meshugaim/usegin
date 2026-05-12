@@ -1,17 +1,16 @@
 #!/usr/bin/env bun
 /**
- * session-sync daemon entrypoint (AC 13, 16, 18, 19, 20, 21, 45 daemon side).
+ * session-sync daemon entrypoint (AC 13, 16, 18, 19, 20, 21, 40, 41, 45 daemon side).
  *
  * Wire layer that composes the pure modules (env-detect, install-id,
- * state, coalescer, startup-scan, safety-net, lifecycle) with the
- * Step 3a/3b primitives (auth, sync-session, syncFile). NOT
- * unit-tested — the smoke procedure in `README.md` is its
- * verification.
+ * state, coalescer, startup-scan, safety-net, lifecycle, heartbeat) with
+ * the HTTP primitives (auth, sync-session, syncFile, postHeartbeat). NOT
+ * unit-tested — the smoke procedure in `README.md` is its verification.
  *
- * Slice-1 boundaries:
- *   - No 409 / lock / heartbeat handling — all slice 2.
- *   - No fork rewrite — slice 2 (AC 36).
- *   - 503 sync_disabled backoff via existing `isInBackoff` filter.
+ * Backoff triggers (sync 503 sync_disabled, sync 409 lock_held, heartbeat
+ * 409 lock_held) all funnel through `applyBackoff`/`computeLockBackoffAt`
+ * in `backoff.ts`; the daemon's persisted state row carries one
+ * `nextRetryAt` marker that `isInBackoff` reads on the next watch tick.
  */
 
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
@@ -19,6 +18,7 @@ import { stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
+import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
 import { Coalescer } from "./coalescer.ts";
 import { detectEnvironment } from "./env-detect.ts";
 import { type HeartbeatLoopHandle, heartbeatLoop } from "./heartbeat.ts";
@@ -33,10 +33,6 @@ import { safetyNetTick } from "./safety-net.ts";
 import { startupScan } from "./startup-scan.ts";
 import { type PerFileState, readState, type StateFile, writeState } from "./state.ts";
 import { postHeartbeat } from "./sync-client.ts";
-import {
-	LOCK_BACKOFF_BUFFER_MS,
-	LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS,
-} from "./backoff.ts";
 import type { EnvIdentity } from "./sync-flow.ts";
 import { syncSession } from "./sync-session.ts";
 
@@ -235,22 +231,20 @@ async function sendHeartbeat(
 	}
 	if (res.kind === "lock_held") {
 		const { holder } = res;
-		const expiresAtRaw = holder.expires_at;
-		const nextRetryAtMs =
-			typeof expiresAtRaw === "string"
-				? Date.parse(expiresAtRaw) + LOCK_BACKOFF_BUFFER_MS
-				: now.getTime() + LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS;
-		d.state[path] = {
-			...perFile,
-			nextRetryAt: new Date(nextRetryAtMs).toISOString(),
-		};
+		const nextRetryAt = computeLockBackoffAt(holder, now);
+		// Same backoff helper the sync 409 path uses — `applyBackoff`
+		// preserves contentHash / lastUploadedSize / storagePath /
+		// lastUploadedAt / lastHeartbeatAt and only mutates `nextRetryAt`.
+		// The sync loop's `isInBackoff` filter then suppresses upload
+		// attempts on the same marker. One mechanism, three triggers.
+		d.state[path] = applyBackoff(perFile, perFile.sessionId, nextRetryAt);
 		console.warn(
 			`[session-sync] heartbeat 409 lock_held for ${perFile.sessionId}: ` +
 				`holder env=${holder.environment_kind ?? "?"}:${
 					holder.environment_id ?? "?"
 				} user=${holder.username ?? "?"} expires_at=${
 					holder.expires_at ?? "?"
-				}; nextRetryAt=${new Date(nextRetryAtMs).toISOString()}`,
+				}; nextRetryAt=${nextRetryAt}`,
 		);
 		await persistStateMaybe(d);
 		return;

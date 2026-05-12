@@ -22,11 +22,11 @@
 
 import type { AuthContext } from "./auth.ts";
 import {
+	applyBackoff,
+	computeLockBackoffAt,
 	computeNextRetryAt,
 	isInBackoff,
 	KILL_SWITCH_BACKOFF_MS,
-	LOCK_BACKOFF_BUFFER_MS,
-	LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS,
 } from "./backoff.ts";
 import { computeContentHash } from "./content-hash.ts";
 import { extractMetadata } from "./extractor.ts";
@@ -34,14 +34,6 @@ import { gzipDeterministic } from "./gzip.ts";
 import type { PerFileState, StateFile } from "./state.ts";
 import { type FetchLike, postSync } from "./sync-client.ts";
 import type { EnvironmentKind, SyncMetadata } from "./sync-metadata.ts";
-
-// Re-exported for callers that want the lock-held constants without
-// reaching across to backoff.ts directly. `backoff.ts` is the source of
-// truth — tests should import from there.
-export {
-	LOCK_BACKOFF_BUFFER_MS,
-	LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS,
-} from "./backoff.ts";
 
 export interface EnvIdentity {
 	kind: string;
@@ -210,31 +202,20 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 	if (response.kind === "lock_held") {
 		// AC 15: another environment holds the lock. The upload did NOT
 		// happen — preserve every prior field (contentHash, lastUploadedSize,
-		// storagePath, lastUploadedAt) so the next successful sync sees the
-		// same hash-match short-circuit it would have without the 409. We
-		// only mutate `nextRetryAt`.
+		// storagePath, lastUploadedAt, lastHeartbeatAt) so the next
+		// successful sync sees the same hash-match short-circuit it would
+		// have without the 409. We only mutate `nextRetryAt`.
 		//
 		// The holder warning line is emitted at the cli.ts boundary (where
 		// the outcome is consumed), not here — keeps `syncFile` a pure
 		// returns-an-outcome function and lets cli.ts deduplicate noisy
 		// warnings if a backoff'd file keeps cycling through the watch loop.
 		const { holder } = response;
-		const expiresAtRaw = holder.expires_at;
-		const nextRetryAtMs =
-			typeof expiresAtRaw === "string"
-				? Date.parse(expiresAtRaw) + LOCK_BACKOFF_BUFFER_MS
-				: now.getTime() + LOCK_BACKOFF_NULL_EXPIRES_FALLBACK_MS;
-		const updatedState: PerFileState = {
-			contentHash: prior?.contentHash ?? "",
-			lastUploadedSize: prior?.lastUploadedSize ?? 0,
+		const updatedState = applyBackoff(
+			prior,
 			sessionId,
-			storagePath: prior?.storagePath ?? "",
-			lastUploadedAt: prior?.lastUploadedAt ?? "",
-			...(prior?.lastHeartbeatAt
-				? { lastHeartbeatAt: prior.lastHeartbeatAt }
-				: {}),
-			nextRetryAt: new Date(nextRetryAtMs).toISOString(),
-		};
+			computeLockBackoffAt(holder, now),
+		);
 		return { kind: "lock_held", updatedState, holder };
 	}
 
@@ -249,18 +230,15 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 
 	if (errResp.syncDisabled) {
 		// AC 45: set nextRetryAt = now + 5min, preserve prior fields where we
-		// have them, otherwise emit a usable placeholder so caller can persist
-		// the row uniformly.
-		const updatedState: PerFileState = {
-			contentHash: prior?.contentHash ?? "",
-			lastUploadedSize: prior?.lastUploadedSize ?? 0,
+		// have them (contentHash, lastUploadedSize, storagePath,
+		// lastUploadedAt, lastHeartbeatAt). `applyBackoff` materializes a
+		// usable placeholder PerFileState row when there's no prior so the
+		// caller can persist uniformly.
+		const updatedState = applyBackoff(
+			prior,
 			sessionId,
-			storagePath: prior?.storagePath ?? "",
-			// No upload happened — leave lastUploadedAt empty when we have no
-			// prior; preserve when we do (later uploads will overwrite this row).
-			lastUploadedAt: prior?.lastUploadedAt ?? "",
-			nextRetryAt: computeNextRetryAt(now, KILL_SWITCH_BACKOFF_MS),
-		};
+			computeNextRetryAt(now, KILL_SWITCH_BACKOFF_MS),
+		);
 		return { kind: "kill_switch", updatedState };
 	}
 

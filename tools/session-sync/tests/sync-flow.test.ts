@@ -307,6 +307,39 @@ describe("syncFile — kill_switch (503 sync_disabled)", () => {
 		expect(s.sessionId).toBe("sess-1");
 		expect(s.nextRetryAt).toBe("2026-05-08T12:05:00.000Z");
 	});
+
+	test("kill_switch preserves prior lastHeartbeatAt (regression pin for ENG-5862 step 5)", async () => {
+		// REGRESSION: step 5 Green's 503 branch hand-rolled the
+		// updatedState spread field-by-field and forgot `lastHeartbeatAt`.
+		// A session that had been heartbeating (heartbeat 200 → state row
+		// gained `lastHeartbeatAt`) would lose that timestamp the moment
+		// the kill-switch flipped, even though no upload ever happened. On
+		// kill-switch flip-back the next `shouldHeartbeat` call would
+		// think the lease was fresh-from-upload and skip the heartbeat
+		// that should have refreshed it. Now both backoff triggers route
+		// through `applyBackoff`, which carries every prior field.
+		const heartbeatIso = "2026-05-08T11:59:30.000Z";
+		const state: StateFile = {
+			[PARENT_PATH]: {
+				contentHash: "h".repeat(64),
+				lastUploadedSize: 99,
+				sessionId: "sess-1",
+				storagePath: "old/path.jsonl.gz",
+				lastUploadedAt: "2026-05-08T11:00:00.000Z",
+				lastHeartbeatAt: heartbeatIso,
+			},
+		};
+		const captured: Captured = {};
+		const fetchImpl = makeFetch(
+			jsonResponse(503, { error: "sync_disabled" }),
+			captured,
+		);
+		const out = await syncFile({ ...baseInput(state), fetchImpl });
+		expect(out.kind).toBe("kill_switch");
+		if (out.kind !== "kill_switch") throw new Error();
+		expect(out.updatedState.lastHeartbeatAt).toBe(heartbeatIso);
+		expect(out.updatedState.nextRetryAt).toBe("2026-05-08T12:05:00.000Z");
+	});
 });
 
 describe("syncFile — transient_error (5xx other / network)", () => {

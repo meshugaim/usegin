@@ -199,3 +199,74 @@ describe("postSync — response classification", () => {
 		);
 	});
 });
+
+describe("postSync — 409 holder contract guard (AC 15)", () => {
+	// `postSync` exposes two valid 409 surfaces: an object holder (even
+	// with null fields) → `kind:"lock_held"` variant; a missing or
+	// non-object holder → `kind:"transport_error"` variant. The latter
+	// is what `sync-flow.ts` routes to `fatal_error`. These tests pin
+	// the guard so a future regression that synthesizes an all-null
+	// holder from a malformed body (masking a server bug as a routine
+	// lock-held) fails loud at this seam.
+
+	test("409 with no holder field → transport_error (routes to fatal_error)", async () => {
+		const fetchImpl: FetchLike = async () =>
+			jsonResponse(409, { error: "lock_held" });
+		const out = await postSync(baseReq(), fetchImpl);
+		expect(out.ok).toBe(false);
+		if (out.ok) throw new Error("expected !ok");
+		if (out.kind !== "transport_error")
+			throw new Error("expected transport_error, got lock_held");
+		expect(out.status).toBe(409);
+		expect(out.syncDisabled).toBe(false);
+	});
+
+	test("409 with non-object holder (string) → transport_error", async () => {
+		const fetchImpl: FetchLike = async () =>
+			jsonResponse(409, { error: "lock_held", holder: "not-an-object" });
+		const out = await postSync(baseReq(), fetchImpl);
+		expect(out.ok).toBe(false);
+		if (out.ok) throw new Error("expected !ok");
+		expect(out.kind).toBe("transport_error");
+		expect(out.status).toBe(409);
+	});
+
+	test("409 with null holder → transport_error (not an all-null lock_held)", async () => {
+		// A `null` value passes the JSON-object body check but fails the
+		// holder shape guard. Without the guard, the daemon would happily
+		// destructure holder.expires_at off `null` and crash — or worse,
+		// synthesize an all-null LockHolder and silently swallow the bug.
+		const fetchImpl: FetchLike = async () =>
+			jsonResponse(409, { error: "lock_held", holder: null });
+		const out = await postSync(baseReq(), fetchImpl);
+		expect(out.ok).toBe(false);
+		if (out.ok) throw new Error("expected !ok");
+		expect(out.kind).toBe("transport_error");
+		expect(out.status).toBe(409);
+	});
+
+	test("409 with object holder containing only null fields → lock_held variant", async () => {
+		// Stale-holder edge case from step 4: the server's `lockRow` lookup
+		// raced, so it returned `holder: {kind:null, id:null, user:null,
+		// expires_at:null}`. The contract is honored (object holder, named
+		// fields) — daemon falls back to `now + 60s` for retry, not an
+		// epoch-arithmetic retry storm. This is the OTHER side of the
+		// contract guard: nulls inside an object are fine.
+		const fetchImpl: FetchLike = async () =>
+			jsonResponse(409, {
+				error: "lock_held",
+				holder: {
+					environment_kind: null,
+					environment_id: null,
+					username: null,
+					expires_at: null,
+				},
+			});
+		const out = await postSync(baseReq(), fetchImpl);
+		expect(out.ok).toBe(false);
+		if (out.ok) throw new Error("expected !ok");
+		expect(out.kind).toBe("lock_held");
+		if (out.kind !== "lock_held") throw new Error();
+		expect(out.holder.expires_at).toBeNull();
+	});
+});
