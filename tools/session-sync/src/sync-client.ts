@@ -49,13 +49,19 @@ export interface SyncRequest {
  * Next.js sync endpoint emits when another environment owns the dev-session
  * lock. The daemon uses these to log a useful warning and to schedule the
  * 409 backoff (`holder.expires_at + LOCK_BACKOFF_BUFFER_MS`).
+ *
+ * All four fields are nullable: step 4's HTTP 409 returns null for any of
+ * them when the server's `lockRow` lookup is stale (READ COMMITTED window
+ * between the conflict-detect SELECT and the holder-fetch SELECT). The
+ * daemon surfaces nulls as-is — production code must NOT substitute `""`
+ * placeholders, because `new Date(null).getTime() + buffer` would resolve
+ * to `5_000` epoch milliseconds and trigger a retry storm.
  */
 export interface LockHolder {
-	environment_kind: string;
-	environment_id: string;
-	/** Server may return null when the holder's username is unknown. */
+	environment_kind: string | null;
+	environment_id: string | null;
 	username: string | null;
-	expires_at: string;
+	expires_at: string | null;
 }
 
 export type SyncResponse =
@@ -148,19 +154,22 @@ export async function postSync(
 		// AC 15: lock_held. Parse `holder` from the body so the caller can
 		// log holder details and schedule backoff via `holder.expires_at`.
 		// Body shape: `{ error: "lock_held", holder: LockHolder }`.
+		// Surface nulls as-is — the caller (sync-flow.ts) must decide the
+		// fallback policy when `expires_at` is null, NOT this layer. Writing
+		// `""` here would silently coerce to epoch+5s downstream.
 		const holderRaw =
 			parsed && typeof parsed === "object"
 				? (parsed as { holder?: unknown }).holder
 				: undefined;
-		const holder =
+		const holder: LockHolder =
 			holderRaw && typeof holderRaw === "object"
 				? (holderRaw as LockHolder)
-				: ({
-						environment_kind: "",
-						environment_id: "",
+				: {
+						environment_kind: null,
+						environment_id: null,
 						username: null,
-						expires_at: "",
-					} as LockHolder);
+						expires_at: null,
+					};
 		return {
 			ok: false,
 			status: 409,

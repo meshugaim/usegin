@@ -38,17 +38,22 @@ export const HEARTBEAT_INTERVAL_MS = 60_000;
  *   - the JSONL has unflushed bytes (`mtimeMs > parseIso(lastUploadedAt)`)
  *   - the last upload is at least `HEARTBEAT_INTERVAL_MS` old
  *
- * Returns false when there's nothing to heartbeat or we already
- * uploaded within the interval window (a real upload obviates the
- * heartbeat).
+ * Returns false when:
+ *   - there's nothing to heartbeat (no unflushed bytes), or
+ *   - we already uploaded within the interval window (a real upload
+ *     obviates the heartbeat), or
+ *   - `mtimeMs` is null (the file was deleted between the watch event
+ *     and this tick — nothing to heartbeat for a deleted file).
  *
  * @param state    Per-file state row for this session.
- * @param mtimeMs  Current `mtimeMs` of the session's JSONL on disk.
+ * @param mtimeMs  Current `mtimeMs` of the session's JSONL on disk, or
+ *                 null when the file no longer exists (deleted between
+ *                 watch event and heartbeat tick).
  * @param now      Wall-clock "now"; injected for deterministic tests.
  */
 export function shouldHeartbeat(
 	_state: PerFileState,
-	_mtimeMs: number,
+	_mtimeMs: number | null,
 	_now: Date,
 ): boolean {
 	throw new Error(

@@ -2,7 +2,7 @@
  * AC 40 / AC 41 / ENG-5862 step 5 (Red).
  *
  * `shouldHeartbeat(state, mtimeMs, now)` is the pure predicate the
- * daemon's heartbeat loop calls every tick. We test the three corners
+ * daemon's heartbeat loop calls every tick. We test the four corners
  * of the truth table:
  *
  *   - Unflushed bytes present AND lastUpload > 60s ago → heartbeat.
@@ -10,10 +10,12 @@
  *     (the recent upload already refreshed lock_expires_at).
  *   - No unflushed bytes (file mtime <= lastUploadedAt) → don't
  *     heartbeat (nothing for the server to know about).
+ *   - mtimeMs is null (file deleted between watch event and this tick)
+ *     → don't heartbeat (no file to talk about).
  *
  * Pure function — no I/O, no timers. Caller (cli.ts heartbeat loop)
- * supplies `mtimeMs` from a `statSync` it already does, and `now` from
- * the wall clock.
+ * supplies `mtimeMs` from a `statSync` it already does (or null when the
+ * file no longer exists), and `now` from the wall clock.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -70,6 +72,20 @@ describe("shouldHeartbeat (AC 40, AC 41)", () => {
 			// has everything.
 			const mtimeMs = new Date(lastUploadedAtIso).getTime() - 100;
 			expect(shouldHeartbeat(state, mtimeMs, NOW)).toBe(false);
+		},
+	);
+
+	test.failing(
+		"ENG-5862: shouldHeartbeat returns false when mtimeMs is null (file deleted)",
+		() => {
+			// Race: fs.watch fired, but by the time the heartbeat tick reads
+			// mtime the file has been deleted (claude session ended, log
+			// rotated, etc.). Caller passes null; predicate must short-circuit
+			// to false rather than throw on a null arithmetic op.
+			const state = baseState({
+				lastUploadedAt: new Date(NOW_MS - 90_000).toISOString(),
+			});
+			expect(shouldHeartbeat(state, null, NOW)).toBe(false);
 		},
 	);
 });
