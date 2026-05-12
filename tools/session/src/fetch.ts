@@ -23,6 +23,7 @@ import {
   isSessionIdOrPrefix,
 } from "./finder";
 import type { SessionInfo } from "./finder/types";
+import { fetchFromSupabase } from "./supabase-fetch";
 
 // =============================================================================
 // TYPES
@@ -40,6 +41,21 @@ export interface FetchResult {
   localPath: string;
   /** Whether the session was already available locally (no fetch needed) */
   alreadyLocal: boolean;
+  /**
+   * Where the session was resolved from.
+   *
+   * - `"local"`: already in `~/.claude/projects/` (alreadyLocal=true).
+   * - `"agent-records"`: decompressed from `~/agent-records/`.
+   * - `"supabase"`: downloaded from the cross-env Supabase fallback
+   *   (ENG-5862 step 7, AC 34). Only produced when local + agent-records
+   *   both miss.
+   *
+   * Optional for now — the agent-records path was written before the
+   * field existed and callers don't rely on it. Green for step 7 will
+   * keep this optional so existing callers compile unchanged; a follow-up
+   * cleanup can promote it to required once all writers populate it.
+   */
+  source?: "local" | "agent-records" | "supabase";
   /** Compressed size in bytes (only set when fetched from remote) */
   compressedSize?: number;
   /** Decompressed size in bytes (only set when fetched from remote) */
@@ -200,19 +216,91 @@ export async function fetchSession(input: string): Promise<FetchResult> {
       shortId: local.id.slice(0, 8),
       localPath: local.path,
       alreadyLocal: true,
+      source: "local",
       subagentCount: 0,
     };
   }
 
-  // 2. Try remote
+  // 2. Try remote (~/agent-records/)
   const remote = await resolveRemote(input);
   if (!remote) {
-    const currentProject = getCurrentProjectHash();
-    throw new SessionNotFoundError(input, {
-      searchedLocation: currentProject
-        ? `~/.claude/projects/${currentProject}/ and ~/agent-records/`
-        : "~/.claude/projects/ and ~/agent-records/",
-    });
+    // 2a. Both local and agent-records missed. Fall back to Supabase —
+    // the cross-environment path for `session resume <id>` when the
+    // session was created in a different env (ENG-5862 step 7, AC 34).
+    //
+    // Only a full UUID makes sense here: prefix resolution requires
+    // listing all sessions in the index, which the cross-env path
+    // doesn't model. If the caller passed a prefix that didn't resolve
+    // locally or in agent-records, we surface the same not-found error
+    // as before — Green can revisit prefix-vs-Supabase if the product
+    // wants it.
+    if (!isSessionId(input)) {
+      const currentProject = getCurrentProjectHash();
+      throw new SessionNotFoundError(input, {
+        searchedLocation: currentProject
+          ? `~/.claude/projects/${currentProject}/ and ~/agent-records/`
+          : "~/.claude/projects/ and ~/agent-records/",
+      });
+    }
+
+    // RED PHASE: `fetchFromSupabase` is a stub that returns
+    // `{ ok: false, error: { kind: "auth_missing" } }`. Green will
+    // implement the four-step wire (auth → JSON GET → signed-URL
+    // download → decompress + place).
+    //
+    // The Red contract is the **call site shape**: chain reaches the
+    // stub on local+remote miss with a full UUID exactly once, and an
+    // `auth_missing` result maps back to `SessionNotFoundError` so
+    // the pre-step-7 contract ("session not anywhere → SessionNotFoundError")
+    // is preserved for callers without credentials.
+    const supa = await fetchFromSupabase(input);
+    if (supa.ok) {
+      return {
+        sessionId: input,
+        shortId: input.slice(0, 8),
+        localPath: supa.localPath,
+        alreadyLocal: false,
+        source: "supabase",
+        compressedSize: supa.compressedSize,
+        decompressedSize: supa.decompressedSize,
+        subagentCount: 0,
+      };
+    }
+    // Discriminated error → user-facing error. `not_found` and
+    // `auth_missing` both surface as `SessionNotFoundError`:
+    //   - `not_found`: server confirmed the row is nowhere.
+    //   - `auth_missing`: no credentials means cross-env is unreachable,
+    //     so from the caller's POV the session simply isn't available.
+    //     Mapping this to a brand-new "Cannot fetch from Supabase: not
+    //     authenticated" error would change the failure shape for every
+    //     unauthed `session resume <missing-id>` call site that exists
+    //     today.
+    // `auth_expired` and `transport_error` are reserved for Green — they
+    // need distinct user-facing strings because the remedy is different
+    // (re-login / retry / file a ticket).
+    switch (supa.error.kind) {
+      case "not_found":
+      case "auth_missing": {
+        const currentProject = getCurrentProjectHash();
+        throw new SessionNotFoundError(input, {
+          searchedLocation: currentProject
+            ? `~/.claude/projects/${currentProject}/, ~/agent-records/, and Supabase`
+            : "~/.claude/projects/, ~/agent-records/, and Supabase",
+        });
+      }
+      case "auth_expired":
+        throw new Error(
+          `Cannot fetch session ${input} from Supabase: authentication failed (token expired or revoked). Run \`effi auth login\` to refresh.`,
+        );
+      case "transport_error": {
+        const bodyPreview = supa.error.body.length > 200
+          ? `${supa.error.body.slice(0, 200)}…`
+          : supa.error.body;
+        throw new Error(
+          `Cannot fetch session ${input} from Supabase: server returned ${supa.error.status}.\n\n${bodyPreview}`,
+        );
+      }
+    }
   }
 
   // 3. Decompress and write to local storage
@@ -253,11 +341,13 @@ export async function fetchSession(input: string): Promise<FetchResult> {
     shortId: remote.id.slice(0, 8),
     localPath,
     alreadyLocal: false,
+    source: "agent-records",
     compressedSize,
     decompressedSize,
     subagentCount,
   };
 }
+
 
 /**
  * Format a FetchResult for display to the user.
