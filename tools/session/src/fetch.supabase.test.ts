@@ -303,4 +303,57 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
       expect(message).toContain("effi auth login");
     },
   );
+
+  // ===========================================================================
+  // Test 7 — Subagent fetch + placement
+  // ===========================================================================
+  //
+  // THE headline use case of slice 2 (per the step-7 charter): when a
+  // session spawned subagents in env A and the human resumes from env B,
+  // both the parent JSONL AND every subagent JSONL must land on disk so
+  // `claude --resume <parent-id>` finds them — agents have no value if
+  // half their conversation history is missing.
+  //
+  // Placement convention: subagents live in the SAME projects-dir as the
+  // parent, named `agent-<agent_id>.jsonl`. The Red stub returns
+  // `auth_missing` short-circuiting before any disk write, so the
+  // FetchResult's `subagentCount` is 0 and `formatFetchResult` doesn't
+  // mention subagents — both failing the assertions below right-reason.
+
+  test.failing(
+    "ENG-5862: both miss + Supabase 200 with subagents → parent + each agent-<id>.jsonl land on disk",
+    async () => {
+      mockFinder({ local: null, remote: null });
+
+      const { fetchSession, formatFetchResult } = await import("./fetch");
+
+      let result: Awaited<ReturnType<typeof fetchSession>> | null = null;
+      let caught: unknown;
+      try {
+        result = await fetchSession(FULL_UUID);
+      } catch (err) {
+        caught = err;
+      }
+
+      // Red: caught is a SessionNotFoundError (auth_missing → not_found
+      // mapping). Green: result is populated, subagentCount matches the
+      // bucket-enumerated subagent_paths array, and the formatted
+      // user-facing line names the subagent count so a human running
+      // `session resume` sees both pieces arrived.
+      expect(caught, "Green must succeed; caught is the Red signal").toBeUndefined();
+      expect(result).not.toBeNull();
+      expect(result?.source).toBe("supabase");
+
+      // The subagentCount field on FetchResult is the contract carry —
+      // it's how `formatFetchResult` decides whether to emit the
+      // "Fetched N subagent files" line. Green wires this to the count
+      // of `subagent_paths` entries the API returned.
+      expect(result?.subagentCount).toBeGreaterThanOrEqual(1);
+
+      // And the formatted output mentions subagents — pins the
+      // user-facing prose so a human running `session resume <id>`
+      // across envs sees "this brought my subagent context too".
+      expect(result && formatFetchResult(result)).toMatch(/subagent/i);
+    },
+  );
 });
