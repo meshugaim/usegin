@@ -286,13 +286,20 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 		expect(out.updatedState.lastUploadedAt).toBe(NOW.toISOString());
 	});
 
-	test("ENG-5862: deleteLock transport_error / throw → outcome.kind = completed_release_transport_error (best-effort)", async () => {
+	test("ENG-5862: deleteLock transport_error / throw → outcome.kind = completed_release_transport_error (best-effort, structured carrier)", async () => {
 		// Two flavors land in the same outcome: an explicit
 		// `transport_error` DeleteLockResponse (5xx, malformed body) AND
 		// a thrown network error. Both mean the release didn't land but
 		// the sync DID — the lease lapses at `expires_at` regardless, so
 		// failing the whole sync would be the wrong tradeoff (we'd then
 		// re-upload bytes the server already has).
+		//
+		// Step 6 refactor: `error` is a structured `{status, body, message}`
+		// carrier (lifted from a stringified `Error.message` hack) so
+		// cli.ts can log status + body symmetric with the 403 branch and
+		// so tests inspect fields directly. The thrown-network-error
+		// flavor uses `status: 0`, `body: null` sentinels to distinguish
+		// from a real HTTP transport_error response.
 		//
 		// Flavor 1: explicit transport_error response (e.g. 500).
 		const spyTransport = makeDeleteLockSpy({
@@ -312,10 +319,15 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 			throw new Error();
 		expect(outTransport.updatedState.sessionId).toBe("sess-1");
 		expect(outTransport.updatedState.lastUploadedAt).toBe(NOW.toISOString());
-		expect(outTransport.error).toBeInstanceOf(Error);
+		expect(outTransport.error.status).toBe(500);
+		expect(outTransport.error.body).toEqual({ error: "internal_server_error" });
+		expect(outTransport.error.message).toContain("500");
+		expect(outTransport.error.message).toContain("internal_server_error");
 
 		// Flavor 2: deleteLockFn throws (network error). Same outcome;
-		// the daemon must catch internally rather than propagate.
+		// the daemon must catch internally rather than propagate. Sentinel
+		// `status: 0` + `body: null` lets cli.ts tell apart "couldn't
+		// reach the server" from "real HTTP transport_error".
 		const spyThrow = makeDeleteLockSpy(new Error("ECONNREFUSED"));
 		const outThrow = await syncFile({
 			...baseInput(),
@@ -326,6 +338,8 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 		expect(outThrow.kind).toBe("completed_release_transport_error");
 		if (outThrow.kind !== "completed_release_transport_error")
 			throw new Error();
+		expect(outThrow.error.status).toBe(0);
+		expect(outThrow.error.body).toBeNull();
 		expect(outThrow.error.message).toContain("ECONNREFUSED");
 	});
 
@@ -409,5 +423,39 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 		if (outTransport.kind !== "completed_release_transport_error")
 			throw new Error();
 		expect(outTransport.updatedState.releasedAt ?? null).toBeNull();
+	});
+
+	test("ENG-5862: subagent sync with metadata.status=completed does NOT fire deleteLock (parent-only gate)", async () => {
+		// S1 — gate the post-completion DELETE on `agentId === undefined`.
+		// Subagents inherit the parent's lock per spec; the dev-session
+		// lock is keyed off `session_id` alone, never the agent id. A
+		// subagent JSONL that happens to carry a `{type:"result"}` line
+		// must NOT trigger a DELETE against the parent's lock — that
+		// would over-release on every subagent sync.
+		//
+		// Empirically holds today (0/545 subagent files contain a result
+		// line as of 2026-05-12), but the gate is the right shape
+		// regardless: a future extractor change or a hand-edited
+		// transcript shouldn't be able to over-release.
+		//
+		// Fixture passes `agentId: "a2789d14b1dfa1ebb"` (real Claude Code
+		// shape per ENG-5962) into syncFile with a COMPLETED parent JSONL.
+		// Spy must record zero calls.
+		const spy = makeDeleteLockSpy({
+			ok: true,
+			status: 204,
+			kind: "released",
+		});
+		const out = await syncFile({
+			...baseInput(),
+			agentId: "a2789d14b1dfa1ebb",
+			fetchImpl: makeOkSyncFetch(),
+			deleteLockFn: spy.fn,
+		});
+		expect(spy.calls.length).toBe(0);
+		// Subagent upload itself still succeeds — only the release-branch
+		// is gated out. The outcome is plain `uploaded`, not any of the
+		// completion variants.
+		expect(out.kind).toBe("uploaded");
 	});
 });

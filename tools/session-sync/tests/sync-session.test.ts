@@ -365,3 +365,135 @@ describe("syncSession — agentId extraction", () => {
 		);
 	});
 });
+
+/**
+ * S2 — `parentDidAdvance` regression guard (step 6 refactor).
+ *
+ * The step-6 ext added three new "parent advanced" outcome kinds beyond
+ * `uploaded`:
+ *
+ *   - `completed_and_released`           — 200 sync + 204 DELETE-lock
+ *   - `completed_release_denied`         — 200 sync + 403 DELETE-lock
+ *   - `completed_release_transport_error`— 200 sync + 5xx/throw DELETE-lock
+ *
+ * All four mean "the parent row of record advanced server-side" and
+ * MUST therefore trigger the subagent fan-out (spec line 299). Without
+ * the gate covering all four kinds, a parent-completion tick silently
+ * skips subagent discovery — subagents attached to a finalized session
+ * would NEVER sync. The Ron-6-red tripwire caught the original gap; this
+ * test pins it so a future refactor that adds a new "advanced" kind
+ * without updating `parentDidAdvance` fails loud here, not in production.
+ *
+ * Test seam: `discoverFn` is the observable side-effect — it's called
+ * iff the parent advanced. We use a completed-status parent JSONL so
+ * each fetch responder can route the DELETE-lock leg to a different
+ * status (204 / 403 / 500) and exercise all three completion variants
+ * via the same code path. For `uploaded`, we use an active-status JSONL
+ * (no DELETE leg fires).
+ */
+const COMPLETED_PARENT_BYTES = new TextEncoder().encode(
+	`${[
+		JSON.stringify({ type: "user", message: { role: "user", content: "hi" } }),
+		JSON.stringify({
+			type: "assistant",
+			message: { role: "assistant", model: "m", content: "ok" },
+		}),
+		JSON.stringify({ type: "result", subtype: "success" }),
+	].join("\n")}\n`,
+);
+
+interface AdvanceCase {
+	label: string;
+	expectedKind:
+		| "uploaded"
+		| "completed_and_released"
+		| "completed_release_denied"
+		| "completed_release_transport_error";
+	parentBytes: Uint8Array;
+	/** Status the DELETE /lock endpoint returns (ignored when parentBytes is active). */
+	deleteLockStatus: number;
+	/** Throw from the DELETE leg (overrides deleteLockStatus when set). */
+	deleteLockThrows?: boolean;
+}
+
+const ADVANCE_CASES: AdvanceCase[] = [
+	{
+		label: "uploaded (active session, no DELETE leg)",
+		expectedKind: "uploaded",
+		parentBytes: PARENT_BYTES,
+		deleteLockStatus: 204,
+	},
+	{
+		label: "completed_and_released (DELETE 204)",
+		expectedKind: "completed_and_released",
+		parentBytes: COMPLETED_PARENT_BYTES,
+		deleteLockStatus: 204,
+	},
+	{
+		label: "completed_release_denied (DELETE 403)",
+		expectedKind: "completed_release_denied",
+		parentBytes: COMPLETED_PARENT_BYTES,
+		deleteLockStatus: 403,
+	},
+	{
+		label: "completed_release_transport_error (DELETE 500)",
+		expectedKind: "completed_release_transport_error",
+		parentBytes: COMPLETED_PARENT_BYTES,
+		deleteLockStatus: 500,
+	},
+];
+
+describe("syncSession — parentDidAdvance covers all four 'advanced' kinds (S2 regression guard)", () => {
+	for (const c of ADVANCE_CASES) {
+		test(`parent ${c.label} → discoverFn is called (subagent fan-out fires)`, async () => {
+			let discoverCalled = false;
+			const subPath =
+				"/home/u/.claude/projects/-x/agent-a1111111111111111.jsonl";
+			const { fetchImpl } = makeFetch((url) => {
+				if (url.includes("/lock")) {
+					if (c.deleteLockThrows) {
+						throw new Error("ECONNREFUSED");
+					}
+					if (c.deleteLockStatus === 204) {
+						return new Response(null, { status: 204 });
+					}
+					return jsonResponse(c.deleteLockStatus, {
+						error:
+							c.deleteLockStatus === 403
+								? "not_holder"
+								: "internal_server_error",
+					});
+				}
+				if (url.includes("/subagents/")) {
+					return jsonResponse(200, { session: { storage_path: "sub.gz" } });
+				}
+				return jsonResponse(200, { session: { storage_path: "parent.gz" } });
+			});
+			const readMap: Record<string, Uint8Array> = {
+				[PARENT_PATH]: c.parentBytes,
+				[subPath]: SUB_BYTES_A,
+			};
+			const out = await syncSession({
+				...baseInput(),
+				fetchImpl,
+				readFileFn: async (p) => {
+					const bytes = readMap[p];
+					if (!bytes) throw new Error(`unexpected path ${p}`);
+					return bytes;
+				},
+				discoverFn: async () => {
+					discoverCalled = true;
+					return [subPath];
+				},
+			});
+			expect(discoverCalled).toBe(true);
+			expect(out.kind).toBe("ok");
+			if (out.kind !== "ok") throw new Error();
+			// Parent outcome matches the case shape.
+			expect(out.outcomes[0]?.outcome.kind).toBe(c.expectedKind);
+			// Subagent ran (proves the fan-out fired, not just discovery).
+			expect(out.outcomes.length).toBe(2);
+			expect(out.outcomes[1]?.outcome.kind).toBe("uploaded");
+		});
+	}
+});

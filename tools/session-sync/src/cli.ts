@@ -529,22 +529,33 @@ async function fireSync(
 						sessionId,
 						"- another env now holds the lock; safety-net will retry",
 					);
-				} else if (
-					o.outcome.kind === "completed_release_transport_error"
-				) {
+				} else if (o.outcome.kind === "completed_release_transport_error") {
 					// AC 18 ext: 5xx / network failure on the release call.
 					// Best-effort contract: the sync DID land — failing the
 					// outcome would force a re-upload of bytes the server
 					// already has. The lease lapses naturally at `expires_at`;
 					// the 5-min safety-net re-issues the release on the next
-					// tick. Same shape as the heartbeat transport_error log
-					// (see sendHeartbeat).
+					// tick.
+					//
+					// Log shape mirrors the 403 branch above and the heartbeat
+					// transport_error log (see sendHeartbeat): we always emit
+					// `status` + `body` so a human reading staging logs can
+					// tell apart a 5xx, a malformed body, and a thrown network
+					// error (status=0, body=null sentinels) without parsing a
+					// message string. `body` is JSON-stringified the same way
+					// the heartbeat path does it.
 					d.state[o.filePath] = o.outcome.updatedState;
+					const { status, body, message } = o.outcome.error;
 					console.warn(
 						"[session-sync] release transport error for completed session",
 						sessionId,
+						"- HTTP",
+						status,
+						typeof body === "string"
+							? body
+							: (JSON.stringify(body) ?? "<no body>"),
 						"-",
-						o.outcome.error.message,
+						message,
 					);
 				}
 			}

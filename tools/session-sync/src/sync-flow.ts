@@ -135,13 +135,39 @@ export type SyncFileOutcome =
 	 * sync does NOT fail because release failed. The 60s heartbeat and
 	 * 5-min safety-net re-issue the release; worst case the lease lapses
 	 * naturally at `expires_at`.
+	 *
+	 * `error` is a structured carrier (NOT an `Error` instance) so cli.ts
+	 * can log status + body the same way it logs the 403 branch. For the
+	 * thrown-network-error flavor (e.g. ECONNREFUSED), `status` is `0`
+	 * and `body` is `null` — sentinel values that distinguish a throw
+	 * from a real HTTP transport-error response while keeping a single
+	 * shape at the outcome boundary.
 	 */
 	| {
 			kind: "completed_release_transport_error";
 			updatedState: PerFileState;
 			sessionRow: Record<string, unknown>;
-			error: Error;
+			error: ReleaseTransportError;
 	  };
+
+/**
+ * Structured carrier for the post-completion DELETE-lock failure path.
+ * Lifted from a stringified `Error.message` hack so cli.ts can format
+ * `status` + `body` consistently with the 403 (`completed_release_denied`)
+ * branch and so the test boundary can inspect the fields directly.
+ *
+ * Two real-world shapes land here:
+ *   - HTTP transport_error (5xx / malformed JSON): `status` is the real
+ *     HTTP code, `body` is whatever the server returned, `message` is a
+ *     synthesized human-readable string.
+ *   - Thrown network error (ECONNREFUSED, DNS failure, …): `status` is
+ *     `0`, `body` is `null`, `message` is the thrown Error's message.
+ */
+export interface ReleaseTransportError {
+	status: number;
+	body: unknown;
+	message: string;
+}
 
 async function defaultReadFile(path: string): Promise<Uint8Array> {
 	const arr = await Bun.file(path).bytes();
@@ -264,11 +290,26 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		};
 
 		// AC 18 ext (slice 2, step 6): post-upload completion branch.
-		// The lock release fires only when the upload landed (response.ok)
-		// AND the JSONL is finalized (`metadata.status === "completed"` —
-		// extractor flips that on `{type:"result"}`). Active sessions still
-		// rely on the 60s heartbeat; non-200 outcomes never held the lock
-		// successfully so there's nothing to release.
+		// The lock release fires only when:
+		//   1. The upload landed (response.ok above), AND
+		//   2. The JSONL is finalized (`metadata.status === "completed"`,
+		//      flipped by the extractor on a `{type:"result"}` line), AND
+		//   3. This is the PARENT session (`agentId === undefined`).
+		//
+		// Subagents inherit the parent's lock per spec (the dev-session
+		// lock is keyed off `session_id` alone — subagent uploads don't
+		// take their own lock). Their `metadata.status` ride-alongs the
+		// extractor's result-line check but the daemon must NOT issue a
+		// DELETE on the parent's lock just because a subagent JSONL
+		// happens to carry a `{type:"result"}` line. Empirically no
+		// subagent file in the historical corpus does (0/545 as of
+		// 2026-05-12), but the gate is the right shape regardless — a
+		// future extractor change or a hand-edited subagent transcript
+		// shouldn't be able to over-release.
+		//
+		// Active sessions still rely on the 60s heartbeat; non-200
+		// outcomes never held the lock successfully so there's nothing
+		// to release.
 		//
 		// Best-effort: a failed release does NOT downgrade the sync. The
 		// `updatedState` payload is identical across all three completion
@@ -278,7 +319,7 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		// release on the next tick. cli.ts decides whether to log or clean
 		// up state based on the discriminator (the pure function stays
 		// log-free, matching the lock_held layering rule).
-		if (metadata.status === "completed") {
+		if (metadata.status === "completed" && agentId === undefined) {
 			let releaseResponse: DeleteLockResponse;
 			try {
 				releaseResponse = await deleteLockFn(
@@ -292,11 +333,21 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 					fetchImpl,
 				);
 			} catch (err) {
+				// Network throw flavor: status=0, body=null sentinels so
+				// cli.ts can format with a single code path while still
+				// being able to tell apart "real HTTP transport_error" from
+				// "couldn't reach the server at all". `message` carries the
+				// original throw message verbatim.
+				const thrown = err as Error;
 				return {
 					kind: "completed_release_transport_error",
 					updatedState,
 					sessionRow: session,
-					error: err as Error,
+					error: {
+						status: 0,
+						body: null,
+						message: thrown.message,
+					},
 				};
 			}
 			if (releaseResponse.kind === "released") {
@@ -327,19 +378,21 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 					sessionRow: session,
 				};
 			}
-			// `releaseResponse.kind === "transport_error"`. Synthesize an
-			// Error from the response so cli.ts can log a single string;
-			// keeps the outcome's `error` field shape uniform with the
-			// network-throw branch above.
+			// `releaseResponse.kind === "transport_error"`. Surface the
+			// real `status` + `body` so cli.ts logs them symmetric with
+			// the 403 branch; synthesize a `message` for callers that
+			// only want a single string.
 			return {
 				kind: "completed_release_transport_error",
 				updatedState,
 				sessionRow: session,
-				error: new Error(
-					`session-sync: DELETE lock returned HTTP ${releaseResponse.status}: ${
+				error: {
+					status: releaseResponse.status,
+					body: releaseResponse.body,
+					message: `session-sync: DELETE lock returned HTTP ${releaseResponse.status}: ${
 						JSON.stringify(releaseResponse.body) ?? "<no body>"
 					}`,
-				),
+				},
 			};
 		}
 
