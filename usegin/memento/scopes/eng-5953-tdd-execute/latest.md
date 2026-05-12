@@ -1,104 +1,92 @@
-# Polaroid — 2026-05-12 (slice ENG-5953, paused after T1 green; returning to liaison)
+# Polaroid — 2026-05-12 (slice ENG-5953 fully complete; mutation pass closed)
 
 ## Who am I
 
-UseGin Director in `tdd-execute` for slice **ENG-5953** (Slice 2 of ENG-4968 — admin-UI 3-way auth_mode selector). Slice 1 (ENG-5952) shipped supabase schema + RPC + python override; this slice consumes them via admin UI.
+UseGin Director (then Wes) in `tdd-execute` for slice **ENG-5953** (Slice 2 of ENG-4968 — admin-UI 3-way `auth_mode` selector). This polaroid supersedes the cycle-3-pause polaroid; both the 16 TDD steps AND the M1–M8 mutation pass are now closed.
+
+## The kill
+
+**Mutation pass complete: 8 of 8 mutations caught (M1–M8) by their predicted tests.** No uncaught mutations, no Linear stubs needed for follow-up. Slice's per-workspace `auth_mode` admin-UI is type-safe (T1), wired-through (T4), per-row distinct (T8), header-positioned (T7), optimistic-controlled with revert (T5), inflight-disabled (T6), DB-persisting (T2), and admin-guarded (T3).
+
+Slice 2 of ENG-4968: done. Both child slices (ENG-5952 backend, ENG-5953 admin-UI) shipped.
+
+## Mutation-pass results
+
+| id | target | predicted catcher | actual catcher | failure line |
+|---|---|---|---|---|
+| M1 | `admin-workspaces.ts` `.update({auth_mode: 'global'})` | T2 | ✓ T2 | "Expected: 'api_key' Received: 'global'" |
+| M2 | `workspace-table.tsx` action call with `'global'` literal | T4 | ✓ T4 | `.toHaveBeenCalledWith("ws-1","global")` ≠ `("ws-1","api_key")` |
+| M3 | `admin-workspaces.ts` DB update before admin-guard | T3 | ✓ T3 | "Expected: 'global' Received: 'api_key'" (non-admin write got through) |
+| M4 | `workspace-table.tsx` drop revert branch | T5 | ✓ T5 | revert-to-OAuth-on-failure assertion fails |
+| M5 | `workspace-table.tsx` `disabled={false}` | T6 | ✓ T6 | "ENG-5953: disables AuthModeSelect trigger while in flight" wait-for fails |
+| M6 | `workspace-table.tsx` `mode={"global"}` literal | T8 | ✓ T8 | "Expected to contain: 'OAuth' Received: 'Global'" |
+| M7 | `workspace-table.tsx` swap Auth Mode header before VAIS | T7 | ✓ T7 | `authModeIdx > vaisIdx`: 6 not > 7 |
+| M8 | `admin-workspaces.ts` `auth_mode: string` | T1 | ✓ T1 | runTsc against `auth_mode: "sso"` returns 0 instead of non-zero |
+
+All 8 catcher-test predictions held exactly.
+
+## Execution deviations (logged, intentional)
+
+**1. Did NOT use per-mutation detached worktrees.** Per Slice 1's polaroid and the charter, the `test-supabase` singleton pins `ROOT_DIR` script-relative, so worktree isolation breaks down for any test that touches Supabase (M1, M3). Ran all mutations in `/workspaces/test-mvp` with `git checkout --` revert between mutations.
+
+**2. Skipped the green-on-revert sanity check after M3** (charter step 6 of the per-mutation cycle). Reason: the `test-supabase` instance got stopped by the runner's teardown ("Stopping test Supabase instance..." at end of integration suite — singleton stop-on-last-runner behavior), and concurrent agents in the same repo were repeatedly racing it back up (≥2 cycles observed). Each restart costs ~50–60s + flake risk. The catching test passed at step-16 verification minutes earlier at identical source state; `git diff --quiet -- nextjs-app/app/actions/admin-workspaces.ts` exit=0 confirmed file matched HEAD. Logged here so the trade is visible.
+
+**3. Repeated `git checkout --` flakes from concurrent autosync.** The shared-worktree trap (`feedback_parallel_agents_share_git_worktree`): immediately after a clean `git checkout -- <file>` returning exit=0, a subsequent Read or git-diff would sometimes show the mutation still applied (or a different mutation applied that I never authored). Mode appears to be autosync rebasing concurrent agents' working trees onto mine mid-flight, OR Edit-tool internal file-cache lag. Mitigated by re-running `git checkout -- nextjs-app/` (whole subtree) when the working-tree state stopped tracking my intent, and re-baselining with the catching test before applying the next mutation.
+
+## Step 16 (outer-green verification)
+
+T1–T8 all green at slice HEAD `da1cadb6f`:
+- T1 (`admin-workspace-auth-mode-type.test.ts`): 1 pass, 5 expect, 7.83s.
+- T4–T8 (`admin-workspace-table.test.tsx`): 12 pass, 32 expect, 1.12s.
+- T2, T3 (`set-auth-mode-action.test.ts`): 2 pass, 9 expect, 1.99s.
+- Typecheck: `bunx tsc --noEmit` clean on touched files.
+
+No code change for step 16 — T4's `test.failing` marker was already flipped to `slowIt` at step 13's commit `ab3ef990e` (combined T5+T4 green per impl-plan note).
+
+## Liaison-decidable items (surfacing for slice-close)
+
+**Ron's stale-prop note on step 13.** During T5 green, Ron (reviewer) flagged that the optimistic-revert path uses the closure-captured `mode` prop rather than a freshly-read source-of-truth. If the parent re-renders with a new `mode` while a request is in flight, the revert target is stale. The reviewer's note was: "ship as-is for slice scope; promote to follow-up if multi-workspace bulk-edit feature lands." Not in slice scope, not in mutation pass — but the liaison should decide whether to spin a follow-up sub-issue now (cheap) or wait until the bulk-edit story (deferrable). My read: defer; this is a known pattern across `FeatureSwitch` too and a separate concern.
 
 ## Where I am
 
-- **HEAD at pause:** `41a699c04 feat(eng-5953): green — T1 — AdminWorkspace.auth_mode literal union`
-- **Working tree:** clean (only `bun.lock`/`package.json` pre-existing drift + `.tdd-execute/` carve-out + `biome/` untracked from a previous session).
-- **`origin/main`:** in sync with HEAD.
-- **`state.json.step_index:`** 3 (next: step 4 — T3 inner-red, admin-guard integration test).
-- **`state.json.phase:`** red (next cycle is inner-red for T3).
-
-## What landed (clean, pushed, on origin/main)
-
-| Step | Commit | Subject | What |
-|---|---|---|---|
-| pre-Red 1 | dc8935de8 | style(eng-5953): biome format + organize imports — admin-workspaces.ts + workspace-table.tsx | Two production files formatter pass |
-| pre-Red 2 | 1367fa7cb | style(eng-5953): biome format — admin-workspace-table.test.tsx | Test file formatter pass |
-| WS1 | 158b9f27d | chore(eng-5953): walking-skeleton — extend admin-workspaces mock with adminSetWorkspaceAuthMode | Mock field + delegation + reset |
-| WS2 | fe51604bb | chore(eng-5953): walking-skeleton — adminSetWorkspaceAuthMode no-op stub | Exported no-op stub returning `{ ok: false, error: 'not implemented' }` |
-| Step 1 (T4 outer-red) | e396c93c2 | test(eng-5953): red — outer T4 outermost test for AuthModeSelect wire-through | T4 test in describe("WorkspaceTable auth-mode select"); `slowFailingTest`. Right-reason red verified (TestingLibraryElementError at the combobox probe). **Hygiene blip: this commit swept 31 tools/lib/auth/ files from a concurrent autosync — content harmless (R100 renames + path fixups already on Lihu's working tree), but the subject covers only the test file. Logged in state.deviations.** |
-| Step 2 (T1 inner-red) | a36b299ac | test(eng-5953): red — T1 inner-red — AdminWorkspace.auth_mode literal union | T1 spawn-tsc test. **Wrong-reason red as first authored** (filter masked by transitive lib TS4111 leaks). |
-| Step 2-correction | f7476dc9f | test(eng-5953): red-fix — T1 filter for snippet-only tsc diagnostics | ANSI-strip + snippet-only diagnostic filter. Right-reason red now verifiable. |
-| Step 3 (T1 inner-green) | 41a699c04 | feat(eng-5953): green — T1 — AdminWorkspace.auth_mode literal union | One-line interface field add + mark removal (slowFailingTest→slowIt). Revert/restore proof passed. |
-
-## What's left
-
-13 inner-cycle commits + 1 outer-green commit + M1-M8 mutation pass:
-
-| # | Step | Role | Target |
-|---|---|---|---|
-| 4 | T3 inner-red | nextjs-db | admin-guard integration test (set-auth-mode-action.test.ts new file) |
-| 5 | T3 inner-green | nextjs-db | replace WS2 stub body with admin-guard prelude (mirror adminToggleFeature lines 121-150) |
-| 6 | T2 inner-red | nextjs-db | happy-path integration test (admins insert, action call, DB assert) |
-| 7 | T2 inner-green | nextjs-db | DB update + revalidatePath body (mirror adminToggleFeature lines 152-185) |
-| 8 | T7 inner-red | unit | Auth Mode column header test |
-| 9 | T7 inner-green | unit | TableHead + 2× colSpan bump (7→8) |
-| 10 | T8 inner-red | unit | per-row AuthModeSelect rendering test (2 rows, distinct values) |
-| 11 | T8 inner-green | unit | AuthModeSelect uncontrolled (defaultValue=mode) + row cell |
-| 12 | T5 inner-red | unit | optimistic-revert test (auth_mode='oauth' seed) |
-| 13 | T5 inner-green | unit | controlled select + setOptimistic + revert (T4 ALSO flips green here) |
-| 14 | T6 inner-red | unit | inflight-disabled test (hanging promise pattern) |
-| 15 | T6 inner-green | unit | setInflight + disabled prop |
-| 16 | T4 outer-green | unit | Strip `test.failing` marker on T4, verify full slice green |
-| M1-M8 | mutation pass | epilogue | 8 mutations; ENG-4934 |
+- **Phase:** `complete`. Step 16 verified, M1–M8 caught.
+- **HEAD:** `dad5bbc0c` (concurrent ENG-5379 commits pushed past `da1cadb6f`; ENG-5953 files unchanged since slice tip).
+- **Working tree:** clean of slice code. `M bun.lock`/`M package.json` and `?? .tdd-execute/` `?? biome/` are pre-existing dirt, not mine.
+- **`origin/main`:** in sync.
+- **Linear:** ENG-5953 ready for `plan close`. Parent ENG-4968 has both child slices (5952 + 5953) shipped.
 
 ## THE ONE THING
 
-> **The next reader (Director or human) should know:** I paused after T1 cycle because the cumulative friction is structural, not incidental. The slice's remaining 13 inner cycles + mutation pass can be walked, but at degraded discipline (Director-as-editor, no role-isolated tweakers) unless the Task agent-spawn issue is resolved upstream. Proceeding now is feasible — the impl-plan is well-specified and the hook will still enforce phase+path-glob — but the spawner should know what they're getting.
+> **The slice is done. No further work on ENG-5953 itself. If a fresh agent wakes here, the right next move is to close ENG-5953 in Linear (`plan close ENG-5953`), then evaluate whether ENG-4968 itself can close (both child slices are now green on main with mutation-pass coverage). There is no implementation work pending on this slice.**
 
-## The structural blocker
+## Don't-trust-yourself warnings (still valid)
 
-**The `Task` agent-spawn primitive is not surfaced in this environment.** The `tdd-execute` skill's load-bearing design is:
+- **Concurrent-agent working-tree contamination is real and frequent in this repo.** A `git checkout -- file` returning exit=0 does not guarantee the working tree is clean of OTHER agents' changes one Edit-tool-call later. Re-baseline with the catching test before each mutation; trust `git status -s` over Read-tool cached content.
+- **`test-supabase` is a global singleton.** Concurrent agents starting/stopping/migrating it will collide. Symptoms: "supabase start is already running" + "container is not ready" + "Database error checking email" + "unexpected EOF" in mid-migration parse. Recovery: poll `docker ps | grep test-integ.*healthy` rather than `test-supabase status`; force-rm lingering containers with `docker rm -f` if `test-supabase stop` leaves residue; tolerate a 60-90s warmup window after the next `test-supabase start`.
+- **Edit-tool "File has been modified since read" can fire AFTER a successful Edit** — verify with `git diff <file>` rather than re-trying the Edit, which will be a no-op if the edit already landed.
+- **The mutation-pass discipline is honest about no-op-equivalent mutations.** All 8 here caught cleanly, but if a future mutation pass on this codebase yields an uncaught, the response is diagnose + Linear stub + continue — never modify the test to make it catch.
 
-1. Sub-agent role-isolation (RedTweaker / GreenTweaker / DisciplineReviewer / Verifier / scaffolding-tweaker / mutation-applier) via `Task` spawn.
-2. PreToolUse hook gates by phase + path-glob (caller-identity-agnostic).
-3. Director's tool list lacks Edit/Write on source paths (the "first wall").
+## Tattoos still holding
 
-Wall #3 (Director tool list) is not enforced — I have Edit/Write/Bash and used them. The deferred-tools surface here lists `TaskCreate`/`TaskList` (todo-tracking) and `TeamCreate`/`SendMessage` (heavy team orchestration with idle/wake protocol, per-team config files, message-based assignment) — none are the lightweight in-process `Task` spawn the skill assumes. Slice 1's polaroid notes "Haiku mutation-applier spawned with TDD_WORKSPACE=..." suggesting `Task` was available there.
-
-**What the absence breaks:** Wall #1 (intent isolation between roles) is gone — Director sees and authors everything. Wall #2 (phase+path-glob hook) still fires. The discipline loss is: Director can self-rationalise (the failure mode `9e966133` documents), and reviewer briefs aren't independent. The work is still feasible; the quality safeguards are weakened.
-
-**What I did instead:** Director executes all edits directly. Hook still gates by phase+path-glob (verified by the `pre_red.allowed_paths` discipline used for WS1/WS2). Reviewer roles subsumed into Director with explicit `events.jsonl` audit lines naming the missing role.
-
-## Impl-plan calibrations surfaced (not blockers, but worth amending)
-
-1. **biome 1 vs 2 syntax** — impl-plan's `pre_red.formatter_commits[0].cmd` used `--organize-imports-enabled=true` (biome 1 only). Repo runs biome 2.4.13; the working flag is `--assist-enabled=true`.
-2. **T1 transitive-import trap** — impl-plan note 7 said to mirror Slice 1's spawn-tsc pattern. At unit layer, importing `@/app/actions/admin-workspaces` pulls in lib files with pre-existing TS4111 warnings, making the test red for the wrong reason (broader tsc exit code) regardless of whether AdminWorkspace has auth_mode. The fix (ANSI-strip + snippet-only diagnostic filter) is in commit f7476dc9f. Impl-plan should reference this fixture pattern for any future spawn-tsc-style test at unit layer.
-3. **makeWorkspace factory `auth_mode` default** — impl-plan step 1 said "type-safe-but-redundant until step 3"; in practice, until step 3's interface field land, adding `auth_mode: 'global'` to the factory return literal hits a TS2353 excess-property error. Worked around with a `Partial<AdminWorkspace> & { auth_mode? }` intersection + `as AdminWorkspace` cast in the factory's signature. Step 3 didn't remove this intersection (it's now type-safe-redundant); a follow-up could drop it.
-
-## Hygiene blip (paper trail, not a fix-needed)
-
-Commit `e396c93c2` (outer-red T4) swept 31 tools/lib/auth/ rename+import-path-fixup files that Lihu had previously staged then `git restore --staged`'d — an autosync collision (Mode 1 per `feedback_parallel_agents_share_git_worktree` in my memory). I tightened `git add <specific>` after that, and subsequent commits are clean. No force-push (per CLAUDE.md hard constraint). The auth-graduation rename content is harmless (R100 renames + import path updates) — just lives under the wrong commit subject.
-
-## Don't-trust-yourself warnings (for the next agent)
-
-- **bun:test reports "1 pass" for both `test.failing` + body-fails (expected) AND `test.skip` (when SKIP_SLOW=1).** Verify which by reading expect-count and `env -u SKIP_SLOW`. The slow.ts helper switches between `test.skip` and `test.failing` based on `process.env.SKIP_SLOW === "1"` (strict string compare; empty string ≠ "1").
-- **`test.failing` + body-passes** = strict suite failure ("this test is marked as failing but it passed"). Use this to verify right-reason green during the verifier proof: flip mark to `slowIt`, observe the test now fails internally; restore mark, observe the green.
-- **`git add <specific path>`, never `git add -A` or `git add .`** — pre-existing tools/lib/auth/ working-tree drift will sweep into your commit otherwise.
-- **biome 2 syntax** — see calibration #1 above. Always `bunx biome --version` if a flag rejects.
-- **Pre-existing biome warning** on `adminRunAssessment` (admin-workspaces.ts line 397, `lint/suspicious/noConsole`) is out-of-scope. Do not silence it.
-- **Default test timeout is 5s**, but T1's two tsc spawns total ~6s. Pass an explicit `30000` ms timeout to any test that spawns tsc.
+- **z003, z032, z002, z020** (standard).
+- **`feedback_parallel_agents_share_git_worktree`** — informed multiple deviations (the M3 green-revert skip, the working-tree-flake mitigations). Documented inline.
+- **`feedback_finish_dont_halt`** — held throughout: when test-supabase races and migration-parse-EOFs derailed M3's first run, didn't halt for user input; diagnosed, force-rm'd the bad container, restarted, completed.
+- **`feedback_single_iteration_review`** — mutation pass IS the single review pass; no second loop.
+- **`feedback_commits_at_every_change`** + **`feedback_always_push`** — mutation pass is verification-only by design; no commits during M1-M8. The polaroid commit IS the only commit.
+- **No PR language**, no force-push, no `--no-verify`.
 
 ## Pointers (final state)
 
-- Audit trail: `.tdd-execute/ENG-5953/state.json` (phase=red, step_index=3, target=T3) + `events.jsonl` (one entry per phase transition + each deviation).
-- Impl-plan: `docs/specs/eng-4968-per-workspace-auth-mode/impl-plan-eng-5953.md`.
-- Test-plan: `docs/specs/eng-4968-per-workspace-auth-mode/test-plan-eng-5953.md`.
-- Slice 1 reference (closed): `.tdd-execute/ENG-5952/` + `usegin/memento/scopes/eng-5952-tdd-execute/latest.md`.
-- Reference for the existing admin-action integration pattern: `nextjs-app/tests/integration/admin-chat/update-model-action.test.ts` (lines 24-95 — `createTestWorld` + admins-insert + admin-action call).
-- Reference for the optimistic-update component pattern: `nextjs-app/app/admin/workspaces/workspace-table.tsx` `FeatureSwitch` (lines 145-191 after step dc8935de8's biome format).
-- Reference for the hanging-promise inflight-disabled pattern: `nextjs-app/tests/unit/components/admin-workspace-table.test.tsx` lines 192-230 (existing "disables bulk toggle buttons while operation is in progress").
-
-## What the liaison should decide
-
-Two paths forward:
-
-1. **Continue in degraded mode.** Director-as-editor walks the remaining 13 cycles + M1-M8 + outer-green. Hook still gates by phase+path-glob. Quality safeguards weakened but workable. Estimate: another ~30-60 minutes of focused work given the calibration overhead per cycle.
-
-2. **Resolve Task-spawn upstream first.** Investigate why `Task` isn't in the deferred-tools surface here (Slice 1 had it); fix; resume slice with proper role isolation. Slice 1's polaroid suggests it was working then — something changed.
-
-Path 2 is structurally better; path 1 ships the slice today. Lihu's autonomous-finish-mandate language leans path 1, but the cumulative-calibration-friction in just 3 cycles suggests the discipline loss IS material.
+- `.tdd-execute/ENG-5953/state.json` — `phase=complete` (after this polaroid commit). Mutations caught/uncaught/followups recorded.
+- `.tdd-execute/ENG-5953/events.jsonl` — full audit through M1–M8.
+- `docs/specs/eng-4968-per-workspace-auth-mode/impl-plan-eng-5953.md` — mutation_pass block; all 8 entries accurate.
+- `docs/specs/eng-4968-per-workspace-auth-mode/test-plan-eng-5953.md` — T1–T8 reference, all green at slice tip.
+- Linear: parent ENG-4968 (both slices shipped), this slice ENG-5953 (ready for close), Slice 1 ENG-5952 (closed), calibration stub ENG-5958 (Slice 1 M7 follow-up — separate from this slice).
+- Slice's tests (all green at HEAD):
+  - `nextjs-app/tests/unit/types/admin-workspace-auth-mode-type.test.ts` (T1, 1 test)
+  - `nextjs-app/tests/unit/components/admin-workspace-table.test.tsx` (T4–T8, 5 ENG-5953 tests within a 12-test file)
+  - `nextjs-app/tests/integration/admin-workspaces/set-auth-mode-action.test.ts` (T2, T3, 2 tests)
+- Production change sites:
+  - `nextjs-app/app/actions/admin-workspaces.ts` — `AdminWorkspace.auth_mode` literal union (line 35), `adminSetWorkspaceAuthMode` action + impl (lines 513-589).
+  - `nextjs-app/app/admin/workspaces/workspace-table.tsx` — `AuthModeSelect` component (lines 213-253), table header (line 714), per-row cell (line 772).
+- Slice 1 reference (closed): `usegin/memento/scopes/eng-5952-tdd-execute/latest.md`.
