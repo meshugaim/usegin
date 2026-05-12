@@ -299,8 +299,14 @@ export type HeartbeatResponse =
  *   - Anything else (4xx, 5xx, network failure caught by caller) →
  *     `{kind:"transport_error"}`. Daemon logs; safety-net retries.
  *
- * Step 6 Red: stub throws "Not implemented" so production reaching this
- * code path before Green wires the real fetch surfaces loud.
+ * Wire shape (mirrors `postHeartbeat`):
+ *   - URL: `${apiUrl}/api/v1/dev-sessions/{sessionId}/lock?environment_kind=…&environment_id=…`
+ *   - Method: DELETE.
+ *   - Headers: `Authorization: Bearer ${token}`. No body, no content-type.
+ *
+ * Throws from `fetch` propagate to the caller (sync-flow wraps the call
+ * site in try/catch and routes throws to `completed_release_transport_error`
+ * — same pattern `syncFile` already uses for `postSync` throws).
  */
 export interface DeleteLockRequest {
 	apiUrl: string;
@@ -333,15 +339,44 @@ export type DeleteLockResponse =
 	  };
 
 export async function postDeleteLock(
-	_req: DeleteLockRequest,
-	_fetchImpl: FetchLike = fetch,
+	req: DeleteLockRequest,
+	fetchImpl: FetchLike = fetch,
 ): Promise<DeleteLockResponse> {
-	// Step 6 Red stub: the right-reason failure for the new tests fires at
-	// the OUTCOME assertion site (current sync-flow returns
-	// `kind:"uploaded"` on 200, not `kind:"completed_and_released"`).
-	// Throwing here only surfaces if Green starts calling this function
-	// before swapping the stub for a real fetch — a useful safety belt.
-	throw new Error("Not implemented (ENG-5862 step 6 Red)");
+	const base = req.apiUrl.replace(/\/+$/, "");
+	const qs = new URLSearchParams({
+		environment_kind: req.environmentKind,
+		environment_id: req.environmentId,
+	}).toString();
+	const url = `${base}/api/v1/dev-sessions/${req.sessionId}/lock?${qs}`;
+
+	const res = await fetchImpl(url, {
+		method: "DELETE",
+		headers: {
+			Authorization: `Bearer ${req.token}`,
+		},
+	});
+
+	if (res.status === 204) {
+		return { ok: true, status: 204, kind: "released" };
+	}
+
+	const parsed = await parseBody(res);
+
+	if (res.status === 403) {
+		return {
+			ok: false,
+			status: 403,
+			kind: "not_holder",
+			body: parsed,
+		};
+	}
+
+	return {
+		ok: false,
+		kind: "transport_error",
+		status: res.status,
+		body: parsed,
+	};
 }
 
 export async function postHeartbeat(

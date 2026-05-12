@@ -57,8 +57,24 @@ function extractAgentId(filePath: string): string | null {
 	return m ? (m[1] ?? null) : null;
 }
 
+/**
+ * The parent row of record advanced server-side and the subagent fan-out
+ * should fire. AC 17's spec line about "on parent 200" extends naturally
+ * to the AC 18 ext completion outcomes (slice 2, step 6): a completed
+ * parent ALSO landed a 200; the release-lock call is what discriminates
+ * the four sub-variants, and all three completion outcomes carry the
+ * same advanced `updatedState` as `uploaded`. Without recognizing them,
+ * subagent files attached to a finalized session would silently skip
+ * discovery on the same tick the release fires — a parent-completion
+ * deletes the subagent's row of record advancement.
+ */
 function parentDidAdvance(outcome: SyncFileOutcome): boolean {
-	return outcome.kind === "uploaded";
+	return (
+		outcome.kind === "uploaded" ||
+		outcome.kind === "completed_and_released" ||
+		outcome.kind === "completed_release_denied" ||
+		outcome.kind === "completed_release_transport_error"
+	);
 }
 
 export async function syncSession(

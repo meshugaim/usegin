@@ -39,12 +39,10 @@
  * error was) lives at the cli.ts boundary — same layering rule as the
  * 409 lock_held outcome (see `sync-flow-409.test.ts:14-20`).
  *
- * All four tests land as `test.failing` per `tdd-ci`. Current production
- * (sync-flow.ts post-step-5) returns `{kind:"uploaded",...}` on 200 with
- * no completion branch, so each assertion right-reason-fails at the
- * `out.kind === "completed_*"` site. Green will wire the post-upload
- * completion branch, then flip these to plain `test` and remove the
- * stubs.
+ * Green (step 6): sync-flow.ts now branches on `metadata.status` after
+ * a 200 and routes through `deleteLockFn` (default = `postDeleteLock`,
+ * injected as a spy here). The `test.failing` markers flipped to plain
+ * `test()` once each outcome assertion passed.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -176,7 +174,7 @@ function baseInput(state: StateFile = {}, fileBytes = COMPLETED_FILE_BYTES) {
 }
 
 describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
-	test.failing("ENG-5862: 200 + metadata.status=completed → deleteLockFn called once with env identity, AFTER upload", async () => {
+	test("ENG-5862: 200 + metadata.status=completed → deleteLockFn called once with env identity, AFTER upload", async () => {
 		// The spy records call shape; the upload's 200 response is what
 		// drives the trigger. Asserting calls.length === 1 pins both
 		// "the call fires" and "it fires exactly once per syncFile run"
@@ -234,7 +232,7 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 		expect(killSpy.calls.length).toBe(0);
 	});
 
-	test.failing("ENG-5862: deleteLock 204 → outcome.kind = completed_and_released, state row advances", async () => {
+	test("ENG-5862: deleteLock 204 → outcome.kind = completed_and_released, state row advances", async () => {
 		// Clean done state. The outcome carries an advanced `updatedState`
 		// (same shape as `uploaded`) so the caller persists the final
 		// hash — a startup-scan replay must not re-upload the same bytes
@@ -260,7 +258,7 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 		expect(out.sessionRow.id).toBe("row-1");
 	});
 
-	test.failing("ENG-5862: deleteLock 403 → outcome.kind = completed_release_denied (rare race; safety-net retries)", async () => {
+	test("ENG-5862: deleteLock 403 → outcome.kind = completed_release_denied (rare race; safety-net retries)", async () => {
 		// The lock was stolen between our successful sync and our DELETE.
 		// Server's 403 body deliberately omits holder fields (release is
 		// an identity assertion, not a discovery surface — see step 4
@@ -288,7 +286,7 @@ describe("syncFile — release on completion (AC 18 ext, step 6)", () => {
 		expect(out.updatedState.lastUploadedAt).toBe(NOW.toISOString());
 	});
 
-	test.failing("ENG-5862: deleteLock transport_error / throw → outcome.kind = completed_release_transport_error (best-effort)", async () => {
+	test("ENG-5862: deleteLock transport_error / throw → outcome.kind = completed_release_transport_error (best-effort)", async () => {
 		// Two flavors land in the same outcome: an explicit
 		// `transport_error` DeleteLockResponse (5xx, malformed body) AND
 		// a thrown network error. Both mean the release didn't land but

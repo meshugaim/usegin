@@ -502,6 +502,50 @@ async function fireSync(
 						holder: o.outcome.holder,
 						nextRetryAt: o.outcome.updatedState.nextRetryAt ?? "unknown",
 					});
+				} else if (o.outcome.kind === "completed_and_released") {
+					// AC 18 ext (slice 2, step 6): clean done state. Persist
+					// the final hash so a startup-scan replay doesn't re-upload
+					// the same bytes. We deliberately leave the row in the state
+					// file — slice-1 doesn't sweep completion entries and the
+					// safety-net's `isInBackoff` filter is harmless on a hash-
+					// matched row; the 5-min scan will GC naturally when the
+					// file rotates out of the watched directory.
+					d.state[o.filePath] = o.outcome.updatedState;
+					console.log(
+						"[session-sync] released lock for completed session",
+						sessionId,
+					);
+				} else if (o.outcome.kind === "completed_release_denied") {
+					// AC 18 ext: 403 — a different env stole the lock between
+					// our successful sync and our DELETE (rare race). Server's
+					// 403 body deliberately omits holder fields (release is an
+					// identity assertion, not a discovery surface — see step 4
+					// route.ts:130-134), so we log the bare denial without
+					// holder details. State row still advances; the safety-net
+					// re-issues the release on its next tick if conditions allow.
+					d.state[o.filePath] = o.outcome.updatedState;
+					console.warn(
+						"[session-sync] release denied (403 not_holder) for completed session",
+						sessionId,
+						"- another env now holds the lock; safety-net will retry",
+					);
+				} else if (
+					o.outcome.kind === "completed_release_transport_error"
+				) {
+					// AC 18 ext: 5xx / network failure on the release call.
+					// Best-effort contract: the sync DID land — failing the
+					// outcome would force a re-upload of bytes the server
+					// already has. The lease lapses naturally at `expires_at`;
+					// the 5-min safety-net re-issues the release on the next
+					// tick. Same shape as the heartbeat transport_error log
+					// (see sendHeartbeat).
+					d.state[o.filePath] = o.outcome.updatedState;
+					console.warn(
+						"[session-sync] release transport error for completed session",
+						sessionId,
+						"-",
+						o.outcome.error.message,
+					);
 				}
 			}
 			await persistStateMaybe(d);

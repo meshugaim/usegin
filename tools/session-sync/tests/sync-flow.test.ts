@@ -143,10 +143,21 @@ describe("syncFile — happy path (uploaded)", () => {
 			jsonResponse(200, { session: { storage_path: "p" } }),
 			captured,
 		);
+		// `metadata.status === "completed"` now fires the post-upload
+		// DELETE-lock branch (AC 18 ext, step 6). Inject a no-op
+		// deleteLockFn so this test stays focused on the metadata payload
+		// — without it, the default `postDeleteLock` would call fetch a
+		// second time and overwrite the captured FormData. The release
+		// outcome is covered exhaustively in release-on-completion.test.ts.
 		await syncFile({
 			...baseInput(),
 			readFileFn: async () => completedBytes,
 			fetchImpl,
+			deleteLockFn: async () => ({
+				ok: true,
+				status: 204,
+				kind: "released",
+			}),
 		});
 		const meta = JSON.parse(captured.body?.get("metadata") as string);
 		expect(meta.status).toBe("completed");

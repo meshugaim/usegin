@@ -36,6 +36,7 @@ import {
 	type DeleteLockRequest,
 	type DeleteLockResponse,
 	type FetchLike,
+	postDeleteLock,
 	postSync,
 } from "./sync-client.ts";
 import type { EnvironmentKind, SyncMetadata } from "./sync-metadata.ts";
@@ -175,6 +176,7 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		now,
 		fetchImpl = fetch,
 		readFileFn = defaultReadFile,
+		deleteLockFn = postDeleteLock,
 	} = input;
 
 	// 1. Skip-if-in-backoff (AC 45).
@@ -260,6 +262,73 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 			storagePath,
 			lastUploadedAt: now.toISOString(),
 		};
+
+		// AC 18 ext (slice 2, step 6): post-upload completion branch.
+		// The lock release fires only when the upload landed (response.ok)
+		// AND the JSONL is finalized (`metadata.status === "completed"` —
+		// extractor flips that on `{type:"result"}`). Active sessions still
+		// rely on the 60s heartbeat; non-200 outcomes never held the lock
+		// successfully so there's nothing to release.
+		//
+		// Best-effort: a failed release does NOT downgrade the sync. The
+		// `updatedState` payload is identical across all three completion
+		// variants AND the `uploaded` variant — only the discriminator and
+		// the `error` field on transport_error differ. The lease lapses at
+		// `expires_at` regardless; the 5-min safety-net re-issues the
+		// release on the next tick. cli.ts decides whether to log or clean
+		// up state based on the discriminator (the pure function stays
+		// log-free, matching the lock_held layering rule).
+		if (metadata.status === "completed") {
+			let releaseResponse: DeleteLockResponse;
+			try {
+				releaseResponse = await deleteLockFn(
+					{
+						apiUrl: auth.apiUrl,
+						token: auth.token,
+						sessionId,
+						environmentKind: envIdentity.kind,
+						environmentId: envIdentity.id,
+					},
+					fetchImpl,
+				);
+			} catch (err) {
+				return {
+					kind: "completed_release_transport_error",
+					updatedState,
+					sessionRow: session,
+					error: err as Error,
+				};
+			}
+			if (releaseResponse.kind === "released") {
+				return {
+					kind: "completed_and_released",
+					updatedState,
+					sessionRow: session,
+				};
+			}
+			if (releaseResponse.kind === "not_holder") {
+				return {
+					kind: "completed_release_denied",
+					updatedState,
+					sessionRow: session,
+				};
+			}
+			// `releaseResponse.kind === "transport_error"`. Synthesize an
+			// Error from the response so cli.ts can log a single string;
+			// keeps the outcome's `error` field shape uniform with the
+			// network-throw branch above.
+			return {
+				kind: "completed_release_transport_error",
+				updatedState,
+				sessionRow: session,
+				error: new Error(
+					`session-sync: DELETE lock returned HTTP ${releaseResponse.status}: ${
+						JSON.stringify(releaseResponse.body) ?? "<no body>"
+					}`,
+				),
+			};
+		}
+
 		return { kind: "uploaded", updatedState, sessionRow: session };
 	}
 
