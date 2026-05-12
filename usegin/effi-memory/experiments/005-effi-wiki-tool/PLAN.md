@@ -1,315 +1,132 @@
 ---
-status: proposal — needs Lihu green-light
+status: scaffolding underway (Worker 1 dispatched 2026-05-12)
 authored: 2026-05-11
+revised: 2026-05-12 — reframed from go/no-go to iterative-learning; implementation spec extracted to SPEC.md
 authored-by: claude (effi-memory R&D)
 references:
+  - SPEC.md (sibling) — implementation spec for workers (file paths, signatures, charter steps)
   - usegin/effi-memory/DESIGN.md (§4 — runtime, §3 — storage progression)
   - usegin/effi-memory/askeffi-app-really/_architecture.md (Architecture B)
-  - usegin/effi-memory/askeffi-app-really/MEMORY.md (the MOC the eval will preload)
+  - usegin/effi-memory/askeffi-app-really/MEMORY.md (the MOC the prompt preloads)
 ---
 
 # Experiment 005 — Effi wiki tool + eval
 
-## Question
+## What we want to learn
 
-**On average, does giving Effi access to the curated wiki make answers
-faster, with quality at least as good as wiki-off?**
+This experiment is a learning loop, not a binary go/no-go. By giving Effi a curated wiki and a tool to read it, we want to learn:
 
-That's the eval bar. Binary, decidable by side-by-side comparison on a
-curated question set. If the answer is yes, we build the v1 storage
-mechanism (DB-as-SoT per `DESIGN.md` §3). If no, we don't ship the
-mechanism regardless of how good exp 004's reconciler turns out.
+- **Behavior** — when does Effi reach for the wiki, when does she skip it, when does she fall through to raw data? The per-question tool-call trace is the primary artifact.
+- **Coverage** — which note shapes hold up under Effi's interpretation, which confuse her, which need rewording. The MOC framing is itself under test.
+- **Cost/benefit** — wiki-on vs wiki-off, side by side: TTFT delta, quality delta, citation fidelity. Data that feeds back into wiki content, conventions, and v1 design — not a pass/fail gate.
+- **Where the wiki is wrong** — eval exposes notes whose framing is misleading, citations that don't propagate, gaps Effi tripped over. Each finding is a wiki edit, not a verdict on the mechanism.
 
-## Why this experiment now, alongside 004
+The v1 mechanism (DB-as-SoT per DESIGN.md §3) proceeds in parallel, informed by this experiment but not blocked on it.
 
-The two arms close different questions:
+## Why both arms (004 + 005) in parallel
 
-- **004** — *can we keep the wiki fresh automatically?*
-- **005** — *is it worth keeping fresh?*
+- **004** — *can we keep the wiki fresh automatically?* (reconciler prototype)
+- **005** — *what happens when Effi actually uses the wiki?* (runtime + eval)
 
-These are independent. 005 doesn't depend on 004 working; the eval can
-run today against the manually-authored wiki we already have. And 005
-gates the whole investment — until we've shown the wiki helps Effi at
-runtime, the offline reconciler is speculative.
+The questions are independent. 005 can run against the manually-authored wiki we already have; it doesn't depend on 004.
 
-## Scope — what the prototype does and does NOT do
+## Scope (high-level)
 
-**Does:**
+**Does:** wire `memory_lookup(topic)` MCP tool gated by env var; preload MOC + conventions into Effi's system prompt for the dogfooding project; bundle wiki into python-services build context; add `--trace-jsonl` to the `effi` CLI for structured tool-call capture; build an eval harness; smoke-run end-to-end with 2-3 obviously-covered questions.
 
-1. Add a `memory_lookup(topic: str)` tool to Effi's tool catalog in
-   `python-services/agent_api`. Returns the markdown body of
-   `notes/<topic>.md` from a bundled wiki, or a structured "not found"
-   message including the available topic list.
-2. Inject a fixed system-prompt section at session start when
-   `session.project_id == ALLOWED_WIKI_PROJECT_ID`:
-   - The three MOCs (`moc/company.md`, `moc/product.md`, `moc/market.md`)
-   - `_conventions.md` (so Effi understands the Current/History/Conflicts/Gaps shape)
-   - One paragraph of instruction: *the wiki is your fast path; use it
-     freely; fall through to raw-data when insufficient.*
-3. Bundle the dogfooding wiki (`usegin/effi-memory/askeffi-app-really/`)
-   into the python-services image via a pre-build stage step. Path
-   resolved at runtime through `EFFI_WIKI_PATH` env var (defaults
-   `/app/wiki` in container; local dev overrides to source tree for
-   hot iteration).
-4. Run an eval of 10–15 questions against (a) wiki-disabled Effi,
-   (b) wiki-enabled Effi via `effi --profile <local>` CLI. Per question
-   log TTFT, time-to-final-token, full response, tool-call trace.
-5. Human + LLM judge score each pair on accuracy + citation quality.
-   Output: `RESULTS.md` with consolidated read.
+**Does NOT:** touch Supabase (storage is intentionally throwaway per DESIGN.md §3); add `memory_search` (MOC pre-load is the index); support multiple wikis (one project hardcoded); wire the offline reconciler (exp 004); implement absence-detection or conflict-detection mechanism; score the real eval (Lihu reviews question set first).
 
-**Does NOT:**
+See SPEC.md for the implementation detail.
 
-- Touch Supabase. Wiki is markdown bundled into the image. (Storage is
-  intentionally throwaway per `DESIGN.md` §3.)
-- Add `memory_search`. MOCs in the system prompt are the index; Effi
-  picks the topic directly. (v1 adds search when wiki exceeds
-  pre-loadable MOC; see DESIGN.md §4.)
-- Support multiple wikis. One project ID hardcoded; other projects see
-  no wiki and no tool. RLS gating is the v1 replacement.
-- Wire the offline reconciler. Wiki updates require redeploy during exp
-  005. Acceptable because iteration happens locally; production deploys
-  are stable-point demos only.
-- Implement absence-detection / gap-flagging. Separate concern, later
-  experiment.
+## Eval set (draft — Lihu reviews before real run)
 
-## Success criteria
-
-The experiment is a **success** if all three hold:
-
-- ✅ **Faster on average.** Wiki-enabled TTFT < wiki-disabled TTFT, mean
-  across the eval set. (We expect 3–5× speedup on questions the wiki
-  covers because we skip raw-data retrieval.)
-- ✅ **Quality at least as good.** For every question, wiki-enabled
-  answer is judged equal or better. Zero regressions. Gaps/Conflicts
-  surfaced honestly (Effi quotes the Gap rather than fabricating).
-- ✅ **No fabricated citations.** Every citation in a wiki-grounded
-  answer resolves to a real artifact. Wiki text already has type-prefixed
-  citations; Effi just propagates them — but we verify.
-
-**Partial success** if criterion 1 holds and 2/3 mostly holds (one or
-two regressions, surfaced and understood). **Failure** if any wiki
-answer is materially worse, or if Effi fabricates a citation, or if the
-mean TTFT regresses.
-
-## Tool shape (concretely)
-
-In `python-services/agent_api/tools/wiki.py` (new file):
-
-```python
-WIKI_ROOT = Path(os.environ.get("EFFI_WIKI_PATH", "/app/wiki"))
-ALLOWED_WIKI_PROJECT_ID = os.environ.get("EFFI_WIKI_PROJECT_ID")
-
-def memory_lookup(topic: str, *, ctx) -> str:
-    """Read a curated wiki note about this project. Available topics are
-    listed in the MOC section of your system prompt."""
-    if ctx.project_id != ALLOWED_WIKI_PROJECT_ID:
-        return "[wiki not available for this project]"
-    safe = sanitize_topic(topic)
-    path = WIKI_ROOT / "notes" / f"{safe}.md"
-    if not path.exists():
-        available = ", ".join(p.stem for p in (WIKI_ROOT / "notes").iterdir())
-        return f"[topic '{safe}' not found. Available: {available}]"
-    return path.read_text()
-```
-
-One tool. No surprises. `sanitize_topic` rejects path separators and
-absolute paths (defense-in-depth even though the gate already
-restricted access).
-
-## System-prompt injection
-
-In `python-services/agent_api/prompts/wiki_section.py` (new file):
-
-Reads `_conventions.md` + the three MOCs at module load, concatenates
-into a block. Effi's prompt assembly checks `session.project_id` and
-appends the block iff it matches `ALLOWED_WIKI_PROJECT_ID`.
-
-The injected block:
-
-```
-# Project wiki
-
-A curated wiki of facts about this project is available to you. Use it
-freely as your fast path for project-knowledge questions. Fall through
-to raw data (canon search, file reading) when the wiki is insufficient
-or when the user asks for source-level detail.
-
-## How to read the wiki
-
-[verbatim _conventions.md — explains Current/History/Conflicts/Gaps shape]
-
-## Available notes (index)
-
-[verbatim moc/company.md + moc/product.md + moc/market.md]
-
-To fetch a note in full, call memory_lookup(topic).
-```
-
-Always loaded for the configured project. Effi decides per turn whether
-to call `memory_lookup`.
-
-## Bundling mechanic
-
-- A pre-build script (`scripts/stage-wiki-for-bundle.sh`) copies
-  `usegin/effi-memory/askeffi-app-really/` → `python-services/wiki/`.
-- `python-services/wiki/` is gitignored.
-- `python-services/Dockerfile` adds `COPY wiki/ /app/wiki/`.
-- `EFFI_WIKI_PATH` defaults to `/app/wiki` in prod; local dev sets it to
-  `usegin/effi-memory/askeffi-app-really/` to read straight from source.
-- Container restart picks up wiki edits in dev (no Docker rebuild needed
-  for local iteration).
-
-## Access gate (deliberate v0 wart)
-
-A single env var `EFFI_WIKI_PROJECT_ID` set to the dogfooding project's
-UUID. Both the tool and the prompt-injection check it. Other projects
-get neither.
-
-This is the bit we throw away in v1. The shape it replaces: an RLS
-policy on `project_wiki_notes` that gates rows by `project_id` and
-existing project-membership tables. Don't elaborate the env-var gate —
-it's a placeholder, not a design.
-
-## Iteration loop
-
-Optimized for fast turnaround:
-
-- `effi --profile <local>` CLI talking to a local python-services
-  pointed at the source markdown via `EFFI_WIKI_PATH`.
-- Edit a note → restart Effi (or hot-reload if we add file watching) →
-  re-run the eval question → compare.
-- No Docker builds, no Railway deploys for tight loops.
-- Production dogfooding-Effi deploys on stable points, not per-edit.
-
-## Eval set (~10–15 questions)
-
-Spans the topic surface with a mix of question shapes. Draft below;
-finalize together before running.
+15 questions across 6 shapes. The set has known issues: Q12 (SOC2) is mis-classified as absence-probing — `compliance.md` likely covers it; Q11 (security posture) is borderline — `compliance.md` is adjacent. Treat as a starting point; revise against actual wiki coverage before the real eval. Smoke-run uses a 2-3 question subset of obviously-covered Qs to prove the harness end-to-end.
 
 **Factual / single-topic:**
 
-1. "Who funded the MFN round?"
-2. "What's our current burn rate?"
-3. "Who are the design partners?"
-4. "What's the AskEffi team size?"
+1. Who funded the MFN round?
+2. What's our current burn rate?
+3. Who are the design partners?
+4. What's the AskEffi team size?
 
 **Interpretive / multi-topic:**
 
-5. "How is the Hudson deployment going?"
-6. "Are we on track to close a seed round?"
-7. "Which design partner is the closest to paid?"
+5. How is the Hudson deployment going?
+6. Are we on track to close a seed round?
+7. Which design partner is the closest to paid?
 
 **Cross-cutting / synthesis:**
 
-8. "What are the biggest risks to the business right now?"
-9. "Who's been the most active contributor in the last month?"
-10. "What's the relationship between Cleverly and our GTM motion?"
+8. What are the biggest risks to the business right now?
+9. Who's been the most active contributor in the last month?
+10. What's the relationship between Cleverly and our GTM motion?
 
-**Absence-probing / gap-detection:**
+**Absence-probing (revise — see notes above):**
 
-11. "What's our security posture?" (we have no `security.md` — Effi
-    should say so, not fabricate)
-12. "What's our compliance status with SOC2?" (similar — should surface
-    absence cleanly)
+11. What's our security posture?
+12. What's our compliance status with SOC2?
 
 **Episode-level (should fall through to raw-data):**
 
-13. "What did Phil Lau say in his last call with us?"
-14. "What was discussed in the Tuesday production review?"
+13. What did Phil Lau say in his last call with us?
+14. What was discussed in the Tuesday production review?
 
 **Adversarial / known-conflict:**
 
-15. "Is Hudson a marquee customer?" (wiki has the qualifier — Effi
-    should propagate it, not the original framing)
+15. Is Hudson a marquee customer?
 
-Per question: run twice via CLI (wiki-off / wiki-on), capture TTFT +
-final-token time + full transcript + tool-call trace.
+Per question: run twice via CLI (`--trace-jsonl --profile agent-dev`) once with `EFFI_WIKI_PROJECT_ID` set, once unset. Capture TTFT + final-token time + transcript + tool-call trace.
 
 ## Scoring rubric
 
-Two judges per pair:
+Two judges per pair (real eval, after Lihu revises the set):
 
-- **Human (Lihu + Gin together)** — read both answers side by side.
-  Mark wiki-on as "better / equal / worse / regression" + a one-line
-  note. Track citation correctness manually.
-- **LLM judge (Claude Opus)** — same rubric, separate prompt, blinded
-  to which answer came from which condition.
+- **Human (Lihu + Gin together)** — read both answers side by side. Mark wiki-on as "better / equal / worse / regression" + one-line note. Track citation correctness manually.
+- **LLM judge (Claude Opus)** — same rubric, separate prompt, blinded to which answer came from which condition.
 
-Disagreement between judges = flag for discussion. Per-question result:
-the consensus or the unresolved disagreement.
+Disagreement between judges → flag for discussion. Per-question result: consensus or unresolved disagreement.
 
 ## Output artifact
 
-`experiments/005-effi-wiki-tool/RESULTS.md` with:
+`experiments/005-effi-wiki-tool/runs/<timestamp>/RESULTS.md` per run:
 
-- Per-question pairs (transcript A / transcript B, judged).
-- Aggregate: mean TTFT delta, mean final-token delta, win-rate, citation
-  fidelity.
-- A "what we learned about the wiki" section — which topics were strong,
-  which were weak, what gaps Effi surfaced, where the wiki was wrong.
-- A "next iteration" section feeding back into wiki content + conventions.
+- **Per-question section** — both transcripts side by side. Above each, a one-line tool-call summary: `memory_lookup(design-partners) → canon_search("Hudson") → memory_lookup(customer-outcomes)`. The tool-call trace is the primary signal; the prose answer is secondary.
+- **Aggregate** — mean TTFT delta, mean final-token delta, win-rate, citation fidelity rate.
+- **"What we learned about the wiki"** — which notes held up, which confused Effi, which gaps got surfaced honestly, where the wiki was wrong.
+- **"What we learned about Effi"** — when she skipped the wiki and why, where she over-relied on it, citation-propagation behavior.
+- **"Next iteration"** — concrete edits to wiki content, conventions, MOC framing, prompt instructions.
+
+The tool-call trace is what makes this a learning loop rather than a benchmark.
 
 ## Cost estimate
 
-Trivial. Per question:
-- One Effi turn each way, ~5K tokens prompt + ~1K response × 2 conditions.
-- LLM judge: ~3K tokens per pair.
-- ~$0.50 for the whole eval at Opus pricing. Negligible.
-
-## Implementation order
-
-A possible split, if delegated:
-
-1. **Worker 1 — tool + prompt wiring.** Adds `memory_lookup`,
-   `wiki_section.py`, bundling script, Dockerfile change, env vars.
-   Tests it locally with a hand-crafted curl against the CLI. ~half day.
-2. **Worker 2 — eval harness.** A small script that takes a list of
-   questions, runs them via the `effi` CLI twice (with/without
-   `EFFI_WIKI_PROJECT_ID`), captures timing + transcripts, writes per-pair
-   files. ~half day.
-3. **Lihu + Gin together — run the eval, score, write RESULTS.md.**
-
-Workers 1 and 2 can proceed in parallel. Worker 1 lands first so worker 2
-has something to point the eval harness at.
+~$0.50 per full eval at Opus pricing. Negligible.
 
 ## The seam to v1
 
-When 005 says "yes, wiki helps" and we're ready to ship the mechanism
-to all projects, the v0 code that survives:
+When the eval informs the v1 design (DB-as-SoT, RLS, per-project rows), the v0 code that survives:
 
-- `memory_lookup` signature and contract (only storage adapter changes).
-- The system-prompt injection pattern (only data source changes —
-  file-read → SQL query).
-- The MOC pre-load model (only data source changes).
+- `memory_lookup` tool name + return shape (only the storage adapter swaps in).
+- The system-prompt block structure (data source swaps file-read → SQL).
+- The MOC pre-load model (data source swaps).
+- `AgentConfig.project_id` (already needed for other features anyway).
 
 The v0 code that goes away:
 
-- File-system storage adapter (replaced by SQL).
+- File-system reads in `wiki_tool.py` (replaced by SQL).
 - `EFFI_WIKI_PROJECT_ID` env-var gate (replaced by RLS).
-- Pre-build staging script + Dockerfile COPY (no longer needed).
-- Hardcoded single-project assumption (replaced by per-project rows).
+- Bundling script + `python-services/wiki/` (no longer needed).
+- Single-project assumption (replaced by per-project rows + per-membership rows).
 
-The DESIGN.md §3 "v0→v1 transition mechanic" lists the exact import
-steps. Do them when the eval passes and project-member access surfaces
-need building.
+DESIGN.md §3 "v0→v1 transition mechanic" has the import sequence.
 
-## Out of scope for this experiment
+## Out of scope
 
-- Multi-project wiki (one hardcoded project).
-- Live wiki updates without deploy (markdown is bundled at build).
+- Multi-project wiki.
+- Live wiki updates without restart (markdown loaded at module init).
 - Absence-detection / gap-flagging mechanism.
 - Conflict-detection mechanism.
-- Offline reconciler (exp 004, parallel arm).
+- Offline reconciler (exp 004).
 - Authoring UI for project members.
 - LLM-as-auditor for missing topics.
-
-## Reading order
-
-1. `usegin/effi-memory/DESIGN.md` — frame (especially §3 storage and
-   §4 runtime).
-2. `usegin/effi-memory/askeffi-app-really/MEMORY.md` — the MOC the
-   prompt will preload.
-3. `usegin/effi-memory/askeffi-app-really/_conventions.md` — note shape
-   the prompt explains to Effi.
-4. This file.
-5. (After running) `RESULTS.md`.
+- Scoring the eval (Lihu reviews set first).
