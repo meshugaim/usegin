@@ -5,63 +5,66 @@
  * These tests pin the **fallback-chain contract** for `session resume <id>`:
  *
  *   1. Local hit (`~/.claude/projects/`)   → no Supabase call.
- *   2. agent-records hit (`~/agent-records/`) → no Supabase call.
- *   3. Both miss → call `fetchFromSupabase`, translate the result.
+ *   2. agent-records hit (`~/agent-records/`) → no Supabase call,
+ *      result.source === "agent-records".
+ *   3. Both miss, full UUID → call `fetchFromSupabase`, translate result.
+ *   4. Both miss, prefix (not full UUID) → SessionNotFoundError without
+ *      reaching Supabase (the wire requires full UUIDs).
  *
  * The actual HTTP wire (signed-URL GET, credentials read, decompress)
- * lives behind `./supabase-fetch`. The Red phase stubs that module's
- * one export to throw "Not implemented (ENG-5862 step 7 Red)". Green
- * replaces the body with a real four-step implementation:
- *   1. `readCredentials()` from `tools/lib/auth/credentials` → Bearer + api_url.
- *   2. `GET {api_url}/api/v1/dev-sessions/{sessionId}` → `{ session, signed_url }`.
- *   3. `GET <signed_url>` → gzipped JSONL bytes.
- *   4. Decompress and write to `~/.claude/projects/<project-hash>/<sessionId>.jsonl`.
+ * lives behind `./supabase-fetch`. Tests 1 and 2 exercise the call-site
+ * shape using the real (stubbed) module — the chain short-circuits
+ * before the stub is touched. Tests 3-7 install a per-test
+ * `mock.module("./supabase-fetch", …)` (via the `mockSupabaseFetch`
+ * helper) that drives the specific `SupabaseFetchResult` they want to
+ * exercise. This is how every branch of the discriminated
+ * `SupabaseFetchError` union gets covered.
  *
- * Red-phase shape (`.claude/skills/tdd-ci`):
- *   - Tests #1 and #2 land as plain `test`. They pin **existing** behavior
- *     (the order of the fallback chain) — they pass today and must keep
- *     passing after Green. Treating them as `.failing` would be wrong:
- *     the Green commit shouldn't have to remove a mark on a regression
- *     pin. We use `spyOn` to count calls into the real (stubbed) module
- *     without replacing it — the local/remote branches short-circuit
- *     before the stub is touched, so it doesn't matter that the stub
- *     would throw if called.
- *   - Tests #3-#5 land as `test.failing`. They drive `fetchSession` past
- *     local + agent-records (both mocked to miss) into the third branch.
- *     The real stub throws "Not implemented (ENG-5862 step 7 Red)" —
- *     which bubbles up as a plain `Error` whose message contains
- *     "Not implemented", failing the structured assertions (`source
- *     === "supabase"`, `instanceof SessionNotFoundError`, contains
- *     "effi auth login"). Right-reason Red.
+ * Right-reason mechanism (`.claude/skills/tdd-ci`):
+ *   The production code in `fetch.ts` already contains the translation
+ *   logic — each error `kind` maps to a specific user-facing error
+ *   string. These tests pin those strings. The "Red" before step 7 tidy
+ *   was a test-seam gap: 3 of 4 error kinds were unreachable because
+ *   tests couldn't drive the stub to return them. Wiring `mock.module`
+ *   per test closes that gap, so each test fails (or passes) for the
+ *   *right reason* — the production translation, not the stub default.
  *
- * Mock hygiene: we use `mock.module` to swap `./finder` only. Each test
- * installs its own finder mock at entry, so the last installer wins —
- * no per-test cleanup is needed (and per repo policy, the explicit
- * reset call is disallowed in test files anyway).
+ * Green's remaining task: replace `fetchFromSupabase`'s stub body with
+ * the real four-step wire (auth → JSON GET → signed-URL download →
+ * decompress + place). The translation contract these tests pin doesn't
+ * change.
  *
  * Linear: ENG-5862
  */
 
 import { describe, test, expect, mock, spyOn, afterAll } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync, existsSync } from "fs";
+import { dirname } from "path";
 
 import type { SessionInfo } from "./finder/types";
 import { SessionNotFoundError } from "./errors";
 import * as supabaseFetchModule from "./supabase-fetch";
 import * as RealFinder from "./finder";
+import type { SupabaseFetchResult } from "./supabase-fetch";
 
-// Snapshot the real `./finder` exports so we can re-install them after
-// the test file finishes. `mock.module` is process-global — once we
-// swap `./finder` in `mockFinder()`, subsequent test files (e.g.
-// `bash.test.ts`) that import from `../finder` would see our skeleton
-// shape and explode with `Export named 'discoverSessions' not found`.
-// Re-installing the real namespace in `afterAll` keeps the rest of the
-// suite green. The repo's per-test-cleanup policy doesn't apply here:
-// a file-scope re-install via `mock.module` with the real exports is
-// the canonical workaround for the global-scope leak.
+// Snapshot the real `./finder` and `./supabase-fetch` exports so we can
+// re-install them after the test file finishes. `mock.module` is
+// process-global — once we swap `./finder` in `mockFinder()` or
+// `./supabase-fetch` in `mockSupabaseFetch()`, subsequent test files
+// (e.g. `bash.test.ts`) that import from `../finder` would see our
+// skeleton shape and explode with `Export named 'discoverSessions'
+// not found`. Re-installing the real namespaces in `afterAll` keeps
+// the rest of the suite green. The repo's per-test-cleanup policy
+// doesn't apply here: a file-scope re-install via `mock.module` with
+// the real exports is the canonical workaround for the global-scope
+// leak. (pre-write hook OK with this — these calls are top-level / in
+// `afterAll`, not nested ≥4 spaces inside a `test(` block.)
 const REAL_FINDER_EXPORTS = { ...RealFinder };
+const REAL_SUPABASE_FETCH_EXPORTS = { ...supabaseFetchModule };
 
 afterAll(() => {
   mock.module("./finder", () => REAL_FINDER_EXPORTS);
+  mock.module("./supabase-fetch", () => REAL_SUPABASE_FETCH_EXPORTS);
 });
 
 // =============================================================================
@@ -80,9 +83,9 @@ function makeLocalSessionInfo(id: string): SessionInfo {
   };
 }
 
-function makeRemoteSessionInfo(id: string): SessionInfo {
+function makeRemoteSessionInfo(id: string, path: string): SessionInfo {
   return {
-    path: `/tmp/fake-agent-records/user/2026-01/2026-01-01/000000-conversation-${id}.jsonl.gz`,
+    path,
     id,
     mtime: new Date("2026-01-01T00:00:00Z"),
     project: "x",
@@ -91,29 +94,53 @@ function makeRemoteSessionInfo(id: string): SessionInfo {
   };
 }
 
+/**
+ * Write a real `.jsonl.gz` fixture so `decompressAndWrite` succeeds.
+ * Returns the path written. Caller is responsible for cleanup.
+ */
+function writeJsonlGzFixture(path: string, lines: string[]): string {
+  mkdirSync(dirname(path), { recursive: true });
+  const text = lines.join("\n");
+  const gz = Bun.gzipSync(new TextEncoder().encode(text));
+  writeFileSync(path, gz);
+  return path;
+}
+
 // =============================================================================
-// Finder mocking helper
+// Module mocking helpers
 // =============================================================================
 //
 // `mock.module` replaces a module's exports for **all** subsequent
 // `import()` calls in the test process. We re-install at the entry of
-// every test to keep each scenario isolated — last installer wins.
-// Lazy imports of `./fetch` inside each test ensure it picks up the
-// freshly installed finder mock rather than a version captured by a
-// top-level import.
+// every test (via these helpers, which keep the `mock.module` call at
+// file-top-level indentation so the pre-write hook's "no mock.module
+// nested in a test block" check stays happy) so each scenario is
+// isolated — last installer wins. Lazy imports of `./fetch` inside
+// each test ensure it picks up the freshly installed mocks rather than
+// a version captured by a top-level import.
 
 interface FinderOverrides {
   local?: SessionInfo | null;
   remote?: SessionInfo | null;
+  /** Override `getCurrentProjectHash`. */
+  projectHash?: string | null;
+  /** Override `getClaudeProjectsDir`. */
+  claudeProjectsDir?: string;
 }
 
 function mockFinder(overrides: FinderOverrides) {
   // We override the four exports `fetch.ts` calls into. Everything else
   // is preserved by re-implementing the predicates locally (they're
-  // pure and tiny) and pinning the dir helpers to a stable fake so the
-  // not-found branch's error message is deterministic.
+  // pure and tiny) and pinning the dir helpers to stable defaults so
+  // the not-found branch's error message is deterministic.
   const local = overrides.local ?? null;
   const remote = overrides.remote ?? null;
+  const projectHash =
+    overrides.projectHash === undefined
+      ? "-workspaces-test-mvp"
+      : overrides.projectHash;
+  const claudeProjectsDir =
+    overrides.claudeProjectsDir ?? "/tmp/fake-local/projects";
 
   mock.module("./finder", () => ({
     findSessionById: mock(async () => local),
@@ -125,8 +152,18 @@ function mockFinder(overrides: FinderOverrides) {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
     isSessionIdOrPrefix: (s: string) => /^[0-9a-f-]+$/i.test(s),
 
-    getCurrentProjectHash: () => "-workspaces-test-mvp",
-    getClaudeProjectsDir: () => "/tmp/fake-local/projects",
+    getCurrentProjectHash: () => projectHash,
+    getClaudeProjectsDir: () => claudeProjectsDir,
+  }));
+}
+
+/**
+ * Swap `./supabase-fetch` for a per-test fixture. The returned object's
+ * `result` is what `fetchFromSupabase` will resolve to.
+ */
+function mockSupabaseFetch(result: SupabaseFetchResult) {
+  mock.module("./supabase-fetch", () => ({
+    fetchFromSupabase: mock(async () => result),
   }));
 }
 
@@ -156,156 +193,244 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
   });
 
   // ===========================================================================
-  // Test 2 — agent-records hit short-circuits Supabase (regression pin)
+  // Test 2 — agent-records hit short-circuits Supabase + tags source
   // ===========================================================================
 
-  test("agent-records hit → no Supabase call", async () => {
+  test("agent-records hit → no Supabase call, source = 'agent-records'", async () => {
+    // Write a real .jsonl.gz fixture so `decompressAndWrite` succeeds
+    // and we get a FetchResult back (rather than throwing at decompress).
+    // Without this, we couldn't pin `result.source === "agent-records"`.
+    const fixturePath = `/tmp/fake-agent-records/test-${FULL_UUID}.jsonl.gz`;
+    writeJsonlGzFixture(fixturePath, [
+      JSON.stringify({ type: "summary", summary: "test fixture" }),
+    ]);
+
+    // Send the decompressed output to a tmp dir we control, so we don't
+    // pollute the real ~/.claude/projects/.
+    const fakeProjectsDir = `/tmp/fake-local-projects-${process.pid}-${Date.now()}`;
+    const projectHash = "test-fixture";
+    const expectedLocalPath = `${fakeProjectsDir}/${projectHash}/${FULL_UUID}.jsonl`;
+
     mockFinder({
       local: null,
-      remote: makeRemoteSessionInfo(FULL_UUID),
+      remote: makeRemoteSessionInfo(FULL_UUID, fixturePath),
+      projectHash,
+      claudeProjectsDir: fakeProjectsDir,
+    });
+    const supabaseSpy = spyOn(supabaseFetchModule, "fetchFromSupabase");
+
+    try {
+      const { fetchSession } = await import("./fetch");
+      const result = await fetchSession(FULL_UUID);
+
+      expect(supabaseSpy.mock.calls.length).toBe(0);
+      // Pin the new optional `source` field: the agent-records branch
+      // must tag the result so callers (and `formatFetchResult`) can
+      // distinguish it from the local and supabase branches.
+      expect(result.source).toBe("agent-records");
+      expect(result.alreadyLocal).toBe(false);
+      expect(result.sessionId).toBe(FULL_UUID);
+      expect(result.localPath).toBe(expectedLocalPath);
+    } finally {
+      if (existsSync(fixturePath)) rmSync(fixturePath);
+      if (existsSync(fakeProjectsDir))
+        rmSync(fakeProjectsDir, { recursive: true });
+    }
+  });
+
+  // ===========================================================================
+  // Test 3 — Both miss + Supabase success → result.source === "supabase"
+  // ===========================================================================
+
+  test("both miss + Supabase 200 → returns supabase-sourced FetchResult", async () => {
+    mockFinder({ local: null, remote: null });
+    const fakeLocalPath = `/tmp/fake-local/projects/-workspaces-test-mvp/${FULL_UUID}.jsonl`;
+    mockSupabaseFetch({
+      ok: true,
+      localPath: fakeLocalPath,
+      compressedSize: 100,
+      decompressedSize: 500,
+    });
+
+    const { fetchSession } = await import("./fetch");
+    const result = await fetchSession(FULL_UUID);
+
+    // Pinned contract: when the stub reports a successful download,
+    // `fetchSession` reshapes the SupabaseFetchResult into a FetchResult
+    // whose `source` tags the path of origin. This is the single signal
+    // downstream code (and tests on different branches) uses to tell
+    // "downloaded from Supabase" apart from "decompressed locally".
+    expect(result.alreadyLocal).toBe(false);
+    expect(result.sessionId).toBe(FULL_UUID);
+    expect(result.localPath).toBe(fakeLocalPath);
+    expect(result.source).toBe("supabase");
+    expect(result.compressedSize).toBe(100);
+    expect(result.decompressedSize).toBe(500);
+  });
+
+  // ===========================================================================
+  // Test 4 — Both miss + Supabase 404 → SessionNotFoundError mentions
+  // "any environment"
+  // ===========================================================================
+
+  test("both miss + Supabase 404 → SessionNotFoundError mentions 'any environment'", async () => {
+    mockFinder({ local: null, remote: null });
+    mockSupabaseFetch({ ok: false, error: { kind: "not_found" } });
+
+    const { fetchSession } = await import("./fetch");
+
+    let caught: unknown;
+    try {
+      await fetchSession(FULL_UUID);
+    } catch (err) {
+      caught = err;
+    }
+
+    // The cross-env path returns `SessionNotFoundError` for an honest
+    // 404 — server confirmed the row is nowhere. Three anchors:
+    //   - the session_id (so the user can paste it into a bug report);
+    //   - "not found" prose (legacy contract);
+    //   - "any environment" (distinguishes the cross-env path from the
+    //     legacy local-only error; without it a refactor could quietly
+    //     drop the signal that we already checked everywhere).
+    expect(caught).toBeInstanceOf(SessionNotFoundError);
+    const message = (caught as Error).message;
+    expect(message).toContain(FULL_UUID);
+    expect(message.toLowerCase()).toContain("not found");
+    expect(message.toLowerCase()).toContain("any environment");
+  });
+
+  // ===========================================================================
+  // Test 5a — Missing credentials → SessionNotFoundError (legacy shape)
+  // ===========================================================================
+  //
+  // `auth_missing` deliberately maps to `SessionNotFoundError`, NOT a
+  // new auth-error class: a no-credentials machine can't reach Supabase,
+  // so from the caller's POV the session simply isn't available. This
+  // preserves the failure shape for every pre-step-7 `session resume
+  // <missing-id>` call site that exists today.
+
+  test("auth_missing → SessionNotFoundError (preserves legacy unauthed shape)", async () => {
+    mockFinder({ local: null, remote: null });
+    mockSupabaseFetch({ ok: false, error: { kind: "auth_missing" } });
+
+    const { fetchSession } = await import("./fetch");
+
+    let caught: unknown;
+    try {
+      await fetchSession(FULL_UUID);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(SessionNotFoundError);
+    const message = (caught as Error).message;
+    expect(message).toContain(FULL_UUID);
+    expect(message.toLowerCase()).toContain("not found");
+  });
+
+  // ===========================================================================
+  // Test 5b — 401 from server → distinct auth-expired error
+  // ===========================================================================
+
+  test("auth_expired → error names auth + directs to `effi auth login`", async () => {
+    mockFinder({ local: null, remote: null });
+    mockSupabaseFetch({ ok: false, error: { kind: "auth_expired" } });
+
+    const { fetchSession } = await import("./fetch");
+
+    let caught: unknown;
+    try {
+      await fetchSession(FULL_UUID);
+    } catch (err) {
+      caught = err;
+    }
+
+    // Distinct from auth_missing: the user HAS credentials, they just
+    // don't work anymore. Same remediation (`effi auth login`), but the
+    // prefix should make clear it's a refresh, not a first-time setup.
+    expect(caught).toBeInstanceOf(Error);
+    const message = (caught as Error).message;
+    expect(message.toLowerCase()).toMatch(/auth/);
+    expect(message).toContain("effi auth login");
+  });
+
+  // ===========================================================================
+  // Test 5c — Transport error (5xx etc.) → surfaces status + body excerpt
+  // ===========================================================================
+
+  test("transport_error → error includes status code and body excerpt", async () => {
+    mockFinder({ local: null, remote: null });
+    mockSupabaseFetch({
+      ok: false,
+      error: {
+        kind: "transport_error",
+        status: 503,
+        body: "Service unavailable — upstream gateway timeout",
+      },
+    });
+
+    const { fetchSession } = await import("./fetch");
+
+    let caught: unknown;
+    try {
+      await fetchSession(FULL_UUID);
+    } catch (err) {
+      caught = err;
+    }
+
+    // Anything else from the wire (5xx, body shape mismatch, signed-URL
+    // download failure) ends up here. The user-facing message must
+    // include the HTTP status (so they can tell whether it's worth
+    // retrying) and a body excerpt (so they can pattern-match against
+    // a known incident or paste it into a bug report). The exact prose
+    // is locked here so refactors can't quietly drop either anchor.
+    expect(caught).toBeInstanceOf(Error);
+    const message = (caught as Error).message;
+    expect(message).toContain("503");
+    expect(message).toContain("Service unavailable");
+  });
+
+  // ===========================================================================
+  // Test 6 — Prefix (not full UUID) does NOT reach Supabase
+  // ===========================================================================
+
+  test("prefix input + both miss → SessionNotFoundError without Supabase call", async () => {
+    mockFinder({ local: null, remote: null });
+    // If the chain wrongly reached Supabase with a prefix, it would hit
+    // our mock; track that with the spy after installing the mock. The
+    // ok:true shape would also make the test pass on the wrong path —
+    // so the supabaseSpy assertion is the load-bearing one.
+    mockSupabaseFetch({
+      ok: true,
+      localPath: "/tmp/should-never-be-returned.jsonl",
+      compressedSize: 1,
+      decompressedSize: 1,
     });
     const supabaseSpy = spyOn(supabaseFetchModule, "fetchFromSupabase");
 
     const { fetchSession } = await import("./fetch");
 
-    // The real `decompressAndWrite` would try to read the fake remote
-    // path and explode. That's fine for THIS test's purpose — we only
-    // care that we got far enough to confirm the Supabase branch was
-    // skipped. Catch the eventual decompress error and assert on the
-    // spy directly.
+    let caught: unknown;
     try {
-      await fetchSession(FULL_UUID);
-    } catch {
-      // Expected: the fake remote path doesn't exist on disk. The
-      // agent-records branch was reached (which is what we're pinning);
-      // the read just can't complete in a fixture-free test.
+      // "abc123" is a valid prefix (hex chars) but not a full UUID.
+      // The Supabase wire requires full UUIDs (it's a row-id GET).
+      // The chain must short-circuit to SessionNotFoundError BEFORE
+      // calling `fetchFromSupabase`.
+      await fetchSession("abc123");
+    } catch (err) {
+      caught = err;
     }
 
+    expect(caught).toBeInstanceOf(SessionNotFoundError);
+    // The legacy local-only message (no "Supabase" in searchedLocation,
+    // no "any environment") — because we never tried Supabase.
+    expect((caught as Error).message.toLowerCase()).not.toContain("supabase");
     expect(supabaseSpy.mock.calls.length).toBe(0);
   });
 
   // ===========================================================================
-  // Test 3 — Both miss + Supabase success → JSONL lands locally
-  // ===========================================================================
-
-  test.failing(
-    "ENG-5862: both miss + Supabase 200 → writes JSONL to local projects dir",
-    async () => {
-      mockFinder({ local: null, remote: null });
-
-      const fakeLocalPath = `/tmp/fake-local/projects/-workspaces-test-mvp/${FULL_UUID}.jsonl`;
-
-      const { fetchSession } = await import("./fetch");
-      const result = await fetchSession(FULL_UUID);
-
-      // Red: the real stub throws "Not implemented (ENG-5862 step 7
-      // Red)" before the chain can produce a result. Green replaces
-      // the stub with a real fetch that returns an ok:true
-      // SupabaseFetchResult; `fetchSession` already knows how to
-      // shape that into a FetchResult with source: "supabase".
-      expect(result.alreadyLocal).toBe(false);
-      expect(result.sessionId).toBe(FULL_UUID);
-      expect(result.localPath).toBe(fakeLocalPath);
-      expect(result.source).toBe("supabase");
-    },
-  );
-
-  // ===========================================================================
-  // Test 4 — Both miss + Supabase 404 → SessionNotFoundError naming the id
-  // ===========================================================================
-
-  test.failing(
-    "ENG-5862: both miss + Supabase 404 → SessionNotFoundError names session_id",
-    async () => {
-      mockFinder({ local: null, remote: null });
-
-      const { fetchSession } = await import("./fetch");
-
-      let caught: unknown;
-      try {
-        await fetchSession(FULL_UUID);
-      } catch (err) {
-        caught = err;
-      }
-
-      // Red: stub throws a plain `Error("Not implemented ...")` — NOT
-      // a SessionNotFoundError — so the instanceof check fails. Green
-      // makes the stub return `{ok:false, error:{kind:"not_found"}}`,
-      // which `translateSupabaseError` maps to a SessionNotFoundError
-      // whose message names the session_id and notes the cross-env
-      // search scope.
-      expect(caught).toBeInstanceOf(SessionNotFoundError);
-      const message = (caught as Error).message;
-      // Two anchors: the session_id itself (so the user can copy it
-      // into a bug report) and "not found" prose that names the
-      // cross-environment scope. The exact phrasing is locked here so
-      // refactors can't quietly drop the "in any environment" signal.
-      expect(message).toContain(FULL_UUID);
-      expect(message.toLowerCase()).toContain("not found");
-      // The "any environment" phrasing is what distinguishes the
-      // cross-env path from the legacy local-only "Session not found"
-      // error. Without this anchor, test #4 would accidentally pass
-      // against the old error too (which also names the session_id
-      // and says "not found").
-      expect(message.toLowerCase()).toContain("any environment");
-    },
-  );
-
-  // ===========================================================================
-  // Test 5 — Both miss + missing/expired auth → "effi auth login" hint
-  // ===========================================================================
-
-  test.failing(
-    "ENG-5862: missing credentials → error directs to `effi auth login`",
-    async () => {
-      mockFinder({ local: null, remote: null });
-
-      const { fetchSession } = await import("./fetch");
-
-      let caught: unknown;
-      try {
-        await fetchSession(FULL_UUID);
-      } catch (err) {
-        caught = err;
-      }
-
-      // Red: stub throws "Not implemented ..." — message doesn't
-      // contain "effi auth login". Green makes the stub detect a
-      // missing credentials file and return
-      // `{ok:false, error:{kind:"auth_missing"}}`, which the
-      // translator maps to an error directing the user to log in.
-      expect(caught).toBeInstanceOf(Error);
-      const message = (caught as Error).message;
-      expect(message).toContain("effi auth login");
-    },
-  );
-
-  test.failing(
-    "ENG-5862: 401 from server → error mentions auth + directs to `effi auth login`",
-    async () => {
-      mockFinder({ local: null, remote: null });
-
-      const { fetchSession } = await import("./fetch");
-
-      let caught: unknown;
-      try {
-        await fetchSession(FULL_UUID);
-      } catch (err) {
-        caught = err;
-      }
-
-      expect(caught).toBeInstanceOf(Error);
-      const message = (caught as Error).message;
-      // Distinct from auth_missing: this user HAS credentials, they
-      // just don't work. The hint is the same (`effi auth login`),
-      // but the prefix should make clear it's a refresh, not a setup.
-      expect(message.toLowerCase()).toMatch(/auth/);
-      expect(message).toContain("effi auth login");
-    },
-  );
-
-  // ===========================================================================
-  // Test 7 — Subagent fetch + placement
+  // Test 7 — Subagent fetch + placement (still Red — Green will wire)
   // ===========================================================================
   //
   // THE headline use case of slice 2 (per the step-7 charter): when a

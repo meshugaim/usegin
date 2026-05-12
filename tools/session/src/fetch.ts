@@ -281,11 +281,17 @@ export async function fetchSession(input: string): Promise<FetchResult> {
     switch (supa.error.kind) {
       case "not_found":
       case "auth_missing": {
+        // The "not found in any environment" phrasing is what distinguishes
+        // the cross-env path from the legacy local-only "Session not found"
+        // error. It's part of the user-facing contract — a refactor that
+        // quietly drops it would erase the signal that we already checked
+        // every environment we know how to reach.
         const currentProject = getCurrentProjectHash();
+        const localScope = currentProject
+          ? `~/.claude/projects/${currentProject}/`
+          : "~/.claude/projects/";
         throw new SessionNotFoundError(input, {
-          searchedLocation: currentProject
-            ? `~/.claude/projects/${currentProject}/, ~/agent-records/, and Supabase`
-            : "~/.claude/projects/, ~/agent-records/, and Supabase",
+          searchedLocation: `all three sources (${localScope}, ~/agent-records/, and Supabase) — not found in any environment`,
         });
       }
       case "auth_expired":
