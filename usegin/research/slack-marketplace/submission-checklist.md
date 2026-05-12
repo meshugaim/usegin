@@ -42,8 +42,8 @@ The C1 callback assumes an app already registered and `SLACK_CLIENT_ID` /
 | 1.2 | **Basic Information** → set Display Name = "AskEffi for Slack", Short description = (per listing-draft.md), tagline if shown. | UI | ☐ |
 | 1.3 | **App Icon & Preview** → upload icon (1600×1000, .png). | UI; from Marketing | ☐ |
 | 1.4 | **OAuth & Permissions** → confirm bot scopes match `listing-draft.md` table exactly: `channels:read`, `channels:history`, `groups:read`, `groups:history`, `users:read`, `team:read`. **Remove** any other scopes. **No** user token scopes at MVP. | UI | ☐ |
-| 1.5 | **OAuth & Permissions** → Redirect URLs — confirm `https://askeffi.ai/api/slack/callback` is the **only** entry. Remove staging/dev URLs from the production app config (use a separate Slack app for non-prod, R5 architectural note). | UI | ☐ |
-| 1.6 | **Event Subscriptions** → enable; set Request URL to `https://askeffi.ai/api/slack/events` (ENG-5415); Slack will challenge it — **must** return 200. Subscribe to bot events: `message.channels`, `message.groups`, `channel_rename`, `channel_archive`, `channel_unarchive`, `channel_deleted`, `app_uninstalled`, `tokens_revoked`. | UI; depends on P2 | ☐ |
+| 1.5 | **OAuth & Permissions** → Redirect URLs — confirm `https://app.askeffi.ai/api/slack/callback` is the **only** entry (the product runs on `app.askeffi.ai`; bare `askeffi.ai` is the landing site). Remove staging/dev URLs from the production app config (use a separate Slack app for non-prod, R5 architectural note). | UI | ☐ |
+| 1.6 | **Event Subscriptions** → enable; set Request URL to `https://app.askeffi.ai/api/slack/events` (ENG-5415); Slack will challenge it — **must** return 200. Subscribe to bot events: `message.channels`, `message.groups`, `channel_rename`, `channel_archive`, `channel_unarchive`, `channel_deleted`, `app_uninstalled`, `tokens_revoked`. | UI; depends on P2 | ☐ |
 | 1.7 | **Interactivity & Shortcuts** → leave **disabled** at MVP (read-only per R2). | UI | ☐ |
 | 1.8 | **Slash Commands** → leave **empty** at MVP (read-only). | UI | ☐ |
 | 1.9 | **Socket Mode** → confirm **disabled**. Marketplace forbids Socket Mode (review-blockers §B6). | UI | ☐ |
