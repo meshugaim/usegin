@@ -114,9 +114,11 @@ export interface QueryLockStateParams {
  *   - 200 `{held:false}`                → `{ held: false }`
  *   - 200 `{held:true, holder, ours}`   → `{ held: true, holder, ours }`
  *   - 404                                → `{ held: false }`   (no row)
- *   - Anything else                      → throws — the caller (resume.ts)
- *     decides fail-open policy (treat as not-held so a transient server
- *     hiccup doesn't block legitimate resumes).
+ *   - Anything else                      → throws. The caller (`resume.ts`)
+ *     wraps this call in try/catch and treats a throw as fail-open
+ *     (proceeds with the legacy spawn path), so a transient server
+ *     hiccup never blocks a legitimate resume. The probe is an
+ *     enhancement, not a precondition.
  *
  * Side-effect-free at both ends — the GET endpoint does not touch the lock
  * row, so a probe can never accidentally take or release the lock.

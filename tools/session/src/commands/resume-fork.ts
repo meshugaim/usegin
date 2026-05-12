@@ -132,31 +132,66 @@ async function countSubagents(
 ): Promise<number> {
   let count = 0;
 
+  // Sibling pass. The outer try only wraps `readdir` (the "directory
+  // doesn't exist / unreadable" case → zero siblings, fall through). The
+  // per-file read sits inside its OWN try so a single unreadable file
+  // does NOT abort counting the remaining siblings: it defaults to
+  // "counted" (++count) and continues. That posture is load-bearing —
+  // fork v1 must HARD REFUSE subagent-containing sessions (spec line
+  // 139), so on read failure we'd rather over-count (refuse a fork that
+  // had only non-matching agent-*.jsonl files) than under-count (silently
+  // drop subagent history and proceed).
+  let dirFiles: string[] = [];
   try {
-    const dirFiles = await readdir(sourceDir);
-    for (const f of dirFiles) {
-      if (!f.startsWith("agent-") || !f.endsWith(".jsonl")) continue;
-      const subPath = join(sourceDir, f);
+    dirFiles = await readdir(sourceDir);
+  } catch {
+    // Source directory unreadable — treat as zero siblings and let the
+    // downstream copy/sync surface the real error.
+  }
+  for (const f of dirFiles) {
+    if (!f.startsWith("agent-") || !f.endsWith(".jsonl")) continue;
+    const subPath = join(sourceDir, f);
+    try {
       const subContent = await Bun.file(subPath).text();
       const firstLine = subContent.slice(
         0,
         subContent.indexOf("\n") || subContent.length,
       );
       if (firstLine.includes(sourceId)) count++;
+    } catch {
+      // Per-file read failure: default to "counted" so a flaky filesystem
+      // can't silently let a subagent-bearing fork through. The caller's
+      // "refuse if subagentCount > 0" check fires.
+      count++;
     }
-  } catch {
-    // Source directory unreadable — treat as zero subagents and let the
-    // downstream copy/sync surface the real error.
   }
 
+  // Nested pass. Mirror the sibling shape: outer try wraps readdir; each
+  // candidate is counted only if its first line references `sourceId`,
+  // matching the sibling-pass discipline. On per-file read failure,
+  // default to "counted" (same hard-refuse posture as siblings).
+  let nestedFiles: string[] = [];
+  let nestedDir = "";
   try {
-    const nestedDir = join(sourceDir, sourceId, "subagents");
-    const nestedFiles = await readdir(nestedDir);
-    for (const f of nestedFiles) {
-      if (f.startsWith("agent-") && f.endsWith(".jsonl")) count++;
-    }
+    nestedDir = join(sourceDir, sourceId, "subagents");
+    nestedFiles = await readdir(nestedDir);
   } catch {
     // No nested subagents dir — fine.
+  }
+  for (const f of nestedFiles) {
+    if (!f.startsWith("agent-") || !f.endsWith(".jsonl")) continue;
+    const nestedPath = join(nestedDir, f);
+    try {
+      const nestedContent = await Bun.file(nestedPath).text();
+      const firstLine = nestedContent.slice(
+        0,
+        nestedContent.indexOf("\n") || nestedContent.length,
+      );
+      if (firstLine.includes(sourceId)) count++;
+    } catch {
+      // Same fail-closed posture as siblings.
+      count++;
+    }
   }
 
   return count;

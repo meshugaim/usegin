@@ -95,15 +95,27 @@ export async function runResume(args: string[]) {
     const env = creds ? detectEnvironment(process.env) : null;
 
     if (creds && apiUrl && env) {
-      const lockState = await queryLockState({
-        apiUrl,
-        token: creds.access_token,
-        sessionId: result.sessionId,
-        environmentKind: env.kind,
-        environmentId: env.id,
-      });
+      // Fail-open: the probe is an enhancement, not a precondition (see the
+      // comment block at the top of this `if` and the docstring on
+      // `queryLockState`). Any transient 500 / network blip / unexpected
+      // status throws; we catch, emit one stderr line, and fall through to
+      // the legacy spawn path below as if the probe had said "not held".
+      let lockState: Awaited<ReturnType<typeof queryLockState>> | null = null;
+      try {
+        lockState = await queryLockState({
+          apiUrl,
+          token: creds.access_token,
+          sessionId: result.sessionId,
+          environmentKind: env.kind,
+          environmentId: env.id,
+        });
+      } catch {
+        console.error(
+          "warning: lock-state probe failed (transient server error?); proceeding with resume",
+        );
+      }
 
-      if (lockState.held && !lockState.ours) {
+      if (lockState?.held && !lockState.ours) {
         if (!resumeArgs.fork) {
           // Lock-held refusal. Print the holder identity + --fork hint.
           // Exit non-zero so callers (shell, CI) see the failure.

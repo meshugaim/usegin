@@ -336,22 +336,9 @@ describe("ENG-5862 step 8 — runResume lock-aware refusal + --fork (AC 36)", ()
       // The initial-sync POST is INSIDE performForkAndInitialSync —
       // that's Green's wire. From outside, we pin the contract by
       // asserting on the **forked_at_turn** value we expect resume.ts
-      // to source from `FetchResult` and thread through. AC 36 (d):
-      // "forked_at_turn = <last turn in source>". The Red phase of
-      // resume.ts doesn't thread the turn count (FetchResult has no
-      // turn_count field yet); Green adds the field + threading, and
-      // this assertion flips green when it lands.
-      //
-      // The test inspects the call params via the sink; once Green
-      // adds `forkedAtTurn` to PerformForkParams (or extracts it from
-      // the source JSONL inside the orchestrator), this becomes a
-      // typed-property check.
-      //
-      // Cast through Record because PerformForkParams doesn't yet
-      // declare forkedAtTurn — that's the Green schema change.
-      const params = forkCallSink.params as
-        | (PerformForkParams & { forkedAtTurn?: number })
-        | undefined;
+      // to source from the JSONL and thread through. AC 36 (d):
+      // "forked_at_turn = <last turn in source>".
+      const params = forkCallSink.params;
       expect(params?.forkedAtTurn).toBeDefined();
       expect(typeof params?.forkedAtTurn).toBe("number");
     },
