@@ -15,7 +15,7 @@ import {
 	readCredentials as defaultReadCredentials,
 } from "../../lib/auth/credentials.ts";
 import { decodeJwtExp } from "../../lib/auth/jwt.ts";
-import { ensureFreshToken as defaultEnsureFreshToken } from "../../effi-cli/src/lib/token-refresh.ts";
+import { ensureFreshToken as defaultEnsureFreshToken } from "../../lib/auth/token-refresh.ts";
 
 /**
  * Refresh the token when fewer than this many seconds remain. Matches
@@ -45,11 +45,11 @@ export interface LoadAuthOptions {
 	profileName?: string;
 	/** Now-clock — injected for tests, defaults to `new Date()`. */
 	now?: Date;
-	/** Override the credentials reader; defaults to `effi-cli/credentials.ts`. */
+	/** Override the credentials reader; defaults to `tools/lib/auth/credentials.ts`. */
 	readCredentialsFn?: (
 		profileName?: string,
 	) => Promise<CredentialsShape | null>;
-	/** Override the api-url resolver; defaults to `effi-cli/credentials.ts`. */
+	/** Override the api-url resolver; defaults to `tools/lib/auth/credentials.ts`. */
 	getApiUrlFn?: (profileName?: string) => Promise<string>;
 }
 
@@ -91,7 +91,7 @@ export interface RefreshAuthOptions {
 	now?: Date;
 	/**
 	 * Override the refresh primitive; defaults to `ensureFreshToken` from
-	 * `effi-cli/lib/token-refresh.ts`. The override receives the api-url
+	 * `tools/lib/auth/token-refresh.ts`. The override receives the api-url
 	 * + an options bag with `profileName` so credentials I/O stays scoped
 	 * to the daemon's profile.
 	 */
