@@ -303,6 +303,52 @@ describe("syncSession — agentId extraction", () => {
 		);
 	});
 
+	// Real shape — see ENG-5962. Claude Code writes 16–17 hex chars after
+	// `agent-a`, NOT a canonical 8-4-4-4-12 UUID. The synthetic UUID fixtures
+	// elsewhere in this file are how this bug shipped; this case pins reality.
+	test.failing(
+		"ENG-5962: agent-a{16-17 hex}.jsonl (real Claude Code shape) → subagent IS synced",
+		async () => {
+			const subPath =
+				"/home/u/.claude/projects/-x/agent-a2789d14b1dfa1ebb.jsonl";
+			const { fetchImpl, calls } = makeFetch((url) => {
+				if (url.includes("/subagents/")) {
+					return jsonResponse(200, { session: { storage_path: "sub.gz" } });
+				}
+				return jsonResponse(200, { session: { storage_path: "parent.gz" } });
+			});
+			const readMap: Record<string, Uint8Array> = {
+				[PARENT_PATH]: PARENT_BYTES,
+				[subPath]: SUB_BYTES_A,
+			};
+			const out = await syncSession({
+				...baseInput(),
+				fetchImpl,
+				readFileFn: async (path) => {
+					const bytes = readMap[path];
+					if (!bytes) throw new Error(`unexpected path ${path}`);
+					return bytes;
+				},
+				discoverFn: async () => [subPath],
+			});
+			expect(out.kind).toBe("ok");
+			if (out.kind !== "ok") throw new Error();
+			// Parent + subagent both uploaded.
+			expect(out.outcomes.length).toBe(2);
+			expect(out.outcomes[0]?.outcome.kind).toBe("uploaded");
+			expect(out.outcomes[1]?.outcome.kind).toBe("uploaded");
+			// Two POSTs: parent, then subagent — agentId derived from the
+			// `a{16-17 hex}` segment.
+			expect(calls.length).toBe(2);
+			expect(calls[0]?.url).toBe(
+				"http://localhost:63000/api/v1/dev-sessions/sess-1/sync",
+			);
+			expect(calls[1]?.url).toBe(
+				"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/a2789d14b1dfa1ebb/sync",
+			);
+		},
+	);
+
 	test("path-traversal-shaped agent filename → skipped (no POST)", async () => {
 		// `basename` strips dirs, but the loose `.+` pattern would still have
 		// accepted `agent-../../escape.jsonl` as a literal filename if it
