@@ -72,9 +72,9 @@ function baseInput(state: StateFile = {}) {
 describe("syncSession — happy path", () => {
 	test("parent uploaded → both subagents synced", async () => {
 		const subPathA =
-			"/home/u/.claude/projects/-x/agent-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jsonl";
+			"/home/u/.claude/projects/-x/agent-aaaaaaaaaaaaaaaaa.jsonl";
 		const subPathB =
-			"/home/u/.claude/projects/-x/agent-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jsonl";
+			"/home/u/.claude/projects/-x/agent-abbbbbbbbbbbbbbbb.jsonl";
 		const { fetchImpl, calls } = makeFetch((url) => {
 			if (url.includes("/subagents/")) {
 				return jsonResponse(200, { session: { storage_path: "sub.gz" } });
@@ -107,10 +107,10 @@ describe("syncSession — happy path", () => {
 			"http://localhost:63000/api/v1/dev-sessions/sess-1/sync",
 		);
 		expect(calls[1]?.url).toBe(
-			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/sync",
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/aaaaaaaaaaaaaaaaa/sync",
 		);
 		expect(calls[2]?.url).toBe(
-			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/sync",
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/abbbbbbbbbbbbbbbb/sync",
 		);
 	});
 
@@ -235,7 +235,7 @@ describe("syncSession — parent failed", () => {
 describe("syncSession — subagent error reported, parent succeeds", () => {
 	test("subagent fatal_error reported in outcomes; parent already uploaded", async () => {
 		const subPath =
-			"/home/u/.claude/projects/-x/agent-cccccccc-cccc-cccc-cccc-cccccccccccc.jsonl";
+			"/home/u/.claude/projects/-x/agent-acccccccccccccccc.jsonl";
 		const { fetchImpl } = makeFetch((url) => {
 			if (url.includes("/subagents/")) {
 				return jsonResponse(403, { error: "no" });
@@ -264,9 +264,8 @@ describe("syncSession — subagent error reported, parent succeeds", () => {
 });
 
 describe("syncSession — agentId extraction", () => {
-	test("derives agentId from agent-{uuid}.jsonl filename", async () => {
-		const subPath =
-			"/some/where/nested/agent-deadbeef-1234-1234-1234-123456789abc.jsonl";
+	test("derives agentId from agent-a{16 hex}.jsonl filename", async () => {
+		const subPath = "/some/where/nested/agent-adeadbeef12345678.jsonl";
 		const { fetchImpl, calls } = makeFetch(() =>
 			jsonResponse(200, { session: { storage_path: "p" } }),
 		);
@@ -278,11 +277,11 @@ describe("syncSession — agentId extraction", () => {
 		});
 		// Second call is the subagent.
 		expect(calls[1]?.url).toBe(
-			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/deadbeef-1234-1234-1234-123456789abc/sync",
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/adeadbeef12345678/sync",
 		);
 	});
 
-	test("non-UUID agent filename → skipped (no POST)", async () => {
+	test("agent-foo.jsonl (not a{16 hex} shape) → skipped (no POST)", async () => {
 		const subPath = "/some/where/nested/agent-foo.jsonl";
 		const { fetchImpl, calls } = makeFetch(() =>
 			jsonResponse(200, { session: { storage_path: "p" } }),
@@ -295,7 +294,8 @@ describe("syncSession — agentId extraction", () => {
 		});
 		expect(out.kind).toBe("ok");
 		if (out.kind !== "ok") throw new Error();
-		// Only the parent POST; subagent skipped because filename isn't a UUID.
+		// Only the parent POST; subagent skipped because filename isn't the
+		// real Claude Code `agent-a{16 hex}.jsonl` shape (`foo` isn't hex).
 		expect(out.outcomes.length).toBe(1);
 		expect(calls.length).toBe(1);
 		expect(calls[0]?.url).toBe(
@@ -303,56 +303,56 @@ describe("syncSession — agentId extraction", () => {
 		);
 	});
 
-	// Real shape — see ENG-5962. Claude Code writes 16–17 hex chars after
-	// `agent-a`, NOT a canonical 8-4-4-4-12 UUID. The synthetic UUID fixtures
-	// elsewhere in this file are how this bug shipped; this case pins reality.
-	test.failing(
-		"ENG-5962: agent-a{16-17 hex}.jsonl (real Claude Code shape) → subagent IS synced",
-		async () => {
-			const subPath =
-				"/home/u/.claude/projects/-x/agent-a2789d14b1dfa1ebb.jsonl";
-			const { fetchImpl, calls } = makeFetch((url) => {
-				if (url.includes("/subagents/")) {
-					return jsonResponse(200, { session: { storage_path: "sub.gz" } });
-				}
-				return jsonResponse(200, { session: { storage_path: "parent.gz" } });
-			});
-			const readMap: Record<string, Uint8Array> = {
-				[PARENT_PATH]: PARENT_BYTES,
-				[subPath]: SUB_BYTES_A,
-			};
-			const out = await syncSession({
-				...baseInput(),
-				fetchImpl,
-				readFileFn: async (path) => {
-					const bytes = readMap[path];
-					if (!bytes) throw new Error(`unexpected path ${path}`);
-					return bytes;
-				},
-				discoverFn: async () => [subPath],
-			});
-			expect(out.kind).toBe("ok");
-			if (out.kind !== "ok") throw new Error();
-			// Parent + subagent both uploaded.
-			expect(out.outcomes.length).toBe(2);
-			expect(out.outcomes[0]?.outcome.kind).toBe("uploaded");
-			expect(out.outcomes[1]?.outcome.kind).toBe("uploaded");
-			// Two POSTs: parent, then subagent — agentId derived from the
-			// `a{16-17 hex}` segment.
-			expect(calls.length).toBe(2);
-			expect(calls[0]?.url).toBe(
-				"http://localhost:63000/api/v1/dev-sessions/sess-1/sync",
-			);
-			expect(calls[1]?.url).toBe(
-				"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/a2789d14b1dfa1ebb/sync",
-			);
-		},
-	);
+	// Real shape — see ENG-5962. Claude Code writes 17 chars after `agent-`,
+	// always starting with `a` followed by 16 hex chars (420/420 of files in
+	// `~/.claude/projects/`). Earlier fixtures elsewhere in this file used a
+	// synthetic 8-4-4-4-12 UUID shape — that's how this bug shipped. Those
+	// fixtures have been corrected; this case pins the real shape explicitly.
+	test("ENG-5962: agent-a{16 hex}.jsonl (real Claude Code shape) → subagent IS synced", async () => {
+		const subPath = "/home/u/.claude/projects/-x/agent-a2789d14b1dfa1ebb.jsonl";
+		const { fetchImpl, calls } = makeFetch((url) => {
+			if (url.includes("/subagents/")) {
+				return jsonResponse(200, { session: { storage_path: "sub.gz" } });
+			}
+			return jsonResponse(200, { session: { storage_path: "parent.gz" } });
+		});
+		const readMap: Record<string, Uint8Array> = {
+			[PARENT_PATH]: PARENT_BYTES,
+			[subPath]: SUB_BYTES_A,
+		};
+		const out = await syncSession({
+			...baseInput(),
+			fetchImpl,
+			readFileFn: async (path) => {
+				const bytes = readMap[path];
+				if (!bytes) throw new Error(`unexpected path ${path}`);
+				return bytes;
+			},
+			discoverFn: async () => [subPath],
+		});
+		expect(out.kind).toBe("ok");
+		if (out.kind !== "ok") throw new Error();
+		// Parent + subagent both uploaded.
+		expect(out.outcomes.length).toBe(2);
+		expect(out.outcomes[0]?.outcome.kind).toBe("uploaded");
+		expect(out.outcomes[1]?.outcome.kind).toBe("uploaded");
+		// Two POSTs: parent, then subagent — agentId derived from the
+		// `a{16 hex}` segment.
+		expect(calls.length).toBe(2);
+		expect(calls[0]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/sync",
+		);
+		expect(calls[1]?.url).toBe(
+			"http://localhost:63000/api/v1/dev-sessions/sess-1/subagents/a2789d14b1dfa1ebb/sync",
+		);
+	});
 
 	test("path-traversal-shaped agent filename → skipped (no POST)", async () => {
 		// `basename` strips dirs, but the loose `.+` pattern would still have
 		// accepted `agent-../../escape.jsonl` as a literal filename if it
-		// reached the regex. Pin: anything non-UUID is rejected.
+		// reached the regex. Pin: only `agent-a{16 hex}.jsonl` is accepted —
+		// `../../escape` isn't hex, so it's safely rejected by the anchored
+		// regex regardless of basename behavior.
 		const subPath = "/some/where/nested/agent-../../escape.jsonl";
 		const { fetchImpl, calls } = makeFetch(() =>
 			jsonResponse(200, { session: { storage_path: "p" } }),

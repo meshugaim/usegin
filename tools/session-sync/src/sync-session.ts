@@ -40,14 +40,16 @@ export type SyncSessionOutcome =
 	  }
 	| { kind: "parent_failed"; error: Error };
 
-const AGENT_FILE_REGEX =
-	/^agent-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
+const AGENT_FILE_REGEX = /^agent-(a[0-9a-f]{16})\.jsonl$/i;
 
 /**
- * Extract the agentId from a filename like `agent-{uuid}.jsonl`. Returns
- * null if the filename doesn't match the UUID convention — caller should
- * skip. The UUID-anchored shape rejects loose matches like `agent-foo.jsonl`
- * or path-traversal attempts that a `.+` pattern would have admitted.
+ * Extract the agentId from a filename like `agent-a{16 hex}.jsonl` — the
+ * real shape Claude Code writes for subagent transcripts (17 chars after
+ * `agent-`, always starting with `a`; empirically 420/420 in
+ * `~/.claude/projects/`, see ENG-5962). Returns null if the filename
+ * doesn't match — caller should skip. The anchored shape rejects loose
+ * matches like `agent-foo.jsonl` or path-traversal attempts that a `.+`
+ * pattern would have admitted.
  */
 function extractAgentId(filePath: string): string | null {
 	const name = basename(filePath);
