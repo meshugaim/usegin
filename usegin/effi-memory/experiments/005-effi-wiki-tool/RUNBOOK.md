@@ -41,7 +41,7 @@ Railway's build context for the python service is **`python-services/`** (each s
 
 ### Options for a real prod path (pick one before promoting)
 
-1. **Un-gitignore + commit staged content.** Run `stage-wiki-for-bundle.sh` before each prod-bound push, `git add python-services/wiki/`, commit. Trades repo bloat (~250KB markdown today) for simplicity. Requires removing the `wiki/` line from `.gitignore`.
+1. **Un-gitignore + commit staged content.** Run `stage-wiki-for-bundle.sh` before each prod-bound push, `git add python-services/wiki/`, commit. Trades repo bloat (~412KB markdown today) for simplicity. Requires removing the `wiki/` line from `.gitignore`.
 2. **Railpack `steps` hook.** Define a build step in `python-services/railpack.json` with `inputs: [{ local: true, include: ["usegin/effi-memory/askeffi-app-really"] }]` and a `cp` command. Requires Railway's per-service Root Directory to be the repo root (currently it's `python-services/`), or restructuring the build graph. Not investigated end-to-end.
 3. **Bake the wiki into a sibling git submodule** that lives inside `python-services/` (e.g. `python-services/wiki` pointing at a separate repo). Heavyweight; only worth it if the wiki gets its own lifecycle.
 
