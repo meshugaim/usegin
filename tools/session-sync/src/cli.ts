@@ -17,12 +17,17 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
 import { Coalescer } from "./coalescer.ts";
 import { detectEnvironment } from "./env-detect.ts";
 import { getOrCreateInstallId } from "./install-id.ts";
-import { type PendingUpload, planShutdown } from "./lifecycle.ts";
+import {
+	type PendingUpload,
+	planShutdown,
+	removePidFile,
+	writePidFile,
+} from "./lifecycle.ts";
 import { safetyNetTick } from "./safety-net.ts";
 import { startupScan } from "./startup-scan.ts";
 import { readState, type StateFile, writeState } from "./state.ts";
@@ -37,7 +42,6 @@ interface Config {
 	projectsDir: string;
 	stateDir: string;
 	stateFile: string;
-	pidFile: string;
 	profileName?: string;
 	username: string;
 	useRecursiveWatch: boolean;
@@ -64,7 +68,6 @@ function parseConfig(argv: string[], env: NodeJS.ProcessEnv): Config {
 		projectsDir,
 		stateDir,
 		stateFile: join(stateDir, "state.json"),
-		pidFile: join(stateDir, "daemon.pid"),
 		profileName: env.SESSION_SYNC_PROFILE,
 		username: env.USER ?? env.USERNAME ?? "unknown",
 		useRecursiveWatch: !noRecursive,
@@ -416,9 +419,9 @@ async function shutdown(d: DaemonState, signal: string): Promise<void> {
 		}
 	}
 	try {
-		await unlink(d.config.pidFile);
-	} catch {
-		/* ignore */
+		await removePidFile(d.config.stateDir);
+	} catch (err) {
+		console.warn("[session-sync] removePidFile failed:", err);
 	}
 	console.log(
 		"[session-sync] shutdown complete (completed=" +
@@ -454,9 +457,8 @@ async function main(): Promise<void> {
 	const envIdentity: EnvIdentity = { kind: detected.kind, id: envId };
 	console.log("[session-sync] env =", envIdentity);
 
-	// 3. Pid file.
-	mkdirSync(dirname(config.pidFile), { recursive: true });
-	await writeFile(config.pidFile, String(process.pid), { mode: 0o600 });
+	// 3. Pid file (sentinel for CLI daemon-deference per ENG-5862).
+	await writePidFile(config.stateDir);
 
 	// 4. State.
 	let state: StateFile;

@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AuthContext } from "../src/auth.ts";
-import {
-	isTokenExpired,
-	loadAuth,
-	refreshAuthIfNeeded,
-} from "../src/auth.ts";
+import { isTokenExpired, loadAuth, refreshAuthIfNeeded } from "../src/auth.ts";
 
 /**
  * Build a fake JWT with a given payload. Header/signature are unused; only

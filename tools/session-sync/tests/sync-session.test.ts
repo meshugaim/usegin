@@ -234,8 +234,7 @@ describe("syncSession — parent failed", () => {
 
 describe("syncSession — subagent error reported, parent succeeds", () => {
 	test("subagent fatal_error reported in outcomes; parent already uploaded", async () => {
-		const subPath =
-			"/home/u/.claude/projects/-x/agent-acccccccccccccccc.jsonl";
+		const subPath = "/home/u/.claude/projects/-x/agent-acccccccccccccccc.jsonl";
 		const { fetchImpl } = makeFetch((url) => {
 			if (url.includes("/subagents/")) {
 				return jsonResponse(403, { error: "no" });

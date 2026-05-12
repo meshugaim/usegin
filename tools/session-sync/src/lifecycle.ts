@@ -1,3 +1,7 @@
+import { mkdir, unlink } from "node:fs/promises";
+import { join } from "node:path";
+import { atomicWriteFile } from "../../lib/auth/fs-utils.ts";
+
 /**
  * Graceful shutdown planner (AC 21).
  *
@@ -55,23 +59,37 @@ export interface PlanShutdownInput {
 // them at the right spots in the start/shutdown sequence.
 // ---------------------------------------------------------------------------
 
+const PIDFILE_NAME = "daemon.pid";
+
 /**
  * Write the daemon sentinel pidfile (`<stateDir>/daemon.pid`) containing the
  * current process's PID. Uses `atomicWriteFile` from `tools/lib/auth/fs-utils`
  * so a torn write can never confuse a CLI's deference check.
  *
+ * Creates `stateDir` (recursive, default mode) if it doesn't already exist.
+ *
  * Returns the absolute path written.
  */
-export async function writePidfile(_stateDir: string): Promise<string> {
-	throw new Error("writePidfile: not implemented (ENG-5862)");
+export async function writePidFile(stateDir: string): Promise<string> {
+	await mkdir(stateDir, { recursive: true });
+	const path = join(stateDir, PIDFILE_NAME);
+	await atomicWriteFile(path, String(process.pid), 0o600);
+	return path;
 }
 
 /**
  * Remove the daemon sentinel pidfile. No-op when the file is already absent
  * (e.g., a crashed daemon left no pidfile, or a previous shutdown cleaned up).
  */
-export async function removePidfile(_stateDir: string): Promise<void> {
-	throw new Error("removePidfile: not implemented (ENG-5862)");
+export async function removePidFile(stateDir: string): Promise<void> {
+	const path = join(stateDir, PIDFILE_NAME);
+	try {
+		await unlink(path);
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+			throw err;
+		}
+	}
 }
 
 export function planShutdown(input: PlanShutdownInput): ShutdownPlan {
