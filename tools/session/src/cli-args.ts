@@ -420,23 +420,35 @@ export function parseFetchArgs(args: string[]): FetchArgs {
 export interface ResumeArgs {
   sessionId: string;
   help: boolean;
+  /**
+   * `--fork` (ENG-5862 AC 36): when the session lock is held by another
+   * live environment, take a copy under a fresh UUIDv4 and resume that
+   * instead of refusing. The fork's initial sync carries
+   * `parent_session_id` + `forked_at_turn` metadata so the lineage stays
+   * queryable. Without this flag, a held lock surfaces an error and
+   * suggests `--fork` as the remediation.
+   */
+  fork: boolean;
 }
 
 /**
  * Parse arguments for `session resume <id>`.
  *
- * Accepts a single positional session ID argument and --help.
+ * Accepts a single positional session ID argument, --fork, and --help.
  * The session ID can be a full UUID or a short prefix.
  */
 export function parseResumeArgs(args: string[]): ResumeArgs {
   const result: ResumeArgs = {
     sessionId: "",
     help: false,
+    fork: false,
   };
 
   for (const arg of args) {
     if (arg === "--help" || arg === "-h") {
       result.help = true;
+    } else if (arg === "--fork") {
+      result.fork = true;
     } else if (!arg.startsWith("-")) {
       result.sessionId = arg;
     }
