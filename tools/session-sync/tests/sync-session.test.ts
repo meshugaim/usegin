@@ -303,11 +303,7 @@ describe("syncSession — agentId extraction", () => {
 		);
 	});
 
-	// Real shape — see ENG-5962. Claude Code writes 17 chars after `agent-`,
-	// always starting with `a` followed by 16 hex chars (420/420 of files in
-	// `~/.claude/projects/`). Earlier fixtures elsewhere in this file used a
-	// synthetic 8-4-4-4-12 UUID shape — that's how this bug shipped. Those
-	// fixtures have been corrected; this case pins the real shape explicitly.
+	// ENG-5962 regression pin: real `agent-<17 hex>` shape end-to-end.
 	test("ENG-5962: agent-a{16 hex}.jsonl (real Claude Code shape) → subagent IS synced", async () => {
 		const subPath = "/home/u/.claude/projects/-x/agent-a2789d14b1dfa1ebb.jsonl";
 		const { fetchImpl, calls } = makeFetch((url) => {
@@ -348,11 +344,9 @@ describe("syncSession — agentId extraction", () => {
 	});
 
 	test("path-traversal-shaped agent filename → skipped (no POST)", async () => {
-		// `basename` strips dirs, but the loose `.+` pattern would still have
-		// accepted `agent-../../escape.jsonl` as a literal filename if it
-		// reached the regex. Pin: only `agent-a{16 hex}.jsonl` is accepted —
-		// `../../escape` isn't hex, so it's safely rejected by the anchored
-		// regex regardless of basename behavior.
+		// Two guards apply: `basename` strips dirs, and the anchored hex-only
+		// regex would reject `../../escape` even if a future refactor regressed
+		// basename. Pin both layers.
 		const subPath = "/some/where/nested/agent-../../escape.jsonl";
 		const { fetchImpl, calls } = makeFetch(() =>
 			jsonResponse(200, { session: { storage_path: "p" } }),
