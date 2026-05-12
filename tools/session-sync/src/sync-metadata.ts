@@ -32,4 +32,13 @@ export interface SyncMetadata {
 	first_user_message?: string | null;
 	file_size_bytes?: number;
 	gzipped_size_bytes?: number;
+	/**
+	 * Fork lineage (ENG-5862 AC 36) — populated together when the daemon
+	 * was started by `session resume <id> --fork`. The fork's first sync
+	 * carries the source session's id and turn_count at fork time; absent
+	 * on every non-fork sync. Mirrors the optional fields on the
+	 * server-side `SyncMetadata` in `nextjs-app/lib/services/dev-sessions.ts`.
+	 */
+	parent_session_id?: string;
+	forked_at_turn?: number;
 }
