@@ -7,13 +7,9 @@ description: Ask the user by building an HTML page and serving it via /serve-sta
 
 Build an HTML page, serve it via `/serve-static`, hand the live user a URL.
 
-## Default — meaningful filename in the URL
+## Default — meaningful filename
 
-The filename shows up in the URL the live user sees (e.g. `…gitpod.dev/email-buttons-and-subjects.review.html`). Default to a descriptive kebab-case name that says *what the page is* — not generic `mock.html` / `review.html` / `index.html`. The URL is a tiny title bar; use it.
-
-Shape: `<topic>-<focus>.<classifier>.html`, e.g. `email-buttons-and-subjects.review.html`, `recipients-v2.proposal.html`, `tooltip-copy.compare.html`. Classifiers we've used: `.review`, `.proposal`, `.compare`, `.mock`. Pick whatever reads true; don't invent ceremony.
-
-Where to put it: alongside the spec/doc it's about (e.g. `docs/scheduled-reports/email-buttons-and-subjects.review.html`) so it lives with the conversation, not in `/tmp` or `$CLAUDE_JOB_DIR`. If there's no obvious home, default to `docs/<topic>/<name>.html`.
+Name the file for what the page is. The filename shows up in the URL the live user opens in the browser — that's a free title bar, use it. Don't default to generic `mock.html` / `review.html` / `index.html`.
 
 **If the artifact is about our web app** — read the *actual relevant pages* (not just the component library), e.g. `nextjs-app/app/projects/[projectId]/config/scheduled-reports/edit-form-modal.tsx`. Mimic or even quote/copy the real layout, copy, classes, badge variants, spacing. The mock should look like the real screen with the proposed change applied — not a generic shadcn page.
 
