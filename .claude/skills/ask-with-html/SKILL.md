@@ -7,6 +7,14 @@ description: Ask the user by building an HTML page and serving it via /serve-sta
 
 Build an HTML page, serve it via `/serve-static`, hand the live user a URL.
 
+## Default — meaningful filename in the URL
+
+The filename shows up in the URL the live user sees (e.g. `…gitpod.dev/email-buttons-and-subjects.review.html`). Default to a descriptive kebab-case name that says *what the page is* — not generic `mock.html` / `review.html` / `index.html`. The URL is a tiny title bar; use it.
+
+Shape: `<topic>-<focus>.<classifier>.html`, e.g. `email-buttons-and-subjects.review.html`, `recipients-v2.proposal.html`, `tooltip-copy.compare.html`. Classifiers we've used: `.review`, `.proposal`, `.compare`, `.mock`. Pick whatever reads true; don't invent ceremony.
+
+Where to put it: alongside the spec/doc it's about (e.g. `docs/scheduled-reports/email-buttons-and-subjects.review.html`) so it lives with the conversation, not in `/tmp` or `$CLAUDE_JOB_DIR`. If there's no obvious home, default to `docs/<topic>/<name>.html`.
+
 **If the artifact is about our web app** — read the *actual relevant pages* (not just the component library), e.g. `nextjs-app/app/projects/[projectId]/config/scheduled-reports/edit-form-modal.tsx`. Mimic or even quote/copy the real layout, copy, classes, badge variants, spacing. The mock should look like the real screen with the proposed change applied — not a generic shadcn page.
 
 **Use the app's actual palette, not a dark-mode default.** The Effi app is a light theme — read tokens from `nextjs-app/app/globals.css` (`--effi-background #FAFBFD`, `--effi-primary #1560BD`, `--effi-deep-denim #102E4A`, `--effi-gray-text #646A83`, `--effi-border #E2E6F2`, `--effi-card-fill #F3F1EF`, `--effi-accent-orange #F3693E`, `--effi-gold #F2BB41`, `--effi-radius-button 8px`, `--effi-radius-card 12px`). Don't reach for `#0b0d12` / generic dark-mode CSS — when the mock is meant to read as "our app", the palette is half the recognition.
