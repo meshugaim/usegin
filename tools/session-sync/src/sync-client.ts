@@ -280,8 +280,12 @@ export type HeartbeatResponse =
  * lapse.
  *
  * Best-effort: the daemon does NOT fail the sync outcome when this call
- * fails. The 60s heartbeat tick and the 5-minute safety-net scan re-issue
- * the release; worst case the lease naturally lapses at `expires_at`.
+ * fails. There is no retry path — release fires only inside `syncFile`'s
+ * post-200 completion branch, and that branch doesn't recur for finalized
+ * JSONLs (size unchanged → hash-match short-circuit before POST; heartbeat
+ * is a POST, not a DELETE). The lease lapses naturally at `expires_at`
+ * (~2 min from acquisition); a peer env that wants the lock waits at most
+ * that long.
  *
  * Body: none. Identity travels as query params (`environment_kind`,
  * `environment_id`) for the same reasons step 4 used query params on the

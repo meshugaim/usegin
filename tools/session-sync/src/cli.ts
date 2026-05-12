@@ -521,21 +521,31 @@ async function fireSync(
 					// 403 body deliberately omits holder fields (release is an
 					// identity assertion, not a discovery surface — see step 4
 					// route.ts:130-134), so we log the bare denial without
-					// holder details. State row still advances; the safety-net
-					// re-issues the release on its next tick if conditions allow.
+					// holder details. State row still advances; the lease lapses
+					// naturally at `expires_at` (~2 min from acquisition). No
+					// retry — the release call is gated on the post-200 branch
+					// of `syncFile`, which doesn't recur for finalized JSONLs
+					// (size unchanged → hash-match short-circuit before POST).
+					// `envIdentity` is inlined so "why did MY env get denied"
+					// debugging doesn't require scrolling to the boot log.
 					d.state[o.filePath] = o.outcome.updatedState;
 					console.warn(
 						"[session-sync] release denied (403 not_holder) for completed session",
 						sessionId,
-						"- another env now holds the lock; safety-net will retry",
+						`envKind=${d.envIdentity.kind} envId=${d.envIdentity.id}`,
+						"- another env now holds the lock; lease will lapse naturally",
 					);
 				} else if (o.outcome.kind === "completed_release_transport_error") {
 					// AC 18 ext: 5xx / network failure on the release call.
 					// Best-effort contract: the sync DID land — failing the
 					// outcome would force a re-upload of bytes the server
-					// already has. The lease lapses naturally at `expires_at`;
-					// the 5-min safety-net re-issues the release on the next
-					// tick.
+					// already has. The lease lapses naturally at `expires_at`
+					// (~2 min from acquisition). No retry — the release call
+					// is gated on the post-200 branch of `syncFile`, which
+					// doesn't recur for finalized JSONLs (size unchanged →
+					// hash-match short-circuit before POST; heartbeat is a
+					// POST not a DELETE). `envIdentity` is inlined for the
+					// same boot-log-scrolling reason as the 403 branch above.
 					//
 					// Log shape mirrors the 403 branch above and the heartbeat
 					// transport_error log (see sendHeartbeat): we always emit
@@ -549,6 +559,7 @@ async function fireSync(
 					console.warn(
 						"[session-sync] release transport error for completed session",
 						sessionId,
+						`envKind=${d.envIdentity.kind} envId=${d.envIdentity.id}`,
 						"- HTTP",
 						status,
 						typeof body === "string"
@@ -556,6 +567,7 @@ async function fireSync(
 							: (JSON.stringify(body) ?? "<no body>"),
 						"-",
 						message,
+						"- lease will lapse naturally; no retry",
 					);
 				}
 			}
