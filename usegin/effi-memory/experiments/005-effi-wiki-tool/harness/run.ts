@@ -3,29 +3,52 @@
  * Experiment 005 — eval harness.
  *
  * Reads a list of questions from eval-questions.md, runs each one twice
- * through `effi ask` (wiki-off / wiki-on), and persists per-pair artifacts
- * (trace JSONL + transcripts) to runs/<timestamp>/ for downstream human +
- * LLM-judge scoring.
+ * through `effi ask` (wiki-off / wiki-on) against the SAME project, and
+ * persists per-pair artifacts (trace JSONL + transcripts) to
+ * runs/<timestamp>/ for downstream human + LLM-judge scoring.
  *
- * Usage:
+ * Methodology
+ * -----------
+ *   - Both sides hit one project — the dogfooding project that the
+ *     server's `EFFI_WIKI_PROJECT_ID` env designates as wiki-eligible.
+ *     This makes the paired comparison fair: same canon, same server,
+ *     only `disable_wiki` differs per request.
+ *   - Wiki-off side: `effi ask --wiki off` sets `disable_wiki: true` in
+ *     the request body; both python-services gate sites suppress the
+ *     wiki (MCP tool + system-prompt section).
+ *   - Wiki-on side: omits `--wiki` (default is "on") — wire-bit absent,
+ *     so the server's env-driven default governs.
+ *   - Session freshness: both spawns pass `--new` so the CLI doesn't
+ *     resume a stored session. Each turn lands in a fresh server-side
+ *     session, so the second side of a pair can't inherit context from
+ *     the first.
+ *
+ * Usage
+ * -----
  *   bun run usegin/effi-memory/experiments/005-effi-wiki-tool/harness/run.ts \
- *     --wiki-project-id <uuid> [--profile agent-dev] [--filter <substring>] \
+ *     --project <uuid> [--profile agent-dev] [--filter <substring>] \
  *     [--questions <path>] [--output-dir <path>] [--dry-run]
  *
- * What it does NOT do:
+ * What it does NOT do
+ * -------------------
  *   - Score answers. That's a separate, human-in-the-loop pass.
  *   - Start `just agent-dev` or otherwise manage services.
- *   - Pull the wiki UUID from anywhere — caller passes it explicitly.
+ *   - Pull the project UUID from anywhere — caller passes it explicitly.
+ *   - Mutate `~/.effi/` state beyond what plain `effi ask --new` does. The
+ *     CLI's per-project `state.json` will end the run pointing at the
+ *     last harness session_id for the named project; that's fine for a
+ *     smoke project but the operator should be aware.
  *
- * Wire shape per pair under runs/<timestamp>/:
+ * Wire shape per pair under runs/<timestamp>/
+ * -------------------------------------------
  *   NNN-off.jsonl        - trace JSONL line from `effi ask --trace-jsonl`
  *   NNN-off.stdout.txt   - assistant content (stdout)
  *   NNN-off.stderr.txt   - tool-call chatter + clock stamps (stderr)
- *   NNN-on.jsonl, ...    - same, but with EFFI_WIKI_PROJECT_ID injected
+ *   NNN-on.jsonl, ...    - same, with the curated wiki enabled
  *   index.md             - per-pair tool-call summary derived from the JSONL
  *   RESULTS.md           - scoring skeleton (human + LLM judge fills in)
  *
- * Part of: ENG-5379 (experiment 005, step 2b)
+ * Part of: ENG-5379 (experiment 005, step 6/6)
  */
 
 import { spawn } from "node:child_process";
@@ -44,7 +67,7 @@ import { parseArgs } from "node:util";
 
 interface CliOptions {
 	questions: string;
-	wikiProjectId: string;
+	projectId: string;
 	profile: string;
 	outputDir: string;
 	filter?: string;
@@ -54,12 +77,20 @@ interface CliOptions {
 const HELP = `Usage: run.ts [options]
 
 Run the experiment 005 eval harness: for each question in eval-questions.md,
-spawn \`effi ask\` twice (wiki-off / wiki-on) and persist per-pair artifacts.
+spawn \`effi ask\` twice (wiki-off / wiki-on) against the same project and
+persist per-pair artifacts.
+
+Both sides hit the project named by --project. To make wiki-on meaningful,
+that project must match the python-services \`EFFI_WIKI_PROJECT_ID\` env at
+startup (the server's gate is per-project). The wiki-off side opts out per
+request via \`effi ask --wiki off\`.
 
 Options:
   --questions <path>          Path to eval-questions.md
                               (default: ../eval-questions.md relative to script)
-  --wiki-project-id <uuid>    Dogfooding project UUID for wiki-on runs (required)
+  --project <uuid>            Project UUID for both sides (required). Must be the
+                              project the server's EFFI_WIKI_PROJECT_ID designates
+                              as wiki-eligible so wiki-on actually has wiki access.
   --profile <name>            effi profile (default: agent-dev)
   --output-dir <path>         Where to write runs/<timestamp>/
                               (default: ../runs relative to script)
@@ -78,7 +109,7 @@ function parseCliOptions(argv: string[]): CliOptions {
 		args: argv,
 		options: {
 			questions: { type: "string" },
-			"wiki-project-id": { type: "string" },
+			project: { type: "string" },
 			profile: { type: "string" },
 			"output-dir": { type: "string" },
 			filter: { type: "string" },
@@ -94,15 +125,15 @@ function parseCliOptions(argv: string[]): CliOptions {
 		process.exit(0);
 	}
 
-	if (!values["wiki-project-id"]) {
-		process.stderr.write("Error: --wiki-project-id <uuid> is required.\n\n");
+	if (!values.project) {
+		process.stderr.write("Error: --project <uuid> is required.\n\n");
 		process.stderr.write(HELP);
 		process.exit(1);
 	}
 
 	return {
 		questions: values.questions ?? defaultQuestions,
-		wikiProjectId: values["wiki-project-id"] as string,
+		projectId: values.project as string,
 		profile: values.profile ?? "agent-dev",
 		outputDir: values["output-dir"] ?? defaultOutputDir,
 		filter: values.filter,
@@ -129,7 +160,11 @@ export function parseQuestions(markdown: string): string[] {
 		const line = rawLine.trimEnd();
 		const m = line.match(/^##\s+(.+)$/);
 		if (!m) continue;
-		const text = m[1].trim();
+		// m[1] is guaranteed by the capture group, but noUncheckedIndexedAccess
+		// types it as `string | undefined`; narrow defensively.
+		const captured = m[1];
+		if (captured === undefined) continue;
+		const text = captured.trim();
 		if (text.length > 0) out.push(text);
 	}
 	return out;
@@ -167,49 +202,58 @@ interface SpawnResult {
 	stderr: string;
 }
 
+/**
+ * Build the `effi ask` argv for one side of a pair.
+ *
+ * - `--new` forces a fresh server-side session per spawn so the second side
+ *   can't inherit the first side's context (smoke finding 2, 2026-05-12).
+ * - `--project <uuid>` overrides whatever project the profile is linked to,
+ *   so both sides land in the same project regardless of CLI link state.
+ * - `--wiki off` is added on the wiki-off side; the wiki-on side omits the
+ *   flag so the body never carries `disable_wiki` (matches CLI omit-when-
+ *   default idiom).
+ */
 function buildAskArgs(opts: {
 	question: string;
 	profile: string;
+	projectId: string;
 	tracePath: string;
+	wikiOff: boolean;
 }): string[] {
-	return [
+	const args = [
 		"ask",
 		opts.question,
 		"--profile",
 		opts.profile,
+		"--project",
+		opts.projectId,
+		"--new",
 		"--json",
 		"--trace-jsonl",
 		opts.tracePath,
 	];
-}
-
-function buildAskEnv(wikiProjectId: string | null): NodeJS.ProcessEnv {
-	const env = { ...process.env };
-	if (wikiProjectId === null) {
-		// Wiki-off run: ensure the var isn't inherited from the caller's shell.
-		delete env.EFFI_WIKI_PROJECT_ID;
-	} else {
-		env.EFFI_WIKI_PROJECT_ID = wikiProjectId;
+	if (opts.wikiOff) {
+		args.push("--wiki", "off");
 	}
-	return env;
+	return args;
 }
 
 async function runEffiAsk(opts: {
 	question: string;
 	profile: string;
+	projectId: string;
 	tracePath: string;
-	wikiProjectId: string | null;
+	wikiOff: boolean;
 }): Promise<SpawnResult> {
-	const args = buildAskArgs({
-		question: opts.question,
-		profile: opts.profile,
-		tracePath: opts.tracePath,
-	});
-	const env = buildAskEnv(opts.wikiProjectId);
+	const args = buildAskArgs(opts);
 
 	return new Promise((resolveP, rejectP) => {
+		// Inherit env cleanly — no per-process EFFI_WIKI_PROJECT_ID mutation.
+		// The server's wiki gate is read at python-services startup, not per
+		// request; the only knob that affects a single request is the body's
+		// `disable_wiki` bit, which `--wiki off` controls.
 		const child = spawn("effi", args, {
-			env,
+			env: process.env,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 
@@ -241,11 +285,13 @@ interface TraceSummary {
 	missing: boolean;
 	parseError: string | null;
 	/**
-	 * What the CLI recorded as the wiki-on/off state for this run. `null` when
-	 * the trace is missing, empty, unparseable, or pre-dates the field. The
-	 * harness cross-checks this against the side it intended to run (see
-	 * `expectedWikiEnabled` on `PairRecord`) so a silently-stripped env var
-	 * doesn't invalidate the experiment.
+	 * What the CLI recorded as the wiki gate for this turn — i.e. `!disableWiki`.
+	 * This reflects what the CLI _asked for_ (whether `--wiki off` was passed).
+	 * It does NOT prove what the server actually did; the harness cross-checks
+	 * this against the side it intended to run (see `expectedWikiEnabled` on
+	 * `PairRecord`) so a CLI/proxy/server bug would surface as a WARN line in
+	 * `index.md`. `null` when the trace is missing / empty / unparseable / or
+	 * pre-dates the field.
 	 */
 	wikiEnabled: boolean | null;
 }
@@ -288,6 +334,16 @@ function summarizeTrace(tracePath: string): TraceSummary {
 	// `effi ask` is one-shot so a single line is expected; we read the last
 	// line in case the file grew (defensive).
 	const lastLine = lines[lines.length - 1];
+	if (lastLine === undefined) {
+		return {
+			toolCallChain: "(trace empty)",
+			ttftMs: null,
+			totalMs: null,
+			missing: true,
+			parseError: null,
+			wikiEnabled: null,
+		};
+	}
 	try {
 		const parsed = JSON.parse(lastLine) as {
 			tool_calls?: Array<{ name?: string }>;
@@ -347,7 +403,7 @@ async function runPair(opts: {
 	index: number;
 	question: string;
 	profile: string;
-	wikiProjectId: string;
+	projectId: string;
 	runDir: string;
 }): Promise<PairRecord> {
 	const n = padIndex(opts.index);
@@ -357,8 +413,9 @@ async function runPair(opts: {
 	const offResult = await runEffiAsk({
 		question: opts.question,
 		profile: opts.profile,
+		projectId: opts.projectId,
 		tracePath: offTracePath,
-		wikiProjectId: null,
+		wikiOff: true,
 	});
 	writeFileSync(resolve(opts.runDir, `${n}-off.stdout.txt`), offResult.stdout);
 	writeFileSync(resolve(opts.runDir, `${n}-off.stderr.txt`), offResult.stderr);
@@ -367,8 +424,9 @@ async function runPair(opts: {
 	const onResult = await runEffiAsk({
 		question: opts.question,
 		profile: opts.profile,
+		projectId: opts.projectId,
 		tracePath: onTracePath,
-		wikiProjectId: opts.wikiProjectId,
+		wikiOff: false,
 	});
 	writeFileSync(resolve(opts.runDir, `${n}-on.stdout.txt`), onResult.stdout);
 	writeFileSync(resolve(opts.runDir, `${n}-on.stderr.txt`), onResult.stderr);
@@ -391,12 +449,14 @@ async function runPair(opts: {
 function renderIndex(opts: {
 	timestamp: string;
 	profile: string;
+	projectId: string;
 	pairs: PairRecord[];
 }): string {
 	const lines: string[] = [];
 	lines.push(`# Experiment 005 — run ${opts.timestamp}`);
 	lines.push("");
 	lines.push(`Profile: \`${opts.profile}\``);
+	lines.push(`Project: \`${opts.projectId}\``);
 	lines.push(`Pairs: ${opts.pairs.length}`);
 	lines.push("");
 	lines.push("Each pair: \`NNN-off.{jsonl,stdout.txt,stderr.txt}\` (wiki-off)");
@@ -420,18 +480,23 @@ function renderIndex(opts: {
 				`  · ttft ${fmtMs(p.onTrace.ttftMs)}` +
 				` · total ${fmtMs(p.onTrace.totalMs)}${onFail}`,
 		);
-		// Cross-check: the trace's `wiki_enabled` must match the side we ran.
-		// A silently-stripped env var (justfile wrapper, profile shim, etc.)
-		// can land a wiki-on run with wiki_enabled=false (or vice versa) and
-		// invalidate the pair without any other signal.
+		// Cross-check: the trace's `wiki_enabled` field is `!disableWiki` from
+		// the CLI's point of view — i.e. it records whether `--wiki off` was
+		// passed for this spawn. If it disagrees with the side we intended to
+		// run, something is wrong in `resolveDisableWiki` or the trace-line
+		// builder. The cross-check survived the env-toggle removal because
+		// the field still encodes the per-request request, not the per-process
+		// env.
 		if (p.offTrace.wikiEnabled === true) {
 			lines.push(
-				"  - **WARN**: wiki-off side ran with `wiki_enabled=true` — env strip failed",
+				"  - **WARN**: wiki-off side recorded `wiki_enabled=true` — " +
+					"likely a bug in `resolveDisableWiki` or trace-JSONL wiring; investigate.",
 			);
 		}
 		if (p.onTrace.wikiEnabled === false) {
 			lines.push(
-				"  - **WARN**: wiki-on side ran with `wiki_enabled=false` — env var didn't reach the CLI",
+				"  - **WARN**: wiki-on side recorded `wiki_enabled=false` — " +
+					"likely a bug in `resolveDisableWiki` or trace-JSONL wiring; investigate.",
 			);
 		}
 		if (p.offTrace.parseError) {
@@ -448,13 +513,14 @@ function renderIndex(opts: {
 function renderResultsSkeleton(opts: {
 	timestamp: string;
 	profile: string;
+	projectId: string;
 	pairCount: number;
 }): string {
 	return `# Experiment 005 — run ${opts.timestamp}
 
 Pairs: ${opts.pairCount}
 Profile: \`${opts.profile}\`
-Wiki project ID: <redacted before commit if sensitive>
+Project: \`${opts.projectId}\`
 
 ## Scoring
 
@@ -498,26 +564,28 @@ TBD
 function renderDryRunPlan(opts: {
 	questions: string[];
 	profile: string;
-	wikiProjectId: string;
+	projectId: string;
 	runDir: string;
 }): string {
 	const lines: string[] = [];
 	lines.push(`# Dry run — ${opts.questions.length} question(s)`);
 	lines.push(`# Run dir: ${opts.runDir}`);
 	lines.push(`# Profile: ${opts.profile}`);
+	lines.push(`# Project: ${opts.projectId}`);
 	lines.push("");
 	opts.questions.forEach((q, i) => {
 		const n = padIndex(i + 1);
 		const offTrace = resolve(opts.runDir, `${n}-off.jsonl`);
 		const onTrace = resolve(opts.runDir, `${n}-on.jsonl`);
+		const baseArgs =
+			`--profile ${opts.profile} --project ${opts.projectId} --new --json`;
 		lines.push(`# Q${n}: ${truncate(q, 80)}`);
 		lines.push(
-			`unset EFFI_WIKI_PROJECT_ID; effi ask ${JSON.stringify(q)} ` +
-				`--profile ${opts.profile} --json --trace-jsonl ${offTrace}`,
+			`effi ask ${JSON.stringify(q)} ${baseArgs} ` +
+				`--wiki off --trace-jsonl ${offTrace}`,
 		);
 		lines.push(
-			`EFFI_WIKI_PROJECT_ID=${opts.wikiProjectId} effi ask ${JSON.stringify(q)} ` +
-				`--profile ${opts.profile} --json --trace-jsonl ${onTrace}`,
+			`effi ask ${JSON.stringify(q)} ${baseArgs} --trace-jsonl ${onTrace}`,
 		);
 		lines.push("");
 	});
@@ -555,7 +623,7 @@ async function main(): Promise<void> {
 			renderDryRunPlan({
 				questions,
 				profile: opts.profile,
-				wikiProjectId: opts.wikiProjectId,
+				projectId: opts.projectId,
 				runDir,
 			}),
 		);
@@ -564,12 +632,17 @@ async function main(): Promise<void> {
 
 	mkdirSync(runDir, { recursive: true });
 	process.stderr.write(`Run dir: ${runDir}\n`);
+	process.stderr.write(`Project: ${opts.projectId}\n`);
 	process.stderr.write(`Questions: ${questions.length}\n\n`);
 
 	const pairs: PairRecord[] = [];
 	for (let i = 0; i < questions.length; i++) {
 		const idx = i + 1;
+		// `i < questions.length` so the index is in-bounds, but
+		// noUncheckedIndexedAccess types the access as `string | undefined`;
+		// narrow defensively.
 		const q = questions[i];
+		if (q === undefined) continue;
 		const n = padIndex(idx);
 		const label = truncate(q, 60);
 		process.stderr.write(`[${n}/${padIndex(questions.length)}] ${label}\n`);
@@ -578,7 +651,7 @@ async function main(): Promise<void> {
 				index: idx,
 				question: q,
 				profile: opts.profile,
-				wikiProjectId: opts.wikiProjectId,
+				projectId: opts.projectId,
 				runDir,
 			});
 			pairs.push(pair);
@@ -590,12 +663,14 @@ async function main(): Promise<void> {
 			);
 			if (pair.offTrace.wikiEnabled === true) {
 				process.stderr.write(
-					"  WARN: wiki-off side reported wiki_enabled=true (env strip failed)\n",
+					"  WARN: wiki-off side recorded wiki_enabled=true " +
+						"(resolveDisableWiki / trace-JSONL bug?)\n",
 				);
 			}
 			if (pair.onTrace.wikiEnabled === false) {
 				process.stderr.write(
-					"  WARN: wiki-on side reported wiki_enabled=false (env var didn't reach CLI)\n",
+					"  WARN: wiki-on side recorded wiki_enabled=false " +
+						"(resolveDisableWiki / trace-JSONL bug?)\n",
 				);
 			}
 		} catch (err) {
@@ -628,13 +703,19 @@ async function main(): Promise<void> {
 
 	writeFileSync(
 		resolve(runDir, "index.md"),
-		renderIndex({ timestamp, profile: opts.profile, pairs }),
+		renderIndex({
+			timestamp,
+			profile: opts.profile,
+			projectId: opts.projectId,
+			pairs,
+		}),
 	);
 	writeFileSync(
 		resolve(runDir, "RESULTS.md"),
 		renderResultsSkeleton({
 			timestamp,
 			profile: opts.profile,
+			projectId: opts.projectId,
 			pairCount: pairs.length,
 		}),
 	);

@@ -1,5 +1,5 @@
 ---
-status: liaison smoke complete; eval methodology needs adjustment before real run
+status: eval methodology gap closed by step-5/step-6 redesign (2026-05-13). Original smoke findings preserved below as historical record; see "Follow-up — 2026-05-13" at the bottom for the chosen path.
 authored: 2026-05-12
 authored-by: claude (effi-memory R&D, exp 005 step 3 — liaison smoke)
 ---
@@ -84,3 +84,67 @@ Files referenced:
 - `usegin/effi-memory/experiments/005-effi-wiki-tool/harness/run.ts`
 - `usegin/effi-memory/experiments/005-effi-wiki-tool/RUNBOOK.md`
 - `usegin/effi-memory/askeffi-app-really/notes/design-partners.md` (wiki source the response cited)
+
+---
+
+## Follow-up — 2026-05-13
+
+The methodology gap surfaced by Findings 1 and 2 is closed. The fix is **not** the
+two-project toggle this doc proposed (`--wiki-on-project` / `--wiki-off-project`);
+that approach was abandoned in favor of moving the gate from per-process env to
+per-request body bit.
+
+### What shipped
+
+- **Per-request `disable_wiki` body bit** (steps 1–5). Both python-services gate
+  sites (`build_tools` and the system-prompt section) now consult a shared
+  `should_disable_wiki(config, disable_wiki_request)` resolver. The CLI exposes
+  `effi ask --wiki on|off` to drive it; the Next.js `/api/v1/chat/stream` proxy
+  passes the bit through verbatim.
+- **Harness rewrite** (step 6 — this doc's follow-up). The harness now runs both
+  sides against the **same project** (the dogfooding wiki-eligible one), passing
+  `--wiki off` on the wiki-off side and omitting the flag on the wiki-on side.
+  Same server, same canon, same project — only `disable_wiki` differs.
+- **Session freshness** is handled by `--new` on every spawn (Finding 2 fix).
+  The CLI already exposed this flag; no new affordance was added.
+
+### Why this is better than the two-project approach
+
+- The paired comparison is genuinely apples-to-apples: same data, same project
+  context, same `project_id` in the request. Only the wiki gate flips.
+- Single source of truth for the gate: `should_disable_wiki(...)` in
+  `python-services/agent_api/services/wiki_gate.py`. Both call sites consult it;
+  the comparison can't drift between them.
+- No "second seed project" to maintain.
+- The trace-JSONL `wiki_enabled` field still encodes what the CLI _asked for_,
+  so a CLI/proxy/server bug would surface as a per-pair WARN in `index.md`.
+
+### What changed in `harness/run.ts`
+
+- `--wiki-project-id <uuid>` → `--project <uuid>` (required). Both sides use it.
+- `EFFI_WIKI_PROJECT_ID` env-toggle in `buildAskEnv` → deleted entirely. Env is
+  inherited cleanly.
+- `runEffiAsk` now adds `--wiki off` on the wiki-off side, `--new` always.
+- The "env strip failed" / "env var didn't reach the CLI" WARN wording was
+  replaced with "likely a bug in `resolveDisableWiki` or trace-JSONL wiring".
+
+### How to run paired comparisons now
+
+See `RUNBOOK.md` → "How to run paired comparisons". TL;DR:
+
+```bash
+bun run usegin/effi-memory/experiments/005-effi-wiki-tool/harness/run.ts \
+  --project 1bf0f507-7627-40a0-be72-8d2eacc40dec \
+  --profile agent-dev
+```
+
+### Open items not on this charter
+
+- `eval-questions.md` Q11/Q12 may be mis-classified (Lihu noted this during the
+  smoke). Lower-priority follow-up; not addressed here.
+- `state.json` footprint: `--new` doesn't prevent the post-turn write, so the
+  harness still leaves the named project's per-project session pointing at the
+  harness's last session_id. Harmless for a dogfooding project. Documented in
+  `RUNBOOK.md`.
+
+Part of: ENG-5379 (experiment 005, step 6/6)
