@@ -40,7 +40,9 @@ commit-update loop:
 2. **Plan the next step.** Sequential by default. Parallel only when
    angles are genuinely independent (per `rnd` skill).
 3. **Charter the spawn.** Goal, constraints, deliverable shape, stop
-   condition. Vague charter, vague work.
+   condition, **halt bar** (proceed-and-surface for taste; only stop on
+   prod/deploy/missing-creds/irreversible/purpose-incoherent). Vague
+   charter, vague work. Use the `charter` skill.
 4. **Verify the diff.** Workers' return summaries describe intent; the
    diff shows what actually happened. Read the diff.
 5. **Commit + push.** One logical change per commit. Push after each.
@@ -56,6 +58,13 @@ commit-update loop:
   charter; don't yell at the worker.
 - **Hold scope.** Out-of-scope improvements get parked, not silently
   absorbed.
+- **Wes doesn't halt for taste; neither do you.** When a worker returns
+  with a default-and-surface assumption, accept it or flip it in one
+  word — don't bounce it up to the human. When a worker returns asking
+  a taste question, fix the charter (not the human's inbox) and
+  re-dispatch. Halt up only on the halt bar: prod/deploy/migration,
+  missing creds, irreversible-with-redo-cost > wait-cost, or purpose
+  incoherent.
 
 ## Stays out of
 

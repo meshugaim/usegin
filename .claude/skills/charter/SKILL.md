@@ -67,9 +67,19 @@ This is *forbidden* to soften. Without it, the sub-Gin reverts to *rosh-katan* l
 What the sub-Gin can decide on its own, what it must coordinate, what it must escalate. Currently implicit per-skill — making it explicit catches a class of friction Lihu currently absorbs as "the agent did something it shouldn't have." See PO"SH C2 doctrine in the war research.
 
 Template:
-- **Can decide alone:** scope/structure of the deliverable, ordering of work, which zettels to thread, how to phrase findings.
+- **Can decide alone:** scope/structure of the deliverable, ordering of work, which zettels to thread, how to phrase findings, naming/path/format choices, working around failing tests or missing fixtures.
 - **Must coordinate (with the spawner before acting):** abandoning the purpose, changing the deliverable shape entirely, contradicting an explicit instruction in this charter.
 - **Must escalate (to Lihu via the spawner):** anything that touches production code, deploys, customer data, secrets, or `CLAUDE.md` in the production tree (per `usegin/Gin.md`).
+
+**Default posture: proceed-and-surface, never halt to ask.** For any ambiguity inside *Can decide alone*, pick the lowest-redo-cost default, keep going, and surface the assumption in your end-of-turn line ("Assumed X because Y; one word flips it"). Halting to ask a taste/path/format/naming question is a charter failure — Lihu can correct a default in one word but cannot un-stop a halted run.
+
+**Halt bar (when to actually stop and wait):**
+- You would push to prod, deploy, or apply a migration to staging/prod DB.
+- You need credentials, OAuth, or external access you don't have.
+- You face an irreversible decision whose redo cost exceeds the wait cost (delete shared resource, send customer comms, force-push, drop table).
+- The purpose itself is incoherent or contradicted by what you found; continuing would produce well-executed irrelevance.
+
+Everything else — failing tests, missing fixtures, flakes, "which name is better," "hook or script," "quick or exhaustive" — is a default-and-surface. Don't make Lihu your interactive shell.
 
 ### 7. Fresh-Haiku test (operational gate)
 
@@ -108,6 +118,7 @@ approach and report what you changed and why.
 - Can decide alone: <scope-shaped list>
 - Must coordinate: <scope-shaped list>
 - Must escalate: <scope-shaped list>
+- **Default posture:** proceed-and-surface, never halt to ask. Halt bar = {prod/deploy/migration, missing creds, irreversible-with-redo-cost > wait-cost, purpose incoherent}. Everything else: pick a default, proceed, surface the assumption in end-of-turn.
 
 **Fresh-Haiku check.** [present-tense, only when authoring — strip from the
 emitted charter.]
@@ -127,6 +138,7 @@ Don't send Haiku to scout a load-bearing decision and "promote" to Opus later �
 - **Soft Selbständigkeit.** "Try to deviate if needed." → reads as permission to comply; replace with the verbatim obligation.
 - **Implicit decision rights.** Save Lihu the friction of explaining after-the-fact why the sub-Gin shouldn't have force-pushed.
 - **Charter without fresh-Haiku check.** UseGin slang is invisible to sub-Gins.
+- **Halt-on-taste.** "Should I name it X or Y?" / "quick version or thorough?" / "this test is flaking, skip it?" Every one is a default-and-surface — the halt bar is named in §6, and anything outside it is decided in flight. A charter that doesn't name the halt bar inherits the agent's default anxiety, not yours.
 
 ## Distill into the corpus
 
