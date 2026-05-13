@@ -405,42 +405,55 @@ describe("ENG-5862 step 7 — cross-env fallback (AC 34)", () => {
   });
 
   // ===========================================================================
-  // Test 6 — Prefix (not full UUID) does NOT reach Supabase
+  // Test 6 — Prefix (not full UUID) DOES reach Supabase (post-ENG-5986)
   // ===========================================================================
+  //
+  // ENG-5986 superseded the pre-existing contract this test pinned. The old
+  // behavior — "prefix short-circuits to SessionNotFoundError without
+  // touching Supabase" — was the bug ENG-5986 fixed: a user running
+  // `session resume <8-hex>` for a cross-env session got a confusing
+  // "not found" even though `session list --remote` showed the session.
+  //
+  // The current contract: when local + agent-records both miss AND the
+  // input is a prefix, `fetchSession` DOES call `fetchFromSupabase` so the
+  // API-prefix-resolve branch (see `supabase-fetch.ts`'s `session_id_prefix`
+  // listSessions call) can turn the prefix into a full UUID. A no-match
+  // result from Supabase surfaces as `SessionNotFoundError` with the
+  // "all three sources... not found in any environment" prose — i.e. we
+  // tell the user we already checked the cross-env path.
+  //
+  // The prefix-flow contract is pinned in
+  // `fetch.prefix-remote.test.ts`; this test is the regression-net
+  // companion in the original Supabase test file.
 
-  test("prefix input + both miss → SessionNotFoundError without Supabase call", async () => {
+  test("prefix input + both miss → SessionNotFoundError after consulting Supabase", async () => {
     mockFinder({ local: null, remote: null });
-    // If the chain wrongly reached Supabase with a prefix, it would hit
-    // our mock; track that with the spy after installing the mock. The
-    // ok:true shape would also make the test pass on the wrong path —
-    // so the supabaseSpy assertion is the load-bearing one.
-    mockSupabaseFetch({
-      ok: true,
-      localPath: "/tmp/should-never-be-returned.jsonl",
-      compressedSize: 1,
-      decompressedSize: 1,
-      subagentCount: 0,
-    });
+    // The mocked Supabase returns "not_found" — the API-prefix lookup
+    // found no matches. `fetchSession` translates that to
+    // `SessionNotFoundError` with the cross-env prose.
+    mockSupabaseFetch({ ok: false, error: { kind: "not_found" } });
     const supabaseSpy = spyOn(supabaseFetchModule, "fetchFromSupabase");
 
     const { fetchSession } = await import("./fetch");
 
     let caught: unknown;
     try {
-      // "abc123" is a valid prefix (hex chars) but not a full UUID.
-      // The Supabase wire requires full UUIDs (it's a row-id GET).
-      // The chain must short-circuit to SessionNotFoundError BEFORE
-      // calling `fetchFromSupabase`.
-      await fetchSession("abc123");
+      // "abc12345" is a valid 8-char hex prefix but not a full UUID.
+      // Post-ENG-5986, the chain DOES call `fetchFromSupabase` so the
+      // API-prefix-resolve branch can attempt cross-env resolution.
+      await fetchSession("abc12345");
     } catch (err) {
       caught = err;
     }
 
     expect(caught).toBeInstanceOf(SessionNotFoundError);
-    // The legacy local-only message (no "Supabase" in searchedLocation,
-    // no "any environment") — because we never tried Supabase.
-    expect((caught as Error).message.toLowerCase()).not.toContain("supabase");
-    expect(supabaseSpy.mock.calls.length).toBe(0);
+    // The cross-env prose: we did check Supabase, and it had no match.
+    expect((caught as Error).message.toLowerCase()).toContain("supabase");
+    // And the chain DID call Supabase exactly once with the prefix
+    // (load-bearing — without this, a refactor could quietly re-add the
+    // short-circuit and ENG-5986 would silently regress).
+    expect(supabaseSpy.mock.calls.length).toBe(1);
+    expect(supabaseSpy.mock.calls[0]?.[0]).toBe("abc12345");
   });
 
   // ===========================================================================

@@ -78,6 +78,23 @@ function formatBytes(bytes: number): string {
 }
 
 /**
+ * Best-effort extract a full session id (UUID) from a JSONL path the
+ * Supabase fetcher wrote to disk. Used as a fallback when
+ * `SupabaseFetchResult.sessionId` is missing — e.g. older test stubs that
+ * predate ENG-5986. Real production fetches always populate `sessionId`
+ * directly. Returns null when the basename doesn't match a UUID shape.
+ */
+function extractSessionIdFromPath(path: string): string | null {
+  const name = basename(path, ".jsonl");
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(name)
+  ) {
+    return name;
+  }
+  return null;
+}
+
+/**
  * Resolve a session identifier (full UUID, short prefix, or path) to a
  * local SessionInfo if one exists, or null if it's not available locally.
  */
@@ -226,38 +243,40 @@ export async function fetchSession(input: string): Promise<FetchResult> {
   if (!remote) {
     // 2a. Both local and agent-records missed. Fall back to Supabase —
     // the cross-environment path for `session resume <id>` when the
-    // session was created in a different env (ENG-5862 step 7, AC 34).
+    // session was created in a different env (ENG-5862 step 7, AC 34;
+    // ENG-5986 extended this branch to handle 8-char prefixes).
     //
-    // Only a full UUID makes sense here: prefix resolution requires
-    // listing all sessions in the index, which the cross-env path
-    // doesn't model. If the caller passed a prefix that didn't resolve
-    // locally or in agent-records, we surface the same not-found error
-    // as before — Green can revisit prefix-vs-Supabase if the product
-    // wants it.
-    if (!isSessionId(input)) {
-      const currentProject = getCurrentProjectHash();
-      throw new SessionNotFoundError(input, {
-        searchedLocation: currentProject
-          ? `~/.claude/projects/${currentProject}/ and ~/agent-records/`
-          : "~/.claude/projects/ and ~/agent-records/",
-      });
-    }
-
-    // RED PHASE: `fetchFromSupabase` is a stub that returns
-    // `{ ok: false, error: { kind: "auth_missing" } }`. Green will
-    // implement the four-step wire (auth → JSON GET → signed-URL
-    // download → decompress + place).
+    // Prefix handling (ENG-5986): when `input` is not a full UUID,
+    // `fetchFromSupabase` first hits `GET /api/v1/dev-sessions?
+    // session_id_prefix=<input>` to resolve the prefix to a full
+    // session_id. 0 matches → `not_found` (collapses to the existing
+    // SessionNotFoundError prose with the prefix in the message);
+    // 1 match → continue with the resolved UUID; 2+ matches →
+    // `ambiguous_prefix` (translated below to AmbiguousSessionError,
+    // mirroring the error class the agent-records prefix branch already
+    // throws so callers route on one `instanceof` regardless of source).
     //
-    // The Red contract is the **call site shape**: chain reaches the
-    // stub on local+remote miss with a full UUID exactly once, and an
-    // `auth_missing` result maps back to `SessionNotFoundError` so
-    // the pre-step-7 contract ("session not anywhere → SessionNotFoundError")
-    // is preserved for callers without credentials.
+    // The original "throw SessionNotFoundError on non-isSessionId before
+    // touching Supabase" branch lived here pre-ENG-5986; it short-circuited
+    // a real `session resume <prefix>` flow for cross-env sessions. See
+    // `fetch.prefix-remote.test.ts` for the failure mode.
     const supa = await fetchFromSupabase(input);
     if (supa.ok) {
+      // Resolved full session id, in order of preference:
+      //   1. `supa.sessionId` — populated by the real Supabase fetcher
+      //      after a prefix-resolve (ENG-5986) or trivially mirrored from
+      //      a full-UUID input.
+      //   2. `parsePath(supa.localPath)` — derived from the JSONL filename
+      //      Supabase fetch wrote to disk; covers test stubs that omit
+      //      `sessionId` but key `localPath` on the resolved UUID
+      //      (`fetch.supabase.test.ts`'s mocks predate ENG-5986).
+      //   3. `input` — the pre-ENG-5862 fallback for callers that don't
+      //      hit either of the above paths.
+      const resolvedSessionId =
+        supa.sessionId ?? extractSessionIdFromPath(supa.localPath) ?? input;
       return {
-        sessionId: input,
-        shortId: input.slice(0, 8),
+        sessionId: resolvedSessionId,
+        shortId: resolvedSessionId.slice(0, 8),
         localPath: supa.localPath,
         alreadyLocal: false,
         source: "supabase",
@@ -303,6 +322,26 @@ export async function fetchSession(input: string): Promise<FetchResult> {
         throw new SessionNotFoundError(input, {
           searchedLocation: `all three sources (${localScope}, ~/agent-records/, and Supabase) — not found in any environment`,
         });
+      }
+      case "ambiguous_prefix": {
+        // ENG-5986: the API prefix-resolve found 2+ candidate session_ids.
+        // Mirror the AmbiguousSessionError class the agent-records prefix
+        // branch already throws (fetch.ts's old `resolveRemote`) so a
+        // single `instanceof AmbiguousSessionError` route covers both
+        // sources. We synthesize minimal SessionInfo entries from the
+        // raw ids — only `id` is load-bearing for the error message
+        // (the formatter slices `id` for short-id display); the other
+        // fields are pinned to placeholders for type compatibility.
+        const { AmbiguousSessionError } = await import("./finder/types");
+        const matches = supa.error.sessionIds.map((sid) => ({
+          path: "", // Unknown — the API doesn't surface storage_path here.
+          id: sid,
+          mtime: new Date(0),
+          project: "",
+          source: "remote" as const,
+          username: "",
+        }));
+        throw new AmbiguousSessionError(supa.error.prefix, matches);
       }
       case "auth_missing":
         throw new AuthRequiredError(input, { cause: "missing" });

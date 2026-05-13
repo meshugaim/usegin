@@ -200,7 +200,7 @@ describe("ENG-5986 — session resume <prefix> falls back to remote API", () => 
   // pins only the outcome and the resolved-id observability via the
   // `fetchFromSupabase` stub seam.
 
-  test.failing(
+  test(
     "ENG-5986: prefix resolves to remote-only session → FetchResult.sessionId is full UUID",
     async () => {
       mockFinder({

@@ -57,10 +57,11 @@ import {
   getApiUrl,
   readCredentials,
 } from "../../lib/auth/credentials";
-import { getSession } from "./finder/api-client";
+import { getSession, listSessions } from "./finder/api-client";
 import {
   getClaudeProjectsDir,
   getCurrentProjectHash,
+  isSessionId,
 } from "./finder";
 
 // =============================================================================
@@ -93,6 +94,19 @@ export type SupabaseFetchError =
   | { kind: "not_found" }
   | { kind: "auth_missing" }
   | { kind: "auth_expired" }
+  | {
+      /**
+       * The prefix matched 2+ rows on the API. `fetchSession` translates
+       * this into `AmbiguousSessionError` with the same shape the
+       * agent-records prefix branch already throws, so callers keep one
+       * `instanceof AmbiguousSessionError` route across both sources
+       * (ENG-5986). Carries the matched session ids so the user-facing
+       * message can list both candidate short-ids.
+       */
+      kind: "ambiguous_prefix";
+      prefix: string;
+      sessionIds: string[];
+    }
   | {
       kind: "transport_error";
       status: number;
@@ -129,6 +143,16 @@ export type SupabaseFetchResult =
       compressedSize: number;
       decompressedSize: number;
       subagentCount: number;
+      /**
+       * Resolved full session id (ENG-5986). When `fetchFromSupabase` is
+       * called with an 8-char prefix, the API-prefix-resolve branch fills
+       * this with the canonical UUID so `fetchSession` can populate
+       * `FetchResult.sessionId` correctly. For full-UUID callers this
+       * mirrors the input; the field is optional so existing test stubs
+       * that omit it (`fetch.supabase.test.ts`) keep working — callers
+       * fall back to the localPath basename or the original input.
+       */
+      sessionId?: string;
     }
   | { ok: false; error: SupabaseFetchError };
 
@@ -211,7 +235,7 @@ async function downloadAndWrite(
  * distinct cwd to a distinct projects-dir directory.
  */
 export async function fetchFromSupabase(
-  sessionId: string,
+  sessionIdOrPrefix: string,
 ): Promise<SupabaseFetchResult> {
   // 1. Auth — no credentials means we can't reach Supabase. The caller
   // (`fetchSession`) maps `auth_missing` to `AuthRequiredError` so a
@@ -223,6 +247,63 @@ export async function fetchFromSupabase(
   }
   const apiUrl = await getApiUrl();
 
+  // 1a. Prefix resolution (ENG-5986). If the caller passed a short hex
+  // prefix (typical: `session resume 7c99a7ed`), resolve it to a full
+  // session_id via the dev_sessions list endpoint's `session_id_prefix`
+  // filter. We pass `limit: 2` because we only need to know
+  // "exactly one" vs "≥2" — the rest of the page would be wasted bytes.
+  //
+  // Resolution outcomes:
+  //   - 1 match → continue with the resolved full UUID below.
+  //   - 0 matches → `not_found` (same shape as the full-UUID 404 path).
+  //   - 2+ matches → `ambiguous_prefix` so `fetchSession` can surface
+  //     `AmbiguousSessionError` listing the candidate short-ids.
+  //
+  // Auth failures inside this branch route through the same `auth_failed`
+  // / 5xx error classes the full-UUID path uses; we map them to
+  // `auth_expired` / `transport_error` so the user-facing remediation
+  // (run `effi auth login`) doesn't vary by entry point.
+  let resolvedSessionId = sessionIdOrPrefix;
+  if (!isSessionId(sessionIdOrPrefix)) {
+    try {
+      const list = await listSessions(
+        { token: creds.access_token, apiUrl },
+        { session_id_prefix: sessionIdOrPrefix, limit: 2 },
+      );
+      if (list.items.length === 0) {
+        return { ok: false, error: { kind: "not_found" } };
+      }
+      if (list.items.length > 1) {
+        return {
+          ok: false,
+          error: {
+            kind: "ambiguous_prefix",
+            prefix: sessionIdOrPrefix,
+            sessionIds: list.items.map((i) => i.session_id),
+          },
+        };
+      }
+      const only = list.items[0];
+      if (!only) {
+        return { ok: false, error: { kind: "not_found" } };
+      }
+      resolvedSessionId = only.session_id;
+    } catch (err) {
+      const e = err as Error & { kind?: string; status?: number };
+      if (e.kind === "auth_failed") {
+        return { ok: false, error: { kind: "auth_expired" } };
+      }
+      return {
+        ok: false,
+        error: {
+          kind: "transport_error",
+          status: e.status ?? 0,
+          body: e.message ?? "unknown",
+        },
+      };
+    }
+  }
+
   // 2. Single-session GET. `getSession` returns null for 404 (which maps
   // to `not_found`), or throws `ApiClientError` for 401/403/5xx/other.
   // We translate each into the discriminated `SupabaseFetchError` shape
@@ -233,7 +314,7 @@ export async function fetchFromSupabase(
   try {
     payload = await getSession(
       { token: creds.access_token, apiUrl },
-      sessionId,
+      resolvedSessionId,
     );
   } catch (err) {
     const e = err as Error & { kind?: string; status?: number };
@@ -269,7 +350,7 @@ export async function fetchFromSupabase(
     };
   }
   const localDir = join(getClaudeProjectsDir(), projectHash);
-  const parentLocalPath = join(localDir, `${sessionId}.jsonl`);
+  const parentLocalPath = join(localDir, `${resolvedSessionId}.jsonl`);
 
   // 4. Parent download. Failure here means the row exists in the API but
   // we can't materialize bytes — `transport_error` with a body excerpt
@@ -304,7 +385,7 @@ export async function fetchFromSupabase(
   // We don't roll back the parent: a user who sees a parent on disk plus
   // a partial-subagent error can retry, and the parent path is idempotent
   // (next call overwrites with the same bytes).
-  const subagentDir = join(localDir, sessionId, "subagents");
+  const subagentDir = join(localDir, resolvedSessionId, "subagents");
   const placedSubagentPaths: string[] = [];
   for (const sub of payload.subagent_paths) {
     const subPath = join(subagentDir, `agent-${sub.agent_id}.jsonl`);
@@ -334,5 +415,6 @@ export async function fetchFromSupabase(
     compressedSize: parentSizes.compressedSize,
     decompressedSize: parentSizes.decompressedSize,
     subagentCount,
+    sessionId: resolvedSessionId,
   };
 }

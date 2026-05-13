@@ -126,6 +126,21 @@ export interface ApiListOptions {
    *   - `nextjs-app/app/api/v1/dev-sessions/route.ts` — `querySchema.include_subagents`
    */
   include_subagents?: boolean;
+  /**
+   * Server-side prefix filter on `session_id` (ENG-5986). Used by
+   * `session resume <8-hex>` to resolve a cross-env session to its full
+   * UUID without paginating the entire dev_sessions table.
+   *
+   * The server enforces ≥8 hex chars (with optional hyphens); shorter or
+   * non-hex values return 400. CLI callers (currently only
+   * `supabase-fetch.ts`'s prefix-resolve branch) are responsible for
+   * passing a value that already satisfies that bar.
+   *
+   * See also:
+   *   - `nextjs-app/lib/services/dev-sessions.ts` — `ListSessionsOptions.session_id_prefix`
+   *   - `nextjs-app/app/api/v1/dev-sessions/route.ts` — `querySchema.session_id_prefix`
+   */
+  session_id_prefix?: string;
 }
 
 export interface ApiListResponse {
@@ -246,6 +261,9 @@ function buildListUrl(apiUrl: string, opts: ApiListOptions): string {
   // future programmatic consumer that wants explicit defensive opt-out.
   if (opts.include_subagents !== undefined) {
     params.set("include_subagents", String(opts.include_subagents));
+  }
+  if (opts.session_id_prefix !== undefined) {
+    params.set("session_id_prefix", opts.session_id_prefix);
   }
   const qs = params.toString();
   return qs
