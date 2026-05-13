@@ -1,0 +1,6 @@
+# Eval-harness output. Each `bun run harness/run.ts ...` writes a fresh
+# `runs/<timestamp>/` with paired trace JSONLs + stdout/stderr captures.
+# Reproducible by re-running against the same fixture; not source of truth.
+# `git add -f runs/<dir>/` if a specific run needs to be persisted as
+# evidence for a finding (see SMOKE-FINDINGS.md's verification table).
+runs/
