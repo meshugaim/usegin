@@ -188,10 +188,15 @@ export function parseListArgs(args: string[]): ListArgs {
     } else if (arg === "--remote") {
       result.remote = true;
     } else if (arg === "--profile") {
+      // TODO(ENG-5995): warn or error when --profile is set without --remote —
+      // currently a silent no-op (the local discovery path has no profile concept).
       const value = requireArgValue(args, i, "--profile");
       result.profile = value;
       i++;
     } else if (arg === "--include-subagents") {
+      // TODO(ENG-5995): warn or error when --include-subagents is set without
+      // --remote — currently a silent no-op (the local discovery path doesn't
+      // read from dev_sessions, so there's no subagent flag to honor).
       result.includeSubagents = true;
     }
   }

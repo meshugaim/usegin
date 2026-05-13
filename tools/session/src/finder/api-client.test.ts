@@ -55,6 +55,7 @@ const sampleItem = {
   storage_path: "u/2026-05-08/sess.jsonl.gz",
   parent_session_id: null,
   forked_at_turn: null,
+  is_subagent: false,
   display_title: "hi",
   created_at: "2026-05-08T11:59:00.000Z",
   updated_at: "2026-05-08T12:00:00.000Z",

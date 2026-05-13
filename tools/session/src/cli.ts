@@ -80,6 +80,10 @@ LIST OPTIONS:
   --profile <name>   Effi CLI profile to authenticate the --remote call
                      (default: ~/.effi/current_profile). Useful for
                      multi-env verification without mutating current_profile.
+  --include-subagents  Surface sub-agent transcripts in the listing
+                     (only meaningful under --remote). The list endpoint
+                     filters is_subagent=true rows out by default — pass
+                     this to opt in.
 
 FIND OPTIONS:
   --project <hash>   Filter to specific project (default: current project)

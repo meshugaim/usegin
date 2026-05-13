@@ -70,6 +70,7 @@ function apiItem(overrides: Partial<ApiSessionItem> = {}): ApiSessionItem {
     storage_path: "oria/2026-05-11/sess.jsonl.gz",
     parent_session_id: null,
     forked_at_turn: null,
+    is_subagent: false,
     display_title: "hello from oria",
     created_at: "2026-05-11T08:59:00.000Z",
     updated_at: "2026-05-11T09:00:00.000Z",
@@ -364,11 +365,11 @@ describe("apiItemToSessionInfo", () => {
 // file). `is_subagent` is the column name on `dev_sessions`; we keep the
 // same name across CLI / API / DB to avoid silent-mistranslation.
 //
-// Tests read new fields via runtime casts (`as ApiListOptions & { ... }` and
-// `apiItem({ is_subagent } as Partial<ApiSessionItem> & { ... })`) so the
-// FILE compiles before Green widens the types. The behavior assertions fail
-// because the flag isn't parsed and the filter isn't threaded — that's the
-// right-reason Red per `feedback_green_right_reason`.
+// `filtersSeen` is cast to `ApiListOptions & { include_subagents?: boolean }`
+// at the read site so the wire-level assertion compiles without widening the
+// public type's contract (the field is now on `ApiListOptions` after Green;
+// the cast at the read site is belt-and-braces if/when a future refactor
+// narrows the optionality away).
 //
 // Out of scope for these CLI tests:
 //   - Visual differentiation of subagent rows in the renderer ([R*] vs [R]).
@@ -410,10 +411,8 @@ describe("runList — --remote subagent default-filter (ENG-5987)", () => {
           const inc = (filters as ApiListOptions & {
             include_subagents?: boolean;
           }).include_subagents;
-          const chat = apiItem({ session_id: chatId, is_subagent: false } as
-            Partial<ApiSessionItem> & { is_subagent: boolean });
-          const sub = apiItem({ session_id: subId, is_subagent: true } as
-            Partial<ApiSessionItem> & { is_subagent: boolean });
+          const chat = apiItem({ session_id: chatId, is_subagent: false });
+          const sub = apiItem({ session_id: subId, is_subagent: true });
           return inc === true ? [chat, sub] : [chat];
         },
         log: (line) => lines.push(line),

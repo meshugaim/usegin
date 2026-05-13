@@ -88,6 +88,10 @@ export interface ApiSessionItem {
    * `is_subagent=true` rows out by default — callers must pass
    * `include_subagents=true` to surface them (ENG-5987). Always present
    * on the response (Postgres NOT NULL DEFAULT false).
+   *
+   * See also:
+   *   - `nextjs-app/lib/services/dev-sessions.ts` — `DevSessionRow.is_subagent`
+   *   - `nextjs-app/app/api/v1/dev-sessions/route.ts` — `querySchema.include_subagents`
    */
   is_subagent: boolean;
   /** Server-coalesced (Postgres GENERATED column). Show this, not raw title. */
@@ -116,6 +120,10 @@ export interface ApiListOptions {
    * — only an explicit `true` opens the gate. Omit (leave `undefined`) to
    * use the server default; the URL query string drops the field entirely
    * so the wire never carries `include_subagents=false` unless we mean it.
+   *
+   * See also:
+   *   - `nextjs-app/lib/services/dev-sessions.ts` — `ListSessionsOptions.include_subagents`
+   *   - `nextjs-app/app/api/v1/dev-sessions/route.ts` — `querySchema.include_subagents`
    */
   include_subagents?: boolean;
 }
@@ -229,6 +237,13 @@ function buildListUrl(apiUrl: string, opts: ApiListOptions): string {
   // Only emit the `include_subagents` query param when the caller set it
   // (typically to `true` for the opt-in). Omitting when `undefined` keeps
   // the wire identical to the pre-ENG-5987 shape for default callers.
+  //
+  // The `String(false)` branch is API-contract-only: the route accepts
+  // `?include_subagents=false` and treats it equivalent to the default
+  // (filtered). The CLI never emits `false` — `commands/list.ts` collapses
+  // `false`/`undefined` to `undefined` here so the wire stays clean. The
+  // branch lives in the client to keep the option type honest for any
+  // future programmatic consumer that wants explicit defensive opt-out.
   if (opts.include_subagents !== undefined) {
     params.set("include_subagents", String(opts.include_subagents));
   }
