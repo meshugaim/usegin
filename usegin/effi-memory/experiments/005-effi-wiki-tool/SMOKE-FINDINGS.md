@@ -148,3 +148,31 @@ bun run usegin/effi-memory/experiments/005-effi-wiki-tool/harness/run.ts \
   `RUNBOOK.md`.
 
 Part of: ENG-5379 (experiment 005, step 6/6)
+
+---
+
+## Verification — 2026-05-13 (gate flips end-to-end)
+
+Local one-question smoke against the new harness shape, run dir
+`runs/20260513-151435/`. Question: "Who are the design partners?". Paired
+run, local Test project (`00000000-0000-0000-0000-000000000001`),
+python-services started with `EFFI_WIKI_PROJECT_ID=00000000-…-001` and
+`EFFI_WIKI_PATH=…/askeffi-app-really`.
+
+|       | `wiki_enabled` (trace) | "wiki MCP server created" log | Tools called |
+|-------|---|---|---|
+| **wiki-off** | `false` | absent | `browse_emails → browse_files → semantic_search → browse_meetings → list_data_summary` |
+| **wiki-on**  | `true`  | present (`INFO:agent_api.agent.mcp_builder:wiki MCP server created (ENG-5379)`) | `mcp__wiki__memory_lookup` only |
+
+Both sides hit the same server, same project. The wiki MCP server's
+construction log appears exactly once — for the wiki-on request — proving
+the per-request gate reaches all the way to `create_wiki_mcp_server`.
+Wiki-off's response confirms the toolbox change: she falls back to
+canon-discovery tools and reports "no data loaded yet" (true — the local
+Test project is empty); wiki-on returns the verbatim 8-partner table from
+`notes/design-partners.md`.
+
+The gate is proven; the **fair eval** against real canon data still
+requires running this harness against a project with content (the
+dogfooding/staging/prod surface). That's a separate activity, not
+infrastructure.
