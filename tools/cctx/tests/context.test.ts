@@ -11,11 +11,15 @@ describe("getContextWindow", () => {
   });
 
   it("returns 1M for current-gen models", () => {
+    expect(getContextWindow("claude-opus-4-7")).toBe(1000000);
+    expect(getContextWindow("claude-sonnet-4-7")).toBe(1000000);
     expect(getContextWindow("claude-opus-4-6")).toBe(1000000);
     expect(getContextWindow("claude-sonnet-4-6")).toBe(1000000);
   });
 
   it("returns 1M for future dated variants via prefix match", () => {
+    expect(getContextWindow("claude-opus-4-7-20260501")).toBe(1000000);
+    expect(getContextWindow("claude-sonnet-4-7-20260601")).toBe(1000000);
     expect(getContextWindow("claude-opus-4-6-20260401")).toBe(1000000);
     expect(getContextWindow("claude-sonnet-4-6-20260601")).toBe(1000000);
   });

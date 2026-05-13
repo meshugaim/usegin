@@ -7,6 +7,8 @@ import { basename } from "path";
 
 /** Known context window sizes by model (exact match). */
 const CONTEXT_WINDOWS: Record<string, number> = {
+  "claude-opus-4-7": 1000000,
+  "claude-sonnet-4-7": 1000000,
   "claude-opus-4-6": 1000000,
   "claude-sonnet-4-6": 1000000,
   "claude-opus-4-5-20251101": 200000,
@@ -18,10 +20,15 @@ const CONTEXT_WINDOWS: Record<string, number> = {
 /**
  * Model family prefixes that default to 1M context.
  * When the API returns a model ID not in the exact-match table
- * (e.g. a new dated variant like claude-opus-4-6-20260401),
+ * (e.g. a new dated variant like claude-opus-4-7-20260501),
  * we match by prefix to avoid defaulting to 200K.
  */
-const FAMILY_1M_PREFIXES = ["claude-opus-4-6", "claude-sonnet-4-6"];
+const FAMILY_1M_PREFIXES = [
+  "claude-opus-4-7",
+  "claude-sonnet-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+];
 
 const DEFAULT_CONTEXT_WINDOW = 200000;
 
