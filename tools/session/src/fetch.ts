@@ -332,6 +332,17 @@ export async function fetchSession(input: string): Promise<FetchResult> {
         // raw ids — only `id` is load-bearing for the error message
         // (the formatter slices `id` for short-id display); the other
         // fields are pinned to placeholders for type compatibility.
+        //
+        // Verified safe: `AmbiguousSessionError`'s constructor (see
+        // `finder/types.ts`) renders ONLY `matchedSession.id.slice(0, 8)`
+        // into the user-facing message — `mtime`, `project`, `username`,
+        // and `path` are never read by the formatter. The placeholder
+        // values here (`new Date(0)`, empty strings) therefore never
+        // surface as "Jan 1 1970" or blank-project artefacts to the
+        // user. If a future formatter change starts rendering those
+        // fields, the API response shape needs to grow `started_at` and
+        // `username` for ambiguous-resolution candidates before that
+        // change lands.
         const { AmbiguousSessionError } = await import("./finder/types");
         const matches = supa.error.sessionIds.map((sid) => ({
           path: "", // Unknown — the API doesn't surface storage_path here.

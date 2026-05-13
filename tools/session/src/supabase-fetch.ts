@@ -265,10 +265,18 @@ export async function fetchFromSupabase(
   // (run `effi auth login`) doesn't vary by entry point.
   let resolvedSessionId = sessionIdOrPrefix;
   if (!isSessionId(sessionIdOrPrefix)) {
+    // ENG-5986: dev_sessions.session_id is canonical-lowercase; normalize
+    // so user input casing variants (`session resume 7C99A7ED` from a
+    // copy-paste of a SHA-style short id) resolve. The API enforces
+    // strict-lowercase at the route layer so an un-normalized prefix
+    // would 400; lowercasing here keeps the gateway strict while the CLI
+    // stays forgiving. See `nextjs-app/app/api/v1/dev-sessions/route.ts`
+    // for the route-layer regex and the rationale.
+    const normalizedPrefix = sessionIdOrPrefix.toLowerCase();
     try {
       const list = await listSessions(
         { token: creds.access_token, apiUrl },
-        { session_id_prefix: sessionIdOrPrefix, limit: 2 },
+        { session_id_prefix: normalizedPrefix, limit: 2 },
       );
       if (list.items.length === 0) {
         return { ok: false, error: { kind: "not_found" } };
@@ -278,7 +286,7 @@ export async function fetchFromSupabase(
           ok: false,
           error: {
             kind: "ambiguous_prefix",
-            prefix: sessionIdOrPrefix,
+            prefix: normalizedPrefix,
             sessionIds: list.items.map((i) => i.session_id),
           },
         };

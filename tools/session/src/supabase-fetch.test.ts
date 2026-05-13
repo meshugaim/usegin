@@ -200,6 +200,91 @@ describe("fetchFromSupabase — nested subagent placement (ENG-5862)", () => {
     },
   );
 
+  test(
+    "ENG-5986: uppercase prefix input is lowercased before hitting the API",
+    async () => {
+      // Strict gateway + forgiving CLI (ENG-5986 follow-up). The
+      // `/api/v1/dev-sessions` route's `session_id_prefix` regex rejects
+      // uppercase with a 400 because `dev_sessions.session_id` stores
+      // canonical-lowercase UUIDs and the service-layer `LIKE` filter is
+      // case-sensitive. The CLI compensates by lowercasing user input
+      // before sending — so a copy-paste of `7C99A7ED` from a SHA-style
+      // short id still resolves end-to-end against an actual session.
+      //
+      // We pin this at the wire so a refactor that drops the
+      // normalization would surface here, not in a confusing 400 from
+      // the route the next time a user types uppercase.
+      const projectHash = "test-project-hash-lowercase";
+      const { projectsDir } = setupFixture(projectHash);
+      createdDirs.push(projectsDir);
+
+      const upperPrefix = "ABCDEF01";
+      const lowerPrefix = "abcdef01";
+      const parentGz = gzipBytes('{"type":"summary","summary":"parent"}');
+
+      // Capture every URL the CLI fetches so we can assert the API call
+      // carried the lowercased prefix — the load-bearing observable.
+      const seenUrls: string[] = [];
+
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (mock(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        seenUrls.push(url);
+        if (url.includes("/api/v1/dev-sessions?")) {
+          // Prefix-resolve list call. Return one match keyed on FULL_UUID.
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: "row-id",
+                  session_id: FULL_UUID,
+                  last_synced_at: "2026-05-13T00:00:00Z",
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (url.endsWith(`/api/v1/dev-sessions/${FULL_UUID}`)) {
+          // Single-session GET after the prefix resolved.
+          return new Response(
+            JSON.stringify({
+              session: { id: FULL_UUID, session_id: FULL_UUID },
+              signed_url: "https://signed.example/parent",
+              subagent_paths: [],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+        if (url === "https://signed.example/parent") {
+          return new Response(parentGz, { status: 200 });
+        }
+        return new Response("unexpected url: " + url, { status: 500 });
+      }) as unknown) as typeof fetch;
+
+      try {
+        const { fetchFromSupabase } = await import("./supabase-fetch");
+
+        const result = await fetchFromSupabase(upperPrefix);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.sessionId).toBe(FULL_UUID);
+
+        // Find the list-call URL and assert it carried the LOWERCASED
+        // prefix on the wire, NOT the uppercase the user typed.
+        const listUrl = seenUrls.find((u) => u.includes("session_id_prefix="));
+        expect(listUrl).toBeDefined();
+        expect(listUrl).toContain(`session_id_prefix=${lowerPrefix}`);
+        expect(listUrl).not.toContain(`session_id_prefix=${upperPrefix}`);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  );
+
   test("subagent failure mid-loop → transport_error carries partialSuccess paths", async () => {
     const projectHash = "test-project-hash-partial";
     const { projectsDir } = setupFixture(projectHash);
