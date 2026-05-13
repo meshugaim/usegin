@@ -135,9 +135,24 @@ file under a `## Findings — Wes return (2026-05-13)` heading.
 
 ## Findings — Wes return (2026-05-13)
 
-Status: parked at step 4 (human-only Slack-admin click). `just agent-dev` left running.
+Status: parked at step 1 (Doppler login, human-only) AND step 4 (Slack admin redirect URL, human-only). Steps 2 + 3 are green. `just agent-dev` left running (it carries env from the now-deleted `.env.local` in process memory; will need restart through Doppler once auth lands).
 
-**Step 1 — `.env.local` (green).** Wrote `nextjs-app/.env.local` with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (values from `bunx supabase status -o env`). Confirmed `.env.local` is in `.gitignore` (root). `just agent-dev` boots; `curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:63000/` → `307` (sign-in redirect = green). No additional env vars were demanded on boot.
+**Path pivot mid-run.** Coordinator reversed the `.env.local` route in favor of the "new organized Doppler" path (alternative #1 from the 2026-05-08 note): patch `justfile`'s `agent-dev-web` to wrap `bun run dev` in `doppler run --project effi --config dev --`. Probed first per coordinator instruction: `doppler secrets get SLACK_CLIENT_ID --project effi --config dev --plain` → **`Doppler Error: you must provide a token`**. Per coordinator's halt rule for that exact error, STOPPED step 1. Did NOT patch the justfile (can't validate the change without Doppler auth, and the patch would block boot for the next reader if pushed un-verified).
+
+Cleanup: deleted `nextjs-app/.env.local` since the new path supplies env via Doppler instead. The running `just agent-dev` still serves 307 because the process loaded env at start time; it will need a kill + restart through Doppler once auth lands. **Did not** commit any justfile change.
+
+**Step 1 (original, now reverted) — `.env.local`.** Wrote `nextjs-app/.env.local` with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (values from `bunx supabase status -o env`). `curl http://127.0.0.1:63000/` → `307` (green). File deleted on coordinator pivot. The file was gitignored throughout (verified against root `.gitignore`).
+
+**Step 1 (revised) — justfile Doppler-wrap (PARKED on human).** `justfile:148-153` is the target:
+
+```
+agent-dev-web:
+    cd nextjs-app && PORT=63000 NEXT_PUBLIC_SITE_URL=http://localhost:63000 \
+      PYTHON_API_PRIVATE_URL=http://localhost:58000 \
+      nohup bun run dev > /tmp/agent-dev-nextjs.log 2>&1 &
+```
+
+Intended edit (NOT applied — awaiting Doppler login): prepend `doppler run --project effi --config dev --` before `nohup bun run dev`. The Python API target at `justfile:156-160` was not flagged by the original boot test and stays as-is. Human action: `doppler login` (interactive browser flow) in this devcontainer, then re-run this charter or apply the one-line patch directly.
 
 **Step 2 — `slackIntegration` browser flag (green).** Cookie `effi-slack-integration` = `true` on a persistent playwright-cli profile (session `wes`, profile dir `/tmp/wes-pw-profile`). Verified via `playwright-cli -s=wes cookie-get effi-slack-integration`. The persistent profile carries into step 5.
 
