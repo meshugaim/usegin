@@ -223,6 +223,11 @@ export async function runList(
       {
         limit: listArgs.limit,
         since: sinceToIso(listArgs.since),
+        // ENG-5987: thread the CLI opt-in onto the wire. Only set when the
+        // user passed `--include-subagents`; leaving `undefined` keeps the
+        // request shape identical to the pre-feature wire for default
+        // callers (the API finder omits the param entirely when undefined).
+        include_subagents: listArgs.includeSubagents ? true : undefined,
       },
       deps.apiDeps ?? {},
     );

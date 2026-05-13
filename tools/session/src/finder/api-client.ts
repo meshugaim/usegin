@@ -82,6 +82,14 @@ export interface ApiSessionItem {
   storage_path: string;
   parent_session_id: string | null;
   forked_at_turn: number | null;
+  /**
+   * True for sub-agent / nested-agent transcripts; false for parent chat
+   * sessions. The `GET /api/v1/dev-sessions` endpoint filters
+   * `is_subagent=true` rows out by default — callers must pass
+   * `include_subagents=true` to surface them (ENG-5987). Always present
+   * on the response (Postgres NOT NULL DEFAULT false).
+   */
+  is_subagent: boolean;
   /** Server-coalesced (Postgres GENERATED column). Show this, not raw title. */
   display_title: string;
   created_at: string;
@@ -103,6 +111,13 @@ export interface ApiListOptions {
   until?: string;
   /** Full-text query against `searchable_content`. */
   q?: string;
+  /**
+   * Opt-in to surface `is_subagent=true` rows. Defaults to `false` server-side
+   * — only an explicit `true` opens the gate. Omit (leave `undefined`) to
+   * use the server default; the URL query string drops the field entirely
+   * so the wire never carries `include_subagents=false` unless we mean it.
+   */
+  include_subagents?: boolean;
 }
 
 export interface ApiListResponse {
@@ -211,6 +226,12 @@ function buildListUrl(apiUrl: string, opts: ApiListOptions): string {
   if (opts.since !== undefined) params.set("since", opts.since);
   if (opts.until !== undefined) params.set("until", opts.until);
   if (opts.q !== undefined) params.set("q", opts.q);
+  // Only emit the `include_subagents` query param when the caller set it
+  // (typically to `true` for the opt-in). Omitting when `undefined` keeps
+  // the wire identical to the pre-ENG-5987 shape for default callers.
+  if (opts.include_subagents !== undefined) {
+    params.set("include_subagents", String(opts.include_subagents));
+  }
   const qs = params.toString();
   return qs
     ? `${base}/api/v1/dev-sessions?${qs}`

@@ -145,6 +145,15 @@ export interface ListArgs {
    * `--remote` is unset — the local path doesn't have a profile concept.
    */
   profile?: string;
+  /**
+   * Opt-in to surface sub-agent transcripts under `--remote` (ENG-5987).
+   * Defaults to false — the list endpoint filters `is_subagent=true` rows
+   * out by default, matching the same shape we see in production where
+   * ~80% of recent `dev_sessions` rows are nested-agent JSONLs the human
+   * never wants in their list. Without `--remote`, the flag is a no-op:
+   * the local discovery path doesn't read from `dev_sessions`.
+   */
+  includeSubagents: boolean;
 }
 
 export function parseListArgs(args: string[]): ListArgs {
@@ -153,6 +162,7 @@ export function parseListArgs(args: string[]): ListArgs {
     output: "path",
     limit: 10,
     remote: false,
+    includeSubagents: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -181,6 +191,8 @@ export function parseListArgs(args: string[]): ListArgs {
       const value = requireArgValue(args, i, "--profile");
       result.profile = value;
       i++;
+    } else if (arg === "--include-subagents") {
+      result.includeSubagents = true;
     }
   }
 

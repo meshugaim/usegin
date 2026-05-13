@@ -389,7 +389,7 @@ describe("runList — --remote subagent default-filter (ENG-5987)", () => {
   // default-filter behaviour is pinned by the integration test (sibling
   // file), which exercises the real Postgres + service + route stack.
 
-  test.failing(
+  test(
     "ENG-5987: --include-subagents threads true to the finder AND renders both rows",
     async () => {
       // Stub plays the server: returns BOTH when `include_subagents===true`,
