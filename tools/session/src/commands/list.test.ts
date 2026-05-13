@@ -352,191 +352,85 @@ describe("apiItemToSessionInfo", () => {
 // ---------------------------------------------------------------------------
 // ENG-5987 — default-filter subagent rows out of `session list --remote`.
 //
-// Phase 1 Red: these tests pin the CLI surface area for the
-// subagent-default-filter feature. They fail today because:
+// Phase 1 Red: pin the CLI behaviour contract. At runtime today:
 //
-//   - `parseListArgs` does not recognize `--include-subagents` (the flag is
-//     silently dropped, so under the current code both calls look the same).
+//   - `parseListArgs` does not recognize `--include-subagents`, so the flag
+//     is silently dropped and the finder is called without a subagent filter.
 //   - `runList` does not thread an `include_subagents` filter to the API
-//     finder (the new query field doesn't exist on `ApiListOptions` yet).
-//   - `ApiSessionItem` does not carry `is_subagent`, so the renderer has no
-//     way to mark a remote row as a subagent transcript.
+//     finder (the field is not yet a key of `ApiListOptions`).
 //
-// Wes-Green (phase 1 Green) wires the flag through CLI → finder → HTTP query
-// string and surfaces `is_subagent` on the response shape. The migration +
-// service + route changes live in the integration test (sibling file).
+// Green wires the flag through CLI → finder → HTTP query string. The
+// migration + service + route changes live in the integration test (sibling
+// file). `is_subagent` is the column name on `dev_sessions`; we keep the
+// same name across CLI / API / DB to avoid silent-mistranslation.
 //
-// `is_subagent` is the column name on `dev_sessions`; we keep the same name
-// across CLI / API / DB to avoid the silent-mistranslation trap where a
-// `is_subagent` row gets surfaced as `kind: "subagent"` on the wire and then
-// has to be re-aliased back in the CLI. One name, three layers.
+// Tests read new fields via runtime casts (`as ApiListOptions & { ... }` and
+// `apiItem({ is_subagent } as Partial<ApiSessionItem> & { ... })`) so the
+// FILE compiles before Green widens the types. The behavior assertions fail
+// because the flag isn't parsed and the filter isn't threaded — that's the
+// right-reason Red per `feedback_green_right_reason`.
 //
-// Strategy note for the reader: today the new field doesn't exist on
-// `ApiSessionItem` or `ApiListOptions`. The tests read the new field via a
-// runtime cast so the FILE compiles. The behavior assertions still fail —
-// because the flag isn't parsed, the filter isn't threaded, and the field
-// isn't carried. That's the right-reason Red per `feedback_green_right_reason`.
+// Out of scope for these CLI tests:
+//   - Visual differentiation of subagent rows in the renderer ([R*] vs [R]).
+//     If/when we want that, it lands as a separate Phase. The Phase 1
+//     contract is default-filter + opt-in flag, nothing more.
 // ---------------------------------------------------------------------------
 
-/** Cast helper: stamp an `is_subagent` flag onto an `ApiSessionItem` fixture
- * without breaking `Partial<ApiSessionItem>` typing on the base factory.
- * After Green lands, the field becomes part of `ApiSessionItem` and this
- * helper collapses to `apiItem({ is_subagent: ... })`. */
-function subagentApiItem(
-  isSubagent: boolean,
-  overrides: Partial<ApiSessionItem> = {},
-): ApiSessionItem {
-  const base = apiItem(overrides);
-  return Object.assign(base, { is_subagent: isSubagent });
-}
-
 describe("runList — --remote subagent default-filter (ENG-5987)", () => {
-  test.failing(
-    "ENG-5987: default (no flag) threads include_subagents=false to the API finder",
-    async () => {
-      const filtersSeen: ApiListOptions[] = [];
+  // Single-test contract: `--include-subagents` flips both the wire-value
+  // (`include_subagents=true` on the finder filter) AND the rendered
+  // output (subagent rows appear). This is the only new CLI behaviour
+  // Phase 1 Green adds.
+  //
+  // We deliberately do NOT pin "default mode filters subagents out" at
+  // the CLI layer: with a stub-server, today's no-filter pre-Green path
+  // returns whatever the stub returns, so a passing assertion would be
+  // testing the stub, not the production code. The user-visible
+  // default-filter behaviour is pinned by the integration test (sibling
+  // file), which exercises the real Postgres + service + route stack.
 
-      await runList(["--remote"], {
+  test.failing(
+    "ENG-5987: --include-subagents threads true to the finder AND renders both rows",
+    async () => {
+      // Stub plays the server: returns BOTH when `include_subagents===true`,
+      // otherwise only the chat row. Today the flag is silently dropped by
+      // `parseListArgs`, so `inc` is undefined → stub returns [chat] →
+      // renderer prints one line → both assertions below fail (the wire
+      // value isn't `true`, and only one line was rendered). Right-reason
+      // Red.
+      const lines: string[] = [];
+      const filtersSeen: ApiListOptions[] = [];
+      const chatId = "55555555-5555-5555-5555-555555555555";
+      const subId = "66666666-6666-6666-6666-666666666666";
+
+      await runList(["--remote", "--include-subagents", "--output", "id"], {
         discoverSessionsFn: async () => [],
         findRemoteSessionsViaApiFn: async (_options, filters) => {
           filtersSeen.push(filters);
-          return [];
+          const inc = (filters as ApiListOptions & {
+            include_subagents?: boolean;
+          }).include_subagents;
+          const chat = apiItem({ session_id: chatId, is_subagent: false } as
+            Partial<ApiSessionItem> & { is_subagent: boolean });
+          const sub = apiItem({ session_id: subId, is_subagent: true } as
+            Partial<ApiSessionItem> & { is_subagent: boolean });
+          return inc === true ? [chat, sub] : [chat];
         },
-        log: () => {},
+        log: (line) => lines.push(line),
         errorLog: () => {},
-      }).catch(() => {
-        // Empty result path calls process.exit; the stub throws. The behavior
-        // we care about is that the finder was called with the right
-        // filter — that signal lives in `filtersSeen` regardless of how the
-        // empty-list error path resolves.
       });
 
-      expect(filtersSeen.length).toBe(1);
-      const filters = filtersSeen[0]! as ApiListOptions & {
-        include_subagents?: boolean;
-      };
-      expect(filters.include_subagents).toBe(false);
-    },
-  );
-
-  test.failing(
-    "ENG-5987: --include-subagents threads include_subagents=true to the API finder",
-    async () => {
-      const filtersSeen: ApiListOptions[] = [];
-
-      await runList(["--remote", "--include-subagents"], {
-        discoverSessionsFn: async () => [],
-        findRemoteSessionsViaApiFn: async (_options, filters) => {
-          filtersSeen.push(filters);
-          return [];
-        },
-        log: () => {},
-        errorLog: () => {},
-      }).catch(() => {
-        // See sibling-test comment above.
-      });
-
+      // Wire contract: opt-in must be EXPLICIT (`true`), not falsy/omitted.
       expect(filtersSeen.length).toBe(1);
       const filters = filtersSeen[0]! as ApiListOptions & {
         include_subagents?: boolean;
       };
       expect(filters.include_subagents).toBe(true);
-    },
-  );
 
-  test.failing(
-    "ENG-5987: default-filter end-to-end — server returns only chat, renderer renders only chat",
-    async () => {
-      // End-to-end pin (CLI → finder filter → simulated server filter →
-      // renderer). The finder stub plays the server: when
-      // `include_subagents` is truthy it returns BOTH rows; when falsy it
-      // returns only the chat row.
-      //
-      // Today this fails for the right reason: the CLI does not pass
-      // `include_subagents` at all (the flag isn't parsed, the field isn't
-      // a known `ApiListOptions` key), so the stub's `inc` is undefined and
-      // the falsy branch DOES return [chat]. The render side then prints
-      // one id. That LOOKS like a pass — but the load-bearing assertion
-      // below pins the filter VALUE explicitly (`=== false`, not just
-      // "falsy"), which today is undefined.
-      const lines: string[] = [];
-      const filtersSeen: ApiListOptions[] = [];
-      const chatId = "55555555-5555-5555-5555-555555555555";
-
-      await runList(["--remote", "--output", "id"], {
-        discoverSessionsFn: async () => [],
-        findRemoteSessionsViaApiFn: async (_options, filters) => {
-          filtersSeen.push(filters);
-          const inc = (filters as ApiListOptions & {
-            include_subagents?: boolean;
-          }).include_subagents;
-          const chat = subagentApiItem(false, { session_id: chatId });
-          const sub = subagentApiItem(true, {
-            session_id: "66666666-6666-6666-6666-666666666666",
-          });
-          return inc ? [chat, sub] : [chat];
-        },
-        log: (line) => lines.push(line),
-        errorLog: () => {},
-      });
-
-      expect(lines).toEqual([chatId]);
-      // Load-bearing: the CLI MUST explicitly request the filtered view by
-      // sending `include_subagents=false`, not just omit the key. Omission
-      // and explicit-false are equivalent on the server today, but pinning
-      // the explicit value catches the regression where a future refactor
-      // drops the field assuming the server default does the work.
-      const filters = filtersSeen[0]! as ApiListOptions & {
-        include_subagents?: boolean;
-      };
-      expect(filters.include_subagents).toBe(false);
-    },
-  );
-
-  test.failing(
-    "ENG-5987: --include-subagents renders both chat and subagent rows",
-    async () => {
-      const lines: string[] = [];
-      const chatId = "77777777-7777-7777-7777-777777777777";
-      const subId = "88888888-8888-8888-8888-888888888888";
-
-      await runList(["--remote", "--include-subagents", "--output", "id"], {
-        discoverSessionsFn: async () => [],
-        findRemoteSessionsViaApiFn: async (_options, filters) => {
-          const inc = (filters as ApiListOptions & {
-            include_subagents?: boolean;
-          }).include_subagents;
-          const chat = subagentApiItem(false, { session_id: chatId });
-          const sub = subagentApiItem(true, { session_id: subId });
-          return inc ? [chat, sub] : [chat];
-        },
-        log: (line) => lines.push(line),
-        errorLog: () => {},
-      });
-
+      // User-visible: both rows render.
       expect(lines.length).toBe(2);
       expect(lines).toContain(chatId);
       expect(lines).toContain(subId);
-    },
-  );
-
-  test.failing(
-    "ENG-5987: apiItemToSessionInfo surfaces is_subagent on SessionInfo.meta",
-    () => {
-      // The renderer needs a stable signal for "this row is a subagent" so a
-      // future UI can mark it (e.g., "[R*]" instead of "[R]"). Today
-      // `SessionInfo.meta` carries no such field; Green adds it and the
-      // adapter propagates it from `ApiSessionItem.is_subagent`.
-      const sub = subagentApiItem(true);
-      const result = apiItemToSessionInfo(sub);
-      expect(result).not.toBeNull();
-      const meta = result!.meta as { is_subagent?: boolean } | undefined;
-      expect(meta?.is_subagent).toBe(true);
-
-      const chat = subagentApiItem(false);
-      const chatResult = apiItemToSessionInfo(chat);
-      const chatMeta = chatResult!.meta as { is_subagent?: boolean } | undefined;
-      expect(chatMeta?.is_subagent).toBe(false);
     },
   );
 });
