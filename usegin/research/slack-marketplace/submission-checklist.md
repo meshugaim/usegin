@@ -23,8 +23,8 @@ submission is honest.
 |---|---|---|---|---|
 | P1 | **ENG-5410 token-encryption helper landed** + Slack callback updated to call it + backfill any raw-text rows. | `security-questionnaire.md` §1 only honest if encryption is real at submission time. | Eng (Lihu/Gin) | ☐ |
 | P2 | **ENG-5415 Events receiver landed** (or questionnaire §3 reworded to describe planned architecture). | Marketplace requires demonstrably-working Events flow. | Eng | ☐ |
-| P3 | **Privacy policy** at `askeffi.ai/privacy` covers Slack data fields, retention, deletion procedure. | Slack reviewer reads it; missing Slack-specific clauses = rejection (review-blockers §B5). | Lihu + legal | ☐ |
-| P4 | **Terms of service** live at `askeffi.ai/terms`. | Marketplace required field. | Lihu + legal | ☐ |
+| P3 | **Add Slack-specific clauses to the existing privacy policy** at `https://app.askeffi.ai/privacy-policy` — what Slack data we collect (channel metadata, messages from selected channels, user profiles excl. email), retention, deletion on workspace disconnect. The page already exists (`nextjs-app/app/privacy-policy/page.tsx`, DB-versioned, current v1.0.1); the gap is Slack coverage inside it, not the page itself. | Slack reviewer reads it; missing Slack-specific clauses = rejection (review-blockers §B5). | Lihu + legal (~30 min read + ~1 hr legal review) | ☐ |
+| P4 | **Confirm the existing terms of service** at `https://app.askeffi.ai/terms-of-service` covers Slack-app usage (data-processor framing, customer obligations re: their workspace data). The page already exists (`nextjs-app/app/terms-of-service/page.tsx`, with `/accept-terms` flow); usually no edit needed — just confirm. | Marketplace required field. | Lihu + legal (~15 min confirm) | ☐ |
 | P5 | **Incident-response runbook** exists in writing (~1–2 pages). | Audit-DPA Commitment 1 flags this gap; Slack questionnaire §7 asks. | Lihu (~half day) | ☐ |
 | P6 | **Confirm support@askeffi.ai is monitored.** | Slack requires reachable support contact. | Lihu | ☐ |
 | P7 | **Confirm dependency-scanning state** (gitleaks, Dependabot, `bun audit`, `pip-audit`). If still gapped, attach Linear ETA to questionnaire §10. | Audit-DPA Commitment 4 was Non-Compliant; reviewer point of friction. | Lihu (lookup) | ☐ |
@@ -65,8 +65,8 @@ The C1 callback assumes an app already registered and `SLACK_CLIENT_ID` /
 | 2.7 | Record + upload demo video to YouTube (30–90s, captions on, ads off). | Script in listing-draft.md "Demo-video script outline" | ☐ |
 | 2.8 | Paste YouTube URL into listing. | UI | ☐ |
 | 2.9 | Paste support email `support@askeffi.ai` (or webform URL). | listing-draft.md | ☐ |
-| 2.10 | Paste privacy policy URL `https://askeffi.ai/privacy`. | depends on P3 | ☐ |
-| 2.11 | Paste terms URL `https://askeffi.ai/terms`. | depends on P4 | ☐ |
+| 2.10 | Paste privacy policy URL `https://app.askeffi.ai/privacy-policy`. | depends on P3 | ☐ |
+| 2.11 | Paste terms URL `https://app.askeffi.ai/terms-of-service`. | depends on P4 | ☐ |
 | 2.12 | Paste landing-page URL `https://askeffi.ai/integrations/slack`. **Page must work at review time** (review-blockers §B11). | Lihu / Marketing | ☐ |
 | 2.13 | Set primary category "Productivity"; secondary "Analytics". | UI | ☐ |
 | 2.14 | Paste 6 feature bullets. | listing-draft.md §Feature-list bullets | ☐ |
@@ -136,7 +136,7 @@ Slack reviewers test installation. Make sure it works.
 
 ## Items deliberately **not** in this checklist
 
-- Writing the privacy policy / terms (legal — out of scope per ENG-5414).
+- Drafting a privacy policy / terms of service from scratch — both already exist (P3/P4 above describe the actual Slack-clause-augmentation work).
 - Building the demo (Lihu / Marketing — out of scope).
 - Implementing ENG-5410 / ENG-5415 (separate tickets — listed as P1/P2
   blockers above so we don't ship a dishonest questionnaire).
