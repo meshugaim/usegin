@@ -27,7 +27,7 @@ export function buildSlackDmCommand(): Command {
 		.action(async (user, message, opts) => {
 			let handle;
 			try {
-				handle = buildSlackClient();
+				handle = await buildSlackClient();
 			} catch (err) {
 				if (err instanceof SlackConfigError) {
 					process.stderr.write(`dx slack dm: ${err.message}\n`);

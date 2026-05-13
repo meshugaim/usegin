@@ -26,7 +26,7 @@ export function buildSlackReactCommand(): Command {
 		.action(async (channel, ts, emoji, opts) => {
 			let handle;
 			try {
-				handle = buildSlackClient();
+				handle = await buildSlackClient();
 			} catch (err) {
 				if (err instanceof SlackConfigError) {
 					process.stderr.write(`dx slack react: ${err.message}\n`);

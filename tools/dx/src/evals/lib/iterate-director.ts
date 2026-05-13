@@ -29,7 +29,7 @@
 
 import { mkdirSync, writeFileSync, copyFileSync, readFileSync } from "fs";
 import { join } from "path";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { resolvePrompt } from "./prompt-resolver";
 import { loadCases } from "./case-loader";
 import type { EvalCase } from "./case-loader";
@@ -434,7 +434,9 @@ export async function runDirector(
   copyFileSync(baselinePromptPath, baselineSnapshot);
 
   // Live mode: one shared SDK client. Dry-run: never instantiated.
-  const client = opts.dryRun ? null : new Anthropic();
+  const client = opts.dryRun
+    ? null
+    : new (await import("@anthropic-ai/sdk")).default();
 
   const dimDescriptors = describeDimensions(dog);
 

@@ -39,7 +39,7 @@ async function actionRead(
 ) {
   let handle;
   try {
-    handle = buildSlackClient();
+    handle = await buildSlackClient();
   } catch (err) {
     if (err instanceof SlackConfigError) {
       process.stderr.write(`dx slack read: ${err.message}\n`);

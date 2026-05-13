@@ -64,7 +64,7 @@ function buildBookmark(): Command {
 			.action(async (channel, url, opts) => {
 				let handle;
 				try {
-					handle = buildSlackClient();
+					handle = await buildSlackClient();
 				} catch (err) {
 					if (err instanceof SlackConfigError) {
 						process.stderr.write(
@@ -210,7 +210,7 @@ async function runOp(
 	opts: { json?: boolean },
 	run: (
 		client: ChannelAdminClient,
-		config: ReturnType<typeof buildSlackClient>["config"],
+		config: Awaited<ReturnType<typeof buildSlackClient>>["config"],
 	) => Promise<OpResult & { members?: MemberRow[] }>,
 ) {
 	let handle;

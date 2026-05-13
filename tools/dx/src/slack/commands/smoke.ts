@@ -36,7 +36,7 @@ export function buildSlackSmokeCommand(): Command {
 		.action(async (opts) => {
 			let handle;
 			try {
-				handle = buildSlackClient();
+				handle = await buildSlackClient();
 			} catch (err) {
 				if (err instanceof SlackConfigError) {
 					process.stderr.write(`dx slack smoke: ${err.message}\n`);

@@ -42,7 +42,7 @@ function buildUpload(): Command {
 		.action(async (channel, path, opts) => {
 			let handle;
 			try {
-				handle = buildSlackClient();
+				handle = await buildSlackClient();
 			} catch (err) {
 				if (err instanceof SlackConfigError) {
 					process.stderr.write(`dx slack files upload: ${err.message}\n`);

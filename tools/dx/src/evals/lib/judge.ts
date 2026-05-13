@@ -9,7 +9,6 @@
  * per that prompt's contract.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import type { DogDocument, DogDimension } from "./dog-loader";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -112,6 +111,7 @@ export async function judge(
   input: JudgeInput,
   judgeModel: string,
 ): Promise<JudgeResult> {
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
   const client = new Anthropic();
   const systemPrompt = judgeSystemPrompt();
   const userMessage = buildUserMessage(input);

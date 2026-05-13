@@ -9,7 +9,7 @@
  * Part of: ENG-5408
  */
 
-import { WebClient } from "@slack/web-api";
+import type { WebClient } from "@slack/web-api";
 import { loadSlackConfig, type SlackConfig } from "./config";
 
 export interface SlackClientHandle {
@@ -22,9 +22,16 @@ export interface SlackClientHandle {
  *
  * Allow injecting a `SlackConfig` for testing — production callers pass
  * nothing and rely on `loadSlackConfig()`.
+ *
+ * Async so the heavy `@slack/web-api` module is only loaded when a slack
+ * subcommand actually runs (keeps the dx CLI startup — incl. the Stop hook
+ * that calls `dx his hook-stop` — free of the SDK).
  */
-export function buildSlackClient(config?: SlackConfig): SlackClientHandle {
+export async function buildSlackClient(
+  config?: SlackConfig,
+): Promise<SlackClientHandle> {
   const cfg = config ?? loadSlackConfig();
+  const { WebClient } = await import("@slack/web-api");
   const client = new WebClient(cfg.botToken);
   return { client, config: cfg };
 }

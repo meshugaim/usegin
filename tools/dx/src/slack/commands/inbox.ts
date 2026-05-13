@@ -44,7 +44,7 @@ async function actionInbox(opts: {
 }) {
   let handle;
   try {
-    handle = buildSlackClient();
+    handle = await buildSlackClient();
   } catch (err) {
     if (err instanceof SlackConfigError) {
       process.stderr.write(`dx slack inbox: ${err.message}\n`);
