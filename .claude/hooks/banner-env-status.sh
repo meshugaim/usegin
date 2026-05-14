@@ -6,6 +6,9 @@
 #   Tmux  : only when TMUX is set AND the window name isn't the default
 #   Git   : only when branch != main, OR working tree dirty, OR HEAD != @{u}
 #   Agent : only when `just agent-dev` is running
+#   Sync  : always — session-sync invisibility was the May-13 incident
+#           (ENG-5989/ENG-5993); banner is now the user-facing channel
+#           for daemon health (✅/⚠/❌ + remediation when not green).
 #
 # If only Host would print and there's nothing else, still print Host so the
 # agent has the env id at hand for the rest of the session.
@@ -99,6 +102,114 @@ if [ ${#running_ports[@]} -gt 0 ]; then
   agent_row="dev running on $(IFS=/; echo "${running_ports[*]}")"
 fi
 
+# --- Session-sync row -------------------------------------------------------
+#
+# Always-printed row covering daemon + auth + last-upload freshness. Inputs,
+# each overridable for tests:
+#
+#   BANNER_SYNC_DAEMON_STATE       — `online` | `down` (skip live pidfile probe)
+#   BANNER_SYNC_EFFI_AUTH_STATUS   — `effi auth status` output (skip live run)
+#   SESSION_SYNC_STATE_DIR         — daemon's state dir (same var it reads)
+#
+# Severity (most-actionable wins, per AC):
+#   ❌ DOWN          → no live daemon
+#   ⚠ auth expired  → daemon up + token expired / not authenticated
+#   ⚠ stale         → daemon up + auth ok + last upload >10 min ago
+#   ✅ ok            → daemon up + auth ok + last upload <10 min ago
+#
+# Daemon liveness via `<stateDir>/daemon.pid` + `kill -0`. NOT pm2 status:
+# pm2 jlist is ~290ms (banner budget is 500ms total) and, more importantly,
+# pm2 reports "online" between auto-respawns even when the daemon is mid-
+# crash-loop. The daemon-side pidfile is the canonical signal (see
+# `tools/session-sync/src/lifecycle.ts`), and `kill -0` catches the
+# common stale-pidfile case where an env was paused/killed without graceful
+# shutdown (May-13 incident shape).
+#
+# "Last upload" is `max(.[].lastUploadedAt)` over state.json. Per-file
+# rather than state-file mtime because heartbeats and safety-net writes
+# touch the file without uploading anything — mtime would lie green during
+# the May-13 silent-failure mode. See ENG-5993.
+
+sync_row=""
+sync_state_dir="${SESSION_SYNC_STATE_DIR:-$HOME/.local/state/session-sync}"
+sync_state_file="$sync_state_dir/state.json"
+sync_pidfile="$sync_state_dir/daemon.pid"
+sync_stale_threshold_s=600  # 10 min
+
+# daemon liveness — pidfile must exist AND its PID must be a live process.
+sync_daemon_state="down"
+if [ -n "${BANNER_SYNC_DAEMON_STATE:-}" ]; then
+  sync_daemon_state="$BANNER_SYNC_DAEMON_STATE"
+elif [ -s "$sync_pidfile" ]; then
+  sync_pid=$(tr -dc '0-9' < "$sync_pidfile" 2>/dev/null)
+  if [ -n "$sync_pid" ] && kill -0 "$sync_pid" 2>/dev/null; then
+    sync_daemon_state="online"
+  fi
+fi
+
+# auth — `effi auth status` exits 0 even on expired-token; parse the text.
+sync_auth_tmp=$(mktemp)
+trap 'rm -f "$sync_auth_tmp"' EXIT
+if [ -n "${BANNER_SYNC_EFFI_AUTH_STATUS:-}" ]; then
+  printf '%s' "$BANNER_SYNC_EFFI_AUTH_STATUS" > "$sync_auth_tmp"
+elif command -v effi >/dev/null 2>&1; then
+  # `effi auth status` writes its human report to stderr (stdout reserved for
+  # machine-readable streams). Capture both so we don't whitewash future
+  # additions to stdout, and so the parser sees the report either way.
+  effi auth status > "$sync_auth_tmp" 2>&1
+fi
+
+sync_auth_state="unknown"
+sync_auth_profile=""
+if [ -s "$sync_auth_tmp" ]; then
+  sync_auth_profile=$(awk -F': ' '/^Profile:/ {print $2; exit}' "$sync_auth_tmp")
+  if grep -q "Token expired" "$sync_auth_tmp"; then
+    sync_auth_state="expired"
+  elif grep -qE "Not authenticated|No (active )?profile|not logged in" "$sync_auth_tmp"; then
+    sync_auth_state="missing"
+  elif grep -q "^Logged in as" "$sync_auth_tmp"; then
+    sync_auth_state="ok"
+  fi
+fi
+
+# last-upload age — max non-empty `lastUploadedAt` across state entries.
+sync_age_s=""
+sync_age_pretty=""
+if [ -s "$sync_state_file" ] && command -v jq >/dev/null 2>&1; then
+  sync_last_iso=$(jq -r '
+    [.[]? | .lastUploadedAt? | select(. != null and . != "")] | max // empty
+  ' "$sync_state_file" 2>/dev/null)
+  if [ -n "$sync_last_iso" ]; then
+    sync_then_s=$(date -d "$sync_last_iso" +%s 2>/dev/null || echo "")
+    if [ -n "$sync_then_s" ]; then
+      sync_age_s=$(( $(date +%s) - sync_then_s ))
+      if   [ "$sync_age_s" -lt 60 ];    then sync_age_pretty="${sync_age_s}s"
+      elif [ "$sync_age_s" -lt 3600 ];  then sync_age_pretty="$((sync_age_s / 60))m"
+      elif [ "$sync_age_s" -lt 86400 ]; then sync_age_pretty="$((sync_age_s / 3600))h"
+      else                                   sync_age_pretty="$((sync_age_s / 86400))d"
+      fi
+    fi
+  fi
+fi
+
+if [ "$sync_daemon_state" = "online" ]; then
+  if [ "$sync_auth_state" = "expired" ] || [ "$sync_auth_state" = "missing" ]; then
+    sync_row="⚠  session-sync auth expired — effi auth refresh && bun pm2 restart session-sync"
+  elif [ -n "$sync_age_s" ] && [ "$sync_age_s" -ge "$sync_stale_threshold_s" ]; then
+    sync_row="⚠  session-sync stale — last upload ${sync_age_pretty} ago (expected <2m while active)"
+  else
+    detail="${sync_auth_profile:-unknown}"
+    [ -n "$sync_age_pretty" ] && detail="${detail} · last upload ${sync_age_pretty} ago"
+    sync_row="✅ session-sync online (${detail})"
+  fi
+else
+  if [ "$sync_auth_state" = "expired" ] || [ "$sync_auth_state" = "missing" ]; then
+    sync_row="❌ session-sync DOWN (auth) — effi auth refresh && bun pm2 start tools/session-sync/ecosystem.config.cjs"
+  else
+    sync_row="❌ session-sync DOWN — bun pm2 start tools/session-sync/ecosystem.config.cjs"
+  fi
+fi
+
 # --- Emit -------------------------------------------------------------------
 
 cat <<BANNER
@@ -111,5 +222,6 @@ BANNER
 [ -n "$tmux_row" ]  && echo "Tmux:  $tmux_row"
 [ -n "$git_row" ]   && echo "Git:   $git_row"
 [ -n "$agent_row" ] && echo "Agent: $agent_row"
+[ -n "$sync_row" ]  && echo "Sync:  $sync_row"
 
 echo "═══════════════════════════════════════════════════════════════════"
