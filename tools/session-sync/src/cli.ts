@@ -24,6 +24,7 @@ import { stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getCredentialsPath } from "../../lib/auth/credentials.ts";
+import { resolveProfileName } from "../../lib/auth/profiles.ts";
 import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
 import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
 import { Coalescer } from "./coalescer.ts";
@@ -212,6 +213,13 @@ interface DaemonState {
 	 * recreating the closure manually each time.
 	 */
 	startHeartbeatLoop: () => HeartbeatLoopHandle;
+	/**
+	 * The resolved profile name (after `resolveProfileName` honored
+	 * `current_profile` / EFFI_PROFILE / etc.). Cached at boot so the
+	 * credentials watcher and recovery `loadAuth` calls hit the same
+	 * profile dir without re-reading `current_profile` on every event.
+	 */
+	resolvedProfileName: string;
 }
 
 /**
@@ -389,7 +397,7 @@ async function dispatchTrigger(
  */
 function armCredWatcher(d: DaemonState): void {
 	if (d.credWatcher) return;
-	const credPath = getCredentialsPath(d.config.profileName);
+	const credPath = getCredentialsPath(d.resolvedProfileName);
 	let lastMtimeMs = 0;
 	try {
 		lastMtimeMs = statSync(credPath).mtimeMs;
@@ -438,11 +446,11 @@ async function onCredentialsChanged(d: DaemonState): Promise<void> {
 	if (d.authState.state !== "needs-auth") return; // stale event after teardown
 	const now = new Date().toISOString();
 	try {
-		let auth = await loadAuth({ profileName: d.config.profileName });
+		let auth = await loadAuth({ profileName: d.resolvedProfileName });
 		// Pre-emptive refresh: if the new token also has <REFRESH_BUFFER
 		// remaining, refresh now before handing it to the heartbeat.
 		auth = await refreshAuthIfNeeded(auth, {
-			profileName: d.config.profileName,
+			profileName: d.resolvedProfileName,
 		});
 		await dispatchTrigger(d, {
 			kind: "credentials-changed",
@@ -1061,6 +1069,12 @@ async function main(): Promise<void> {
 		"entries",
 	);
 
+	// Resolve the active profile name once, up-front. The state-dir flag
+	// I/O is profile-agnostic, but the credentials watcher and recovery
+	// `loadAuth` calls need to hit the same profile dir that auth.ts will
+	// (which honors `current_profile`).
+	const resolvedProfileName = await resolveProfileName(config.profileName);
+
 	// 1. Auth — with ENG-5990 restart persistence + needs-auth fallback.
 	//
 	// (a) If <stateDir>/needs-auth.flag exists, boot directly into
@@ -1133,6 +1147,7 @@ async function main(): Promise<void> {
 		startHeartbeatLoop: () => {
 			throw new Error("heartbeat factory not yet wired");
 		},
+		resolvedProfileName,
 	};
 
 	// Wire the heartbeat factory now that `d` exists.
