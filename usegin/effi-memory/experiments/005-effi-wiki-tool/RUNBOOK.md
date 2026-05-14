@@ -70,9 +70,9 @@ For experiment 005 the project is **AskEffi App (really)** —
 UUID `1bf0f507-7627-40a0-be72-8d2eacc40dec`. Same project on both sides of the harness; the
 server's `EFFI_WIKI_PROJECT_ID` must equal this UUID for wiki-on to have wiki access.
 
-## Production (Railway-hosted Effi) — NOT WIRED YET
+## Production (Railway-hosted Effi) — Option 1 wired (staged-and-committed)
 
-The bundle plumbing exists but the deploy path is **not complete**. Read the gotcha before pushing anything that depends on prod-Effi seeing the wiki.
+The bundle plumbing is complete via Option 1 below: `python-services/wiki/` is checked in and re-staged from `usegin/effi-memory/askeffi-app-really/` before any prod-bound push. Read the gotcha for context on why this was needed.
 
 ### What's in place
 
@@ -87,17 +87,16 @@ Railway's build context for the python service is **`python-services/`** (each s
 - `python-services/wiki/` is gitignored, so committing locally-staged content doesn't help either.
 - Running `stage-wiki-for-bundle.sh` locally before `git push` populates the dir but git doesn't track it.
 
-**Net effect:** running the script today produces a local-only `python-services/wiki/` that never reaches Railway. There is no working prod path as-shipped.
+**Net effect:** the wiki now lives in git under `python-services/wiki/` (Option 1 below) and is re-staged from `usegin/effi-memory/askeffi-app-really/` via `stage-wiki-for-bundle.sh` before each prod-bound push, so Railway's build context sees current content.
 
-### Options for a real prod path (pick one before promoting)
+### Options for a real prod path
 
-1. **Un-gitignore + commit staged content.** Run `stage-wiki-for-bundle.sh` before each prod-bound push, `git add python-services/wiki/`, commit. Trades repo bloat (~412KB markdown today) for simplicity. Requires removing the `wiki/` line from `.gitignore`.
+1. **Un-gitignore + commit staged content. — CHOSEN.** Run `stage-wiki-for-bundle.sh` before each prod-bound push, `git add python-services/wiki/`, commit. Trades repo bloat (~412KB markdown today) for simplicity. The `wiki/` line has been removed from `python-services/.gitignore`.
+   - **Re-staging cadence:** the operator must re-run `stage-wiki-for-bundle.sh` and commit the result before any prod-bound push so the bundled `python-services/wiki/` stays in sync with the canonical source at `usegin/effi-memory/askeffi-app-really/`.
 2. **Railpack `steps` hook.** Define a build step in `python-services/railpack.json` with `inputs: [{ local: true, include: ["usegin/effi-memory/askeffi-app-really"] }]` and a `cp` command. Requires Railway's per-service Root Directory to be the repo root (currently it's `python-services/`), or restructuring the build graph. Not investigated end-to-end.
 3. **Bake the wiki into a sibling git submodule** that lives inside `python-services/` (e.g. `python-services/wiki` pointing at a separate repo). Heavyweight; only worth it if the wiki gets its own lifecycle.
 
-Option 1 is simplest. Today the experiment runs locally with `EFFI_WIKI_PATH` pointed at the source tree — promotion to prod-Effi is deferred until one of the above is chosen.
-
-### Env vars for prod (once a path is chosen)
+### Env vars for prod
 
 - `EFFI_WIKI_PATH=/app/wiki` (or whatever the bundle path resolves to)
 - `EFFI_WIKI_PROJECT_ID=<dogfooding-project-uuid>`
