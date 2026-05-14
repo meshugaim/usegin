@@ -45,8 +45,19 @@ export type Trigger =
 
 /** Side-effects emitted by `dispatch`. */
 export type Effect =
-	| { kind: "write-flag"; since: string; lastCheckedAt: string; errorClass: NeedsAuthErrorClass; errorMessage: string }
-	| { kind: "update-flag"; lastCheckedAt: string; errorClass: NeedsAuthErrorClass; errorMessage: string }
+	| {
+			kind: "write-flag";
+			since: string;
+			lastCheckedAt: string;
+			errorClass: NeedsAuthErrorClass;
+			errorMessage: string;
+	  }
+	| {
+			kind: "update-flag";
+			lastCheckedAt: string;
+			errorClass: NeedsAuthErrorClass;
+			errorMessage: string;
+	  }
 	| { kind: "delete-flag" }
 	| { kind: "assign-auth"; auth: AuthContext }
 	| { kind: "clear-auth" }

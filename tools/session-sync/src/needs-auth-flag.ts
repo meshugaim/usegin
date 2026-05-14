@@ -72,7 +72,9 @@ export async function writeFlag(
 	}
 }
 
-export async function readFlag(stateDir: string): Promise<NeedsAuthFlag | null> {
+export async function readFlag(
+	stateDir: string,
+): Promise<NeedsAuthFlag | null> {
 	const path = flagPath(stateDir);
 	if (!existsSync(path)) return null;
 	try {
@@ -116,7 +118,11 @@ export async function deleteFlag(stateDir: string): Promise<void> {
  */
 export async function updateFlag(
 	stateDir: string,
-	patch: { lastCheckedAt: string; errorClass?: NeedsAuthErrorClass; errorMessage?: string },
+	patch: {
+		lastCheckedAt: string;
+		errorClass?: NeedsAuthErrorClass;
+		errorMessage?: string;
+	},
 ): Promise<void> {
 	const existing = await readFlag(stateDir);
 	const merged: NeedsAuthFlag = existing

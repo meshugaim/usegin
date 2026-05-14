@@ -152,12 +152,12 @@ export async function loadAuth(
 	const creds = await readCredentialsFn(opts.profileName);
 	if (!creds) {
 		throw new Error(
-			"session-sync: no credentials. Run `effi auth login` to authenticate, then restart the daemon.",
+			"session-sync: no credentials. Run `effi auth login` to authenticate.",
 		);
 	}
 	if (isTokenExpired(creds.access_token, now)) {
 		throw new Error(
-			"session-sync: dev-login token is expired. Run `effi auth login` to refresh, then restart the daemon.",
+			"session-sync: dev-login token is expired. Run `effi auth refresh` (or `effi auth login`) to refresh.",
 		);
 	}
 	const sub = decodeJwtSub(creds.access_token);

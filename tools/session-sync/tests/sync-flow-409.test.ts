@@ -28,9 +28,9 @@
 
 import { describe, expect, test } from "bun:test";
 import type { AuthContext } from "../src/auth.ts";
+import { LOCK_BACKOFF_BUFFER_MS } from "../src/backoff.ts";
 import type { StateFile } from "../src/state.ts";
 import type { FetchLike, LockHolder } from "../src/sync-client.ts";
-import { LOCK_BACKOFF_BUFFER_MS } from "../src/backoff.ts";
 import { syncFile } from "../src/sync-flow.ts";
 
 /**
@@ -78,8 +78,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 function makeLockHeldFetch(): FetchLike {
-	return async () =>
-		jsonResponse(409, { error: "lock_held", holder: HOLDER });
+	return async () => jsonResponse(409, { error: "lock_held", holder: HOLDER });
 }
 
 function baseInput(state: StateFile = {}) {
@@ -97,134 +96,119 @@ function baseInput(state: StateFile = {}) {
 }
 
 describe("syncFile — 409 lock_held (AC 15)", () => {
-	test(
-		"ENG-5862: 409 → outcome.kind = lock_held with all four holder fields",
-		async () => {
-			// DATA contract: syncFile surfaces a `lock_held` outcome whose
-			// `holder` carries the four identifying fields. The rendering of
-			// those fields into a warning line lives at the cli.ts boundary
-			// (separate test, separate phase). Asserting on console.warn here
-			// would only catch warnings emitted from inside syncFile's call
-			// stack; the layering pushes that emission up to cli.ts.
-			const out = await syncFile({
-				...baseInput(),
-				fetchImpl: makeLockHeldFetch(),
-			});
-			expect(out.kind).toBe("lock_held");
-			if (out.kind !== "lock_held") throw new Error();
-			expect(out.holder.environment_kind).toBe(HOLDER.environment_kind);
-			expect(out.holder.environment_id).toBe(HOLDER.environment_id);
-			expect(out.holder.username).toBe(HOLDER.username);
-			expect(out.holder.expires_at).toBe(HOLDER.expires_at);
-		},
-	);
+	test("ENG-5862: 409 → outcome.kind = lock_held with all four holder fields", async () => {
+		// DATA contract: syncFile surfaces a `lock_held` outcome whose
+		// `holder` carries the four identifying fields. The rendering of
+		// those fields into a warning line lives at the cli.ts boundary
+		// (separate test, separate phase). Asserting on console.warn here
+		// would only catch warnings emitted from inside syncFile's call
+		// stack; the layering pushes that emission up to cli.ts.
+		const out = await syncFile({
+			...baseInput(),
+			fetchImpl: makeLockHeldFetch(),
+		});
+		expect(out.kind).toBe("lock_held");
+		if (out.kind !== "lock_held") throw new Error();
+		expect(out.holder.environment_kind).toBe(HOLDER.environment_kind);
+		expect(out.holder.environment_id).toBe(HOLDER.environment_id);
+		expect(out.holder.username).toBe(HOLDER.username);
+		expect(out.holder.expires_at).toBe(HOLDER.expires_at);
+	});
 
-	test(
-		"ENG-5862: 409 → outcome.lock_held with nextRetryAt = holder.expires_at + 5s",
-		async () => {
-			const out = await syncFile({
-				...baseInput(),
-				fetchImpl: makeLockHeldFetch(),
-			});
-			expect(out.kind).toBe("lock_held");
-			if (out.kind !== "lock_held") throw new Error();
-			const expectedRetry = new Date(
-				new Date(HOLDER_EXPIRES_AT).getTime() + LOCK_BACKOFF_BUFFER_MS,
-			).toISOString();
-			expect(out.updatedState.nextRetryAt).toBe(expectedRetry);
-			expect(out.updatedState.sessionId).toBe("sess-1");
-			// Did NOT advance lastUploadedAt — the upload didn't happen.
-			expect(out.updatedState.lastUploadedAt).not.toBe(NOW.toISOString());
-			expect(out.holder).toEqual(HOLDER);
-		},
-	);
+	test("ENG-5862: 409 → outcome.lock_held with nextRetryAt = holder.expires_at + 5s", async () => {
+		const out = await syncFile({
+			...baseInput(),
+			fetchImpl: makeLockHeldFetch(),
+		});
+		expect(out.kind).toBe("lock_held");
+		if (out.kind !== "lock_held") throw new Error();
+		const expectedRetry = new Date(
+			new Date(HOLDER_EXPIRES_AT).getTime() + LOCK_BACKOFF_BUFFER_MS,
+		).toISOString();
+		expect(out.updatedState.nextRetryAt).toBe(expectedRetry);
+		expect(out.updatedState.sessionId).toBe("sess-1");
+		// Did NOT advance lastUploadedAt — the upload didn't happen.
+		expect(out.updatedState.lastUploadedAt).not.toBe(NOW.toISOString());
+		expect(out.holder).toEqual(HOLDER);
+	});
 
-	test(
-		"ENG-5862: 409 with null holder.expires_at → nextRetryAt = now + 60_000ms",
-		async () => {
-			// Step 4's HTTP 409 returns null fields when `lockRow` is null
-			// (READ COMMITTED stale-holder edge case). If the daemon does
-			// `new Date(null).getTime() + 5_000`, nextRetryAt becomes
-			// 1970-01-01T00:00:05Z → instant retry storm. Daemon must fall
-			// back to `now + 60_000ms` instead.
-			const nullHolder: LockHolder = {
-				environment_kind: null,
-				environment_id: null,
-				username: null,
-				expires_at: null,
-			};
-			const fetchImpl: FetchLike = async () =>
-				jsonResponse(409, { error: "lock_held", holder: nullHolder });
-			const out = await syncFile({
-				...baseInput(),
-				fetchImpl,
-			});
-			expect(out.kind).toBe("lock_held");
-			if (out.kind !== "lock_held") throw new Error();
-			const expectedRetry = new Date(
-				NOW.getTime() + NULL_EXPIRES_FALLBACK_MS,
-			).toISOString();
-			expect(out.updatedState.nextRetryAt).toBe(expectedRetry);
-			expect(out.holder.expires_at).toBeNull();
-		},
-	);
+	test("ENG-5862: 409 with null holder.expires_at → nextRetryAt = now + 60_000ms", async () => {
+		// Step 4's HTTP 409 returns null fields when `lockRow` is null
+		// (READ COMMITTED stale-holder edge case). If the daemon does
+		// `new Date(null).getTime() + 5_000`, nextRetryAt becomes
+		// 1970-01-01T00:00:05Z → instant retry storm. Daemon must fall
+		// back to `now + 60_000ms` instead.
+		const nullHolder: LockHolder = {
+			environment_kind: null,
+			environment_id: null,
+			username: null,
+			expires_at: null,
+		};
+		const fetchImpl: FetchLike = async () =>
+			jsonResponse(409, { error: "lock_held", holder: nullHolder });
+		const out = await syncFile({
+			...baseInput(),
+			fetchImpl,
+		});
+		expect(out.kind).toBe("lock_held");
+		if (out.kind !== "lock_held") throw new Error();
+		const expectedRetry = new Date(
+			NOW.getTime() + NULL_EXPIRES_FALLBACK_MS,
+		).toISOString();
+		expect(out.updatedState.nextRetryAt).toBe(expectedRetry);
+		expect(out.holder.expires_at).toBeNull();
+	});
 
-	test(
-		"ENG-5862: 409 preserves prior lastHeartbeatAt (regression pin)",
-		async () => {
-			// Companion of the 503 kill_switch regression pin in
-			// sync-flow.test.ts. Both backoff triggers route through
-			// `applyBackoff`; `lastHeartbeatAt` survives both.
-			const heartbeatIso = "2026-05-12T11:59:30.000Z";
-			const state: StateFile = {
-				[PARENT_PATH]: {
-					contentHash: "h".repeat(64),
-					lastUploadedSize: 100,
-					sessionId: "sess-1",
-					storagePath: "old/path.jsonl.gz",
-					lastUploadedAt: "2026-05-12T11:00:00.000Z",
-					lastHeartbeatAt: heartbeatIso,
-				},
-			};
-			const out = await syncFile({
-				...baseInput(state),
-				fetchImpl: makeLockHeldFetch(),
-			});
-			expect(out.kind).toBe("lock_held");
-			if (out.kind !== "lock_held") throw new Error();
-			expect(out.updatedState.lastHeartbeatAt).toBe(heartbeatIso);
-		},
-	);
+	test("ENG-5862: 409 preserves prior lastHeartbeatAt (regression pin)", async () => {
+		// Companion of the 503 kill_switch regression pin in
+		// sync-flow.test.ts. Both backoff triggers route through
+		// `applyBackoff`; `lastHeartbeatAt` survives both.
+		const heartbeatIso = "2026-05-12T11:59:30.000Z";
+		const state: StateFile = {
+			[PARENT_PATH]: {
+				contentHash: "h".repeat(64),
+				lastUploadedSize: 100,
+				sessionId: "sess-1",
+				storagePath: "old/path.jsonl.gz",
+				lastUploadedAt: "2026-05-12T11:00:00.000Z",
+				lastHeartbeatAt: heartbeatIso,
+			},
+		};
+		const out = await syncFile({
+			...baseInput(state),
+			fetchImpl: makeLockHeldFetch(),
+		});
+		expect(out.kind).toBe("lock_held");
+		if (out.kind !== "lock_held") throw new Error();
+		expect(out.updatedState.lastHeartbeatAt).toBe(heartbeatIso);
+	});
 
-	test(
-		"ENG-5862: subsequent sync while now < nextRetryAt → daemon skips POST",
-		async () => {
-			// Integrated sequence: first sync seeds nextRetryAt via 409,
-			// second sync should hit the `isInBackoff` filter and never call
-			// fetch. Counter on the spy proves it.
-			let calls = 0;
-			const fetchImpl: FetchLike = async () => {
-				calls += 1;
-				return jsonResponse(409, { error: "lock_held", holder: HOLDER });
-			};
+	test("ENG-5862: subsequent sync while now < nextRetryAt → daemon skips POST", async () => {
+		// Integrated sequence: first sync seeds nextRetryAt via 409,
+		// second sync should hit the `isInBackoff` filter and never call
+		// fetch. Counter on the spy proves it.
+		let calls = 0;
+		const fetchImpl: FetchLike = async () => {
+			calls += 1;
+			return jsonResponse(409, { error: "lock_held", holder: HOLDER });
+		};
 
-			// Mutable state shared across both syncs.
-			const state: StateFile = {};
-			const firstOut = await syncFile({
-				...baseInput(state),
-				fetchImpl,
-			});
-			expect(firstOut.kind).toBe("lock_held");
-			if (firstOut.kind !== "lock_held") throw new Error();
-			// Caller would persist this row; mimic that here.
-			state[PARENT_PATH] = firstOut.updatedState;
+		// Mutable state shared across both syncs.
+		const state: StateFile = {};
+		const firstOut = await syncFile({
+			...baseInput(state),
+			fetchImpl,
+		});
+		expect(firstOut.kind).toBe("lock_held");
+		if (firstOut.kind !== "lock_held") throw new Error();
+		// Caller would persist this row; mimic that here.
+		state[PARENT_PATH] = firstOut.updatedState;
 
-			const secondOut = await syncFile({
-				...baseInput(state),
-				fetchImpl,
-			});
-			expect(secondOut.kind).toBe("skipped_backoff");
-			expect(calls).toBe(1);
-		},
-	);
+		const secondOut = await syncFile({
+			...baseInput(state),
+			fetchImpl,
+		});
+		expect(secondOut.kind).toBe("skipped_backoff");
+		expect(calls).toBe(1);
+	});
 });

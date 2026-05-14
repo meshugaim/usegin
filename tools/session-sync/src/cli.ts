@@ -13,14 +13,22 @@
  * `nextRetryAt` marker that `isInBackoff` reads on the next watch tick.
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import {
+	existsSync,
+	watch as fsWatch,
+	mkdirSync,
+	readdirSync,
+	statSync,
+} from "node:fs";
 import { stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { getCredentialsPath } from "../../lib/auth/credentials.ts";
 import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
 import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
 import { Coalescer } from "./coalescer.ts";
 import { detectEnvironment } from "./env-detect.ts";
+import { classifyError } from "./error-classify.ts";
 import { type HeartbeatLoopHandle, heartbeatLoop } from "./heartbeat.ts";
 import { getOrCreateInstallId } from "./install-id.ts";
 import {
@@ -29,9 +37,29 @@ import {
 	removePidFile,
 	writePidFile,
 } from "./lifecycle.ts";
+import {
+	deleteFlag,
+	type NeedsAuthErrorClass,
+	readFlag,
+	updateFlag,
+	writeFlag,
+} from "./needs-auth-flag.ts";
 import { safetyNetTick } from "./safety-net.ts";
 import { startupScan } from "./startup-scan.ts";
-import { type PerFileState, readState, type StateFile, writeState } from "./state.ts";
+import {
+	type PerFileState,
+	readState,
+	type StateFile,
+	writeState,
+} from "./state.ts";
+import {
+	dispatch,
+	type Effect,
+	initialNeedsAuth,
+	initialOk,
+	type MachineSnapshot,
+	type Trigger,
+} from "./state-machine.ts";
 import { type LockHolder, postHeartbeat } from "./sync-client.ts";
 import type { EnvIdentity } from "./sync-flow.ts";
 import { syncSession } from "./sync-session.ts";
@@ -141,7 +169,13 @@ async function fileSize(path: string): Promise<number> {
 
 interface DaemonState {
 	state: StateFile;
-	auth: AuthContext;
+	/**
+	 * Live `AuthContext`. Null when the daemon is in `needs-auth` state
+	 * (ENG-5990) — startup auth-fail, mid-run auth-class failure, or
+	 * restart-into-needs-auth all clear this. Code paths that read `auth`
+	 * MUST guard against null.
+	 */
+	auth: AuthContext | null;
 	envIdentity: EnvIdentity;
 	config: Config;
 	coalescer: Coalescer;
@@ -155,6 +189,29 @@ interface DaemonState {
 	// at the bottom of `main()`; shutdown() calls `.stop()` to clear the
 	// 60s interval so the process can exit cleanly.
 	heartbeat: HeartbeatLoopHandle | null;
+	/**
+	 * Auth state machine snapshot (ENG-5990). When `state === "needs-auth"`,
+	 * `fireSync` and the heartbeat tick are no-ops, the credentials watcher
+	 * is armed (`credWatcher !== null`), and `auth` is null.
+	 */
+	authState: MachineSnapshot;
+	/**
+	 * Watcher on `~/.effi/profiles/<profile>/credentials.json`, armed only
+	 * while in `needs-auth`. mtime change → retry `loadAuth`; success →
+	 * dispatch a `credentials-changed` trigger that transitions back to `ok`.
+	 *
+	 * Armed in `ok → needs-auth`; closed in `needs-auth → ok`. This
+	 * structurally closes the self-write feedback loop (the daemon's own
+	 * `refreshAuthIfNeeded` rewrites credentials.json every ~55min; in
+	 * `ok` state the watcher is closed so that write is invisible).
+	 */
+	credWatcher: { close: () => void } | null;
+	/**
+	 * Factory for the heartbeat loop. Stored on DaemonState so we can
+	 * stop+restart the heartbeat across needs-auth transitions without
+	 * recreating the closure manually each time.
+	 */
+	startHeartbeatLoop: () => HeartbeatLoopHandle;
 }
 
 /**
@@ -212,6 +269,214 @@ function warnLockHeld(opts: {
 }
 
 /**
+ * Map an `ErrorClass` (auth/lock/network) plus diagnostic context into the
+ * `NeedsAuthErrorClass` enum the flag file carries. The flag's value is
+ * for diagnostics only — the banner uses presence-of-flag, not this
+ * field — so the enum stays small and intentional.
+ */
+function diagnoseErrorClass(args: {
+	source: "loadAuth" | "refresh" | "api";
+	status?: number;
+	message: string;
+}): NeedsAuthErrorClass {
+	if (args.source === "loadAuth") {
+		if (/no credentials/i.test(args.message)) return "missing_credentials";
+		return "expired_refresh_token";
+	}
+	if (args.source === "refresh") return "expired_refresh_token";
+	if (args.status === 401) return "401_from_api";
+	if (args.status === 403) return "403_from_api";
+	return "unknown";
+}
+
+/**
+ * Execute one Effect against `DaemonState`. Pure-ish — flag I/O and
+ * watcher arm/close are the side-effects; the in-memory mutations are
+ * direct on `d`. The state-machine emits effects in load-bearing order;
+ * callers MUST iterate the array sequentially and await each.
+ */
+async function applyEffect(d: DaemonState, effect: Effect): Promise<void> {
+	switch (effect.kind) {
+		case "write-flag":
+			try {
+				await writeFlag(d.config.stateDir, {
+					since: effect.since,
+					lastCheckedAt: effect.lastCheckedAt,
+					errorClass: effect.errorClass,
+					errorMessage: effect.errorMessage,
+				});
+			} catch (err) {
+				console.error("[session-sync] writeFlag failed:", err);
+			}
+			return;
+		case "update-flag":
+			try {
+				await updateFlag(d.config.stateDir, {
+					lastCheckedAt: effect.lastCheckedAt,
+					errorClass: effect.errorClass,
+					errorMessage: effect.errorMessage,
+				});
+			} catch (err) {
+				console.error("[session-sync] updateFlag failed:", err);
+			}
+			return;
+		case "delete-flag":
+			try {
+				await deleteFlag(d.config.stateDir);
+			} catch (err) {
+				console.error("[session-sync] deleteFlag failed:", err);
+			}
+			return;
+		case "assign-auth":
+			d.auth = effect.auth;
+			return;
+		case "clear-auth":
+			d.auth = null;
+			return;
+		case "arm-watcher":
+			armCredWatcher(d);
+			return;
+		case "close-watcher":
+			d.credWatcher?.close();
+			d.credWatcher = null;
+			return;
+		case "stop-heartbeat":
+			d.heartbeat?.stop();
+			d.heartbeat = null;
+			return;
+		case "start-heartbeat":
+			d.heartbeat = d.startHeartbeatLoop();
+			return;
+		case "drain-backlog":
+			// One-shot safety-net pass to drain rows that accumulated during
+			// `needs-auth`. The regular interval will pick up anything this
+			// pass misses (e.g. a row whose nextRetryAt slid past during the
+			// drain itself).
+			await safetyTick(d);
+			return;
+	}
+}
+
+/**
+ * Dispatch a trigger through the pure state machine and execute every
+ * effect in order. Console-logs the transition for grep-ability.
+ */
+async function dispatchTrigger(
+	d: DaemonState,
+	trigger: Trigger,
+): Promise<void> {
+	const before = d.authState.state;
+	const result = dispatch(d.authState, trigger);
+	d.authState = result.next;
+	if (result.effects.length > 0 && before !== d.authState.state) {
+		console.log(
+			`[session-sync] auth-state: ${before} → ${d.authState.state}`,
+			trigger.kind === "auth-failure"
+				? `(${trigger.ctx.errorClass}: ${trigger.ctx.errorMessage})`
+				: "",
+		);
+	}
+	for (const effect of result.effects) {
+		await applyEffect(d, effect);
+	}
+}
+
+/**
+ * Arm a watcher on the profile's credentials.json. mtime change →
+ * retry `loadAuth` and dispatch a `credentials-changed` trigger.
+ *
+ * Idempotent: re-arming while a watcher exists is a no-op.
+ */
+function armCredWatcher(d: DaemonState): void {
+	if (d.credWatcher) return;
+	const credPath = getCredentialsPath(d.config.profileName);
+	let lastMtimeMs = 0;
+	try {
+		lastMtimeMs = statSync(credPath).mtimeMs;
+	} catch {
+		// File may not exist yet (missing-credentials path). Watch the
+		// parent dir; on first appearance we'll fire.
+	}
+	let watcher: { close: () => void } | null = null;
+	try {
+		// Watch the parent dir so we catch the file's creation as well as
+		// in-place mtime bumps. Filtering for our exact basename keeps the
+		// signal narrow.
+		const parent = credPath.slice(0, credPath.lastIndexOf("/"));
+		mkdirSync(parent, { recursive: true });
+		const baseName = credPath.slice(credPath.lastIndexOf("/") + 1);
+		watcher = fsWatch(parent, (_event, filename) => {
+			if (!filename || filename !== baseName) return;
+			let mtimeMs = 0;
+			try {
+				mtimeMs = statSync(credPath).mtimeMs;
+			} catch {
+				return;
+			}
+			if (mtimeMs === lastMtimeMs) return;
+			lastMtimeMs = mtimeMs;
+			void onCredentialsChanged(d);
+		});
+	} catch (err) {
+		console.warn(
+			"[session-sync] failed to arm credentials watcher:",
+			(err as Error).message,
+		);
+		return;
+	}
+	d.credWatcher = watcher;
+	console.log("[session-sync] credentials watcher armed on", credPath);
+}
+
+/**
+ * Credentials watcher callback: retry `loadAuth`, optionally pre-emptively
+ * refresh, then dispatch a `credentials-changed` trigger. Result is interpreted
+ * by the state machine — happy path transitions to `ok`, failure stays in
+ * `needs-auth` with bumped `lastCheckedAt`.
+ */
+async function onCredentialsChanged(d: DaemonState): Promise<void> {
+	if (d.authState.state !== "needs-auth") return; // stale event after teardown
+	const now = new Date().toISOString();
+	try {
+		let auth = await loadAuth({ profileName: d.config.profileName });
+		// Pre-emptive refresh: if the new token also has <REFRESH_BUFFER
+		// remaining, refresh now before handing it to the heartbeat.
+		auth = await refreshAuthIfNeeded(auth, {
+			profileName: d.config.profileName,
+		});
+		await dispatchTrigger(d, {
+			kind: "credentials-changed",
+			loadResult: { ok: true, auth },
+			now,
+		});
+	} catch (err) {
+		const klass = classifyError(err as Error);
+		if (klass !== "auth") {
+			// Network/lock during recovery — log and idle until the next
+			// mtime tick. The state machine treats this as a failed recovery.
+			console.warn(
+				"[session-sync] credentials-changed: non-auth error during recovery -",
+				(err as Error).message,
+			);
+		}
+		await dispatchTrigger(d, {
+			kind: "credentials-changed",
+			loadResult: {
+				ok: false,
+				ctx: {
+					errorClass: diagnoseErrorClass({
+						source: "loadAuth",
+						message: (err as Error).message,
+					}),
+					errorMessage: (err as Error).message,
+				},
+			},
+			now,
+		});
+	}
+}
+
+/**
  * Wire-layer heartbeat callback: POST one heartbeat for a single
  * session, then update `d.state[path]` based on the outcome.
  *
@@ -230,6 +495,11 @@ async function sendHeartbeat(
 	path: string,
 	perFile: PerFileState,
 ): Promise<void> {
+	// ENG-5990: skip the entire tick if we're idle on needs-auth. Reading
+	// `d.auth` fresh per tick (vs capturing in a closure at heartbeat-loop
+	// start) means a second recovery cycle re-arms the heartbeat against
+	// the new AuthContext, not the stale one.
+	if (d.authState.state === "needs-auth" || d.auth === null) return;
 	// Refresh JWT first — heartbeat is far less hot than sync but the
 	// daemon can park overnight and a stale token would silently fail
 	// every tick.
@@ -238,6 +508,21 @@ async function sendHeartbeat(
 			profileName: d.config.profileName,
 		});
 	} catch (err) {
+		const klass = classifyError(err as Error);
+		if (klass === "auth") {
+			await dispatchTrigger(d, {
+				kind: "auth-failure",
+				ctx: {
+					errorClass: diagnoseErrorClass({
+						source: "refresh",
+						message: (err as Error).message,
+					}),
+					errorMessage: (err as Error).message,
+				},
+				now: new Date().toISOString(),
+			});
+			return;
+		}
 		console.warn(
 			"[session-sync] heartbeat: token refresh failed for",
 			perFile.sessionId,
@@ -253,6 +538,30 @@ async function sendHeartbeat(
 		environmentKind: d.envIdentity.kind,
 		environmentId: d.envIdentity.id,
 	});
+	// Wire-side classification: 401/403-with-auth-body from heartbeat POST
+	// flips state. lock_held + sync_disabled + 5xx keep existing handlers.
+	if (!res.ok && res.kind === "transport_error") {
+		const klass = classifyError(res);
+		if (klass === "auth") {
+			await dispatchTrigger(d, {
+				kind: "auth-failure",
+				ctx: {
+					errorClass: diagnoseErrorClass({
+						source: "api",
+						status: res.status,
+						message: `heartbeat ${res.status}`,
+					}),
+					errorMessage: `heartbeat ${res.status}: ${
+						typeof res.body === "string"
+							? res.body
+							: (JSON.stringify(res.body) ?? "<no body>")
+					}`,
+				},
+				now: new Date().toISOString(),
+			});
+			return;
+		}
+	}
 	const now = new Date();
 	if (res.ok) {
 		d.state[path] = {
@@ -290,7 +599,7 @@ async function sendHeartbeat(
 		"-",
 		typeof res.body === "string"
 			? res.body
-			: JSON.stringify(res.body) ?? "<no body>",
+			: (JSON.stringify(res.body) ?? "<no body>"),
 	);
 }
 
@@ -444,19 +753,37 @@ async function fireSync(
 	path: string,
 	sessionId: string,
 ): Promise<void> {
+	// ENG-5990 AC3: in needs-auth, return early — no refresh, no POST, no
+	// pending-map mutation, no state write.
+	if (d.authState.state === "needs-auth" || d.auth === null) return;
 	const uploadId = `${sessionId}:${Date.now()}`;
 	d.pending.set(uploadId, { uploadId, estimatedRemainingMs: 500 });
 	try {
 		// Keep the JWT fresh before every upload. Hot-path no-op when the
 		// existing token still has >5min of life. On refresh failure
-		// (revoked refresh_token, transient network), log + skip this
-		// upload — the next tick re-tries. We deliberately don't crash:
-		// a steady stream of warnings is louder than a dead daemon.
+		// (revoked refresh_token, transient network), classify: auth-class
+		// flips state to needs-auth (daemon goes idle); network-class logs
+		// and skips this upload — the next tick re-tries.
 		try {
 			d.auth = await refreshAuthIfNeeded(d.auth, {
 				profileName: d.config.profileName,
 			});
 		} catch (err) {
+			const klass = classifyError(err as Error);
+			if (klass === "auth") {
+				await dispatchTrigger(d, {
+					kind: "auth-failure",
+					ctx: {
+						errorClass: diagnoseErrorClass({
+							source: "refresh",
+							message: (err as Error).message,
+						}),
+						errorMessage: (err as Error).message,
+					},
+					now: new Date().toISOString(),
+				});
+				return;
+			}
 			console.warn(
 				"[session-sync] token refresh failed; skipping upload for",
 				sessionId,
@@ -573,6 +900,33 @@ async function fireSync(
 			}
 			await persistStateMaybe(d);
 		} else {
+			// ENG-5990 AC7: classify the bubbled error. `fatal_error` from a
+			// 4xx may carry an auth-class status (401, or 403 with auth body).
+			// Extract status from the synthesized message (sync-flow.ts:455
+			// shape: "session-sync: HTTP <status> from sync endpoint: <body>").
+			const msg = outcome.error.message;
+			const statusMatch = /HTTP (\d{3})/.exec(msg);
+			const status = statusMatch
+				? Number.parseInt(statusMatch[1] ?? "0", 10)
+				: 0;
+			if (
+				status === 401 ||
+				(status === 403 && /unauthorized|expired|invalid_grant/i.test(msg))
+			) {
+				await dispatchTrigger(d, {
+					kind: "auth-failure",
+					ctx: {
+						errorClass: diagnoseErrorClass({
+							source: "api",
+							status,
+							message: msg,
+						}),
+						errorMessage: msg,
+					},
+					now: new Date().toISOString(),
+				});
+				return;
+			}
 			console.warn(
 				"[session-sync] parent sync failed for",
 				sessionId,
@@ -619,6 +973,12 @@ async function shutdown(d: DaemonState, signal: string): Promise<void> {
 	// pending uploads.
 	d.heartbeat?.stop();
 	d.heartbeat = null;
+	try {
+		d.credWatcher?.close();
+	} catch {
+		/* ignore */
+	}
+	d.credWatcher = null;
 	for (const w of d.watchers) {
 		try {
 			w.close();
@@ -673,17 +1033,8 @@ async function main(): Promise<void> {
 	const config = parseConfig(process.argv.slice(2), process.env);
 	console.log("[session-sync] starting; projectsDir =", config.projectsDir);
 
-	// 1. Auth.
-	let auth: AuthContext;
-	try {
-		auth = await loadAuth({ profileName: config.profileName });
-	} catch (err) {
-		console.error("[session-sync] auth failed:", (err as Error).message);
-		process.exit(1);
-	}
-	console.log("[session-sync] auth ok; userId =", auth.userId);
-
-	// 2. Env detect + install-id.
+	// 2. Env detect + install-id. Done before auth so the stateDir is
+	// guaranteed mkdir'd before we look for needs-auth.flag in it.
 	const detected = detectEnvironment(process.env);
 	mkdirSync(config.stateDir, { recursive: true });
 	let envId = detected.id;
@@ -710,6 +1061,59 @@ async function main(): Promise<void> {
 		"entries",
 	);
 
+	// 1. Auth — with ENG-5990 restart persistence + needs-auth fallback.
+	//
+	// (a) If <stateDir>/needs-auth.flag exists, boot directly into
+	//     needs-auth, preserving `since` from the flag. Skip loadAuth
+	//     entirely (the credentials watcher will retry on mtime change).
+	// (b) Otherwise call loadAuth; on success, pre-emptively refresh if
+	//     the token has <5min left, then enter `ok`. Any failure (loadAuth
+	//     throw, pre-emptive refresh throw with auth-class) enters
+	//     `needs-auth` without exiting.
+	let auth: AuthContext | null = null;
+	let authState: MachineSnapshot = initialOk();
+	const existingFlag = await readFlag(config.stateDir);
+	const nowISO = new Date().toISOString();
+	if (existingFlag) {
+		console.log(
+			"[session-sync] needs-auth.flag present; booting into needs-auth (since",
+			existingFlag.since + ")",
+		);
+		authState = initialNeedsAuth(existingFlag.since);
+		// Bump lastCheckedAt so the banner reflects this boot's check.
+		await updateFlag(config.stateDir, {
+			lastCheckedAt: nowISO,
+			errorClass: existingFlag.errorClass,
+			errorMessage: existingFlag.errorMessage,
+		});
+	} else {
+		try {
+			auth = await loadAuth({ profileName: config.profileName });
+			// Pre-emptive refresh (AC2): if the just-loaded token has
+			// <REFRESH_BUFFER_SECONDS remaining, refresh now so the first
+			// heartbeat / fireSync doesn't hit a guaranteed 401.
+			auth = await refreshAuthIfNeeded(auth, {
+				profileName: config.profileName,
+			});
+			console.log("[session-sync] auth ok; userId =", auth.userId);
+		} catch (err) {
+			const message = (err as Error).message;
+			console.warn("[session-sync] auth failed at startup:", message);
+			// Enter needs-auth without exiting — daemon stays up.
+			authState = { state: "needs-auth", since: nowISO };
+			auth = null;
+			await writeFlag(config.stateDir, {
+				since: nowISO,
+				lastCheckedAt: nowISO,
+				errorClass: diagnoseErrorClass({
+					source: "loadAuth",
+					message,
+				}),
+				errorMessage: message,
+			});
+		}
+	}
+
 	const d: DaemonState = {
 		state,
 		auth,
@@ -722,7 +1126,29 @@ async function main(): Promise<void> {
 		subdirs: new Set(),
 		lastPersistAt: 0,
 		heartbeat: null,
+		authState,
+		credWatcher: null,
+		// Forward-reference: the factory is assigned after `d` is constructed
+		// (closure needs to see `d`). This is a typed placeholder.
+		startHeartbeatLoop: () => {
+			throw new Error("heartbeat factory not yet wired");
+		},
 	};
+
+	// Wire the heartbeat factory now that `d` exists.
+	d.startHeartbeatLoop = (): HeartbeatLoopHandle =>
+		heartbeatLoop({
+			getState: () => d.state,
+			getMtimeMs,
+			sendHeartbeat: (path, perFile) => sendHeartbeat(d, path, perFile),
+		});
+
+	// If we booted into needs-auth, arm the watcher now (effects for the
+	// startup-trigger were already applied inline above — keep that path
+	// minimal; this is the structural complement).
+	if (d.authState.state === "needs-auth") {
+		armCredWatcher(d);
+	}
 
 	// 5. Startup scan.
 	const scan = await startupScan({
@@ -770,11 +1196,14 @@ async function main(): Promise<void> {
 	// reads the live `d.state` snapshot, calls `shouldHeartbeat` per
 	// entry, and posts via `sendHeartbeat` only on the entries that
 	// match. Shutdown calls `.stop()` to clear the interval.
-	d.heartbeat = heartbeatLoop({
-		getState: () => d.state,
-		getMtimeMs,
-		sendHeartbeat: (path, perFile) => sendHeartbeat(d, path, perFile),
-	});
+	//
+	// ENG-5990: only start the heartbeat in `ok` state. The state machine
+	// will re-start it via the `start-heartbeat` effect on `needs-auth → ok`
+	// recovery; `sendHeartbeat` reads `d.auth` fresh per tick so the
+	// restart uses the refreshed auth, not the stale one.
+	if (d.authState.state === "ok") {
+		d.heartbeat = d.startHeartbeatLoop();
+	}
 
 	// 10. Signal handlers.
 	const onSig = (sig: string) => {

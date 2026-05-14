@@ -102,7 +102,8 @@ export function classifyError(input: Classifiable): ErrorClass {
 		// the error object itself or on its `.cause`.
 		const code =
 			(input as Error & { code?: string }).code ??
-			((input as Error & { cause?: { code?: string } }).cause?.code ?? "");
+			(input as Error & { cause?: { code?: string } }).cause?.code ??
+			"";
 		if (code === "ECONNREFUSED" || code === "EAI_AGAIN") return "network";
 		if (code === "UND_ERR_CONNECT_TIMEOUT") return "network";
 		if (code === "ETIMEDOUT" || code === "ENETUNREACH") return "network";
