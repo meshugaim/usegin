@@ -21,7 +21,7 @@ Read top-down. Strike rows when answered (don't delete — leave the strike for 
 | # | Ask | From | Why |
 |---|---|---|---|
 | P1-1 | Grant this devcontainer prod-DB read access (Supabase service-role key in env, or `supabase link` to prod ref). | tmunat-matzav | Today the OAuth fork installed `psql` + used the Supabase Management API; the cross-cutting fork couldn't query `sync_items` at all. Read access would let future grounding be 1 fork instead of 3. |
-| P1-2 | Grant this devcontainer's GH token read access to `AskEffi/oria-crazy-world`. | Zisser (recurring) | Personas/values SoT lives there; values doc currently lives at `usegin/values.md` as fallback (per Zisser's note). |
+| P1-2 | Grant this devcontainer's GH token read access to `meshugaim/oria-crazy-world`. | Zisser (recurring) | Personas/values SoT lives there; values doc currently lives at `usegin/values.md` as fallback (per Zisser's note). |
 | P1-3 | Authorize Wes dispatch for Inbox walking-skeleton — charter is at `zisser/dispatched/2026-04-30-inbox-app-walking-skeleton-wes.md`. Walking skeleton = S0+S1+S2+S3 = one Q end-to-end, no LLM. | Zisser | This file (`inbox-pending.md`) is the temporary patch; Wes builds the real `/inbox` Next.js page. |
 
 ## P2 — Zisser plan ↑Qs (defaults already taken)

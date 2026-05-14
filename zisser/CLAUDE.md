@@ -106,7 +106,7 @@ Workarounds:
 
 The justfile `_persona zisser` recipe and the spawn instructions
 reference `oria-crazy-world/ground/personas/zisser.md`. That tree is a
-separate private repo (`AskEffi/oria-crazy-world`). Some devcontainers'
+separate private repo (`meshugaim/oria-crazy-world`). Some devcontainers'
 GH tokens lack access (HTTP 403 on `just bootstrap-world`). Until the
 clone lands, the persona file SOT is `zisser/persona.md`.
 

@@ -40,7 +40,7 @@ or a free-form sentence. If free-form, infer the door; if ambiguous, ask.
 
 ## Constraints
 
-- World edits commit to `AskEffi/oria-crazy-world`, not the monorepo. `cd
+- World edits commit to `meshugaim/oria-crazy-world`, not the monorepo. `cd
   oria-crazy-world` before `git add`.
 - No production code. No deploys. No customer data.
 - Append-mostly. Never delete a placement; supersede.
