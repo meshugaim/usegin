@@ -36,7 +36,7 @@ When `/personal-gtd` runs:
    - **Gmail** (`team-gmail`) — unread + sent-but-unanswered
    - **Slack DMs + @-mentions** (`team-slack`) — direct messages, mentions, threads where the user is participating
    - **Slack team channels** — only when a discussion explicitly tags the user's areas (don't dump every channel post)
-   - **Fathom** (`mcp__claude_ai_Fathom__*`) — meetings the user was in, recent first
+   - **Fathom** — meetings the user was in, recent first. **Use the `effi` CLI, not the Gmail Fathom-recap email** — the Gmail connector returns snippet-only for those emails even with `FULL_CONTENT`. Direct transcript path: `effi meetings show <id> --transcript [--json]`, plus `--speaker NAME` / `--time-start HH:MM:SS` / `--time-end HH:MM:SS` to filter without round-trips. The structured `summary` and `action_items` fields are populated by Fathom enrichment, which lags — when `enrichment_status: "pending"`, treat the raw `transcript` as source of truth. To find a meeting `<id>`, today the only path is `effi ask "list meetings between X and Y"` (LLM-mediated — uses the internal `Browse meetings` tool); there is no `effi meetings list` subcommand and `/projects/{project}/meetings` is not exposed via `effi api`. Cache transcripts to `$CLAUDE_JOB_DIR/<slug>.json` so subsequent grepping is local.
    - **Linear** (`plan` CLI) — issues assigned to or watched by the user; status/comment changes
    - **git** — commits touching files the user authored or commented on
    - **Effi dogfooding** (`dogfooding-effi`) — Effi reports what changed at project level; Claude uses the user's GTD state as the relevance filter and drills down by asking Effi follow-ups when something looks load-bearing.
