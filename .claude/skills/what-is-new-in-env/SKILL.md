@@ -58,6 +58,14 @@ Once you have both SHAs:
 git log <previous-sha>..<current-sha> --oneline --no-merges
 ```
 
+**Bash-tool truncation note.** The Bash tool truncates stdout aggressively (commonly to ~50 lines on busy weeks). For any `git log` over a multi-week window — or for `git diff --name-only` over a large delta — write to a file in `$CLAUDE_JOB_DIR` first and read with `wc -l`, `grep`, `awk`, etc. Don't pipe a 700-commit log through tool stdout and trust the count. Same applies to the directory-scan commands in Step 4a.
+
+```bash
+git --no-pager log <prev>..<curr> --no-merges --format=fuller > "$CLAUDE_JOB_DIR/commits.txt"
+wc -l "$CLAUDE_JOB_DIR/commits.txt"
+grep -oE 'ENG-[0-9]+' "$CLAUDE_JOB_DIR/commits.txt" | sort -u
+```
+
 ## Step 2: Extract Linear issues
 
 Scan all commit messages (full body, not just subject line) for `ENG-\d+` references. Deduplicate — multiple commits often touch the same issue.
