@@ -49,12 +49,36 @@ git config dx.ci-watcher       # prints "true" or "false"
 | `dx identify` | Show or set current user identity (`--as <name>` to set) |
 | `dx list` | Show all registered features with gate counts |
 | `dx docs` | List embedded documentation (`dx docs show <handle>` to read) |
+| `dx fleet` | Live view of running Claude/Gin agent jobs from local `~/.claude/jobs` + `~/.claude/sessions` (`dx fleet snapshot` writes a markdown snapshot) |
 
 All read commands support `--json`. The CLI auto-detects headless contexts (non-TTY, `CLAUDECODE=1`) and defaults to JSON. Override with `DX_OUTPUT=json` or `DX_OUTPUT=human`.
 
 Prefix matching is enabled: `dx st` = `dx status`, `dx r` = `dx resolve`, etc.
 
 **Bare `dx` behavior:** In headless mode (non-TTY / `CLAUDECODE=1`), bare `dx` outputs JSON status. In TTY mode, bare `dx` launches an interactive feature toggle picker.
+
+## `dx fleet` — live agent fleet view
+
+Friday-night inventory of all currently-running (and recently-finished) Claude/Gin agent sessions on this machine. Joins two on-disk registries:
+
+- `~/.claude/jobs/<jobId>/state.json` — per-job state, intent, what it's blocked on (`needs`)
+- `~/.claude/sessions/<pid>.json` — live session entries (process running)
+
+Joined on `jobId`. A job folder with no live session entry is `live: false` (process exited, state preserved). A session entry with no job folder is synthesized into a minimal row.
+
+| Command | Description |
+|---------|-------------|
+| `dx fleet` | Default: headless-aware. TTY → human table to stderr. Headless → JSON to stdout. |
+| `dx fleet --json` | Force JSON to stdout. |
+| `dx fleet --only-blocked` | Filter: only `state === "blocked"` rows. |
+| `dx fleet --include-cwd <prefix>` | Filter: only rows whose `cwd` starts with the prefix. |
+| `dx fleet snapshot [--output <path>]` | Write a markdown snapshot, print the absolute path to stdout. |
+
+Default snapshot path: `usegin/memento/scopes/fleet-snapshots/<iso-utc>.md` resolved from the repo root.
+
+Sort order: `blocked` → `working` → `done`, then newest `updatedAt` first within each bucket. Each row carries `jobId`/`sessionId` (full + short 8-char), `live`, `state`, `ageSeconds`/`ageHuman`, `updatedAt`, `needs`, `intent` (first line, truncated), and `cwd`.
+
+Read-only — never writes to `~/.claude/jobs/` or `~/.claude/sessions/`.
 
 ## How-Is-Session (HIS) — `dx his`
 
