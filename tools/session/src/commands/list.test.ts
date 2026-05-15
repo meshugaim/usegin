@@ -575,3 +575,80 @@ describe("runList — handles ApiClientError without leaking stack traces", () =
     expect(errors.some((e) => /transient.*server/i.test(e))).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Subagent disclosure (ENG-5987 follow-up)
+//
+// When --remote is on and --include-subagents is off, list filters out a
+// large slice of dev_sessions rows. Without disclosure the user thinks the
+// list they see is the full list. Emit a footer hint pointing at the flag.
+//
+// We intentionally don't count the hidden rows — that needs an API change
+// (the response envelope has no total_count). The hint alone closes the
+// misleading-UX gap.
+// ---------------------------------------------------------------------------
+
+describe("runList — subagent disclosure", () => {
+  test("--remote without --include-subagents emits a footer hint", async () => {
+    const lines: string[] = [];
+    await runList(["--remote"], {
+      discoverSessionsFn: async () => [],
+      findRemoteSessionsViaApiFn: async () => [apiItem()],
+      log: (line) => lines.push(line),
+      errorLog: () => {},
+    });
+    expect(
+      lines.some((l) => /--include-subagents/i.test(l)),
+    ).toBe(true);
+    expect(
+      lines.some((l) => /subagent/i.test(l) && /hidden/i.test(l)),
+    ).toBe(true);
+  });
+
+  test("--remote --include-subagents emits NO disclosure", async () => {
+    const lines: string[] = [];
+    await runList(["--remote", "--include-subagents"], {
+      discoverSessionsFn: async () => [],
+      findRemoteSessionsViaApiFn: async () => [apiItem()],
+      log: (line) => lines.push(line),
+      errorLog: () => {},
+    });
+    expect(
+      lines.some((l) => /hidden/i.test(l)),
+    ).toBe(false);
+  });
+
+  test("local-only (no --remote) emits NO disclosure", async () => {
+    const lines: string[] = [];
+    await runList([], {
+      discoverSessionsFn: async () => [localSession()],
+      findRemoteSessionsViaApiFn: async () => [],
+      extractSessionMetaFn: async () => ({
+        messages: [],
+        lineCount: 0,
+        turnCount: 0,
+        summary: null,
+        hasUserMessages: false,
+      }),
+      log: (line) => lines.push(line),
+      errorLog: () => {},
+    });
+    expect(
+      lines.some((l) => /hidden/i.test(l)),
+    ).toBe(false);
+  });
+
+  test("disclosure only emitted for path-output (not id/json)", async () => {
+    const lines: string[] = [];
+    await runList(["--remote", "--output", "id"], {
+      discoverSessionsFn: async () => [],
+      findRemoteSessionsViaApiFn: async () => [apiItem()],
+      log: (line) => lines.push(line),
+      errorLog: () => {},
+    });
+    // id-mode output is for scripting — must stay parseable.
+    expect(
+      lines.some((l) => /hidden/i.test(l)),
+    ).toBe(false);
+  });
+});

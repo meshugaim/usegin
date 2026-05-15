@@ -167,6 +167,15 @@ async function renderList(
       const meta = session.meta ?? (await extractMeta(session.path));
       log(formatListLine(session, meta));
     }
+    // When --remote is on and the user didn't opt into subagents, the
+    // server filtered out is_subagent=true rows. Without disclosure the
+    // returned page reads as "the full list" — call it out. Only emitted
+    // in path-output mode so id/json output stays parseable for scripts.
+    if (listArgs.remote && !listArgs.includeSubagents) {
+      log(
+        "\n  Note: subagent sessions hidden; pass --include-subagents to include them.",
+      );
+    }
     if (process.stdout.isTTY) {
       log("\n  Expand: session <id>    Timeline: --timeline    Full: --full");
     }
