@@ -30,11 +30,7 @@ _Items we haven't clarified yet — need discussion between you and Claude befor
 - **Sync-failure email alerting** — Elsante found a stuck Excel sync only by happenstance log-in; Guy: "Yes, we should do that, I agree." — from Elsante transcript 2026-05-13.
 - **Calendar attendees → Effi context** — Elsante: "great if we were able to add the Hudson Technologies Effi email as part of the invited list of attendees… Effi knows there's an imminent meeting Friday and XYZ people are invited." Customer-pull on the previously-parked "calendar-prep" Someday item. — from Elsante transcript 2026-05-13.
 
-### ❓ Open question — staging Slack app
-- **Re-create staging Slack app, or get admin transfer on the existing one?** You weren't the creator. Cheap fix: ask Lihu to transfer admin (30s, no client_id rotation, env vars stay). Drift fix: re-create + rotate `SLACK_CLIENT_ID`/`SECRET` + update Doppler→Railway env vars (Lihu's SOON banner) + redirect URLs. Which problem are we solving — ownership, or drift? — captured 2026-05-15
-
 ### 🧠 Mind-sweep (from your 2026-05-15 scratchpad)
-- Slack: rm slack toggle (recent commits — confirm landed)
 - Slack: self-invite — scope question; need it to still work w/o it
 - Slack: VAIS pipeline (channel-as-doc decided in team meeting 2026-05-14)
 - Slack: marketplace listing (ENG-5417 backlog; ToS clock to 2026-03 per Lihu's banner)
@@ -48,7 +44,9 @@ _Items we haven't clarified yet — need discussion between you and Claude befor
 ## Next Actions
 _Filed tickets stay here until done-in-prod (DoD). Each carries `track:<depth>` and `comms:<cadence>` so future runs know what to surface and what to draft._
 
-- **Deploy Slack integration to production** — gates today's Critical Loop kickoff with Andrew. Toggle currently still gating prod (Guy asked explicitly at team meeting [01:12:12]). `track:through-production` `comms:Guy on-deploy + Andrew on-live`
+_CL-today commitments all landed: disconnect ws ✓, files:read scope on prod app ✓, slackIntegration flag removed in fb058a918 ✓_
+
+- **Re-create staging Slack app** + rotate `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` in Doppler → Railway (per Lihu's SOON banner) + set redirect URLs (canonical staging + `https://local-dev.askeffi.ai/api/slack/callback` if applicable). Decided 2026-05-15 to re-create rather than admin-transfer. `track:through-staging` `comms:silent` (internal hygiene)
 
 ### Closure proposals (Claude → you — approve, decline, or steer)
 - **ENG-5838** (Loose-ends silent fire) — Linear `Done`. Tracking was `through-production` + `comms:Guy on-solve + on-deploy`. Confirm: shipped to prod? Guy notified?
