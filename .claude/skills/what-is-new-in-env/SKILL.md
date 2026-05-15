@@ -64,6 +64,16 @@ Scan all commit messages (full body, not just subject line) for `ENG-\d+` refere
 
 Also note any commits that don't reference an issue — they go in a separate section.
 
+### 2a. Orphan-commit triage (don't dismiss wholesale)
+
+Orphan commits (no `ENG-\d+`) are NOT automatically housekeeping. On a typical week ~30% of commits are orphan and a meaningful fraction of those are real product work that just didn't get an ENG tag. Triage before dismissing:
+
+1. Filter orphans through the shipping-verb subject filter (see Step 5.5 for the full list): keep subjects starting with `feat`, `fix`, or `refactor`.
+2. Group the survivors by directory cluster (e.g. all `nextjs-app/src/components/integrations/slack/*` commits together).
+3. Each surviving cluster becomes a candidate "Untagged user-facing work" bullet in the executive summary — apply the Step 5.5 self-check to it like any other cluster.
+
+The orphan-commits table in the verification guide (Step 7 / Step 8) is reserved for **truly** orphan commits — auto-memory snapshots (`memory: auto-update`), scratchpads, scattered chore commits, doc tweaks. Real feat/fix work that survives the triage above gets a proper executive-summary section, not a row in the orphan table.
+
 ## Step 3: Enrich from Linear
 
 For each unique issue ID:
@@ -89,7 +99,27 @@ Organize by:
 1. **Parent issue / epic** — features that have a parent get grouped under it
 2. **Label type** — within each group: features first, then bugs, then chores
 3. **Ungrouped** — standalone issues without a parent
-4. **Orphan commits** — commits with no issue reference
+4. **Orphan commits** — commits with no issue reference (already triaged in Step 2a)
+
+### 4a. Cross-check: directory-based bucketing
+
+Issue titles can hide distinct workstreams. A single issue may host two unrelated efforts in the same week, and the issue title will describe only one of them. Catch this with two checks:
+
+**New top-level directories.** Enumerate paths added during the window:
+
+```bash
+git diff --diff-filter=A --name-only <prev>..<curr> | awk -F/ '{print $1"/"$2}' | sort -u
+```
+
+Any **new** top-level directory is a strong signal of a distinct workstream — they almost always represent a new product capability that the parent issue title doesn't describe. Each new top-level dir becomes its own candidate cluster in the executive summary, even if its commits already live under an existing ENG-xxxx grouping.
+
+**Same-issue-different-paths split.** For any issue with >20 commits, list the unique top-level paths its commits touched:
+
+```bash
+git log <prev>..<curr> --grep='ENG-XXXX' --name-only --pretty=format: | awk -F/ 'NF>1 {print $1"/"$2}' | sort -u
+```
+
+If those paths span unrelated areas (e.g. `usegin/zettel/` AND `python-services/wiki/`), the issue is hosting multiple workstreams. Split into separate clusters in the summary, each with its own user-facing translation. Do not collapse them under the issue title.
 
 ## Step 5: Translate technical changes to business impact
 
@@ -107,8 +137,63 @@ Examples of the translation you need to do:
 | OAuth CSRF state validation on callbacks | Protection against account takeover attacks during login |
 | DOMPurify sanitization for email HTML | Prevents malicious content in displayed emails |
 | `meeting_inclusion_rules` table + LLM evaluation endpoint | Users define rules for which meetings to include instead of manually managing a blocklist |
+| `chore: remove webChatHistory toggle (always-on)` | Web chat history (refresh-resume, history dropdown) is now live for all users — previously flag-gated |
 
 If you can't articulate the user-facing impact, the change probably belongs in "Infrastructure / Not user-visible" rather than the executive summary.
+
+### Step 5 self-check: before writing "X shipped"
+
+Before placing any cluster in "User-facing features", confirm **all three**:
+
+- **(a) Linear status** of the issue — or of its leaf-slice children — is `Done`. `Backlog` and `In Progress` do not ship.
+- **(b) Shipping-verb evidence** — at least one commit with a shipping-verb subject (see Step 5.5 lists) touched **user-reachable** code paths. `tests/`, `docs/`, `experiments/`, and pure flag-registration changes are not user-reachable.
+- **(c) Flag state, if applicable** — if the feature was gated behind a toggle, confirm one of: the toggle was removed in this window, the toggle was set to always-on, or the issue notes mention dogfooding-complete graduation.
+
+If any of (a)/(b)/(c) fails, the cluster belongs in **"In flight"** (Step 5.5) or **"Not user-visible"** — not in "User-facing features."
+
+## Step 5.5: Verify shipped, don't infer from references
+
+A commit *mentioning* `ENG-XXXX` is not evidence that `ENG-XXXX` shipped. Distinguish the two commit classes below, and gate inclusion in the executive summary's "User-facing features" on **both** (i) at least one shipping-verb commit in the cluster AND (ii) Linear status `Done` on the issue or on a leaf-slice issue.
+
+**Shipping verbs (subject-line prefixes that indicate user-reachable change):**
+
+- `feat(...)` — but only when NOT qualified by scaffolding markers below
+- `fix(...)`
+- `refactor(...)` — only if it changes user-reachable behavior
+- `feat(...): Green` — the Green phase of a TDD slice, where the production code lands
+
+**Scaffolding patterns to watch for (these do NOT indicate shipping, even though they reference an issue):**
+
+| Pattern | Why it's scaffolding |
+|---------|---------------------|
+| `slice 0` | Convention: slice 0 is substrate/setup, no user-facing change |
+| `register .* (flag\|toggle)` | Flag registration only — the gated code may not exist yet |
+| `feat(...): register .* flag` | Flag registration dressed as feat — still substrate |
+| `RED` / `Red` / `test(... Red)` | TDD red phase — test exists, production code does not |
+| `docs(spec)` / `docs(specs)` | Spec document only, no implementation |
+| `test-plan` in subject | Spec/test-plan sync, no implementation |
+| `chore(deps)` | Dependency bump |
+| `chore(...): sync` | Doc/state sync, not user-facing |
+
+**Graduation events (positive scaffolding pattern — these DO ship):**
+
+When triaging `chore(...)` commits, grep first for these patterns — they look like housekeeping but are functionally shipping events because they flip a feature from flag-gated to live-for-all:
+
+- `remove .*toggle`
+- `retire .*toggle`
+- `(always[.-]on)`
+- `make .* (default|always-on)`
+- subject or body mentions "flag removal" / "toggle retirement" / "graduate"
+
+Promote graduation events to "User-facing features" with a one-liner of the shape: **"[Feature X] was flag-gated; now live for all users."** Cite the toggle name and the commit SHA in the verification guide.
+
+**Routing rule:**
+
+For each cluster, after applying the above:
+
+- ≥1 shipping-verb commit on user-reachable paths **AND** Linear `Done` on issue / leaf-slice → **"User-facing features"**
+- Only scaffolding commits, OR Linear status is `Backlog` / `In Progress`, OR commits touch only `tests/` `docs/` `experiments/` `flags/` → **"In flight — substrate landed, user-facing feature did NOT ship"** (a subsection inside "Not user-visible")
+- Graduation event commits → **"User-facing features"**, framed as graduation
 
 ## Step 6: Generate the executive summary
 
@@ -126,11 +211,15 @@ If you catch yourself writing any of these, stop and translate to business langu
 
 **Structure:**
 
-1. **User-facing features** — lead with what users can now do. Group by epic. 2-4 sentences each, focused on the outcome not the mechanism.
+1. **User-facing features** — lead with what users can now do. Group by epic. 2-4 sentences each, focused on the outcome not the mechanism. Only include clusters that passed the Step 5 self-check and Step 5.5 routing rule. Include graduation events here, framed as "[Feature] was flag-gated; now live for all users."
 
-2. **Bug fixes** — "Fixed: [what was broken from the user's perspective]". One line each.
+2. **Untagged user-facing work** — surviving orphan clusters from Step 2a (real feat/fix work that didn't get an ENG tag). One bullet per directory cluster, in the same translated-to-user-impact style as #1. Omit this section if Step 2a produced nothing.
 
-3. **Not user-visible (but important)** — a short section for infrastructure, internal tooling, SDK upgrades, and refactors that don't change user behavior. Keep it brief (1 sentence each) and label it clearly so executives can skip it. This is where technical changes that don't have a user-facing translation go.
+3. **Bug fixes** — "Fixed: [what was broken from the user's perspective]". One line each.
+
+4. **Not user-visible (but important)** — a short section for infrastructure, internal tooling, SDK upgrades, and refactors that don't change user behavior. Keep it brief (1 sentence each) and label it clearly so executives can skip it. This is where technical changes that don't have a user-facing translation go.
+
+   - **In flight — substrate landed, user-facing feature did NOT ship** — a sub-bullet list for clusters that referenced an `ENG-XXXX` but failed the Step 5 self-check (only scaffolding commits, or Linear status not `Done`, or flag still gated). Name the issue, note what substrate landed (specs / RED tests / flag registration / slice 0), and explicitly state that the user-facing feature is not yet live. This prevents the "treated as shipped because commits referenced it" failure.
 
 **Tone:** Write as if briefing a CEO who has 2 minutes. Lead with impact. Be specific about what users can do, not how it works.
 
@@ -223,11 +312,17 @@ The saved file has the full, detailed versions of both sections. Use this templa
 [Human-readable description of what shipped and why it matters.
 No technical terms. No code. Pure business impact.]
 
+### Untagged user-facing work
+- [Cluster description, translated to user impact] (commits: `abc1234`, `def5678`)
+
 ### Bug Fixes
 - Fixed: [what was broken, from the user's perspective]
 
 ### Not User-Visible
 - [Brief description of infrastructure/internal changes]
+
+#### In flight — substrate landed, user-facing feature did NOT ship
+- **ENG-XXXX [Title]:** [what substrate landed — specs / RED tests / flag registration / slice 0]. User-facing feature is not yet live (Linear status: [Backlog | In Progress]).
 
 ---
 
