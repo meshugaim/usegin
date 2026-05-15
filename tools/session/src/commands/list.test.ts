@@ -433,3 +433,67 @@ describe("runList — --remote subagent default-filter (ENG-5987)", () => {
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// Warnings on mismatched flags (ENG-5995)
+//
+// `--profile` and `--include-subagents` only do work under `--remote`. Without
+// the flag they're silently ignored — the user pays a typo and the CLI quietly
+// runs the local-only path. Surface them.
+// ---------------------------------------------------------------------------
+
+describe("runList — warns on flags that only apply under --remote", () => {
+  test("--profile without --remote emits warning to stderr", async () => {
+    const errors: string[] = [];
+    await runList(["--profile", "lihu-staging.owner@askeffi.ai:staging"], {
+      discoverSessionsFn: async () => [localSession()],
+      findRemoteSessionsViaApiFn: async () => [],
+      extractSessionMetaFn: async () => ({
+        messages: [],
+        lineCount: 0,
+        turnCount: 0,
+        summary: null,
+        hasUserMessages: false,
+      }),
+      log: () => {},
+      errorLog: (line) => errors.push(line),
+    });
+    expect(errors.some((e) => /--profile.*--remote/i.test(e))).toBe(true);
+  });
+
+  test("--include-subagents without --remote emits warning to stderr", async () => {
+    const errors: string[] = [];
+    await runList(["--include-subagents"], {
+      discoverSessionsFn: async () => [localSession()],
+      findRemoteSessionsViaApiFn: async () => [],
+      extractSessionMetaFn: async () => ({
+        messages: [],
+        lineCount: 0,
+        turnCount: 0,
+        summary: null,
+        hasUserMessages: false,
+      }),
+      log: () => {},
+      errorLog: (line) => errors.push(line),
+    });
+    expect(
+      errors.some((e) => /--include-subagents.*--remote/i.test(e)),
+    ).toBe(true);
+  });
+
+  test("flags WITH --remote emit no warning", async () => {
+    const errors: string[] = [];
+    await runList(
+      ["--remote", "--profile", "p", "--include-subagents"],
+      {
+        discoverSessionsFn: async () => [],
+        findRemoteSessionsViaApiFn: async () => [apiItem()],
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      },
+    );
+    expect(
+      errors.some((e) => /--remote/i.test(e)),
+    ).toBe(false);
+  });
+});

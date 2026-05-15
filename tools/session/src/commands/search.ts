@@ -241,6 +241,16 @@ export async function runSearch(
   deps: RunSearchDeps = {},
 ): Promise<void> {
   const searchArgs = parseSearchArgs(args);
+  const errorLog = deps.errorLog ?? ((line: string) => console.error(line));
+
+  // ENG-5995: --profile only does work under --remote — the semantic-search
+  // shim has no profile concept. Without --remote the flag is silently
+  // dropped; surface the mismatch instead of pretending we honored it.
+  if (!searchArgs.remote && searchArgs.profile !== undefined) {
+    errorLog(
+      "Warning: --profile only applies to --remote; ignoring (the semantic search path has no profile concept).",
+    );
+  }
 
   if (searchArgs.remote) {
     // `--index` is a semantic-shim flag that triggers index rebuild — it has
@@ -248,8 +258,6 @@ export async function runSearch(
     // in `semanticRest` and be dropped, which looks like "the build flag was
     // accepted but did nothing." Reject explicitly.
     if (searchArgs.semanticRest.includes("--index")) {
-      const errorLog =
-        deps.errorLog ?? ((line: string) => console.error(line));
       errorLog(
         "Error: --index is incompatible with --remote (it builds the local semantic index).",
       );

@@ -464,3 +464,44 @@ describe("runSearch — argv validation", () => {
     expect(exitCalls).toEqual([1]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Warnings on mismatched flags (ENG-5995)
+//
+// `--profile` only does work under `--remote` — the semantic-search shim has
+// no profile concept. Without `--remote` it's silently ignored.
+// ---------------------------------------------------------------------------
+
+describe("runSearch — warns on flags that only apply under --remote", () => {
+  test("--profile without --remote emits warning then runs semantic", async () => {
+    const errors: string[] = [];
+    let semanticCalls = 0;
+    await runSearch(
+      ["query", "--profile", "lihu-staging.owner@askeffi.ai:staging"],
+      {
+        runSemanticFn: async () => {
+          semanticCalls++;
+          return 0;
+        },
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      },
+    );
+    expect(errors.some((e) => /--profile.*--remote/i.test(e))).toBe(true);
+    // Still dispatches to semantic — warning shouldn't block the run.
+    expect(semanticCalls).toBe(1);
+  });
+
+  test("--profile WITH --remote emits no warning", async () => {
+    const errors: string[] = [];
+    await runSearch(
+      ["--remote", "query", "--profile", "p"],
+      {
+        findRemoteSessionsViaApiFn: async () => [apiItem()],
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      },
+    );
+    expect(errors.some((e) => /--profile/i.test(e))).toBe(false);
+  });
+});

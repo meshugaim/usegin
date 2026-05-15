@@ -196,6 +196,22 @@ export async function runList(
     errorLog(`Warning: ${conflictWarning}`);
   }
 
+  // ENG-5995: flag pair that only does work under --remote. Without it the
+  // local discovery path runs and the flag is silently dropped — surface the
+  // mismatch instead of pretending we honored it.
+  if (!listArgs.remote) {
+    if (listArgs.profile !== undefined) {
+      errorLog(
+        "Warning: --profile only applies to --remote; ignoring (the local discovery path has no profile concept).",
+      );
+    }
+    if (listArgs.includeSubagents) {
+      errorLog(
+        "Warning: --include-subagents only applies to --remote; ignoring (the local discovery path doesn't read from dev_sessions).",
+      );
+    }
+  }
+
   const currentProject = getCurrentProjectHash();
   const projectFilter = listArgs.allProjects
     ? undefined
