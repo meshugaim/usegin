@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import {
+  applyFleetFilters,
   defaultSnapshotPath,
   findRepoRoot,
   formatSnapshotMarkdown,
@@ -22,12 +23,7 @@ export function runSnapshot(opts: SnapshotOptions): string {
   const now = new Date();
   const jobs = readJobsRegistry(home);
   const sessions = readSessionsRegistry(home);
-  let rows = joinFleet(jobs, sessions, now);
-  if (opts.onlyBlocked) rows = rows.filter((r) => r.state === "blocked");
-  if (opts.includeCwd) {
-    const prefix = opts.includeCwd;
-    rows = rows.filter((r) => r.cwd.startsWith(prefix));
-  }
+  const rows = applyFleetFilters(joinFleet(jobs, sessions, now), opts);
   const md = formatSnapshotMarkdown(rows, now.toISOString());
   let outPath = opts.output;
   if (!outPath) {

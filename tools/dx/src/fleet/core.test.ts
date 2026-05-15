@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  applyFleetFilters,
   countByState,
   formatHumanTable,
   formatJson,
@@ -105,9 +106,8 @@ describe("readJobsRegistry", () => {
       updatedAt: "2026-05-15T00:00:00.000Z",
     });
     const rows = readJobsRegistry(home);
-    expect(rows.map((r) => r.jobId)).toContain("good0001");
-    expect(rows.map((r) => r.jobId)).not.toContain("emptyfolder");
-    expect(rows.map((r) => r.jobId)).not.toContain("malformed");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].jobId).toBe("good0001");
   });
 });
 
@@ -370,6 +370,93 @@ describe("formatHumanTable", () => {
       expect(line.length).toBeLessThanOrEqual(120);
     }
     expect(out).toContain("1 jobs: 1 blocked");
+  });
+});
+
+describe("applyFleetFilters", () => {
+  const now = new Date("2026-05-15T15:00:00.000Z");
+  const mkJob = (id: string, state: string, cwd: string): JobState => ({
+    jobId: id,
+    state,
+    tempo: null,
+    intent: id,
+    needs: null,
+    sessionId: id,
+    cwd,
+    updatedAt: "2026-05-15T14:00:00Z",
+    createdAt: null,
+  });
+  const rows = joinFleet(
+    [
+      mkJob("blok01", "blocked", "/workspaces/test-mvp"),
+      mkJob("work01", "working", "/workspaces/test-mvp"),
+      mkJob("blok02", "blocked", "/other"),
+      mkJob("done01", "done", "/workspaces/test-mvp"),
+    ],
+    [],
+    now,
+  );
+
+  test("--only-blocked filters to blocked rows", () => {
+    const out = applyFleetFilters(rows, { onlyBlocked: true });
+    expect(out.map((r) => r.jobId).sort()).toEqual(["blok01", "blok02"]);
+  });
+
+  test("--include-cwd filters by prefix", () => {
+    const out = applyFleetFilters(rows, {
+      includeCwd: "/workspaces/test-mvp",
+    });
+    expect(out.map((r) => r.jobId).sort()).toEqual([
+      "blok01",
+      "done01",
+      "work01",
+    ]);
+  });
+
+  test("filters compose with AND semantics", () => {
+    const out = applyFleetFilters(rows, {
+      onlyBlocked: true,
+      includeCwd: "/workspaces/test-mvp",
+    });
+    expect(out.map((r) => r.jobId)).toEqual(["blok01"]);
+  });
+
+  test("empty options is identity", () => {
+    const out = applyFleetFilters(rows, {});
+    expect(out).toHaveLength(rows.length);
+  });
+});
+
+describe("joinFleet sort — unknown state", () => {
+  test("synthetic 'unknown' rows sort after done", () => {
+    const now = new Date("2026-05-15T15:00:00.000Z");
+    const jobs: JobState[] = [
+      {
+        jobId: "donejob1",
+        state: "done",
+        tempo: null,
+        intent: "i",
+        needs: null,
+        sessionId: "donejob1",
+        cwd: "/c",
+        updatedAt: "2026-05-15T14:00:00Z",
+        createdAt: null,
+      },
+    ];
+    const sessions: SessionState[] = [
+      {
+        jobId: "orphanjob",
+        sessionId: "orphanjob-s",
+        cwd: "/c",
+        updatedAtMs: now.getTime() - 60_000,
+        status: "busy",
+        name: "x",
+        pid: 1,
+      },
+    ];
+    const rows = joinFleet(jobs, sessions, now);
+    // done before unknown (rank 2 < 99)
+    expect(rows.map((r) => r.state)).toEqual(["done", "unknown"]);
   });
 });
 

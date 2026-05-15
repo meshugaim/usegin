@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import {
+  applyFleetFilters,
   formatHumanTable,
   formatJson,
   joinFleet,
@@ -25,12 +26,7 @@ export function runFleet(opts: FleetOptions): {
   const now = new Date();
   const jobs = readJobsRegistry(home);
   const sessions = readSessionsRegistry(home);
-  let rows = joinFleet(jobs, sessions, now);
-  if (opts.onlyBlocked) rows = rows.filter((r) => r.state === "blocked");
-  if (opts.includeCwd) {
-    const prefix = opts.includeCwd;
-    rows = rows.filter((r) => r.cwd.startsWith(prefix));
-  }
+  const rows = applyFleetFilters(joinFleet(jobs, sessions, now), opts);
   return { rows, now };
 }
 

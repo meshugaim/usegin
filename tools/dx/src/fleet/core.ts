@@ -4,7 +4,7 @@
  * seed temp directories and freeze time.
  */
 
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 
 export interface JobState {
@@ -137,7 +137,6 @@ function compareRows(a: FleetRow, b: FleetRow): number {
   const ra = STATE_RANK[a.state] ?? 99;
   const rb = STATE_RANK[b.state] ?? 99;
   if (ra !== rb) return ra - rb;
-  // Newer updatedAt first.
   if (a.updatedAt > b.updatedAt) return -1;
   if (a.updatedAt < b.updatedAt) return 1;
   return 0;
@@ -340,6 +339,8 @@ export function defaultSnapshotPath(
   repoRoot: string,
   now: Date,
 ): string {
+  // Colons are valid on Linux/macOS filesystems but break shell quoting,
+  // confuse some editors, and are not allowed on Windows. Dashes are safe.
   const iso = now.toISOString().slice(0, 19).replace(/:/g, "-");
   return join(
     repoRoot,
@@ -351,6 +352,20 @@ export function defaultSnapshotPath(
   );
 }
 
-// Re-export node:fs helpers used by command handlers so tests can stub via
-// dependency injection if needed in the future.
-export const __internal = { readFileSync, statSync };
+export interface FleetFilters {
+  onlyBlocked?: boolean;
+  includeCwd?: string;
+}
+
+export function applyFleetFilters(
+  rows: FleetRow[],
+  filters: FleetFilters,
+): FleetRow[] {
+  let out = rows;
+  if (filters.onlyBlocked) out = out.filter((r) => r.state === "blocked");
+  if (filters.includeCwd) {
+    const prefix = filters.includeCwd;
+    out = out.filter((r) => r.cwd.startsWith(prefix));
+  }
+  return out;
+}
