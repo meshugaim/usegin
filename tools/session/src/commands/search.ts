@@ -131,11 +131,11 @@ async function renderRemote(
 async function runRemoteSearch(
   searchArgs: SearchArgs,
   deps: RunSearchDeps,
+  errorLog: (line: string) => void,
 ): Promise<void> {
   const findRemoteFn = deps.findRemoteSessionsViaApiFn ?? findRemoteSessionsViaApi;
   const extractMeta = deps.extractSessionMetaFn ?? extractSessionMeta;
   const log = deps.log ?? ((line: string) => console.log(line));
-  const errorLog = deps.errorLog ?? ((line: string) => console.error(line));
 
   if (!searchArgs.query) {
     errorLog("Error: `session search --remote` requires a query argument.");
@@ -172,7 +172,7 @@ async function runRemoteSearch(
   }
 
   const sessions = apiItems
-    .map(apiItemToSessionInfo)
+    .map((item) => apiItemToSessionInfo(item, errorLog))
     .filter((s): s is SessionInfo => s !== null);
 
   if (sessions.length === 0) {
@@ -253,12 +253,11 @@ export async function runSearch(
   const searchArgs = parseSearchArgs(args);
   const errorLog = deps.errorLog ?? ((line: string) => console.error(line));
 
-  // ENG-5995: --profile only does work under --remote — the semantic-search
-  // shim has no profile concept. Without --remote the flag is silently
-  // dropped; surface the mismatch instead of pretending we honored it.
+  // ENG-5995: --profile is only honored under --remote. Without the flag
+  // it's silently dropped — surface so the user can act on it.
   if (!searchArgs.remote && searchArgs.profile !== undefined) {
     errorLog(
-      "Warning: --profile only applies to --remote; ignoring (the semantic search path has no profile concept).",
+      "Warning: --profile is only honored when --remote is set; add --remote or remove --profile, then retry.",
     );
   }
 
@@ -274,7 +273,7 @@ export async function runSearch(
       process.exit(1);
       return;
     }
-    await runRemoteSearch(searchArgs, deps);
+    await runRemoteSearch(searchArgs, deps, errorLog);
     return;
   }
 

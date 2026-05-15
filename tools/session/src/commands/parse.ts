@@ -21,6 +21,56 @@ function isDebugEnabled(args: MainArgs): boolean {
   return args.debug || process.env.DEBUG === "session";
 }
 
+/**
+ * Dependency-injection seam for `resolveForParse` so tests can pin the
+ * --remote vs local-only branch without touching the real filesystem or
+ * Supabase. Production wires the defaults.
+ */
+export interface ResolveForParseDeps {
+  fetchSessionFn?: typeof fetchSession;
+  resolveSessionPathFn?: typeof resolveSessionPath;
+}
+
+/**
+ * Heuristic: input that looks like a filesystem path (contains a slash or
+ * ends in .jsonl) should never trigger a Supabase lookup — fetchSession
+ * would treat the path as a session ID and produce a confusing "not found"
+ * message with the path baked in. Route paths to resolveSessionPath
+ * regardless of --remote. Ron N5.
+ */
+function looksLikePath(input: string): boolean {
+  return input.includes("/") || input.endsWith(".jsonl");
+}
+
+/**
+ * Resolve the user's `args.file` (path, full UUID, or short prefix) to a
+ * local JSONL path:
+ *
+ *   - filesystem-like input → `resolveSessionPath` (path passes through
+ *     verbatim; only IDs/prefixes hit the network).
+ *   - `--remote` + ID/prefix → delegate to `fetchSession`, which walks
+ *     local → ~/agent-records/ → Supabase. Idempotent if the session is
+ *     already local. Closes the cross-env read story (ENG-5956 slice 1).
+ *   - no `--remote` → `resolveSessionPath`, which only searches local
+ *     storage. Throws SessionNotFoundError if the session is unknown
+ *     locally — the bare-path / known-local case stays zero-cost.
+ *
+ * Exported so a regression that silently rewires any branch (e.g.
+ * swapping the calls) trips a focused test in parse.test.ts.
+ */
+export async function resolveForParse(
+  args: Pick<MainArgs, "file" | "remote">,
+  deps: ResolveForParseDeps = {},
+): Promise<string> {
+  if (args.remote && !looksLikePath(args.file)) {
+    const fetchFn = deps.fetchSessionFn ?? fetchSession;
+    const result = await fetchFn(args.file);
+    return result.localPath;
+  }
+  const resolveFn = deps.resolveSessionPathFn ?? resolveSessionPath;
+  return resolveFn(args.file);
+}
+
 export async function runParse(args: MainArgs) {
   try {
     // Stream mode - read from stdin
@@ -71,17 +121,10 @@ export async function runParse(args: MainArgs) {
     const debug = isDebugEnabled(args);
     const totalStart = Date.now();
 
-    // Resolve session ID to a local path. When --remote is set, delegate to
-    // fetchSession which checks local → ~/agent-records/ → Supabase in that
-    // order (ENG-5862 step 7, ENG-5986). Without --remote the resolver only
-    // searches local — keeps the bare-path / known-local case zero-cost.
-    let filePath: string;
-    if (args.remote) {
-      const result = await fetchSession(args.file);
-      filePath = result.localPath;
-    } else {
-      filePath = await resolveSessionPath(args.file);
-    }
+    // Resolve to a local JSONL path. --remote falls through to fetchSession's
+    // local → ~/agent-records/ → Supabase chain; local-only uses
+    // resolveSessionPath. See resolveForParse for the contract.
+    const filePath = await resolveForParse(args);
 
     // List related files mode - just print file paths
     if (args.listFiles) {

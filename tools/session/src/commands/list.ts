@@ -77,17 +77,22 @@ function sinceToIso(since: string | undefined): string | undefined {
  * Returns `null` when the row can't be safely adapted — the caller filters
  * those out before merging.
  */
-export function apiItemToSessionInfo(item: ApiSessionItem): SessionInfo | null {
+export function apiItemToSessionInfo(
+  item: ApiSessionItem,
+  errorLog: (line: string) => void = (line) => console.error(line),
+): SessionInfo | null {
   // Defense-in-depth: the server contract types `last_synced_at` as
   // non-null ISO, but `mergeSessionLists` sorts by `mtime.getTime()` and a
   // single NaN poisons the entire ordering. If the server ever returns a
   // null/malformed value, drop the row rather than default-to-now —
   // defaulting would inject a row at the top of the list with no signal
   // that its true age is unknown, hiding the bug. Dropping + stderr warn
-  // surfaces it.
+  // surfaces it. errorLog defaults to console.error so existing callers
+  // (and direct adapter unit tests) work unchanged; runList / runSearch
+  // pass the injected errorLog so test stubs capture the warning. Ron N9.
   const mtime = new Date(item.last_synced_at);
   if (Number.isNaN(mtime.getTime())) {
-    console.error(
+    errorLog(
       `Warning: dropping API session ${item.session_id}: invalid last_synced_at (${JSON.stringify(item.last_synced_at)})`,
     );
     return null;
@@ -169,11 +174,19 @@ async function renderList(
     }
     // When --remote is on and the user didn't opt into subagents, the
     // server filtered out is_subagent=true rows. Without disclosure the
-    // returned page reads as "the full list" — call it out. Only emitted
-    // in path-output mode so id/json output stays parseable for scripts.
-    if (listArgs.remote && !listArgs.includeSubagents) {
+    // returned page reads as "the full list" — call it out. Gated on TTY
+    // so a redirect-to-file (`session list --remote > sessions.txt`) keeps
+    // the file payload clean, matching the Expand hint's gating below.
+    // The empty-result branch in runList still emits the same hint to
+    // stderr (Ron B2) regardless of TTY, since that path is correctness,
+    // not affordance.
+    if (
+      listArgs.remote &&
+      !listArgs.includeSubagents &&
+      process.stdout.isTTY
+    ) {
       log(
-        "\n  Note: subagent sessions hidden; pass --include-subagents to include them.",
+        "\n  Note: subagent transcripts hidden; pass --include-subagents to include them.",
       );
     }
     if (process.stdout.isTTY) {
@@ -206,18 +219,17 @@ export async function runList(
     errorLog(`Warning: ${conflictWarning}`);
   }
 
-  // ENG-5995: flag pair that only does work under --remote. Without it the
-  // local discovery path runs and the flag is silently dropped — surface the
-  // mismatch instead of pretending we honored it.
+  // ENG-5995: flags that are only honored under --remote. Without the flag
+  // they're silently dropped — surface so the user can act.
   if (!listArgs.remote) {
     if (listArgs.profile !== undefined) {
       errorLog(
-        "Warning: --profile only applies to --remote; ignoring (the local discovery path has no profile concept).",
+        "Warning: --profile is only honored when --remote is set; add --remote or remove --profile, then retry.",
       );
     }
     if (listArgs.includeSubagents) {
       errorLog(
-        "Warning: --include-subagents only applies to --remote; ignoring (the local discovery path doesn't read from dev_sessions).",
+        "Warning: --include-subagents is only honored when --remote is set; add --remote or remove --include-subagents, then retry.",
       );
     }
   }
@@ -267,7 +279,7 @@ export async function runList(
       throw err;
     }
     const remoteSessions = apiItems
-      .map(apiItemToSessionInfo)
+      .map((item) => apiItemToSessionInfo(item, errorLog))
       .filter((s): s is SessionInfo => s !== null);
     sessions = mergeSessionLists(localSessions, remoteSessions);
   }

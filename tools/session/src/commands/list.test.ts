@@ -492,8 +492,11 @@ describe("runList — warns on flags that only apply under --remote", () => {
         errorLog: (line) => errors.push(line),
       },
     );
+    // Anchor on the warning's load-bearing phrase, not the literal
+    // "--remote" substring — a future unrelated warning that mentions
+    // --remote shouldn't fail this test.
     expect(
-      errors.some((e) => /--remote/i.test(e)),
+      errors.some((e) => /only honored when --remote/i.test(e)),
     ).toBe(false);
   });
 });
@@ -589,7 +592,25 @@ describe("runList — handles ApiClientError without leaking stack traces", () =
 // ---------------------------------------------------------------------------
 
 describe("runList — subagent disclosure", () => {
-  test("--remote without --include-subagents emits a footer hint", async () => {
+  // The TTY-gating tests (path-output disclosure footer) need
+  // `process.stdout.isTTY` true. Bun's default is undefined; we stub
+  // for-real-readers tests and restore in afterEach.
+  let realIsTTY: unknown;
+  beforeEach(() => {
+    realIsTTY = process.stdout.isTTY;
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: realIsTTY,
+    });
+  });
+
+  test("--remote without --include-subagents emits a footer hint (TTY)", async () => {
     const lines: string[] = [];
     await runList(["--remote"], {
       discoverSessionsFn: async () => [],
@@ -603,6 +624,23 @@ describe("runList — subagent disclosure", () => {
     expect(
       lines.some((l) => /subagent/i.test(l) && /hidden/i.test(l)),
     ).toBe(true);
+  });
+
+  test("non-TTY (redirected to file) emits NO disclosure footer", async () => {
+    // Ron S2: file-redirect case. Without this gate, `session list --remote
+    // > out.txt` bakes the disclosure into the file payload.
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: false,
+    });
+    const lines: string[] = [];
+    await runList(["--remote"], {
+      discoverSessionsFn: async () => [],
+      findRemoteSessionsViaApiFn: async () => [apiItem()],
+      log: (line) => lines.push(line),
+      errorLog: () => {},
+    });
+    expect(lines.some((l) => /hidden/i.test(l))).toBe(false);
   });
 
   test("--remote --include-subagents emits NO disclosure", async () => {
