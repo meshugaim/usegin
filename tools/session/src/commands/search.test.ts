@@ -505,3 +505,57 @@ describe("runSearch — warns on flags that only apply under --remote", () => {
     expect(errors.some((e) => /--profile/i.test(e))).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Auth error handling on --remote (ENG-5956 polish)
+// Mirrors list.test.ts — same translation contract.
+// ---------------------------------------------------------------------------
+
+function apiClientError(
+  kind: "auth_failed" | "kill_switch" | "transient" | "other",
+  status: number,
+): Error {
+  const err = new Error(`auth failed (HTTP ${status})`) as Error & {
+    name: string;
+    kind: string;
+    status: number;
+  };
+  err.name = "ApiClientError";
+  err.kind = kind;
+  err.status = status;
+  return err;
+}
+
+describe("runSearch — handles ApiClientError without leaking stack traces", () => {
+  test("401 auth_failed → clean message + exit 1, no stack trace", async () => {
+    const errors: string[] = [];
+    await expect(
+      runSearch(["--remote", "query"], {
+        findRemoteSessionsViaApiFn: async () => {
+          throw apiClientError("auth_failed", 401);
+        },
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      }),
+    ).rejects.toThrow(/__test_exit_1__/);
+    expect(exitCalls).toEqual([1]);
+    expect(errors.some((e) => /effi auth login/i.test(e))).toBe(true);
+    expect(errors.some((e) => /Authentication required/i.test(e))).toBe(true);
+    expect(errors.some((e) => /at .*\.ts:\d+/i.test(e))).toBe(false);
+  });
+
+  test("503 kill_switch → clean message + exit 1", async () => {
+    const errors: string[] = [];
+    await expect(
+      runSearch(["--remote", "query"], {
+        findRemoteSessionsViaApiFn: async () => {
+          throw apiClientError("kill_switch", 503);
+        },
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      }),
+    ).rejects.toThrow(/__test_exit_1__/);
+    expect(exitCalls).toEqual([1]);
+    expect(errors.some((e) => /sync.*disabled/i.test(e))).toBe(true);
+  });
+});

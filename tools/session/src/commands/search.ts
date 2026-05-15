@@ -47,6 +47,7 @@ import {
 } from "../finder";
 import { parseSearchArgs, type SearchArgs } from "../cli-args";
 import { apiItemToSessionInfo } from "./list";
+import { handleApiClientError } from "./api-error-handler";
 
 /**
  * Convert `Nd` / `Nw` / `YYYY-MM-DD` to an ISO timestamp the API's
@@ -148,18 +149,27 @@ async function runRemoteSearch(
   const apiOptions: ApiFinderOptions =
     deps.apiOptions ??
     (searchArgs.profile ? { profileName: searchArgs.profile } : {});
-  const apiItems = await findRemoteFn(
-    apiOptions,
-    {
-      q: searchArgs.query,
-      limit: searchArgs.limit,
-      since: sinceToIso(searchArgs.since),
-      until: sinceToIso(searchArgs.until),
-      user_id: searchArgs.user,
-      status: searchArgs.status,
-    },
-    deps.apiDeps ?? {},
-  );
+  let apiItems;
+  try {
+    apiItems = await findRemoteFn(
+      apiOptions,
+      {
+        q: searchArgs.query,
+        limit: searchArgs.limit,
+        since: sinceToIso(searchArgs.since),
+        until: sinceToIso(searchArgs.until),
+        user_id: searchArgs.user,
+        status: searchArgs.status,
+      },
+      deps.apiDeps ?? {},
+    );
+  } catch (err) {
+    if (handleApiClientError(err, errorLog)) {
+      process.exit(1);
+      return;
+    }
+    throw err;
+  }
 
   const sessions = apiItems
     .map(apiItemToSessionInfo)
