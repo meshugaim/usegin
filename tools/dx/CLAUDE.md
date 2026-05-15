@@ -76,6 +76,8 @@ Joined on `jobId`. A job folder with no live session entry is `live: false` (pro
 
 Default snapshot path: `usegin/memento/scopes/fleet-snapshots/<iso-utc>.md` resolved from the repo root.
 
+Each run also refreshes `usegin/memento/scopes/fleet-snapshots/latest.md` (a byte-identical copy of the most recent snapshot) so users can `cat .../latest.md` without typing an ISO. `latest.md` is `.gitignored` — only the timestamped files commit. The Layer 2 `/fleet` skill (`.claude/skills/fleet/SKILL.md`) maintains the same `latest.md` for its enriched output, so whichever writer ran last wins.
+
 Sort order: `blocked` → `working` → `done`, then newest `updatedAt` first within each bucket. Each row carries `jobId`/`sessionId` (full + short 8-char), `live`, `state`, `ageSeconds`/`ageHuman`, `updatedAt`, `needs`, `intent` (first line, truncated), and `cwd`.
 
 Read-only — never writes to `~/.claude/jobs/` or `~/.claude/sessions/`.

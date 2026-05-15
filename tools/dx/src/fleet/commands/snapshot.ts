@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import {
   applyFleetFilters,
   defaultSnapshotPath,
@@ -33,6 +33,10 @@ export function runSnapshot(opts: SnapshotOptions): string {
   const absOut = isAbsolute(outPath) ? outPath : resolve(process.cwd(), outPath);
   mkdirSync(dirname(absOut), { recursive: true });
   writeFileSync(absOut, md);
+  // Refresh the stable-name "latest.md" pointer next to the timestamped file,
+  // so `cat .../fleet-snapshots/latest.md` always works without typing an ISO.
+  // .gitignored — local convenience only; the timestamped file is the committed record.
+  writeFileSync(join(dirname(absOut), "latest.md"), md);
   return absOut;
 }
 

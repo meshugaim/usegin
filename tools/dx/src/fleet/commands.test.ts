@@ -112,4 +112,21 @@ describe("runFleet / runSnapshot integration", () => {
     expect(md).toContain("aaaa1111");
     expect(md).not.toContain("bbbb2222");
   });
+
+  test("runSnapshot refreshes latest.md next to the timestamped file", () => {
+    const outPath = join(home, "2026-01-01T00-00-00Z.md");
+    runSnapshot({ output: outPath });
+    const latestPath = join(home, "latest.md");
+    expect(existsSync(latestPath)).toBe(true);
+    expect(readFileSync(latestPath, "utf-8")).toBe(
+      readFileSync(outPath, "utf-8"),
+    );
+    // A second run overwrites latest.md with the newer snapshot's contents.
+    const outPath2 = join(home, "2026-01-01T00-00-01Z.md");
+    runSnapshot({ output: outPath2, onlyBlocked: true });
+    expect(readFileSync(latestPath, "utf-8")).toBe(
+      readFileSync(outPath2, "utf-8"),
+    );
+    expect(readFileSync(latestPath, "utf-8")).not.toContain("bbbb2222");
+  });
 });
