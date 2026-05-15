@@ -21,7 +21,7 @@ What's GA, what's actively in flight, what's queued, what's on the horizon, and 
 | **SharePoint** | GA behind feature toggle, released to Epsilon. — attachment:223abc60 |
 | **Linear** | GA. Was 401-broken since early April for new connections; fixed week of 2026-04-25. — attachment:223abc60 |
 | **Google Drive** | **Hidden for non-allowlisted users.** Google verification for `drive.readonly` pending. — attachment:0f530be9 |
-| **Slack** | **OAuth + channel binding live behind `slackIntegration` browser flag** (default off). Not yet publicly released. — attachment:80d51643, file:2347ede4 |
+| **Slack** | **OAuth + channel binding live, UI always on** (the `slackIntegration` browser flag was removed 2026-05-15, ENG-6020). Marketplace listing review (ENG-5417) still pending for public launch. — attachment:80d51643, file:2347ede4 |
 | **Internal/External separation** | GA per-row across documents/emails/Drive items. |
 | **Scheduled Reports** | Launched week 2026-04-25. Major overhaul week 2026-05-02→05-08. Now first-class: runs in canon, recipients v2, test-fire loop, live SSE progress, 10-min wall-clock cap, anchored-chat link in every email. — attachment:80d51643, attachment:223abc60 |
 | **Magic-link auth** | GA. |
