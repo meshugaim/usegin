@@ -13,7 +13,7 @@
 
 interface ApiClientErrorShape {
   name: string;
-  kind: "auth_failed" | "not_found" | "kill_switch" | "transient" | "other";
+  kind: string;
   status?: number;
   message: string;
 }
@@ -23,7 +23,8 @@ function isApiClientError(err: unknown): err is ApiClientErrorShape {
     !!err &&
     typeof err === "object" &&
     (err as { name?: unknown }).name === "ApiClientError" &&
-    typeof (err as { kind?: unknown }).kind === "string"
+    typeof (err as { kind?: unknown }).kind === "string" &&
+    typeof (err as { message?: unknown }).message === "string"
   );
 }
 
@@ -50,12 +51,21 @@ export function handleApiClientError(
       );
       return true;
     case "not_found":
-      // 404 isn't currently surfaced through list/search (they return empty
-      // results), but if a future code path does, render plainly.
+      // 404 isn't currently surfaced through list/search at the time of this
+      // writing (see finder/api-client.ts:classifyError) — they return empty
+      // results. Future code paths that DO get a 404 land here with a plain
+      // render.
       errorLog("Not found.");
       return true;
     case "other":
       errorLog(`Request failed: ${err.message}`);
+      return true;
+    default:
+      // Unknown kind — a future contributor extended ApiErrorKind without
+      // teaching this translator about it. Don't leak a Bun stack trace:
+      // render the underlying message verbatim and consume the error.
+      // The caller still exits 1 via the same handled-true path.
+      errorLog(`Request failed (${err.kind}): ${err.message}`);
       return true;
   }
 }

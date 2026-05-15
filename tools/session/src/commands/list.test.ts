@@ -651,4 +651,80 @@ describe("runList — subagent disclosure", () => {
       lines.some((l) => /hidden/i.test(l)),
     ).toBe(false);
   });
+
+  test("empty --remote result without --include-subagents still emits disclosure (B2)", async () => {
+    // The user-impact case Ron flagged: API returned only subagent rows, the
+    // server filtered them all out, the merged list is empty. Without
+    // disclosure the user sees "No sessions found" and concludes the env has
+    // nothing — when in fact subagent rows exist and were just hidden.
+    const errors: string[] = [];
+    await expect(
+      runList(["--remote"], {
+        discoverSessionsFn: async () => [],
+        findRemoteSessionsViaApiFn: async () => [],
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      }),
+    ).rejects.toThrow(/__test_exit_1__/);
+    expect(
+      errors.some((e) => /--include-subagents/i.test(e)),
+    ).toBe(true);
+    expect(
+      errors.some((e) => /subagent/i.test(e) && /hidden/i.test(e)),
+    ).toBe(true);
+  });
+
+  test("empty --remote --include-subagents result emits NO disclosure", async () => {
+    const errors: string[] = [];
+    await expect(
+      runList(["--remote", "--include-subagents"], {
+        discoverSessionsFn: async () => [],
+        findRemoteSessionsViaApiFn: async () => [],
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      }),
+    ).rejects.toThrow(/__test_exit_1__/);
+    expect(errors.some((e) => /hidden/i.test(e))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleApiClientError exhaustive-default (Ron B1)
+//
+// If a future ApiErrorKind isn't taught to the translator, the switch must
+// still consume the error (return true) rather than fall through to an
+// implicit undefined return — which the caller treats as "not handled" and
+// re-throws, surfacing the exact stack trace this module was meant to
+// suppress.
+// ---------------------------------------------------------------------------
+
+describe("runList — unknown ApiErrorKind is consumed, not re-thrown", () => {
+  test("unknown kind → clean stderr line + exit 1, no stack trace", async () => {
+    const errors: string[] = [];
+    await expect(
+      runList(["--remote"], {
+        discoverSessionsFn: async () => [],
+        findRemoteSessionsViaApiFn: async () => {
+          // Synthetic: an ApiClientError shape with a kind the translator
+          // doesn't know about (e.g. a future "rate_limited"). The caller
+          // must NOT re-throw.
+          const err = new Error("rate limited (HTTP 429)") as Error & {
+            name: string;
+            kind: string;
+            status: number;
+          };
+          err.name = "ApiClientError";
+          err.kind = "rate_limited";
+          err.status = 429;
+          throw err;
+        },
+        log: () => {},
+        errorLog: (line) => errors.push(line),
+      }),
+    ).rejects.toThrow(/__test_exit_1__/);
+    expect(exitCalls).toEqual([1]);
+    // User sees the underlying message verbatim — no stack trace.
+    expect(errors.some((e) => /rate_limited/.test(e))).toBe(true);
+    expect(errors.some((e) => /at .*\.ts:\d+/i.test(e))).toBe(false);
+  });
 });

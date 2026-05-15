@@ -282,6 +282,16 @@ export async function runList(
       projectsDirExists,
     });
     errorLog(`Error: ${error.message}`);
+    // Ron B2: empty-result with --remote + default-hidden subagents is
+    // exactly the case where the disclosure is load-bearing — the user
+    // sees "No sessions found" and concludes the env has nothing, when in
+    // fact subagent rows exist and were just filtered out. Surface here
+    // before exiting so renderList's footer-only emission doesn't miss it.
+    if (listArgs.remote && !listArgs.includeSubagents) {
+      errorLog(
+        "Note: subagent sessions hidden; pass --include-subagents to include them.",
+      );
+    }
     process.exit(1);
   }
 
