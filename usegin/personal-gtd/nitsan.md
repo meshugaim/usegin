@@ -46,7 +46,6 @@ _Filed tickets stay here until done-in-prod (DoD). Each carries `track:<depth>` 
 
 _CL-today commitments all landed: disconnect ws ✓, files:read scope on prod app ✓, slackIntegration flag removed in fb058a918 ✓_
 
-- **Re-create staging Slack app** + rotate `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` in Doppler → Railway (per Lihu's SOON banner) + set redirect URLs (canonical staging + `https://local-dev.askeffi.ai/api/slack/callback` if applicable). Decided 2026-05-15 to re-create rather than admin-transfer. `track:through-staging` `comms:silent` (internal hygiene)
 
 ### Closure proposals (Claude → you — approve, decline, or steer)
 - **ENG-5838** (Loose-ends silent fire) — Linear `Done`. Tracking was `through-production` + `comms:Guy on-solve + on-deploy`. Confirm: shipped to prod? Guy notified?
