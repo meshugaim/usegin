@@ -30,10 +30,15 @@ bun pm2 stop session-sync                                # stop without forgetti
 bun pm2 delete session-sync                              # forget (state.json on disk persists)
 ```
 
-`autorestart: false` in the ecosystem file: when `src/cli.ts` exits because
-auth/profile loading failed (no `effi auth login` yet, or token expired), PM2 keeps
-the process in "stopped" state. Recovery is `effi auth login` followed by
-`bun pm2 restart session-sync`.
+`autorestart: true` with `min_uptime: 60000`, `max_restarts: 5`,
+`restart_delay: 5000` in the ecosystem file. The daemon recovers automatically
+from any process death (SIGKILL, OOM, segfault, env-pause-induced teardown).
+When `src/cli.ts` exits cleanly because auth/profile loading failed (no
+`effi auth login` yet, or token expired), pm2 retries 5 times with a 5s delay
+between attempts; if each attempt runs <60s, pm2 marks the process `errored`
+and stops. The banner-env-status hook surfaces the `errored` state and prints
+the recovery hint. Manual recovery on auth expiry is unchanged: `effi auth
+login` followed by `bun pm2 restart session-sync`.
 
 ## Slice 1 scope (Steps 3a + 3b + 3c)
 

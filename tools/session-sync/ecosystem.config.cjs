@@ -12,10 +12,16 @@
  *   bun pm2 logs session-sync
  *   bun pm2 status
  *
- * autorestart: false — `src/cli.ts` exits cleanly when auth/profile
- * loading fails (no `effi auth login` yet, or the token expired). Letting PM2
- * keep restarting in that state burns CPU and produces noisy logs. The
- * recovery flow is: `effi auth login`, then `bun pm2 restart session-sync`.
+ * autorestart: true with guardrails — `min_uptime` + `max_restarts` +
+ * `restart_delay` bound the auth-expiry loop. When `src/cli.ts` exits cleanly
+ * because auth/profile loading failed (no `effi auth login` yet, or the token
+ * expired), pm2 waits `restart_delay` (5s) and retries; after `max_restarts`
+ * unstable starts (each running <`min_uptime`/60s), pm2 marks the process
+ * `errored` and stops. The banner-env-status hook picks up `errored` and
+ * prints the recovery hint. Trade-off vs the earlier `autorestart: false`:
+ * we now survive process death from any cause (SIGKILL, OOM, segfault,
+ * env-pause-induced teardown) without manual restart. Recovery flow on auth
+ * expiry is unchanged: `effi auth login`, then `bun pm2 restart session-sync`.
  *
  * Environment variables consumed by `src/cli.ts` (see README):
  *   SESSION_SYNC_PROJECTS_DIR, SESSION_SYNC_STATE_DIR, SESSION_SYNC_IDLE_MS,
@@ -36,7 +42,10 @@ module.exports = {
 			interpreter: "none",
 			cwd: __dirname,
 			instances: 1,
-			autorestart: false,
+			autorestart: true,
+			min_uptime: 60000,
+			max_restarts: 5,
+			restart_delay: 5000,
 			watch: false,
 			max_memory_restart: "256M",
 			env: {
