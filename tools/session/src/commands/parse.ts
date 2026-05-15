@@ -6,6 +6,7 @@ import { formatTimeline } from "../formatter-timeline";
 import { buildJsonOutput } from "../json-format";
 import { getSessionCommits } from "../git-commits";
 import { resolveSessionPath } from "../finder";
+import { fetchSession } from "../fetch";
 import { debugLog } from "../debug";
 import { sliceTurns, formatPositionHeader } from "../incremental";
 import { filterNotifications } from "../filter-notifications";
@@ -70,8 +71,17 @@ export async function runParse(args: MainArgs) {
     const debug = isDebugEnabled(args);
     const totalStart = Date.now();
 
-    // Resolve session ID to path if needed
-    const filePath = await resolveSessionPath(args.file);
+    // Resolve session ID to a local path. When --remote is set, delegate to
+    // fetchSession which checks local → ~/agent-records/ → Supabase in that
+    // order (ENG-5862 step 7, ENG-5986). Without --remote the resolver only
+    // searches local — keeps the bare-path / known-local case zero-cost.
+    let filePath: string;
+    if (args.remote) {
+      const result = await fetchSession(args.file);
+      filePath = result.localPath;
+    } else {
+      filePath = await resolveSessionPath(args.file);
+    }
 
     // List related files mode - just print file paths
     if (args.listFiles) {

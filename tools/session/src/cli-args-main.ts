@@ -72,6 +72,15 @@ export interface MainArgs {
   sinceCommit?: string;
   /** Delegate to `plan list --session <id> --json` instead of parsing. */
   issues: boolean;
+  /**
+   * Fall back to fetching from `/api/v1/dev-sessions` (then Supabase storage)
+   * when the session ID/prefix isn't found locally. Without this flag the
+   * resolver throws SessionNotFoundError; with it, the parse path delegates
+   * to `fetchSession` which already handles the local → agent-records →
+   * Supabase fallback chain. ENG-5956 (slice 1, "read any session from
+   * any env").
+   */
+  remote: boolean;
 }
 
 export function parseMainArgs(args: string[]): MainArgs {
@@ -95,6 +104,7 @@ export function parseMainArgs(args: string[]): MainArgs {
     commits: false,
     excludeNotifications: false,
     issues: false,
+    remote: false,
   };
 
   // Track whether --format was explicitly provided (takes precedence over --full)
@@ -179,6 +189,8 @@ export function parseMainArgs(args: string[]): MainArgs {
       i++;
     } else if (arg === "--issues") {
       result.issues = true;
+    } else if (arg === "--remote") {
+      result.remote = true;
     } else if (!arg?.startsWith("-")) {
       result.file = arg || "";
     }

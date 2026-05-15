@@ -65,6 +65,9 @@ SESSION IDENTIFIERS:
   - Full UUID: 502de9c7-684a-4724-b592-34aa88aac626
   - Short prefix: 502de9c7 (minimum 4 hex characters)
 
+  Pass --remote to fall back to /api/v1/dev-sessions (then Supabase) when
+  the session isn't found locally — for reading sessions from another env.
+
 PICK OPTIONS:
   --method <method>  Picker method: auto, tmux, vsc (default: auto)
   --all-projects     Show sessions from all projects
@@ -151,6 +154,9 @@ OPTIONS:
   --subagents        Include subagent transcripts (appended at end)
   --include-warmups  Include warmup subagents (excluded by default)
   --list-files       List all related files (main + subagents), one per line
+  --remote           Fall back to /api/v1/dev-sessions (then Supabase) when
+                     the session isn't found locally — read remote sessions
+                     without an explicit 'session fetch' first.
   --issues           Show Linear issues touched by this session (delegates to plan list --session)
   --debug            Show timing and progress info (also: DEBUG=session env var)
   --timeout <secs>   Timeout in seconds (default: 30, 0 to disable)

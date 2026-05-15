@@ -1057,3 +1057,29 @@ describe("parseSearchArgs", () => {
     });
   });
 });
+
+describe("parseMainArgs --remote flag (ENG-5956)", () => {
+  it("defaults remote to false", () => {
+    expect(parseMainArgs(["session.jsonl"]).remote).toBe(false);
+  });
+
+  it("sets remote to true when --remote is specified", () => {
+    const result = parseMainArgs([
+      "502de9c7-684a-4724-b592-34aa88aac626",
+      "--remote",
+    ]);
+    expect(result.remote).toBe(true);
+    expect(result.file).toBe("502de9c7-684a-4724-b592-34aa88aac626");
+  });
+
+  it("works alongside output-shaping flags", () => {
+    const result = parseMainArgs([
+      "abc12345",
+      "--remote",
+      "--format",
+      "terminal",
+    ]);
+    expect(result.remote).toBe(true);
+    expect(result.format).toBe("terminal");
+  });
+});
