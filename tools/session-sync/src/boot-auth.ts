@@ -22,7 +22,7 @@
  */
 
 import type { AuthContext } from "./auth.ts";
-import type { NeedsAuthErrorClass } from "./needs-auth-flag.ts";
+import type { NeedsAuthErrorClass, NeedsAuthFlag } from "./needs-auth-flag.ts";
 import {
 	type Effect,
 	initialNeedsAuth,
@@ -32,12 +32,7 @@ import {
 
 export interface BootAuthDecisionInput {
 	/** The on-disk `needs-auth.flag`, or null if none. */
-	flag: {
-		since: string;
-		lastCheckedAt: string;
-		errorClass: NeedsAuthErrorClass;
-		errorMessage: string;
-	} | null;
+	flag: NeedsAuthFlag | null;
 	/** Result of the boot-time `loadAuth` probe. */
 	loadAuthResult:
 		| { ok: true; auth: AuthContext }
@@ -61,7 +56,7 @@ export interface BootAuthDecision {
  *
  *   1. no flag + loadAuth ok       → state ok, no effects.
  *   2. no flag + loadAuth fails    → write flag, enter needs-auth.
- *   3. flag present + loadAuth ok  → DELETE flag, enter ok (ENG-6032).
+ *   3. flag present + loadAuth ok  → DELETE flag, enter ok.
  *   4. flag present + loadAuth fails → keep flag, bump lastCheckedAt,
  *                                       preserve original `since`.
  *
@@ -74,26 +69,23 @@ export interface BootAuthDecision {
 export function decideBootAuthState(
 	input: BootAuthDecisionInput,
 ): BootAuthDecision {
-	if (input.flag) {
+	if (input.flag === null) {
 		if (input.loadAuthResult.ok) {
-			// Case 3 (ENG-6032 fix): credentials valid despite a stale flag.
+			// Case 1: clean boot.
 			return {
 				snapshot: initialOk(),
 				auth: input.loadAuthResult.auth,
-				effects: [
-					{ kind: "assign-auth", auth: input.loadAuthResult.auth },
-					{ kind: "delete-flag" },
-				],
+				effects: [],
 			};
 		}
-		// Case 4: still broken. Preserve `since` from the flag so the banner's
-		// "waiting for login since 12m ago" age stays accurate across restarts.
+		// Case 2: first-time auth failure.
 		return {
-			snapshot: initialNeedsAuth(input.flag.since),
+			snapshot: initialNeedsAuth(input.now),
 			auth: null,
 			effects: [
 				{
-					kind: "update-flag",
+					kind: "write-flag",
+					since: input.now,
 					lastCheckedAt: input.now,
 					errorClass: input.loadAuthResult.errorClass,
 					errorMessage: input.loadAuthResult.errorMessage,
@@ -102,21 +94,24 @@ export function decideBootAuthState(
 		};
 	}
 	if (input.loadAuthResult.ok) {
-		// Case 1: clean boot.
+		// Case 3: credentials valid despite a stale flag — recover into ok.
 		return {
 			snapshot: initialOk(),
 			auth: input.loadAuthResult.auth,
-			effects: [],
+			effects: [
+				{ kind: "assign-auth", auth: input.loadAuthResult.auth },
+				{ kind: "delete-flag" },
+			],
 		};
 	}
-	// Case 2: first-time auth failure.
+	// Case 4: still broken. Preserve `since` from the flag so the banner's
+	// "waiting for login since 12m ago" age stays accurate across restarts.
 	return {
-		snapshot: { state: "needs-auth", since: input.now },
+		snapshot: initialNeedsAuth(input.flag.since),
 		auth: null,
 		effects: [
 			{
-				kind: "write-flag",
-				since: input.now,
+				kind: "update-flag",
 				lastCheckedAt: input.now,
 				errorClass: input.loadAuthResult.errorClass,
 				errorMessage: input.loadAuthResult.errorMessage,

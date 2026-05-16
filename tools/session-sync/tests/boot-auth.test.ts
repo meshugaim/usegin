@@ -23,10 +23,11 @@ const SAMPLE_AUTH: AuthContext = {
 	userId: "user-uuid-1",
 };
 
+// T_NOW is after T_SINCE — proves `since` is preserved across boot, not bumped to now.
 const T_SINCE = "2026-05-14T09:42:38.598Z";
 const T_NOW = "2026-05-14T09:51:02.103Z";
 
-describe("decideBootAuthState — flag present + loadAuth succeeds (ENG-6032)", () => {
+describe("decideBootAuthState — flag present + loadAuth succeeds", () => {
 	test("ENG-6032: boot probes loadAuth when needs-auth.flag exists; success → state ok + flag deleted", () => {
 		const result = decideBootAuthState({
 			flag: {
@@ -43,12 +44,10 @@ describe("decideBootAuthState — flag present + loadAuth succeeds (ENG-6032)", 
 		expect(result.auth).toEqual(SAMPLE_AUTH);
 		// Effect order matches the state-machine's recovery sequence —
 		// assign-auth before delete-flag is the load-bearing invariant.
-		const kinds = result.effects.map((e) => e.kind);
-		expect(kinds).toContain("delete-flag");
-		const assignIdx = kinds.indexOf("assign-auth");
-		const deleteIdx = kinds.indexOf("delete-flag");
-		expect(assignIdx).toBeGreaterThanOrEqual(0);
-		expect(assignIdx).toBeLessThan(deleteIdx);
+		expect(result.effects).toEqual([
+			{ kind: "assign-auth", auth: SAMPLE_AUTH },
+			{ kind: "delete-flag" },
+		]);
 	});
 });
 
@@ -58,7 +57,9 @@ describe("decideBootAuthState — flag present + loadAuth fails", () => {
 			flag: {
 				since: T_SINCE,
 				lastCheckedAt: T_SINCE,
-				errorClass: "expired_refresh_token",
+				// Prior flag's errorClass differs from the new failure's class — proves
+				// update-flag overwrites errorClass rather than preserving the prior value.
+				errorClass: "missing_credentials",
 				errorMessage: "prior",
 			},
 			loadAuthResult: {
@@ -72,13 +73,13 @@ describe("decideBootAuthState — flag present + loadAuth fails", () => {
 		expect(result.snapshot.since).toBe(T_SINCE);
 		expect(result.auth).toBeNull();
 		expect(result.effects.length).toBe(1);
-		const update = result.effects[0] as Extract<
-			(typeof result.effects)[number],
-			{ kind: "update-flag" }
-		>;
-		expect(update.kind).toBe("update-flag");
-		expect(update.lastCheckedAt).toBe(T_NOW);
-		expect(update.errorMessage).toBe("still expired");
+		const effect = result.effects[0];
+		if (effect === undefined || effect.kind !== "update-flag") {
+			throw new Error(`expected update-flag, got ${effect?.kind ?? "undefined"}`);
+		}
+		expect(effect.lastCheckedAt).toBe(T_NOW);
+		expect(effect.errorClass).toBe("expired_refresh_token");
+		expect(effect.errorMessage).toBe("still expired");
 	});
 });
 
@@ -110,12 +111,11 @@ describe("decideBootAuthState — no flag, first-time auth failure", () => {
 		expect(result.snapshot.since).toBe(T_NOW);
 		expect(result.auth).toBeNull();
 		expect(result.effects.length).toBe(1);
-		const write = result.effects[0] as Extract<
-			(typeof result.effects)[number],
-			{ kind: "write-flag" }
-		>;
-		expect(write.kind).toBe("write-flag");
-		expect(write.since).toBe(T_NOW);
-		expect(write.errorClass).toBe("missing_credentials");
+		const effect = result.effects[0];
+		if (effect === undefined || effect.kind !== "write-flag") {
+			throw new Error(`expected write-flag, got ${effect?.kind ?? "undefined"}`);
+		}
+		expect(effect.since).toBe(T_NOW);
+		expect(effect.errorClass).toBe("missing_credentials");
 	});
 });

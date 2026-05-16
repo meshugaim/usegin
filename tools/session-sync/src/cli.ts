@@ -1090,7 +1090,6 @@ async function main(): Promise<void> {
 	// <REFRESH_BUFFER_SECONDS left so the first heartbeat / fireSync doesn't
 	// hit a guaranteed 401.
 	const existingFlag = await readFlag(config.stateDir);
-	const nowISO = new Date().toISOString();
 	let loadAuthResult:
 		| { ok: true; auth: AuthContext }
 		| { ok: false; errorClass: NeedsAuthErrorClass; errorMessage: string };
@@ -1118,6 +1117,7 @@ async function main(): Promise<void> {
 				: "loadAuth still failing — staying in needs-auth.",
 		);
 	}
+	const nowISO = new Date().toISOString();
 	const bootDecision = decideBootAuthState({
 		flag: existingFlag,
 		loadAuthResult,
@@ -1126,27 +1126,56 @@ async function main(): Promise<void> {
 	const auth: AuthContext | null = bootDecision.auth;
 	const authState: MachineSnapshot = bootDecision.snapshot;
 	// Apply boot effects inline — `d` doesn't exist yet, and the boot's
-	// effect surface is small (flag I/O + auth assignment). assign-auth is
-	// already captured via `bootDecision.auth`; arm-watcher is the
-	// structural step a few lines below.
+	// effect surface is small (flag I/O + auth assignment). Exhaustive
+	// switch over Effect.kind: TypeScript will catch any unhandled kind
+	// via the assertNever default; new effect kinds added to state-machine
+	// must opt into a boot-time handler explicitly.
 	for (const effect of bootDecision.effects) {
-		if (effect.kind === "write-flag") {
-			await writeFlag(config.stateDir, {
-				since: effect.since,
-				lastCheckedAt: effect.lastCheckedAt,
-				errorClass: effect.errorClass,
-				errorMessage: effect.errorMessage,
-			});
-		} else if (effect.kind === "update-flag") {
-			await updateFlag(config.stateDir, {
-				lastCheckedAt: effect.lastCheckedAt,
-				errorClass: effect.errorClass,
-				errorMessage: effect.errorMessage,
-			});
-		} else if (effect.kind === "delete-flag") {
-			await deleteFlag(config.stateDir);
+		switch (effect.kind) {
+			case "write-flag":
+				await writeFlag(config.stateDir, {
+					since: effect.since,
+					lastCheckedAt: effect.lastCheckedAt,
+					errorClass: effect.errorClass,
+					errorMessage: effect.errorMessage,
+				});
+				break;
+			case "update-flag":
+				await updateFlag(config.stateDir, {
+					lastCheckedAt: effect.lastCheckedAt,
+					errorClass: effect.errorClass,
+					errorMessage: effect.errorMessage,
+				});
+				break;
+			case "delete-flag":
+				console.log(
+					"[session-sync] needs-auth.flag deleted; recovered into ok state",
+				);
+				await deleteFlag(config.stateDir);
+				break;
+			case "assign-auth":
+				// No-op here; `auth` already carries the value via bootDecision.auth.
+				break;
+			case "clear-auth":
+			case "arm-watcher":
+			case "close-watcher":
+			case "stop-heartbeat":
+			case "start-heartbeat":
+			case "drain-backlog":
+				// Not emitted by decideBootAuthState today, but listed exhaustively
+				// so a new boot-time emission of any of these forces a conscious
+				// wire-up here rather than silently dropping.
+				console.warn(
+					`[session-sync] boot effect '${effect.kind}' has no boot-time handler; ignoring`,
+				);
+				break;
+			default: {
+				const _exhaustive: never = effect;
+				throw new Error(
+					`[session-sync] unknown boot effect kind: ${JSON.stringify(_exhaustive)}`,
+				);
+			}
 		}
-		// assign-auth: no-op here; `auth` already carries the value.
 	}
 
 	const d: DaemonState = {
