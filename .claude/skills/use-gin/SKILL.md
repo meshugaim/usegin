@@ -56,6 +56,8 @@ Why this beats `ask`: Hebrew-heavy transcripts make semantic search miss paraphr
 - `session find` — interactive fzf browse
 - `session search-in <id> <query>` — search within a session's turns
 - `session bash [id] --grep <p>` — browse Bash commands across sessions
+- `session prompts list [--grep <p>] [--since 30d]` — list user prompts (human-typed) across recent sessions
+- `session prompts pick` — fzf picker over past prompts; emits selection to stdout. Bound to **prefix + Q** in tmux: popup → enter → prompt lands in the tmux paste buffer.
 
 ### Rate session vibe mid-session
 

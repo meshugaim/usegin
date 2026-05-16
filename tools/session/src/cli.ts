@@ -26,6 +26,7 @@ import {
   runFork,
   runRm,
   runBash,
+  runPrompts,
   runSearch,
   runSearchIn,
   runDocs,
@@ -50,6 +51,8 @@ USAGE:
   session rm <id> [--yes]   Delete a session and its subagent files
   session delete <id>       Alias for 'rm'
   session bash [id] [--grep <p>]  Browse Bash commands from sessions
+  session prompts list [opts]     List user prompts from past sessions
+  session prompts pick [opts]     Pick a past prompt via fzf; emit to stdout
   session search <query> [-k N]   Semantic search across all sessions
   session search --index          Build / refresh the semantic index
   session search --remote <q> [--user --since --until --status --limit --output --profile]
@@ -252,6 +255,12 @@ async function main() {
   // Check for 'bash' subcommand
   if (rawArgs[0] === "bash") {
     await runBash(rawArgs.slice(1));
+    return;
+  }
+
+  // Check for 'prompts' subcommand
+  if (rawArgs[0] === "prompts") {
+    await runPrompts(rawArgs.slice(1));
     return;
   }
 
