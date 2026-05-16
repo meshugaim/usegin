@@ -57,18 +57,37 @@ export interface BootAuthDecision {
 /**
  * Decide the daemon's boot-time auth posture.
  *
- * Stub (Red phase): mirrors the OLD broken behavior — trusts the
- * flag's presence and skips the loadAuth probe. The Red test asserts
- * the CORRECT behavior, so this stub makes the test fail with the
- * right reason: the function returns the wrong answer.
+ * Four cases — full matrix over (flag presence, loadAuth outcome):
  *
- * Green replaces this body with the probing logic.
+ *   1. no flag + loadAuth ok       → state ok, no effects.
+ *   2. no flag + loadAuth fails    → write flag, enter needs-auth.
+ *   3. flag present + loadAuth ok  → DELETE flag, enter ok (ENG-6032).
+ *   4. flag present + loadAuth fails → keep flag, bump lastCheckedAt,
+ *                                       preserve original `since`.
+ *
+ * Case 3 is the load-bearing one: it makes the `effi auth refresh &&
+ * pm2 restart session-sync` recovery sequence actually recover. The
+ * effect order (assign-auth before delete-flag) mirrors
+ * state-machine.ts's recovery sequence so banner correctness holds
+ * even if the daemon crashes mid-apply.
  */
 export function decideBootAuthState(
 	input: BootAuthDecisionInput,
 ): BootAuthDecision {
 	if (input.flag) {
-		// OLD broken behavior: trust the flag, ignore loadAuthResult.
+		if (input.loadAuthResult.ok) {
+			// Case 3 (ENG-6032 fix): credentials valid despite a stale flag.
+			return {
+				snapshot: initialOk(),
+				auth: input.loadAuthResult.auth,
+				effects: [
+					{ kind: "assign-auth", auth: input.loadAuthResult.auth },
+					{ kind: "delete-flag" },
+				],
+			};
+		}
+		// Case 4: still broken. Preserve `since` from the flag so the banner's
+		// "waiting for login since 12m ago" age stays accurate across restarts.
 		return {
 			snapshot: initialNeedsAuth(input.flag.since),
 			auth: null,
@@ -76,19 +95,21 @@ export function decideBootAuthState(
 				{
 					kind: "update-flag",
 					lastCheckedAt: input.now,
-					errorClass: input.flag.errorClass,
-					errorMessage: input.flag.errorMessage,
+					errorClass: input.loadAuthResult.errorClass,
+					errorMessage: input.loadAuthResult.errorMessage,
 				},
 			],
 		};
 	}
 	if (input.loadAuthResult.ok) {
+		// Case 1: clean boot.
 		return {
 			snapshot: initialOk(),
 			auth: input.loadAuthResult.auth,
 			effects: [],
 		};
 	}
+	// Case 2: first-time auth failure.
 	return {
 		snapshot: { state: "needs-auth", since: input.now },
 		auth: null,

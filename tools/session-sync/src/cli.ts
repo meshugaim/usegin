@@ -27,6 +27,7 @@ import { getCredentialsPath } from "../../lib/auth/credentials.ts";
 import { resolveProfileName } from "../../lib/auth/profiles.ts";
 import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
 import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
+import { decideBootAuthState } from "./boot-auth.ts";
 import { Coalescer } from "./coalescer.ts";
 import { detectEnvironment } from "./env-detect.ts";
 import { classifyError } from "./error-classify.ts";
@@ -56,8 +57,6 @@ import {
 import {
 	dispatch,
 	type Effect,
-	initialNeedsAuth,
-	initialOk,
 	type MachineSnapshot,
 	type Trigger,
 } from "./state-machine.ts";
@@ -1075,57 +1074,79 @@ async function main(): Promise<void> {
 	// (which honors `current_profile`).
 	const resolvedProfileName = await resolveProfileName(config.profileName);
 
-	// 1. Auth — with ENG-5990 restart persistence + needs-auth fallback.
+	// 1. Auth — with ENG-5990 restart persistence + ENG-6032 boot probe.
 	//
-	// (a) If <stateDir>/needs-auth.flag exists, boot directly into
-	//     needs-auth, preserving `since` from the flag. Skip loadAuth
-	//     entirely (the credentials watcher will retry on mtime change).
-	// (b) Otherwise call loadAuth; on success, pre-emptively refresh if
-	//     the token has <5min left, then enter `ok`. Any failure (loadAuth
-	//     throw, pre-emptive refresh throw with auth-class) enters
-	//     `needs-auth` without exiting.
-	let auth: AuthContext | null = null;
-	let authState: MachineSnapshot = initialOk();
+	// Boot ALWAYS probes loadAuth, regardless of needs-auth.flag presence.
+	// (a) flag absent + loadAuth ok        → enter ok.
+	// (b) flag absent + loadAuth fails     → write flag, enter needs-auth.
+	// (c) flag present + loadAuth ok       → DELETE flag, enter ok (ENG-6032
+	//     fix: `effi auth refresh && pm2 restart session-sync` recovers
+	//     deterministically; the watcher's mtime path is no longer the
+	//     only way out).
+	// (d) flag present + loadAuth fails    → keep flag, bump lastCheckedAt,
+	//     preserve original `since`.
+	//
+	// On the (a)/(c) success paths, pre-emptively refresh if the token has
+	// <REFRESH_BUFFER_SECONDS left so the first heartbeat / fireSync doesn't
+	// hit a guaranteed 401.
 	const existingFlag = await readFlag(config.stateDir);
 	const nowISO = new Date().toISOString();
+	let loadAuthResult:
+		| { ok: true; auth: AuthContext }
+		| { ok: false; errorClass: NeedsAuthErrorClass; errorMessage: string };
+	try {
+		let probed = await loadAuth({ profileName: config.profileName });
+		probed = await refreshAuthIfNeeded(probed, {
+			profileName: config.profileName,
+		});
+		loadAuthResult = { ok: true, auth: probed };
+		console.log("[session-sync] auth ok; userId =", probed.userId);
+	} catch (err) {
+		const message = (err as Error).message;
+		console.warn("[session-sync] auth probe failed at startup:", message);
+		loadAuthResult = {
+			ok: false,
+			errorClass: diagnoseErrorClass({ source: "loadAuth", message }),
+			errorMessage: message,
+		};
+	}
 	if (existingFlag) {
 		console.log(
-			"[session-sync] needs-auth.flag present; booting into needs-auth (since",
-			existingFlag.since + ")",
+			`[session-sync] needs-auth.flag present (since ${existingFlag.since});`,
+			loadAuthResult.ok
+				? "loadAuth succeeded — recovering."
+				: "loadAuth still failing — staying in needs-auth.",
 		);
-		authState = initialNeedsAuth(existingFlag.since);
-		// Bump lastCheckedAt so the banner reflects this boot's check.
-		await updateFlag(config.stateDir, {
-			lastCheckedAt: nowISO,
-			errorClass: existingFlag.errorClass,
-			errorMessage: existingFlag.errorMessage,
-		});
-	} else {
-		try {
-			auth = await loadAuth({ profileName: config.profileName });
-			// Pre-emptive refresh (AC2): if the just-loaded token has
-			// <REFRESH_BUFFER_SECONDS remaining, refresh now so the first
-			// heartbeat / fireSync doesn't hit a guaranteed 401.
-			auth = await refreshAuthIfNeeded(auth, {
-				profileName: config.profileName,
-			});
-			console.log("[session-sync] auth ok; userId =", auth.userId);
-		} catch (err) {
-			const message = (err as Error).message;
-			console.warn("[session-sync] auth failed at startup:", message);
-			// Enter needs-auth without exiting — daemon stays up.
-			authState = { state: "needs-auth", since: nowISO };
-			auth = null;
+	}
+	const bootDecision = decideBootAuthState({
+		flag: existingFlag,
+		loadAuthResult,
+		now: nowISO,
+	});
+	const auth: AuthContext | null = bootDecision.auth;
+	const authState: MachineSnapshot = bootDecision.snapshot;
+	// Apply boot effects inline — `d` doesn't exist yet, and the boot's
+	// effect surface is small (flag I/O + auth assignment). assign-auth is
+	// already captured via `bootDecision.auth`; arm-watcher is the
+	// structural step a few lines below.
+	for (const effect of bootDecision.effects) {
+		if (effect.kind === "write-flag") {
 			await writeFlag(config.stateDir, {
-				since: nowISO,
-				lastCheckedAt: nowISO,
-				errorClass: diagnoseErrorClass({
-					source: "loadAuth",
-					message,
-				}),
-				errorMessage: message,
+				since: effect.since,
+				lastCheckedAt: effect.lastCheckedAt,
+				errorClass: effect.errorClass,
+				errorMessage: effect.errorMessage,
 			});
+		} else if (effect.kind === "update-flag") {
+			await updateFlag(config.stateDir, {
+				lastCheckedAt: effect.lastCheckedAt,
+				errorClass: effect.errorClass,
+				errorMessage: effect.errorMessage,
+			});
+		} else if (effect.kind === "delete-flag") {
+			await deleteFlag(config.stateDir);
 		}
+		// assign-auth: no-op here; `auth` already carries the value.
 	}
 
 	const d: DaemonState = {
