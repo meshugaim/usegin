@@ -272,7 +272,7 @@ describe("loadAuthWithRefresh", () => {
 		expect(refreshCalls).toBe(0);
 	});
 
-	test.failing("on expired-token error: calls refreshFn, then retries loadAuth and returns the refreshed context", async () => {
+	test("on expired-token error: calls refreshFn, then retries loadAuth and returns the refreshed context", async () => {
 		const expiredToken = makeJwt({ sub: "user-uuid-abc", exp: nowSec - 60 });
 		const refreshedToken = makeJwt({
 			sub: "user-uuid-abc",
@@ -354,7 +354,7 @@ describe("loadAuthWithRefresh", () => {
 		expect(refreshCalls).toBe(0);
 	});
 
-	test.failing("when refresh ALSO fails (e.g. invalid_grant): propagates the REFRESH error (not the original loadAuth error) so caller can classify as expired_refresh_token", async () => {
+	test("when refresh ALSO fails (e.g. invalid_grant): propagates the REFRESH error (not the original loadAuth error) so caller can classify as expired_refresh_token", async () => {
 		const expiredToken = makeJwt({ sub: "user-uuid-abc", exp: nowSec - 60 });
 		// Distinctive sentinel only the refresh path can produce — proves the
 		// caller sees the refresh failure, not the original "token is expired"

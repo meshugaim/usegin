@@ -25,7 +25,12 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { getCredentialsPath } from "../../lib/auth/credentials.ts";
 import { resolveProfileName } from "../../lib/auth/profiles.ts";
-import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
+import {
+	type AuthContext,
+	loadAuth,
+	loadAuthWithRefresh,
+	refreshAuthIfNeeded,
+} from "./auth.ts";
 import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
 import { decideBootAuthState } from "./boot-auth.ts";
 import { Coalescer } from "./coalescer.ts";
@@ -1094,7 +1099,8 @@ async function main(): Promise<void> {
 	// (which honors `current_profile`).
 	const resolvedProfileName = await resolveProfileName(config.profileName);
 
-	// 1. Auth — with ENG-5990 restart persistence + ENG-6032 boot probe.
+	// 1. Auth — with ENG-5990 restart persistence + ENG-6032 boot probe +
+	// ENG-6035 boot auto-refresh.
 	//
 	// Boot ALWAYS probes loadAuth, regardless of needs-auth.flag presence.
 	// (a) flag absent + loadAuth ok        → enter ok.
@@ -1106,15 +1112,29 @@ async function main(): Promise<void> {
 	// (d) flag present + loadAuth fails    → keep flag, bump lastCheckedAt,
 	//     preserve original `since`.
 	//
+	// ENG-6035: the loadAuth probe goes through `loadAuthWithRefresh`, which
+	// transparently refreshes a lapsed access_token against the on-disk
+	// refresh_token before declaring failure. Long-paused devcontainers
+	// (env-resume after >1h) used to require a manual `effi auth refresh &&
+	// pm2 restart session-sync` to recover — the helper now does it
+	// automatically in <1s on boot. If the refresh ALSO fails (invalid_grant,
+	// network), the upstream refresh error propagates so the flag's
+	// errorMessage tells a human exactly what's broken (not the stale
+	// "access token is expired" complaint).
+	//
 	// On the (a)/(c) success paths, pre-emptively refresh if the token has
 	// <REFRESH_BUFFER_SECONDS left so the first heartbeat / fireSync doesn't
-	// hit a guaranteed 401.
+	// hit a guaranteed 401. (Redundant with the loadAuthWithRefresh path
+	// when the access token was outright expired, but still load-bearing
+	// for the "fresh enough to load, near-expiry by 5min buffer" case.)
 	const existingFlag = await readFlag(config.stateDir);
 	let loadAuthResult:
 		| { ok: true; auth: AuthContext }
 		| { ok: false; errorClass: NeedsAuthErrorClass; errorMessage: string };
 	try {
-		let probed = await loadAuth({ profileName: config.profileName });
+		let probed = await loadAuthWithRefresh({
+			profileName: config.profileName,
+		});
 		probed = await refreshAuthIfNeeded(probed, {
 			profileName: config.profileName,
 		});
