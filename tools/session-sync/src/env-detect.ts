@@ -40,19 +40,14 @@ export function detectEnvironment(
 	return { kind: "local-devcontainer", id: "" };
 }
 
-export type ValidateEnvIdentityInput = {
-	kind: EnvironmentKind;
-	id: string;
-};
-
 export type ValidateEnvIdentityResult =
 	| { ok: true }
 	| { ok: false; error: string };
 
 /**
- * Refuse to proceed when env_id is empty on a cloud env (ona / gitpod /
- * codespaces). Empty id ships as `environment_id: ""` in upload metadata
- * and the API rejects it with HTTP 400 invalid_metadata.
+ * Refuse to proceed when env_id is empty. Empty id ships as
+ * `environment_id: ""` in upload metadata and the API rejects it with
+ * HTTP 400 invalid_metadata.
  *
  * This is the safety net for ENG-6033: pm2 captures env at the original
  * `pm2 start` time and never refreshes it across Ona env-resume, so
@@ -61,16 +56,15 @@ export type ValidateEnvIdentityResult =
  * every env-resume) prevents the staleness; this validator catches the
  * symptom if that path didn't run.
  *
- * `local-devcontainer` is intentionally allowed through with an empty
- * id: env-detect returns `id: ""` as a sentinel, and `cli.ts` threads
- * the real install-id in via `getOrCreateInstallId()` after this check.
+ * Caller contract: invoke AFTER install-id resolution. `cli.ts` runs
+ * `getOrCreateInstallId()` for the local-devcontainer branch first and
+ * then threads the resolved id into the validator. Treating all kinds
+ * uniformly (empty id = reject) means a corrupt state-dir on local can't
+ * silently slip through with `environment_id: ""`.
  */
 export function validateEnvIdentity(
-	input: ValidateEnvIdentityInput,
+	input: DetectedEnvironment,
 ): ValidateEnvIdentityResult {
-	if (input.kind === "local-devcontainer") {
-		return { ok: true };
-	}
 	if (input.id === "") {
 		return {
 			ok: false,

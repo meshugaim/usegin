@@ -29,7 +29,11 @@ import { type AuthContext, loadAuth, refreshAuthIfNeeded } from "./auth.ts";
 import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
 import { decideBootAuthState } from "./boot-auth.ts";
 import { Coalescer } from "./coalescer.ts";
-import { detectEnvironment, validateEnvIdentity } from "./env-detect.ts";
+import {
+	type DetectedEnvironment,
+	detectEnvironment,
+	validateEnvIdentity,
+} from "./env-detect.ts";
 import { classifyError } from "./error-classify.ts";
 import { type HeartbeatLoopHandle, heartbeatLoop } from "./heartbeat.ts";
 import { getOrCreateInstallId } from "./install-id.ts";
@@ -1043,23 +1047,28 @@ async function main(): Promise<void> {
 	// 2. Env detect + install-id. Done before auth so the stateDir is
 	// guaranteed mkdir'd before we look for needs-auth.flag in it.
 	const detected = detectEnvironment(process.env);
-	// ENG-6033: gate cloud envs against the pm2-stale-env trap. pm2
-	// captures env at original `pm2 start` and never refreshes it across
-	// Ona env-resume, so GITPOD_SVC can be empty under us. An empty id
-	// becomes `environment_id: ""` in upload metadata and the API rejects
-	// every POST with HTTP 400 invalid_metadata. The script-side fix runs
+	mkdirSync(config.stateDir, { recursive: true });
+	const resolvedEnv: DetectedEnvironment =
+		detected.kind === "local-devcontainer"
+			? { kind: detected.kind, id: await getOrCreateInstallId(config.stateDir) }
+			: detected;
+	// ENG-6033: gate against the pm2-stale-env trap. pm2 captures env at
+	// original `pm2 start` and never refreshes it across Ona env-resume,
+	// so GITPOD_SVC can be empty under us. An empty id becomes
+	// `environment_id: ""` in upload metadata and the API rejects every
+	// POST with HTTP 400 invalid_metadata. The script-side fix runs
 	// `pm2 restart --update-env` on env-resume; this is the safety net.
-	const envCheck = validateEnvIdentity(detected);
+	//
+	// Validate AFTER install-id resolution so the local-devcontainer
+	// branch (which uses install-id, not detected.id) is checked on the
+	// resolved value rather than the env-detect sentinel — a corrupt
+	// state-dir can't silently slip through with empty id.
+	const envCheck = validateEnvIdentity(resolvedEnv);
 	if (!envCheck.ok) {
-		console.error("[session-sync] env validation failed:", envCheck.error);
+		console.error("[session-sync] STARTUP REFUSED:", envCheck.error);
 		process.exit(1);
 	}
-	mkdirSync(config.stateDir, { recursive: true });
-	let envId = detected.id;
-	if (detected.kind === "local-devcontainer") {
-		envId = await getOrCreateInstallId(config.stateDir);
-	}
-	const envIdentity: EnvIdentity = { kind: detected.kind, id: envId };
+	const envIdentity: EnvIdentity = resolvedEnv;
 	console.log("[session-sync] env =", envIdentity);
 
 	// 3. Pid file (sentinel for CLI daemon-deference per ENG-5862).

@@ -8,9 +8,12 @@ import { validateEnvIdentity } from "../src/env-detect.ts";
 //
 // Part A (ensure-session-sync.sh) prevents the staleness on env-resume.
 // Part B (this validation) is the safety net: if env_id is empty for any
-// non-local environment kind, the daemon refuses to start with a message
-// pointing at the `--update-env` recovery, instead of silently spraying
-// invalid POSTs.
+// environment kind, the daemon refuses to start with a message pointing at
+// the `--update-env` recovery, instead of silently spraying invalid POSTs.
+//
+// The validator runs AFTER install-id resolution (see cli.ts), so the
+// local-devcontainer branch is checked against the resolved install-id
+// rather than the env-detect empty-string sentinel.
 describe("validateEnvIdentity", () => {
 	test(
 		"ona kind with empty id is rejected with --update-env recovery hint",
@@ -58,16 +61,27 @@ describe("validateEnvIdentity", () => {
 		expect(result).toEqual({ ok: true });
 	});
 
-	test("local-devcontainer with empty id is accepted (install-id is set later)", () => {
-		// In the local path env-detect intentionally returns `id: ""`; the
-		// caller threads in the install-id via getOrCreateInstallId(). The
-		// validator runs BEFORE that resolution step, so it must allow this
-		// shape through.
+	test("codespaces kind with a valid id is accepted", () => {
+		const result = validateEnvIdentity({
+			kind: "codespaces",
+			id: "lihu-jubilant-octopus-abc123",
+		});
+		expect(result).toEqual({ ok: true });
+	});
+
+	test("local-devcontainer with empty id is rejected (caller must resolve install-id first)", () => {
+		// The validator runs AFTER cli.ts's install-id resolution step.
+		// If a local-devcontainer ever lands here with an empty id, the
+		// state-dir is corrupt — getOrCreateInstallId would have minted one
+		// otherwise. Reject uniformly rather than spray `environment_id: ""`.
 		const result = validateEnvIdentity({
 			kind: "local-devcontainer",
 			id: "",
 		});
-		expect(result).toEqual({ ok: true });
+		expect(result.ok).toBe(false);
+		if (result.ok) throw new Error("unreachable — narrowing for TS");
+		expect(result.error).toContain("empty env_id");
+		expect(result.error).toContain("local-devcontainer");
 	});
 
 	test("local-devcontainer with a resolved install-id is accepted", () => {

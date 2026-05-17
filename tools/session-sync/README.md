@@ -104,6 +104,20 @@ CLI flags:
 - `--no-recursive-watch` — skip the preflight, walk + watch each subdir
   individually. Useful on kernels where recursive `fs.watch` is flaky.
 
+## Recovery
+
+If `bun pm2 status session-sync` shows `errored`, check `~/.local/state/session-sync/pm2-error.log` for the boot failure:
+
+- **`[session-sync] STARTUP REFUSED: empty env_id ...`** — pm2's captured env is stale (typically `GITPOD_SVC` after an Ona env-resume). Recover with:
+
+  ```sh
+  bun pm2 restart session-sync --update-env
+  ```
+
+  This refreshes pm2's captured env to the current shell, fixing the stale-`GITPOD_SVC`-across-env-resume case (ENG-6033). The `.devcontainer/ensure-session-sync.sh` script runs this automatically on every env-resume; manual recovery is only needed if that path didn't fire.
+
+- **Auth-class failure (`No credentials` / `expired_refresh_token` / etc.)** — `effi auth login`, then `bun pm2 restart session-sync`.
+
 ## Manual smoke
 
 `scripts/smoke.ts` exercises the full lifecycle against a tmpdir-mounted
