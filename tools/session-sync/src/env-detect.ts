@@ -49,9 +49,36 @@ export type ValidateEnvIdentityResult =
 	| { ok: true }
 	| { ok: false; error: string };
 
-// Stub — Red phase placeholder. Real implementation lands in Green commit.
+/**
+ * Refuse to proceed when env_id is empty on a cloud env (ona / gitpod /
+ * codespaces). Empty id ships as `environment_id: ""` in upload metadata
+ * and the API rejects it with HTTP 400 invalid_metadata.
+ *
+ * This is the safety net for ENG-6033: pm2 captures env at the original
+ * `pm2 start` time and never refreshes it across Ona env-resume, so
+ * `GITPOD_SVC` (and thus `id`) goes stale-to-empty under us. The script
+ * fix (`ensure-session-sync.sh` calling `pm2 restart --update-env` on
+ * every env-resume) prevents the staleness; this validator catches the
+ * symptom if that path didn't run.
+ *
+ * `local-devcontainer` is intentionally allowed through with an empty
+ * id: env-detect returns `id: ""` as a sentinel, and `cli.ts` threads
+ * the real install-id in via `getOrCreateInstallId()` after this check.
+ */
 export function validateEnvIdentity(
-	_input: ValidateEnvIdentityInput,
+	input: ValidateEnvIdentityInput,
 ): ValidateEnvIdentityResult {
+	if (input.kind === "local-devcontainer") {
+		return { ok: true };
+	}
+	if (input.id === "") {
+		return {
+			ok: false,
+			error:
+				`empty env_id for kind=${input.kind} — pm2 likely captured a stale ` +
+				`environment at original start (ENG-6033). Recover with: ` +
+				`bun pm2 restart session-sync --update-env`,
+		};
+	}
 	return { ok: true };
 }

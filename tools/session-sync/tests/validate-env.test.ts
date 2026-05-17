@@ -12,7 +12,7 @@ import { validateEnvIdentity } from "../src/env-detect.ts";
 // pointing at the `--update-env` recovery, instead of silently spraying
 // invalid POSTs.
 describe("validateEnvIdentity", () => {
-	test.failing(
+	test(
 		"ona kind with empty id is rejected with --update-env recovery hint",
 		() => {
 			const result = validateEnvIdentity({ kind: "ona", id: "" });
@@ -24,7 +24,7 @@ describe("validateEnvIdentity", () => {
 		},
 	);
 
-	test.failing("gitpod kind with empty id is rejected", () => {
+	test("gitpod kind with empty id is rejected", () => {
 		const result = validateEnvIdentity({ kind: "gitpod", id: "" });
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error("unreachable — narrowing for TS");
@@ -33,7 +33,7 @@ describe("validateEnvIdentity", () => {
 		expect(result.error).toContain("--update-env");
 	});
 
-	test.failing("codespaces kind with empty id is rejected", () => {
+	test("codespaces kind with empty id is rejected", () => {
 		const result = validateEnvIdentity({ kind: "codespaces", id: "" });
 		expect(result.ok).toBe(false);
 		if (result.ok) throw new Error("unreachable — narrowing for TS");
