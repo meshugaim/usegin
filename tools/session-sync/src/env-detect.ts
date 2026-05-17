@@ -39,3 +39,19 @@ export function detectEnvironment(
 	}
 	return { kind: "local-devcontainer", id: "" };
 }
+
+export type ValidateEnvIdentityInput = {
+	kind: EnvironmentKind;
+	id: string;
+};
+
+export type ValidateEnvIdentityResult =
+	| { ok: true }
+	| { ok: false; error: string };
+
+// Stub — Red phase placeholder. Real implementation lands in Green commit.
+export function validateEnvIdentity(
+	_input: ValidateEnvIdentityInput,
+): ValidateEnvIdentityResult {
+	return { ok: true };
+}
