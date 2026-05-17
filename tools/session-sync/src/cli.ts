@@ -30,6 +30,7 @@ import {
 	loadAuth,
 	loadAuthWithRefresh,
 	refreshAuthIfNeeded,
+	RefreshFailedError,
 } from "./auth.ts";
 import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
 import { decideBootAuthState } from "./boot-auth.ts";
@@ -1117,10 +1118,11 @@ async function main(): Promise<void> {
 	// refresh_token before declaring failure. Long-paused devcontainers
 	// (env-resume after >1h) used to require a manual `effi auth refresh &&
 	// pm2 restart session-sync` to recover — the helper now does it
-	// automatically in <1s on boot. If the refresh ALSO fails (invalid_grant,
-	// network), the upstream refresh error propagates so the flag's
-	// errorMessage tells a human exactly what's broken (not the stale
-	// "access token is expired" complaint).
+	// automatically on boot. If the refresh ALSO fails (invalid_grant,
+	// network), the wrapped `RefreshFailedError` lets the catch branch
+	// classify as `source: "refresh"` and the upstream refresh message
+	// reaches the flag's errorMessage (not the stale "access token is
+	// expired" complaint).
 	//
 	// On the (a)/(c) success paths, pre-emptively refresh if the token has
 	// <REFRESH_BUFFER_SECONDS left so the first heartbeat / fireSync doesn't
@@ -1141,11 +1143,18 @@ async function main(): Promise<void> {
 		loadAuthResult = { ok: true, auth: probed };
 		console.log("[session-sync] auth ok; userId =", probed.userId);
 	} catch (err) {
-		const message = (err as Error).message;
+		const message = err instanceof Error ? err.message : String(err);
+		// ENG-6035: `loadAuthWithRefresh` wraps refresh-attempt failures in
+		// `RefreshFailedError`. Classify by source so ENG-6034 can branch on
+		// `expired_refresh_token` vs `network` (today both return
+		// `expired_refresh_token` for either source, but the distinction is
+		// load-bearing once `diagnoseErrorClass` grows the branch).
+		const source: "loadAuth" | "refresh" =
+			err instanceof RefreshFailedError ? "refresh" : "loadAuth";
 		console.warn("[session-sync] auth probe failed at startup:", message);
 		loadAuthResult = {
 			ok: false,
-			errorClass: diagnoseErrorClass({ source: "loadAuth", message }),
+			errorClass: diagnoseErrorClass({ source, message }),
 			errorMessage: message,
 		};
 	}

@@ -162,9 +162,43 @@ export interface LoadAuthWithRefreshOptions extends LoadAuthOptions {
  * missing) are NOT recoverable via refresh, and a blanket retry would
  * waste a refresh API call (and hide a true bug) for those cases.
  *
- * Kept in lockstep with the throw site in `loadAuth` below.
+ * Used as the catch-sentinel in `loadAuthWithRefresh` below; interpolated
+ * into the throw site in `loadAuth` so the constant is the single source
+ * of truth (no compiler-invisible lockstep).
  */
 const EXPIRED_TOKEN_ERROR_SENTINEL = "dev-login token is expired";
+
+/**
+ * Tagged error thrown by `loadAuthWithRefresh` when the refresh attempt
+ * itself fails (not when the initial `loadAuth` fails for any reason).
+ *
+ * Callers branch on `err instanceof RefreshFailedError` to classify the
+ * boot-time failure as `source: "refresh"` for `diagnoseErrorClass`:
+ *
+ *   - `source: "loadAuth"`  → initial probe failed (missing creds, no `sub`,
+ *                             or expired access_token with refresh attempt
+ *                             never reached).
+ *   - `source: "refresh"`   → access_token was expired, refresh attempt ran
+ *                             and ALSO failed (invalid_grant, network blip).
+ *
+ * Today both paths classify identically inside `diagnoseErrorClass`, but
+ * the distinction is load-bearing for ENG-6034 (loud notification on
+ * `expired_refresh_token`, quiet retry on `network`). Wrapping the original
+ * error here makes the boot path supply the truthful source so future
+ * `diagnoseErrorClass` branches actually fire.
+ *
+ * The original error is preserved on `cause` so the upstream message
+ * (e.g. invalid_grant detail) reaches `needs-auth.flag.errorMessage` for
+ * a human grepping logs.
+ */
+export class RefreshFailedError extends Error {
+	override readonly cause: Error;
+	constructor(cause: Error) {
+		super(cause.message);
+		this.cause = cause;
+		this.name = "RefreshFailedError";
+	}
+}
 
 /**
  * Boot-path variant of `loadAuth` with one-shot auto-refresh (ENG-6035).
@@ -179,23 +213,25 @@ const EXPIRED_TOKEN_ERROR_SENTINEL = "dev-login token is expired";
  * still good. The old boot path threw straight into `needs-auth`,
  * stranding the daemon until a human ran `effi auth refresh && pm2
  * restart session-sync`. With this helper, the daemon does the
- * refresh itself in <1s on boot — matching what `effi auth refresh`
- * would do manually.
+ * refresh itself on boot — matching what `effi auth refresh` would
+ * do manually.
  *
- * On refresh failure (invalid_grant, network blip): the upstream error
- * propagates so the boot path can classify it (expired_refresh_token
- * vs network) and write an accurate `needs-auth.flag`. We deliberately
- * surface the refresh failure rather than the stale "token is expired"
- * complaint — a human reading the flag wants to know "your
- * refresh_token is gone", not "your access_token expired (we tried)".
+ * On refresh failure (invalid_grant, network blip): the refresh error
+ * is wrapped in `RefreshFailedError` with the original error preserved
+ * on `.cause` (and `super(cause.message)` so `(err as Error).message`
+ * still surfaces the upstream message). The caller branches on
+ * `instanceof RefreshFailedError` to feed `source: "refresh"` into
+ * `diagnoseErrorClass`, so ENG-6034's `expired_refresh_token` vs
+ * `network` distinction can fire. The upstream message lands in
+ * `needs-auth.flag.errorMessage` for a human grepping logs.
  *
  * Note on the duplicate refresh primitive: `refreshAuthIfNeeded` (this
  * file) and `ensureFreshToken` (`tools/lib/auth/token-refresh.ts`)
  * share intent but differ in input — the former takes an AuthContext,
  * the latter reads creds from disk. This helper needs the latter shape
  * because there is no AuthContext yet (loadAuth blew up before
- * producing one). Unifying them is out of scope (ENG-6035) and tracked
- * separately.
+ * producing one). Unifying them is out of scope here and tracked under
+ * ENG-6036 (filed under parent ENG-5989).
  */
 export async function loadAuthWithRefresh(
 	opts: LoadAuthWithRefreshOptions = {},
@@ -203,7 +239,7 @@ export async function loadAuthWithRefresh(
 	try {
 		return await loadAuth(opts);
 	} catch (err) {
-		const message = (err as Error).message ?? "";
+		const message = err instanceof Error ? err.message : String(err);
 		if (!message.includes(EXPIRED_TOKEN_ERROR_SENTINEL)) {
 			throw err;
 		}
@@ -211,12 +247,25 @@ export async function loadAuthWithRefresh(
 		const refreshFn = opts.refreshFn ?? defaultEnsureFreshToken;
 		const getApiUrlFn = opts.getApiUrlFn ?? defaultGetApiUrl;
 		const apiUrl = await getApiUrlFn(opts.profileName);
-		// Refresh failures propagate verbatim — caller (cli.ts boot path)
-		// classifies via diagnoseErrorClass({source:'refresh', ...}) and
-		// writes the upstream message into needs-auth.flag.errorMessage.
-		await refreshFn(apiUrl, { profileName: opts.profileName });
-		// Refresh wrote fresh creds to disk; retry the load.
-		return await loadAuth(opts);
+		// Refresh failures are wrapped in RefreshFailedError so the caller
+		// (cli.ts boot path) can branch on `instanceof` and classify via
+		// diagnoseErrorClass({source:'refresh', ...}). The original error's
+		// message is preserved on `.cause` (and via super(cause.message)) so
+		// the upstream message reaches `needs-auth.flag.errorMessage`.
+		try {
+			await refreshFn(apiUrl, { profileName: opts.profileName });
+		} catch (refreshErr) {
+			const cause =
+				refreshErr instanceof Error
+					? refreshErr
+					: new Error(String(refreshErr));
+			throw new RefreshFailedError(cause);
+		}
+		// Refresh wrote fresh creds to disk; retry the load. Override the
+		// api-url resolver to return the already-resolved value so we don't
+		// re-do the I/O (and the disk read happens through `readCredentialsFn`
+		// once more, which is the actual point of the retry).
+		return await loadAuth({ ...opts, getApiUrlFn: async () => apiUrl });
 	}
 }
 
@@ -235,7 +284,7 @@ export async function loadAuth(
 	}
 	if (isTokenExpired(creds.access_token, now)) {
 		throw new Error(
-			"session-sync: dev-login token is expired. Run `effi auth refresh` (or `effi auth login`) to refresh.",
+			`session-sync: ${EXPIRED_TOKEN_ERROR_SENTINEL}. Run \`effi auth refresh\` (or \`effi auth login\`) to refresh.`,
 		);
 	}
 	const sub = decodeJwtSub(creds.access_token);

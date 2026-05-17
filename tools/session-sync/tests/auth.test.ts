@@ -5,6 +5,7 @@ import {
 	loadAuth,
 	loadAuthWithRefresh,
 	refreshAuthIfNeeded,
+	RefreshFailedError,
 } from "../src/auth.ts";
 
 /**
@@ -313,6 +314,7 @@ describe("loadAuthWithRefresh", () => {
 			{ apiUrl: "http://localhost:63000", profileName: "agent-dev" },
 		]);
 		// loadAuth was called twice: once to discover the expiry, once after refresh.
+		expect(reads).toHaveLength(2);
 		expect(reads).toEqual([expiredToken, refreshedToken]);
 	});
 
@@ -354,7 +356,7 @@ describe("loadAuthWithRefresh", () => {
 		expect(refreshCalls).toBe(0);
 	});
 
-	test("when refresh ALSO fails (e.g. invalid_grant): propagates the REFRESH error (not the original loadAuth error) so caller can classify as expired_refresh_token", async () => {
+	test("when refresh ALSO fails (e.g. invalid_grant): wraps in RefreshFailedError with cause set, message preserves upstream so caller can classify as `source: \"refresh\"`", async () => {
 		const expiredToken = makeJwt({ sub: "user-uuid-abc", exp: nowSec - 60 });
 		// Distinctive sentinel only the refresh path can produce — proves the
 		// caller sees the refresh failure, not the original "token is expired"
@@ -364,8 +366,9 @@ describe("loadAuthWithRefresh", () => {
 		// human grepping logs can tell apart invalid_grant vs network.
 		const REFRESH_SENTINEL = "REFRESH_API_INVALID_GRANT_SENTINEL";
 		let refreshCalls = 0;
-		await expect(
-			loadAuthWithRefresh({
+		let caught: unknown;
+		try {
+			await loadAuthWithRefresh({
 				now,
 				readCredentialsFn: async () => ({
 					access_token: expiredToken,
@@ -378,8 +381,50 @@ describe("loadAuthWithRefresh", () => {
 					refreshCalls += 1;
 					throw new Error(REFRESH_SENTINEL);
 				},
-			}),
-		).rejects.toThrow(REFRESH_SENTINEL);
+			});
+		} catch (err) {
+			caught = err;
+		}
 		expect(refreshCalls).toBe(1);
+		expect(caught).toBeInstanceOf(RefreshFailedError);
+		const wrapped = caught as RefreshFailedError;
+		expect(wrapped.message).toBe(REFRESH_SENTINEL);
+		expect(wrapped.cause).toBeInstanceOf(Error);
+		expect(wrapped.cause.message).toBe(REFRESH_SENTINEL);
+		expect(wrapped.name).toBe("RefreshFailedError");
+	});
+
+	test("when refresh succeeds but the refreshed token has no `sub` claim, propagates the missing-sub error (not RefreshFailedError)", async () => {
+		const expiredToken = makeJwt({ sub: "user-uuid-abc", exp: nowSec - 60 });
+		// Refreshed token is well-formed timing-wise but missing `sub` — the
+		// second `loadAuth` should hit its own missing-sub branch and throw a
+		// plain Error, NOT a RefreshFailedError (the refresh itself succeeded).
+		const refreshedTokenNoSub = makeJwt({ exp: nowSec + 3600 });
+		let currentAccessToken = expiredToken;
+		let refreshCalls = 0;
+		let caught: unknown;
+		try {
+			await loadAuthWithRefresh({
+				now,
+				readCredentialsFn: async () => ({
+					access_token: currentAccessToken,
+					refresh_token: "rt",
+					email: "x@y.z",
+					api_url: "http://localhost:63000",
+				}),
+				getApiUrlFn: async () => "http://localhost:63000",
+				refreshFn: async () => {
+					refreshCalls += 1;
+					currentAccessToken = refreshedTokenNoSub;
+					return refreshedTokenNoSub;
+				},
+			});
+		} catch (err) {
+			caught = err;
+		}
+		expect(refreshCalls).toBe(1);
+		expect(caught).toBeInstanceOf(Error);
+		expect(caught).not.toBeInstanceOf(RefreshFailedError);
+		expect((caught as Error).message).toMatch(/sub/i);
 	});
 });
