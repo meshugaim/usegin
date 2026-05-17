@@ -72,6 +72,35 @@ test.describe("Feature X", () => {
 
 - Always strict: unexpected pass = suite failure
 
+### Shell
+
+Bash has no `test.failing` primitive, so we wrap the assertions in a script
+that gates exit code on an `EXPECT=fail|pass` variable. Canonical example:
+`docs/bugs/098-verifier/ensure-session-sync-safety.sh`.
+
+```bash
+EXPECT="${EXPECT:-fail}"  # flip to "pass" once green lands
+
+# ... run the thing, evaluate assertions, count FAILs into $TOTAL_FAIL ...
+
+if [[ "$EXPECT" == "fail" ]]; then
+    if [[ $TOTAL_FAIL -gt 0 ]]; then
+        echo "EXPECTED-FAIL: ENG-XXX not yet landed ($TOTAL_FAIL/N assertions failed as expected)"
+        exit 0  # CI stays green
+    else
+        echo "UNEXPECTED-PASS: flip EXPECT=pass; assertions now pass — Green has landed"
+        exit 1  # CI catches the un-flipped mark
+    fi
+else  # EXPECT=pass
+    [[ $TOTAL_FAIL -eq 0 ]] && exit 0 || exit 1
+fi
+```
+
+When Green lands, the developer flips `EXPECT=fail` → `EXPECT=pass` in the
+test file (the equivalent of removing `test.failing` / `xfail`). Strictness
+matches bun/pytest/playwright: an unexpected pass under `EXPECT=fail`
+fails the run.
+
 ## Convention
 
 - Always include Linear issue ID in the reason: `"ENG-XXX: short description"`
