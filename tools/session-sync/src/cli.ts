@@ -25,6 +25,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { getCredentialsPath } from "../../lib/auth/credentials.ts";
 import { resolveProfileName } from "../../lib/auth/profiles.ts";
+import { resolveDaemonUsername } from "./username.ts";
 import {
 	type AuthContext,
 	loadAuth,
@@ -109,7 +110,7 @@ function parseConfig(argv: string[], env: NodeJS.ProcessEnv): Config {
 		stateDir,
 		stateFile: join(stateDir, "state.json"),
 		profileName: env.SESSION_SYNC_PROFILE,
-		username: env.USER ?? env.USERNAME ?? "unknown",
+		username: resolveDaemonUsername(env),
 		useRecursiveWatch: !noRecursive,
 	};
 }
