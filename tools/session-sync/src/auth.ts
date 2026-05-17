@@ -142,6 +142,35 @@ export async function refreshAuthIfNeeded(
 	return { token: newToken, apiUrl: auth.apiUrl, userId: sub };
 }
 
+/**
+ * Boot-path variant of `loadAuth` (ENG-6035, Red stub).
+ *
+ * Will eventually try `loadAuth`; on the specific "dev-login token is
+ * expired" error, refresh against the on-disk refresh_token via
+ * `ensureFreshToken`, then retry `loadAuth`. For now this is a stub
+ * that delegates straight to `loadAuth` so the Red tests can compile
+ * and fail on assertions instead of on a missing-export error.
+ *
+ * Green will replace the body.
+ */
+export async function loadAuthWithRefresh(
+	opts: LoadAuthWithRefreshOptions = {},
+): Promise<AuthContext> {
+	return loadAuth(opts);
+}
+
+export interface LoadAuthWithRefreshOptions extends LoadAuthOptions {
+	/**
+	 * Override the refresh primitive; defaults to `ensureFreshToken` from
+	 * `tools/lib/auth/token-refresh.ts`. Same shape as
+	 * `RefreshAuthOptions.refreshFn`.
+	 */
+	refreshFn?: (
+		apiUrl: string,
+		opts: { profileName?: string },
+	) => Promise<string>;
+}
+
 export async function loadAuth(
 	opts: LoadAuthOptions = {},
 ): Promise<AuthContext> {

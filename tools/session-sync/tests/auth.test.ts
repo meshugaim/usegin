@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { AuthContext } from "../src/auth.ts";
-import { isTokenExpired, loadAuth, refreshAuthIfNeeded } from "../src/auth.ts";
+import {
+	isTokenExpired,
+	loadAuth,
+	loadAuthWithRefresh,
+	refreshAuthIfNeeded,
+} from "../src/auth.ts";
 
 /**
  * Build a fake JWT with a given payload. Header/signature are unused; only
@@ -221,5 +226,160 @@ describe("refreshAuthIfNeeded", () => {
 				},
 			}),
 		).rejects.toThrow(/effi auth login/);
+	});
+});
+
+/**
+ * loadAuthWithRefresh (ENG-6035)
+ *
+ * Boot-path helper: try `loadAuth`; if it throws specifically because the
+ * on-disk access token is expired, attempt a refresh against the on-disk
+ * refresh_token (via `ensureFreshToken` semantics — read creds, refresh,
+ * write back), then retry `loadAuth`. If refresh ALSO fails, propagate the
+ * refresh error so the boot path can write an accurate `needs-auth.flag`.
+ *
+ * Distinction from `refreshAuthIfNeeded` (called from the hot path): that
+ * one needs a valid AuthContext in hand to decide whether to refresh.
+ * `loadAuthWithRefresh` handles the boot case where there is no AuthContext
+ * yet — `loadAuth` blew up before producing one.
+ */
+describe("loadAuthWithRefresh", () => {
+	const now = new Date("2026-05-17T08:00:00.000Z");
+	const nowSec = Math.floor(now.getTime() / 1000);
+
+	test("returns AuthContext directly when loadAuth succeeds; refreshFn NOT called", async () => {
+		const token = makeJwt({ sub: "user-uuid-abc", exp: nowSec + 3600 });
+		let refreshCalls = 0;
+		const ctx = await loadAuthWithRefresh({
+			now,
+			readCredentialsFn: async () => ({
+				access_token: token,
+				refresh_token: "rt",
+				email: "x@y.z",
+				api_url: "http://localhost:63000",
+			}),
+			getApiUrlFn: async () => "http://localhost:63000",
+			refreshFn: async () => {
+				refreshCalls += 1;
+				return "should-not-be-called";
+			},
+		});
+		expect(ctx).toEqual({
+			token,
+			apiUrl: "http://localhost:63000",
+			userId: "user-uuid-abc",
+		});
+		expect(refreshCalls).toBe(0);
+	});
+
+	test.failing("on expired-token error: calls refreshFn, then retries loadAuth and returns the refreshed context", async () => {
+		const expiredToken = makeJwt({ sub: "user-uuid-abc", exp: nowSec - 60 });
+		const refreshedToken = makeJwt({
+			sub: "user-uuid-abc",
+			exp: nowSec + 3600,
+		});
+		// Stateful disk-stand-in: the first read returns the expired token;
+		// after refreshFn runs (simulating `ensureFreshToken` writing new
+		// creds), subsequent reads return the refreshed token.
+		let currentAccessToken = expiredToken;
+		const reads: string[] = [];
+		const refreshCalls: Array<{
+			apiUrl: string;
+			profileName: string | undefined;
+		}> = [];
+		const ctx = await loadAuthWithRefresh({
+			now,
+			profileName: "agent-dev",
+			readCredentialsFn: async () => {
+				reads.push(currentAccessToken);
+				return {
+					access_token: currentAccessToken,
+					refresh_token: "rt",
+					email: "x@y.z",
+					api_url: "http://localhost:63000",
+				};
+			},
+			getApiUrlFn: async () => "http://localhost:63000",
+			refreshFn: async (apiUrl, opts) => {
+				refreshCalls.push({ apiUrl, profileName: opts?.profileName });
+				currentAccessToken = refreshedToken;
+				return refreshedToken;
+			},
+		});
+		expect(ctx.token).toBe(refreshedToken);
+		expect(ctx.userId).toBe("user-uuid-abc");
+		expect(ctx.apiUrl).toBe("http://localhost:63000");
+		expect(refreshCalls).toEqual([
+			{ apiUrl: "http://localhost:63000", profileName: "agent-dev" },
+		]);
+		// loadAuth was called twice: once to discover the expiry, once after refresh.
+		expect(reads).toEqual([expiredToken, refreshedToken]);
+	});
+
+	test("on missing-credentials error: refreshFn NOT called, original error propagates", async () => {
+		let refreshCalls = 0;
+		await expect(
+			loadAuthWithRefresh({
+				now,
+				readCredentialsFn: async () => null,
+				getApiUrlFn: async () => "http://localhost:63000",
+				refreshFn: async () => {
+					refreshCalls += 1;
+					return "should-not-be-called";
+				},
+			}),
+		).rejects.toThrow(/no credentials/i);
+		expect(refreshCalls).toBe(0);
+	});
+
+	test("on missing-sub error: refreshFn NOT called (refresh won't fix a malformed JWT)", async () => {
+		const tokenNoSub = makeJwt({ exp: nowSec + 3600 });
+		let refreshCalls = 0;
+		await expect(
+			loadAuthWithRefresh({
+				now,
+				readCredentialsFn: async () => ({
+					access_token: tokenNoSub,
+					refresh_token: "rt",
+					email: "x@y.z",
+					api_url: "http://localhost:63000",
+				}),
+				getApiUrlFn: async () => "http://localhost:63000",
+				refreshFn: async () => {
+					refreshCalls += 1;
+					return "should-not-be-called";
+				},
+			}),
+		).rejects.toThrow(/sub/i);
+		expect(refreshCalls).toBe(0);
+	});
+
+	test.failing("when refresh ALSO fails (e.g. invalid_grant): propagates the REFRESH error (not the original loadAuth error) so caller can classify as expired_refresh_token", async () => {
+		const expiredToken = makeJwt({ sub: "user-uuid-abc", exp: nowSec - 60 });
+		// Distinctive sentinel only the refresh path can produce — proves the
+		// caller sees the refresh failure, not the original "token is expired"
+		// loadAuth complaint. `diagnoseErrorClass({source:'refresh', ...})` is
+		// what wants this — it always returns `expired_refresh_token`, but the
+		// errorMessage on the flag should be the upstream refresh message so a
+		// human grepping logs can tell apart invalid_grant vs network.
+		const REFRESH_SENTINEL = "REFRESH_API_INVALID_GRANT_SENTINEL";
+		let refreshCalls = 0;
+		await expect(
+			loadAuthWithRefresh({
+				now,
+				readCredentialsFn: async () => ({
+					access_token: expiredToken,
+					refresh_token: "rt",
+					email: "x@y.z",
+					api_url: "http://localhost:63000",
+				}),
+				getApiUrlFn: async () => "http://localhost:63000",
+				refreshFn: async () => {
+					refreshCalls += 1;
+					throw new Error(REFRESH_SENTINEL);
+				},
+			}),
+		).rejects.toThrow(REFRESH_SENTINEL);
+		expect(refreshCalls).toBe(1);
 	});
 });
