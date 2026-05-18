@@ -11,25 +11,39 @@ This is the cheap cousin of `serve-static`: that skill stands up an HTTP server 
 
 ## The drop-zone pattern
 
-Most common use: the human wants to share an image (or any file) with the agent but the agent is in a cloud env with no access to the human's local files. Recipe:
+Most common use: the human wants to share an image (or any file) with the agent but the agent is in a cloud env with no access to the human's local files. Two recipes — pick by whether you want to wait for the drop.
+
+### Ask-when-done (simple)
 
 1. `ona-url -p $CLAUDE_JOB_DIR/uploads` → prints a URL.
 2. Hand the URL to the human.
 3. Human opens it (VS Code-web tab scoped to `$CLAUDE_JOB_DIR/uploads/`).
 4. Human drags the file from their desktop onto the file tree.
-5. `Read $CLAUDE_JOB_DIR/uploads/<their-filename>` to see it.
+5. Human pings you ("done" / filename); you `Read $CLAUDE_JOB_DIR/uploads/<filename>`.
 
 The `-p` flag mkdirs the dir first so step 1 doesn't fail on a fresh job.
+
+### Auto-notify on drop (recommended for screenshots)
+
+Use `-w` and wrap with the **Monitor** tool — you get notified the moment the human drops a file, no "done" ping needed.
+
+1. Run `ona-url -w $CLAUDE_JOB_DIR/uploads` via the Monitor tool.
+2. First notification = the URL. Post it to the human.
+3. Subsequent notifications = filenames (one per drop). `Read` each, then stop the Monitor task.
+
+`-w` implies `-p`. The watcher fires on `close_write` and `moved_to`, which covers desktop-drag uploads and atomic-move writes from VS Code-web's drop handler.
 
 ## Usage
 
 ```bash
 ona-url [path]        # print URL for path (defaults to $PWD)
 ona-url -p [path]     # mkdir -p path first (drop-zone use case)
+ona-url -w [path]     # print URL, then watch dir; one stdout line per
+                      # new file. Implies -p. Wrap with Monitor.
 ona-url -h            # help
 ```
 
-Output is a single URL on stdout. Resolved to an absolute path under the hood.
+Output is a single URL on stdout (plus filenames after that in `-w` mode). Resolved to an absolute path under the hood.
 
 ## Examples
 
@@ -37,6 +51,11 @@ Output is a single URL on stdout. Resolved to an absolute path under the hood.
 # Drop-zone in this job's scratch dir
 ona-url -p "$CLAUDE_JOB_DIR/uploads"
 # → https://vscode.gitpod.io/environment/<id>/home/vscode/.claude/jobs/<job>/uploads
+
+# Same drop-zone, with auto-notify on drop (wrap in Monitor)
+ona-url -w "$CLAUDE_JOB_DIR/uploads"
+# stdout line 1: URL    ← post to human
+# stdout line 2+: filenames as they land  ← Read and act
 
 # Open a generated file in the editor
 ona-url docs/scheduled-reports/email-buttons.review.html
@@ -53,7 +72,7 @@ The env-id (the long UUID in the URL) is NOT in any env var — checked exhausti
 
 - **HTML pages / dashboards / served apps** — VS Code-web shows source, not rendered output. Use `serve-static` instead.
 - **Outside Ona/Gitpod** — the URL pattern doesn't work elsewhere. The CLI errors out if `ona` is missing.
-- **Long-running file watchers** — the URL is just a viewer; if you need a server with state, build one.
+- **Stateful watchers / triggered actions** — `-w` is for "tell me when a file lands". If you need a server that watches and re-renders/processes on change, build one.
 
 ## Cross-references
 
