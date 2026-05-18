@@ -34,6 +34,8 @@ mcp__claude_ai_Gmail__get_thread threadId='19df1982550d352a' messageFormat='FULL
 
 ## Draft
 
+**Always re-read the thread right before drafting.** Between turns the human may have sent, edited, or discarded drafts; new messages may have arrived; the situation you're answering may already be resolved. The connector has no `update_draft` or `delete_draft` — every stale draft you create lives in Drafts until the human manually discards it, and a reply written against an obsolete thread state creates a misleading message. One quick `get_thread` (MINIMAL is enough) before each `create_draft` catches: (a) the previous draft was sent (don't redraft the same answer), (b) a new inbound message changes the ask, (c) your "I'll check X" promise is now stale because you've checked X. Cheap pre-flight, prevents an awkward correction email.
+
 ```bash
 # Plain draft to one or more recipients
 mcp__claude_ai_Gmail__create_draft \
