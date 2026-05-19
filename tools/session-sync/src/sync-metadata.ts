@@ -41,4 +41,19 @@ export interface SyncMetadata {
 	 */
 	parent_session_id?: string;
 	forked_at_turn?: number;
+	/**
+	 * ENG-6068 — ISO-8601 timestamp the session started at, derived by
+	 * `extractMetadata` from the earliest JSONL event `timestamp`. Wires
+	 * through to the server's `metadata.started_at`; the upsert pins
+	 * `dev_sessions.started_at` and the `storage_path` date segment to the
+	 * day the session ACTUALLY started, not the upload day.
+	 *
+	 * Optional + backward-compatible — the field MUST be OMITTED (not sent
+	 * as `null` or empty string) when the extractor returns `null`, so
+	 * pre-A.2 daemons' wire shape and the daemon-meta-only-file wire shape
+	 * stay byte-identical and the server's `if (m.started_at != null)`
+	 * validator branch stays inert. Mirrors the server-side optional shape
+	 * on `SyncMetadata` in `nextjs-app/lib/services/dev-sessions.ts`.
+	 */
+	started_at?: string;
 }

@@ -253,6 +253,15 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 		gzipped_size_bytes: gzipped.byteLength,
 	};
 
+	// ENG-6068 — only set `started_at` when the extractor surfaced a
+	// timestamp. OMIT the field on `null` (don't send `started_at: null`)
+	// so the server's `if (m.started_at != null)` validator branch
+	// (`nextjs-app/lib/services/dev-sessions.ts:362-372`) stays inert for
+	// daemon-meta-only files.
+	if (extracted.started_at !== null) {
+		metadata.started_at = extracted.started_at;
+	}
+
 	// 5. POST.
 	let response: Awaited<ReturnType<typeof postSync>>;
 	try {

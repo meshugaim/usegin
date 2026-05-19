@@ -128,6 +128,72 @@ describe("syncFile — happy path (uploaded)", () => {
 		expect(meta.gzipped_size_bytes).toBeGreaterThan(0);
 	});
 
+	// ENG-6068 Phase B.2 wire test — the extractor surfaces
+	// `started_at` from the earliest JSONL timestamp; this pins the
+	// composition layer's promise that it actually lands in the POST body.
+	// The extractor test (`extractor.test.ts`) covers walking semantics in
+	// isolation; this one closes Ron's carry-forward #2 (wire-gap coverage)
+	// so a refactor that drops the extractor → metadata thread can't pass
+	// CI silently.
+	test("metadata.started_at threaded from extractor when JSONL carries a timestamp — ENG-6068", async () => {
+		const bytesWithTimestamps = new TextEncoder().encode(
+			`${[
+				JSON.stringify({ type: "isSnapshotUpdate", payload: { foo: 1 } }),
+				JSON.stringify({
+					type: "assistant",
+					timestamp: "2026-03-11T12:24:05.000Z",
+					message: { role: "assistant", content: "later" },
+				}),
+				JSON.stringify({
+					type: "user",
+					timestamp: "2026-03-11T12:24:00.000Z",
+					message: { role: "user", content: "earlier" },
+				}),
+			].join("\n")}\n`,
+		);
+		const captured: Captured = {};
+		const fetchImpl = makeFetch(
+			jsonResponse(200, { session: { storage_path: "p" } }),
+			captured,
+		);
+		await syncFile({
+			...baseInput(),
+			readFileFn: async () => bytesWithTimestamps,
+			fetchImpl,
+		});
+		const meta = JSON.parse(captured.body?.get("metadata") as string);
+		// The earliest timestamp is 12:24:00, not 12:24:05 — proves the
+		// walker is run AND its result lands in the POST body.
+		expect(meta.started_at).toBe("2026-03-11T12:24:00.000Z");
+	});
+
+	// Daemon-meta-only files (no parseable timestamp anywhere) must OMIT
+	// the field entirely — neither `null` nor empty string — so the
+	// server's `if (m.started_at != null)` validator branch stays inert.
+	// Pins the wire-shape promise the daemon's SyncMetadata docstring makes.
+	test("metadata.started_at omitted when extractor returns null — ENG-6068", async () => {
+		const bytesNoTimestamps = new TextEncoder().encode(
+			`${[
+				JSON.stringify({ type: "isSnapshotUpdate", payload: { foo: 1 } }),
+				JSON.stringify({ type: "user", timestamp: 1_741_692_240_000 }),
+			].join("\n")}\n`,
+		);
+		const captured: Captured = {};
+		const fetchImpl = makeFetch(
+			jsonResponse(200, { session: { storage_path: "p" } }),
+			captured,
+		);
+		await syncFile({
+			...baseInput(),
+			readFileFn: async () => bytesNoTimestamps,
+			fetchImpl,
+		});
+		const meta = JSON.parse(captured.body?.get("metadata") as string);
+		// `in` is the strict check — `started_at: null` would still have
+		// the key on the object. We want the key absent.
+		expect("started_at" in meta).toBe(false);
+	});
+
 	test("status=completed when JSONL contains type:'result'", async () => {
 		const completedBytes = new TextEncoder().encode(
 			`${[
