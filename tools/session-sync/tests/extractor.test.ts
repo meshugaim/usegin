@@ -114,30 +114,73 @@ describe("extractMetadata", () => {
 	});
 
 	// ENG-6068 RED — pins the daemon-side contract for `started_at`:
-	// `extractMetadata` walks the JSONL and surfaces the first line carrying
-	// a string `timestamp` field, verbatim. The daemon emits ISO-8601 UTC
-	// (`Z`-suffix); we pin that exact shape end-to-end so the server's
-	// strict validator (`^\d{4}-\d{2}-\d{2}` + `Date.parse` finite) accepts
-	// the value and downstream `storage_path` date segment matches the
-	// real session day, not the upload day. GREEN will flip this from
-	// `test.failing` to `test` once the walker is wired.
+	// `extractMetadata` walks every JSONL line, parses each, and surfaces the
+	// EARLIEST string `timestamp` value it finds. Mirrors
+	// `extractFirstEventTimestamp` in `nextjs-app/lib/services/dev-sessions.ts:988-1007`
+	// — same shape, same comparison semantics (lexical string compare on ISO-8601 UTC).
+	//
+	// The daemon emits ISO-8601 UTC (`Z`-suffix); we pin that exact shape end-to-end
+	// so the server's strict validator (`^\d{4}-\d{2}-\d{2}` + `Date.parse` finite,
+	// `nextjs-app/lib/services/dev-sessions.ts:392-401`) accepts the value and the
+	// downstream `storage_path` date segment matches the real session day, not the
+	// upload day. GREEN flips both these tests from `test.failing` to `test` once
+	// the walker is wired.
+	//
+	// Fixture has two intentional shapes:
+	//   1. Walk-past lines — `isSnapshotUpdate`-style entries with NO `timestamp`
+	//      field, sitting in front of the real events. Production JSONLs from the
+	//      conversation-watcher routinely lead with these; the canonical
+	//      `extractFirstEventTimestamp` docstring (lines 977-982) calls this out
+	//      explicitly. A "read entry[0].timestamp" implementation would return
+	//      undefined here — forcing GREEN to actually walk.
+	//   2. Events out of order — the second event's `timestamp` is earlier than
+	//      the first event's. "first-encountered" would return the later value;
+	//      "earliest" (the correct semantics) returns the smaller string. Forces
+	//      GREEN to compare, not just take.
 	test.failing(
-		"extractMetadata: started_at is populated from first JSONL event timestamp — ENG-6068",
+		"extractMetadata: started_at is the earliest event timestamp, walking past non-event lines — ENG-6068",
 		() => {
 			const content = jsonl([
-				{
-					type: "user",
-					timestamp: "2026-03-11T12:24:00.000Z",
-					message: { role: "user", content: "hello" },
-				},
+				// Walk-past: daemon-meta lines with no `timestamp`. GREEN must skip these.
+				{ type: "isSnapshotUpdate", payload: { foo: 1 } },
+				{ type: "file-history-snapshot", path: "src/x.ts" },
+				// Out-of-order events: the EARLIEST timestamp is 12:24:00, not 12:24:05.
 				{
 					type: "assistant",
 					timestamp: "2026-03-11T12:24:05.000Z",
 					message: { role: "assistant", content: "hi" },
+				},
+				{
+					type: "user",
+					timestamp: "2026-03-11T12:24:00.000Z",
+					message: { role: "user", content: "hello" },
 				},
 			]);
 			const meta = extractMetadata(content);
 			expect(meta.started_at).toBe("2026-03-11T12:24:00.000Z");
 		},
 	);
+
+	// Pin the null-sentinel contract for sessions with zero parseable timestamps.
+	// `SyncMetadata.started_at` on the server is optional; the daemon's POST
+	// composition (B.2 GREEN, `sync-flow.ts:238`) should OMIT the field when
+	// extractMetadata returns null (not send `started_at: null` or empty string)
+	// so the server's `if (m.started_at != null)` validator branch stays out
+	// of the picture for daemon-meta-only files. The null sentinel here is what
+	// the composition layer keys off.
+	//
+	// Not `test.failing`: this contract is trivially satisfied in RED (the
+	// stub returns `null` unconditionally), but it MUST hold after GREEN lands
+	// the walker — guardrail against a GREEN implementation that returns
+	// `undefined`, `""`, or `"null"` for daemon-meta-only files.
+	test("extractMetadata: started_at is null when no JSONL line carries a string timestamp — ENG-6068", () => {
+		const content = jsonl([
+			{ type: "isSnapshotUpdate", payload: { foo: 1 } },
+			// Non-string timestamp must NOT count — guards against future
+			// JSONL writers emitting `timestamp: <epoch-ms-number>`.
+			{ type: "user", timestamp: 1_741_692_240_000 },
+		]);
+		const meta = extractMetadata(content);
+		expect(meta.started_at).toBeNull();
+	});
 });
