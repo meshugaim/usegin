@@ -9,7 +9,12 @@
 
 import { Command } from "commander";
 import { readFileSync, writeFileSync } from "fs";
-import { extractEmailPrefix, matchSignalToUser, type DxContext } from "../core";
+import {
+  extractEmailPrefix,
+  matchSignalToUser,
+  type DxContext,
+  type UserDefinition,
+} from "../core";
 import { dxShouldOutputJson } from "../output";
 import dx from "../../sdk";
 
@@ -71,7 +76,7 @@ export function collectIdentitySignals(
  */
 export function autoDetectUser(
   signals: CollectedSignal[],
-  users: Record<string, { aliases: string[]; overrides: Record<string, boolean> }>,
+  users: Record<string, UserDefinition>,
 ): string | null {
   for (const s of signals) {
     let matchValue = s.value;

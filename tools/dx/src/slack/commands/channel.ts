@@ -213,9 +213,9 @@ async function runOp(
 		config: Awaited<ReturnType<typeof buildSlackClient>>["config"],
 	) => Promise<OpResult & { members?: MemberRow[] }>,
 ) {
-	let handle;
+	let handle: Awaited<ReturnType<typeof buildSlackClient>>;
 	try {
-		handle = buildSlackClient();
+		handle = await buildSlackClient();
 	} catch (err) {
 		if (err instanceof SlackConfigError) {
 			process.stderr.write(`dx slack channel ${verb}: ${err.message}\n`);

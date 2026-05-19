@@ -103,10 +103,18 @@ function buildTestProgram(): { program: Command; invoked: string[] } {
   });
 
   const invoked: string[] = [];
-  program.command("status").action(() => invoked.push("status"));
-  program.command("resolve").action(() => invoked.push("resolve"));
-  program.command("sync").action(() => invoked.push("sync"));
-  program.command("whoami").action(() => invoked.push("whoami"));
+  program.command("status").action(() => {
+    invoked.push("status");
+  });
+  program.command("resolve").action(() => {
+    invoked.push("resolve");
+  });
+  program.command("sync").action(() => {
+    invoked.push("sync");
+  });
+  program.command("whoami").action(() => {
+    invoked.push("whoami");
+  });
 
   return { program, invoked };
 }
@@ -891,5 +899,5 @@ describe("standard aliases", () => {
   });
 
   // Finding #10: list alias is for a future slice — mark as todo
-  test.todo("registers 'ls' alias for list command (slice 3)");
+  test.todo("registers 'ls' alias for list command (slice 3)", () => {});
 });
