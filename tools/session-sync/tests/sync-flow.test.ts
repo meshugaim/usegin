@@ -194,6 +194,62 @@ describe("syncFile — happy path (uploaded)", () => {
 		expect("started_at" in meta).toBe(false);
 	});
 
+	// ENG-6068 defense-in-depth — extractor normalizes to ISO-8601 UTC, but
+	// a future refactor or corrupted JSONL slipping past the parser
+	// shouldn't be able to land a malformed value at the server (which
+	// would 400 the upload and stall the file behind fatal_error). The
+	// client-side guard drops the field on shape failure; the upload
+	// still goes through.
+	//
+	// To exercise the guard we monkey-patch the extractor on the module
+	// boundary to surface a malformed string. The test would fail if the
+	// guard ever regressed back to a "pass through whatever extractor says"
+	// shape.
+	test("metadata.started_at dropped + warned when shape is malformed — ENG-6068", async () => {
+		const captured: Captured = {};
+		const fetchImpl = makeFetch(
+			jsonResponse(200, { session: { storage_path: "p" } }),
+			captured,
+		);
+		const extractorModule = await import("../src/extractor.ts");
+		const { spyOn } = await import("bun:test");
+		const warns: string[] = [];
+		const warnSpy = spyOn(console, "warn").mockImplementation((msg) => {
+			warns.push(String(msg));
+		});
+		const extractSpy = spyOn(extractorModule, "extractMetadata").mockReturnValue({
+			turn_count: 0,
+			line_count: 0,
+			preview_first: null,
+			preview_last: null,
+			first_user_message: null,
+			git_branch: null,
+			git_sha: null,
+			claude_model: null,
+			status: "active",
+			// Malformed: passes Date.parse (returns a finite NaN-coerced
+			// epoch via the year prefix) BUT fails the `^\d{4}-\d{2}-\d{2}`
+			// strict shape check. The server's exact validator would also
+			// reject this — we mirror its rule.
+			started_at: "2026/03/11 12:24:00",
+		});
+		try {
+			await syncFile({ ...baseInput(), fetchImpl });
+		} finally {
+			extractSpy.mockRestore();
+			warnSpy.mockRestore();
+		}
+		const meta = JSON.parse(captured.body?.get("metadata") as string);
+		// Field dropped — upload still went through, but no started_at on
+		// the wire so the server takes the no-started_at codepath.
+		expect("started_at" in meta).toBe(false);
+		// Warning surfaced so operators can see the regression.
+		expect(warns.some((w) => w.includes("dropping malformed started_at"))).toBe(
+			true,
+		);
+		expect(warns.some((w) => w.includes("2026/03/11 12:24:00"))).toBe(true);
+	});
+
 	test("status=completed when JSONL contains type:'result'", async () => {
 		const completedBytes = new TextEncoder().encode(
 			`${[

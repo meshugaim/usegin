@@ -174,6 +174,28 @@ async function defaultReadFile(path: string): Promise<Uint8Array> {
 	return arr;
 }
 
+/**
+ * ENG-6068 — client-side defensive mirror of the server's `started_at`
+ * shape check at `nextjs-app/lib/services/dev-sessions.ts:362-372`. The
+ * extractor already normalizes to ISO-8601 UTC, but a future refactor or
+ * a corrupted JSONL slipping past the parser shouldn't be able to land a
+ * malformed value at the server — a 400 would push the file into
+ * `fatal_error` and stall it permanently. When the shape looks wrong,
+ * `syncFile` logs and drops the field; the row still upserts via the
+ * no-`started_at` path (lands at the upload-day prefix, the pre-ENG-6068
+ * behavior).
+ *
+ * Shape rules — mirror of `validateSyncMetadata`:
+ *   - `^\d{4}-\d{2}-\d{2}` so the server's strict prefix check passes.
+ *   - `Date.parse(value)` is finite so the downstream UTC-day derivation
+ *     has a real instant to work with.
+ */
+const STARTED_AT_PREFIX_REGEX = /^\d{4}-\d{2}-\d{2}/;
+function isValidStartedAt(value: string): boolean {
+	if (!STARTED_AT_PREFIX_REGEX.test(value)) return false;
+	return Number.isFinite(Date.parse(value));
+}
+
 function asEnvironmentKind(raw: string): EnvironmentKind {
 	// AC 19's detection produces one of the four kinds; fall back to
 	// local-devcontainer if upstream ever drifts. Validation on the server
@@ -257,9 +279,17 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 	// timestamp. OMIT the field on `null` (don't send `started_at: null`)
 	// so the server's `if (m.started_at != null)` validator branch
 	// (`nextjs-app/lib/services/dev-sessions.ts:362-372`) stays inert for
-	// daemon-meta-only files.
-	if (extracted.started_at !== null) {
-		metadata.started_at = extracted.started_at;
+	// daemon-meta-only files. Belt-and-suspenders re-validation of the
+	// shape happens here too — see `isValidStartedAt` for why.
+	const startedAt = extracted.started_at;
+	if (startedAt !== null) {
+		if (isValidStartedAt(startedAt)) {
+			metadata.started_at = startedAt;
+		} else {
+			console.warn(
+				`session-sync: dropping malformed started_at "${startedAt}" from ${localFilePath} — extractor returned a non-ISO-8601 / unparseable value`,
+			);
+		}
 	}
 
 	// 5. POST.
