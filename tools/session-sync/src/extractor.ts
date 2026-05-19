@@ -26,13 +26,28 @@ export interface ExtractedMetadata {
 	claude_model: string | null;
 	status: "active" | "completed";
 	/**
-	 * ENG-6068 — ISO-8601 UTC timestamp (Z-suffixed) of the first JSONL line
-	 * carrying a string `timestamp` field. Wires through to the server's
+	 * ENG-6068 — ISO-8601 UTC timestamp of the EARLIEST JSONL line carrying
+	 * a string `timestamp` field. Wires through to the server's
 	 * `metadata.started_at` so the upsert pins `dev_sessions.started_at` and
 	 * the `storage_path` date segment to the real session day instead of the
-	 * row's `created_at` (upload day). `null` when no parseable timestamp is
-	 * found (very-early sessions, daemon-meta-only files, malformed inputs).
-	 * GREEN populates this field; this typing exists so the RED test compiles.
+	 * row's `created_at` (upload day).
+	 *
+	 * Walks every line (some JSONLs lead with daemon-meta entries like
+	 * `isSnapshotUpdate` and `file-history-snapshot` that have no
+	 * `timestamp`), parses each, and returns the lexicographically smallest
+	 * value seen (= chronologically earliest for fixed-format ISO-8601 UTC).
+	 * Mirrors the canonical `extractFirstEventTimestamp` in
+	 * `nextjs-app/lib/services/dev-sessions.ts:933-952`.
+	 *
+	 * `Z`-suffixed strings pass through verbatim (preserves sub-millisecond
+	 * precision); non-`Z` forms are re-emitted via `new Date(...).toISOString()`
+	 * so the server's UTC-date derivation never sees a tz-offset surprise.
+	 *
+	 * `null` when no parseable string timestamp is found (very-early sessions,
+	 * daemon-meta-only files, numeric-epoch timestamps, malformed inputs).
+	 * The `sync-flow` composition layer OMITS `metadata.started_at` from the
+	 * POST body when this is `null` — daemon-side mirror of the server's
+	 * `if (m.started_at != null)` validator branch.
 	 */
 	started_at: string | null;
 }
@@ -41,6 +56,7 @@ interface JsonlEntry {
 	type?: string;
 	gitBranch?: string;
 	gitSha?: string;
+	timestamp?: unknown;
 	message?: {
 		role?: string;
 		model?: string;
@@ -80,6 +96,15 @@ export function extractMetadata(jsonlContent: string): ExtractedMetadata {
 	let git_branch: string | null = null;
 	let git_sha: string | null = null;
 	let claude_model: string | null = null;
+	// ENG-6068 — earliest JSONL event timestamp. Mirrors
+	// `extractFirstEventTimestamp` in
+	// `nextjs-app/lib/services/dev-sessions.ts:933-952`: walk every line,
+	// collect every string `timestamp` that parses as a Date, return the
+	// lexicographically smallest (= chronologically earliest for fixed-format
+	// ISO-8601 UTC). Must walk past daemon-meta lines (`isSnapshotUpdate`,
+	// `file-history-snapshot`) that lead some JSONLs, AND must compare
+	// rather than take-first since events are not always in order.
+	let earliest_timestamp: string | null = null;
 
 	for (const line of lines) {
 		const trimmed = line.trim();
@@ -103,6 +128,21 @@ export function extractMetadata(jsonlContent: string): ExtractedMetadata {
 			git_sha = entry.gitSha;
 		}
 
+		// ENG-6068 — only accept string timestamps that `Date.parse` finds
+		// finite. Guards against numeric-epoch timestamps and malformed
+		// strings that would otherwise leak into the POST payload and
+		// trip the server's `^\d{4}-\d{2}-\d{2}` + `Date.parse` validator
+		// (`nextjs-app/lib/services/dev-sessions.ts:392-401`).
+		const ts = entry.timestamp;
+		if (typeof ts === "string" && ts.length > 0) {
+			const parsed = Date.parse(ts);
+			if (Number.isFinite(parsed)) {
+				if (earliest_timestamp === null || ts < earliest_timestamp) {
+					earliest_timestamp = ts;
+				}
+			}
+		}
+
 		const msg = entry.message;
 		if (msg && msg.role === "user") {
 			const text = flattenContent(msg.content);
@@ -120,6 +160,22 @@ export function extractMetadata(jsonlContent: string): ExtractedMetadata {
 			typeof msg.model === "string"
 		) {
 			claude_model = msg.model;
+		}
+	}
+
+	// Normalize the output to ISO-8601 UTC `Z`-suffixed form. JSONLs already
+	// emitted that way (the daemon's actual production shape) pass through
+	// verbatim — preserves sub-millisecond precision the spec mentions.
+	// Anything that parsed via `Date.parse` but wasn't `Z`-suffixed gets
+	// re-emitted via `toISOString()` so the server's downstream
+	// `new Date(...).toISOString().slice(0, 10)` UTC-date derivation sees
+	// a known shape.
+	let started_at: string | null = null;
+	if (earliest_timestamp !== null) {
+		if (earliest_timestamp.endsWith("Z")) {
+			started_at = earliest_timestamp;
+		} else {
+			started_at = new Date(earliest_timestamp).toISOString();
 		}
 	}
 
@@ -146,8 +202,6 @@ export function extractMetadata(jsonlContent: string): ExtractedMetadata {
 		git_sha,
 		claude_model,
 		status: isSessionComplete(jsonlContent) ? "completed" : "active",
-		// ENG-6068 RED: not yet populated. GREEN walks the JSONL for the
-		// first event with a string `timestamp` field and returns it here.
-		started_at: null,
+		started_at,
 	};
 }

@@ -137,7 +137,7 @@ describe("extractMetadata", () => {
 	//      the first event's. "first-encountered" would return the later value;
 	//      "earliest" (the correct semantics) returns the smaller string. Forces
 	//      GREEN to compare, not just take.
-	test.failing(
+	test(
 		"extractMetadata: started_at is the earliest event timestamp, walking past non-event lines — ENG-6068",
 		() => {
 			const content = jsonl([
