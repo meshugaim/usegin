@@ -37,7 +37,12 @@ export interface ExtractedMetadata {
 	 * `timestamp`), parses each, and returns the lexicographically smallest
 	 * value seen (= chronologically earliest for fixed-format ISO-8601 UTC).
 	 * Mirrors the canonical `extractFirstEventTimestamp` in
-	 * `nextjs-app/lib/services/dev-sessions.ts:933-952`.
+	 * `nextjs-app/lib/services/dev-sessions.ts` (search by name; line
+	 * numbers drift). Production JSONLs from Claude Code emit
+	 * `Z`-suffixed UTC timestamps verbatim — the lex compare on raw strings
+	 * is correct for that shape. Mixed-suffix inputs (`Z` and offset
+	 * suffixes in the same file) would compare chronologically wrong, but
+	 * Claude Code does not emit those today.
 	 *
 	 * `Z`-suffixed strings pass through verbatim (preserves sub-millisecond
 	 * precision); non-`Z` forms are re-emitted via `new Date(...).toISOString()`
@@ -98,10 +103,11 @@ export function extractMetadata(jsonlContent: string): ExtractedMetadata {
 	let claude_model: string | null = null;
 	// ENG-6068 — earliest JSONL event timestamp. Mirrors
 	// `extractFirstEventTimestamp` in
-	// `nextjs-app/lib/services/dev-sessions.ts:933-952`: walk every line,
-	// collect every string `timestamp` that parses as a Date, return the
-	// lexicographically smallest (= chronologically earliest for fixed-format
-	// ISO-8601 UTC). Must walk past daemon-meta lines (`isSnapshotUpdate`,
+	// `nextjs-app/lib/services/dev-sessions.ts` (search by name; line
+	// numbers drift): walk every line, collect every string `timestamp`
+	// that parses as a Date, return the lexicographically smallest
+	// (= chronologically earliest for fixed-format ISO-8601 UTC). Must
+	// walk past daemon-meta lines (`isSnapshotUpdate`,
 	// `file-history-snapshot`) that lead some JSONLs, AND must compare
 	// rather than take-first since events are not always in order.
 	let earliest_timestamp: string | null = null;
@@ -132,7 +138,7 @@ export function extractMetadata(jsonlContent: string): ExtractedMetadata {
 		// finite. Guards against numeric-epoch timestamps and malformed
 		// strings that would otherwise leak into the POST payload and
 		// trip the server's `^\d{4}-\d{2}-\d{2}` + `Date.parse` validator
-		// (`nextjs-app/lib/services/dev-sessions.ts:392-401`).
+		// in `validateSyncMetadata` (`nextjs-app/lib/services/dev-sessions.ts`).
 		const ts = entry.timestamp;
 		if (typeof ts === "string" && ts.length > 0) {
 			const parsed = Date.parse(ts);

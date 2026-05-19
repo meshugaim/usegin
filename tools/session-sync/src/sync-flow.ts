@@ -176,7 +176,8 @@ async function defaultReadFile(path: string): Promise<Uint8Array> {
 
 /**
  * ENG-6068 — client-side defensive mirror of the server's `started_at`
- * shape check at `nextjs-app/lib/services/dev-sessions.ts:362-372`. The
+ * shape check in `validateSyncMetadata`
+ * (`nextjs-app/lib/services/dev-sessions.ts`, search `m.started_at`). The
  * extractor already normalizes to ISO-8601 UTC, but a future refactor or
  * a corrupted JSONL slipping past the parser shouldn't be able to land a
  * malformed value at the server — a 400 would push the file into
@@ -278,9 +279,10 @@ export async function syncFile(input: SyncFileInput): Promise<SyncFileOutcome> {
 	// ENG-6068 — only set `started_at` when the extractor surfaced a
 	// timestamp. OMIT the field on `null` (don't send `started_at: null`)
 	// so the server's `if (m.started_at != null)` validator branch
-	// (`nextjs-app/lib/services/dev-sessions.ts:362-372`) stays inert for
-	// daemon-meta-only files. Belt-and-suspenders re-validation of the
-	// shape happens here too — see `isValidStartedAt` for why.
+	// in `validateSyncMetadata` (`nextjs-app/lib/services/dev-sessions.ts`)
+	// stays inert for daemon-meta-only files. Belt-and-suspenders
+	// re-validation of the shape happens here too — see `isValidStartedAt`
+	// for why.
 	const startedAt = extracted.started_at;
 	if (startedAt !== null) {
 		if (isValidStartedAt(startedAt)) {
