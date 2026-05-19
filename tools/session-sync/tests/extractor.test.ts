@@ -112,4 +112,32 @@ describe("extractMetadata", () => {
 		]);
 		expect(extractMetadata(content).first_user_message).toBe("part 1\npart 2");
 	});
+
+	// ENG-6068 RED — pins the daemon-side contract for `started_at`:
+	// `extractMetadata` walks the JSONL and surfaces the first line carrying
+	// a string `timestamp` field, verbatim. The daemon emits ISO-8601 UTC
+	// (`Z`-suffix); we pin that exact shape end-to-end so the server's
+	// strict validator (`^\d{4}-\d{2}-\d{2}` + `Date.parse` finite) accepts
+	// the value and downstream `storage_path` date segment matches the
+	// real session day, not the upload day. GREEN will flip this from
+	// `test.failing` to `test` once the walker is wired.
+	test.failing(
+		"extractMetadata: started_at is populated from first JSONL event timestamp — ENG-6068",
+		() => {
+			const content = jsonl([
+				{
+					type: "user",
+					timestamp: "2026-03-11T12:24:00.000Z",
+					message: { role: "user", content: "hello" },
+				},
+				{
+					type: "assistant",
+					timestamp: "2026-03-11T12:24:05.000Z",
+					message: { role: "assistant", content: "hi" },
+				},
+			]);
+			const meta = extractMetadata(content);
+			expect(meta.started_at).toBe("2026-03-11T12:24:00.000Z");
+		},
+	);
 });

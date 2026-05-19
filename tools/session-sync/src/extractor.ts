@@ -25,6 +25,16 @@ export interface ExtractedMetadata {
 	git_sha: string | null;
 	claude_model: string | null;
 	status: "active" | "completed";
+	/**
+	 * ENG-6068 — ISO-8601 UTC timestamp (Z-suffixed) of the first JSONL line
+	 * carrying a string `timestamp` field. Wires through to the server's
+	 * `metadata.started_at` so the upsert pins `dev_sessions.started_at` and
+	 * the `storage_path` date segment to the real session day instead of the
+	 * row's `created_at` (upload day). `null` when no parseable timestamp is
+	 * found (very-early sessions, daemon-meta-only files, malformed inputs).
+	 * GREEN populates this field; this typing exists so the RED test compiles.
+	 */
+	started_at: string | null;
 }
 
 interface JsonlEntry {
@@ -136,5 +146,8 @@ export function extractMetadata(jsonlContent: string): ExtractedMetadata {
 		git_sha,
 		claude_model,
 		status: isSessionComplete(jsonlContent) ? "completed" : "active",
+		// ENG-6068 RED: not yet populated. GREEN walks the JSONL for the
+		// first event with a string `timestamp` field and returns it here.
+		started_at: null,
 	};
 }
