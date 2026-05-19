@@ -269,3 +269,47 @@ If during build we hit a real surprise (e.g., Slack's API doesn't expose what th
 - Do **not** use LLM for message extraction (per email-splitter precedent). Mrkdwn → plain is regex.
 - Do **not** auto-bind newly-created channels matching a pattern at MVP (D2 option 3). Surprising behavior; opt-in only.
 - Do **not** store raw bot tokens in `slack_connections` — vault reference only. (Same posture as we should have for all OAuth tokens; if we don't, that's its own zettel.)
+
+---
+
+## 2026-05-Update — channel→project cardinality relaxed (ENG-6062)
+
+The 2026-04 round landed strict **one channel → one project** at the schema level:
+
+> *"If a channel could fan out to multiple projects, we'd lose RLS clarity and double-index every message."*
+
+ENG-6062 re-examined that constraint in 2026-05 against a real customer use case (cross-functional channels like `#general`, `#all-hands`, `#internal-ops` that are legitimately relevant to multiple AskEffi projects under one Slack workspace) and **relaxed it to one channel → N projects**.
+
+### What changed in the data model
+
+- `slack_channel_bindings` unique key relaxed from `(slack_install_id, slack_channel_id)` to `(slack_install_id, slack_channel_id, project_id)`. Existing rows stay valid under the wider key — no data migration needed.
+- Per-message storage: ONE `slack_messages` row per wire message (still idempotent on `team_id, channel_id, ts`), fanned out to N `data_items` — one per binding, each with its own `project_id` and `slack_channel_binding_id` (per-binding FK with `ON DELETE CASCADE`).
+- New trigger `slack_message_gc_after_data_item_delete` reference-counts via remaining `data_items.entity_id` and collects orphan `slack_messages` when the last data_item dies. Replaces the legacy born-together cascade.
+
+### Why the original RLS objection didn't hold
+
+RLS on `data_items.access_level` stays scalar per-row — fan-out happens at the `data_items` layer, so `user_can_see_at_access_level(project_id, auth.uid(), access_level)` applies unchanged per fanned-out child. The "any-child-grant" SELECT policy on `slack_messages` (visible iff at least one child is visible to the viewer) is the new shape; matches how fan-out works conceptually.
+
+### Why the leak concern was addressable
+
+Binding to a second project is workspace-owner-only (RLS on `slack_installs` enforces it). Slice 3a/3b/3b-retro added an **informed-consent gate**: every action's workspace-owner-via-install-SELECT happens BEFORE any cross-project enumeration; if the channel is already bound elsewhere, the action returns `{ status: 'confirm_required', otherProjects }` and the picker renders a warn modal with owner-bar projection (named for projects the viewer owns, opaque for the rest, count form for N≥2). Same gate pattern across `bindSlackChannelAction`, `listSlackChannelsAction`, `getProjectSlackContextAction`, `unbindSlackChannelAction`. Cross-project topology is workspace-owner-only at the UI layer too — non-owner project members see `otherProjects: []` and no badge.
+
+### Shipped slices (ENG-6062)
+
+- **Slice 1 / 1B groundwork** (`8245044a7`, `77999ed82`) — schema migration, new RPCs (`ensure_slack_message`, `ensure_slack_data_item`), GC trigger, per-project unique on `data_items`.
+- **Slice 2** (`b920036f6`) — handler swap to per-binding fan-out loop.
+- **Slice 2.5** (`c378e4c60`) — drop legacy `slack_messages.{project_id, slack_channel_binding_id, data_item_id}` columns + cascade FKs + dead RPC. Flipped Scenario A in the cascade integration test from `test.failing` → green.
+- **Slice 3a + 3a-fix** (`34fcad1e7`, `cebd0551c`) — bind-action informed-consent gate + owner-bar projection helper + workspace-owner-gate-before-admin-touch invariant.
+- **Slice 3b + 3b-retro** (`dbe1d30e1`, `bfa477156`) — read paths enriched + batched helper + retroactive install-SELECT gate on `unbindSlackChannelAction`.
+- **Slice 4** (`95b040af4`) — picker UX: per-row warn affordance + confirm modal swap + Manage deep-link. Closes ENG-6060.
+- **Slice 5** (`1298cfd9a`) — project-card shared badge + unbind impact-preview dialog.
+
+### Companion design refs
+
+- `docs/specs/slack-fan-out/design.md` — full proposal, schema diff, handler split, cascade rework, badge-visibility-workspace-owner-only policy (pinned 2026-05).
+- `docs/specs/slack-fan-out/html/01..07` — visual sketches (picker warn, bind-confirm, project-card shared, unbind impact, schema, ingest flow, cascade).
+- `nextjs-app/lib/services/slack/binding-context.ts` — `OwnerProjectedBinding` + `applyOwnerBarRule` + the batched cross-project helper. Single source for the owner-bar naming rule across actions + UI.
+
+### Sibling issue surfaced during review
+
+**ENG-6070** — defense-in-depth audit on `SECURITY DEFINER` RPCs in the `public` schema. The `REVOKE ALL FROM PUBLIC + GRANT EXECUTE TO service_role` idiom doesn't strip Supabase's default grants to `anon` + `authenticated`. Same pattern across at least four functions (slack ensure RPCs, workspace bootstrap RPCs). Filed as a follow-up sweep, not blocking fan-out.
