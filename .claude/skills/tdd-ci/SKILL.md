@@ -40,6 +40,18 @@ test.failing("ENG-XXX: description", async () => {
 
 This works because the import failure happens inside the test body, where `test.failing` expects it.
 
+**In a typechecked package, the import specifier must be a `const` variable, not a string literal.** If the package's pre-push / CI runs `tsc` (e.g. nextjs-app, effi-cli), a string-literal `await import("@/app/api/my-route/route")` of a not-yet-existing module fails typecheck with `TS2307: Cannot find module` — and `const { foo } = await import("@/lib/x")` of a not-yet-exported `foo` fails with a missing-property error — so pre-push rejects your Red commit. Assign the specifier to a `const` first; tsc then types the dynamic import as `any` and skips static resolution, keeping the Red commit's typecheck green:
+
+```ts
+const ROUTE = "@/app/api/my-route/route"; // const, not inline literal
+test.failing("ENG-XXX: description", async () => {
+  const { POST } = await import(ROUTE); // typed `any` → no TS2307 / missing-export error
+  // ... assertions
+});
+```
+
+When Green lands and the module exists, convert back to a normal top-level import for real type-checking.
+
 ### Pytest
 
 ```python
