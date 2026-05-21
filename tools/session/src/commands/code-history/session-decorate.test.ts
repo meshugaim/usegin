@@ -217,6 +217,8 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
       expect(decorated.session!.intent).toBeUndefined();
       expect(decorated.session!.trigger).toBeUndefined();
       expect(decorated.session!.outcome).toBeUndefined();
+      // shortId absence is the JSON-mode "unresolved pointer" discriminator.
+      expect(decorated.session!.shortId).toBeUndefined();
     },
   );
 
@@ -253,6 +255,8 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
       expect(decorated.session!.intent).toBeUndefined();
       expect(decorated.session!.trigger).toBeUndefined();
       expect(decorated.session!.outcome).toBeUndefined();
+      // shortId absence is the JSON-mode "unresolved pointer" discriminator.
+      expect(decorated.session!.shortId).toBeUndefined();
     },
   );
 
