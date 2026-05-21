@@ -1,4 +1,7 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, afterEach } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   parseGitLogOutput,
   getCommitsFromGitHistory,
@@ -7,6 +10,65 @@ import {
   getSessionCommits,
   type GitCommit,
 } from "./git-commits";
+
+// ============================================================================
+// Temp-repo fixture for getCommitsFromGitHistory integration tests
+// ----------------------------------------------------------------------------
+// These tests must NOT run against the ambient monorepo. A 1-year window over
+// /workspaces/test-mvp's ~12k commits feeds ~35k lines of --shortstat through
+// the parser and blows past the 5s test timeout (and worsens as the repo
+// grows). Instead we build a SMALL repo with commits at KNOWN, deterministic
+// times so the time-window query is fast and stable across runs.
+//
+// The `code-history` test fixture (makeFixtureRepo) builds commits at "now"
+// with no date control, so it can't pin a deterministic window — this fixture
+// sets GIT_AUTHOR_DATE / GIT_COMMITTER_DATE per commit instead.
+// ============================================================================
+
+const FIXTURE_GIT_ENV = {
+  GIT_AUTHOR_NAME: "Git Commits Test",
+  GIT_AUTHOR_EMAIL: "git-commits-test@example.com",
+  GIT_COMMITTER_NAME: "Git Commits Test",
+  GIT_COMMITTER_EMAIL: "git-commits-test@example.com",
+} as const;
+
+function runGit(cwd: string, args: string[], date?: string): void {
+  const env: Record<string, string> = { ...process.env, ...FIXTURE_GIT_ENV };
+  if (date) {
+    env.GIT_AUTHOR_DATE = date;
+    env.GIT_COMMITTER_DATE = date;
+  }
+  const proc = Bun.spawnSync(["git", ...args], { cwd, env });
+  if (proc.exitCode !== 0) {
+    const stderr = new TextDecoder().decode(proc.stderr);
+    throw new Error(`git ${args.join(" ")} failed:\n${stderr}`);
+  }
+}
+
+interface FixtureCommit {
+  /** ISO 8601 date passed to GIT_AUTHOR_DATE / GIT_COMMITTER_DATE. */
+  date: string;
+  subject: string;
+}
+
+/**
+ * Create a throwaway git repo on `main` with the given commits at known
+ * times. Caller is responsible for `rmSync(dir, { recursive, force })` —
+ * tracked dirs are torn down by the `afterEach` below.
+ */
+function makeTimedRepo(commits: FixtureCommit[]): string {
+  const dir = mkdtempSync(join(tmpdir(), "git-commits-history-"));
+  mkdirSync(join(dir, "src"), { recursive: true });
+  runGit(dir, ["init", "-q", "-b", "main"]);
+
+  commits.forEach((commit, index) => {
+    writeFileSync(join(dir, "src", "file.ts"), `line 1\nchange ${index + 1}\n`);
+    runGit(dir, ["add", "src/file.ts"]);
+    runGit(dir, ["commit", "-q", "-m", commit.subject], commit.date);
+  });
+
+  return dir;
+}
 
 // ============================================================================
 // parseGitLogOutput — pure parsing, no git required
@@ -324,32 +386,47 @@ describe("parseGitLogOutput", () => {
 // ============================================================================
 
 describe("getCommitsFromGitHistory", () => {
-  // These tests run against the real git repo we're in.
+  // Integration tests against a small, time-pinned fixture repo (see
+  // makeTimedRepo above) — NOT the ambient monorepo. The graceful-error
+  // cases below still point at real paths (/tmp, nonexistent) because they
+  // exercise the "not a git repo / bad input" branches, which need no commits.
+  const fixtureDirs: string[] = [];
+  afterEach(() => {
+    while (fixtureDirs.length > 0) {
+      rmSync(fixtureDirs.pop()!, { recursive: true, force: true });
+    }
+  });
 
-  test("returns commits from the current repo within a valid time window", async () => {
-    // Use a wide window that should include at least the most recent commit
-    const endTime = new Date().toISOString();
-    const startTime = new Date(
-      Date.now() - 365 * 24 * 60 * 60 * 1000
-    ).toISOString(); // 1 year ago
+  test("returns commits from a repo within a valid time window", async () => {
+    // Two commits at known times in 2025; query a window that brackets them.
+    const dir = makeTimedRepo([
+      { date: "2025-03-01T10:00:00+00:00", subject: "feat: first commit" },
+      { date: "2025-03-02T10:00:00+00:00", subject: "fix: second commit" },
+    ]);
+    fixtureDirs.push(dir);
 
     const commits = await getCommitsFromGitHistory({
-      cwd: "/workspaces/test-mvp",
-      startTime,
-      endTime,
+      cwd: dir,
+      startTime: "2025-02-01T00:00:00+00:00",
+      endTime: "2025-04-01T00:00:00+00:00",
     });
 
-    // We're in a git repo, so there should be at least one commit
-    expect(commits.length).toBeGreaterThan(0);
+    // Both commits fall inside the window.
+    expect(commits.length).toBe(2);
 
-    // Verify structure of the first commit
-    const first = commits[0]!;
-    expect(first.hash).toMatch(/^[0-9a-f]{40}$/);
-    expect(first.shortHash.length).toBeGreaterThanOrEqual(7);
-    expect(first.subject.length).toBeGreaterThan(0);
-    expect(first.authorName.length).toBeGreaterThan(0);
-    expect(first.authorEmail.length).toBeGreaterThan(0);
-    expect(first.timestamp.length).toBeGreaterThan(0);
+    // Verify structure of every commit.
+    for (const commit of commits) {
+      expect(commit.hash).toMatch(/^[0-9a-f]{40}$/);
+      expect(commit.shortHash.length).toBeGreaterThanOrEqual(7);
+      expect(commit.subject.length).toBeGreaterThan(0);
+      expect(commit.authorName.length).toBeGreaterThan(0);
+      expect(commit.authorEmail.length).toBeGreaterThan(0);
+      expect(commit.timestamp.length).toBeGreaterThan(0);
+    }
+
+    // Ascending by timestamp — the older commit's subject comes first.
+    expect(commits[0]!.subject).toBe("feat: first commit");
+    expect(commits[1]!.subject).toBe("fix: second commit");
   });
 
   test("returns empty array for a time window with no commits", async () => {
@@ -364,16 +441,23 @@ describe("getCommitsFromGitHistory", () => {
   });
 
   test("returns sorted commits (ascending by timestamp)", async () => {
-    const endTime = new Date().toISOString();
-    const startTime = new Date(
-      Date.now() - 365 * 24 * 60 * 60 * 1000
-    ).toISOString();
+    // Seed commits out of chronological order to prove the parser sorts,
+    // rather than relying on git's emit order. The fixture also keeps this
+    // off the ambient monorepo (same slow-window concern as the test above).
+    const dir = makeTimedRepo([
+      { date: "2025-03-03T10:00:00+00:00", subject: "third by date" },
+      { date: "2025-03-01T10:00:00+00:00", subject: "first by date" },
+      { date: "2025-03-02T10:00:00+00:00", subject: "second by date" },
+    ]);
+    fixtureDirs.push(dir);
 
     const commits = await getCommitsFromGitHistory({
-      cwd: "/workspaces/test-mvp",
-      startTime,
-      endTime,
+      cwd: dir,
+      startTime: "2025-02-01T00:00:00+00:00",
+      endTime: "2025-04-01T00:00:00+00:00",
     });
+
+    expect(commits.length).toBe(3);
 
     // Verify ascending order
     for (let i = 1; i < commits.length; i++) {
@@ -381,6 +465,13 @@ describe("getCommitsFromGitHistory", () => {
       const currTime = new Date(commits[i]!.timestamp).getTime();
       expect(currTime).toBeGreaterThanOrEqual(prevTime);
     }
+
+    // Concretely: ordered by date, not by commit (emit) order.
+    expect(commits.map((c) => c.subject)).toEqual([
+      "first by date",
+      "second by date",
+      "third by date",
+    ]);
   });
 
   // ==========================================================================
@@ -495,6 +586,18 @@ describe("getCommitsByTrailer", () => {
 // ============================================================================
 
 describe("getSessionCommits", () => {
+  // Time-window fallback tests use a small time-pinned fixture repo (see
+  // makeTimedRepo) instead of the ambient monorepo: a wide 1-year window over
+  // /workspaces/test-mvp's ~12k commits blows past the 5s test timeout. The
+  // fixture commits carry no Claude-Session trailer, so a non-matching session
+  // ID exercises exactly the trailer-miss → time-window fall-through under test.
+  const fixtureDirs: string[] = [];
+  afterEach(() => {
+    while (fixtureDirs.length > 0) {
+      rmSync(fixtureDirs.pop()!, { recursive: true, force: true });
+    }
+  });
+
   test("returns empty array for empty cwd", async () => {
     const commits = await getSessionCommits({
       cwd: "",
@@ -514,19 +617,23 @@ describe("getSessionCommits", () => {
   });
 
   test("falls back to time-window when no trailer commits found", async () => {
-    // Use a session ID that won't match any trailers, but a wide time window
-    const endTime = new Date().toISOString();
-    const startTime = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    // Fixture commits have no Claude-Session trailer, so the non-matching
+    // session ID misses the trailer strategy and falls through to time-window.
+    const dir = makeTimedRepo([
+      { date: "2025-03-01T10:00:00+00:00", subject: "feat: in-window commit" },
+    ]);
+    fixtureDirs.push(dir);
 
     const commits = await getSessionCommits({
-      cwd: "/workspaces/test-mvp",
+      cwd: dir,
       sessionId: "nonexistent-session-id-that-no-commit-has-99999",
-      startTime,
-      endTime,
+      startTime: "2025-02-01T00:00:00+00:00",
+      endTime: "2025-04-01T00:00:00+00:00",
     });
 
-    // Should fall back to time-window and find commits
-    expect(commits.length).toBeGreaterThan(0);
+    // Should fall back to time-window and find the in-window commit.
+    expect(commits.length).toBe(1);
+    expect(commits[0]!.subject).toBe("feat: in-window commit");
   });
 
   test("returns empty array when no trailer match and no time window provided", async () => {
@@ -606,19 +713,22 @@ describe("getSessionCommits", () => {
   });
 
   test("falls through from SHA to time-window when SHAs invalid and no trailer match", async () => {
-    const endTime = new Date().toISOString();
-    const startTime = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    const dir = makeTimedRepo([
+      { date: "2025-03-01T10:00:00+00:00", subject: "feat: in-window commit" },
+    ]);
+    fixtureDirs.push(dir);
 
     const commits = await getSessionCommits({
-      cwd: "/workspaces/test-mvp",
+      cwd: dir,
       sessionId: "nonexistent-session-id-that-no-commit-has-99999",
-      startTime,
-      endTime,
+      startTime: "2025-02-01T00:00:00+00:00",
+      endTime: "2025-04-01T00:00:00+00:00",
       shas: ["0000000000000000000000000000000000000000"],
     });
 
     // Invalid SHA -> trailer miss -> fall through to time-window
-    expect(commits.length).toBeGreaterThan(0);
+    expect(commits.length).toBe(1);
+    expect(commits[0]!.subject).toBe("feat: in-window commit");
   });
 });
 
