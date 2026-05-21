@@ -109,6 +109,61 @@ Run \`effi auth login\` to refresh, then retry.`;
 }
 
 // =============================================================================
+// SUPABASE FETCH (TRANSPORT) FAILURE
+// =============================================================================
+
+export interface SupabaseFetchOptions {
+  /** HTTP status the Supabase fetch returned (e.g. 400, 503). */
+  status: number;
+  /** Truncated response-body excerpt (already first-200-chars by the caller). */
+  bodyPreview: string;
+  /**
+   * Optional "partial fetch" note appended verbatim to the message — names
+   * what already landed on disk when a mid-subagent-loop failure leaves the
+   * parent + N subagents cached. Empty/omitted when nothing partial happened.
+   */
+  partialNote?: string;
+}
+
+/**
+ * Thrown when a cross-environment session fetch (`fetchSession` → Supabase)
+ * fails at the transport layer — a bogus session id the server rejects with
+ * HTTP 400, a 5xx, a body-shape mismatch, a signed-URL download failure, or
+ * the env being offline. Distinct from:
+ *   - `SessionNotFoundError` (server confirmed the row is nowhere — 404), and
+ *   - `AuthRequiredError` (we have no usable credentials to even ask).
+ *
+ * This is its own class so callers can route on "we couldn't reach / didn't
+ * get a usable response from Supabase" without sniffing the message string.
+ * `code-history`'s session decorator catches it to degrade gracefully (omit
+ * the session enrichment, keep rendering the commit) — a transport hiccup on
+ * the optional cross-env fetch must not crash the whole command. Other
+ * callers (`resume` / `fork` / `fetch`) still surface `.message` to the user
+ * via their `instanceof Error` paths, unchanged.
+ *
+ * The message format (status + body excerpt + optional partial note) is the
+ * user-facing contract pinned by `fetch.supabase.test.ts` — keep the `status`
+ * and body excerpt in the prose so retry-worthiness and incident pattern-
+ * matching stay possible.
+ *
+ * Part of: ENG-6137
+ */
+export class SupabaseFetchError extends SessionError {
+  public readonly sessionId: string;
+  public readonly status: number;
+
+  constructor(sessionId: string, options: SupabaseFetchOptions) {
+    const { status, bodyPreview, partialNote = "" } = options;
+    super(
+      `Cannot fetch session ${sessionId} from Supabase: server returned ${status}.\n\n${bodyPreview}${partialNote}`,
+    );
+    this.name = "SupabaseFetchError";
+    this.sessionId = sessionId;
+    this.status = status;
+  }
+}
+
+// =============================================================================
 // NO SESSIONS FOUND
 // =============================================================================
 

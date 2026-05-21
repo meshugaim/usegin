@@ -9,6 +9,8 @@
  *   - Multi-trailer (amend): last trailer wins.
  *   - `SessionNotFoundError` → `commit.session = { id, sinceTimestampCmd }`
  *     only (AC 13 graceful degradation), NO throw.
+ *   - `SupabaseFetchError` (cross-env transport failure — bogus-id 400,
+ *     5xx, offline) → same AC 13 graceful degradation, NO throw (ENG-6137).
  *   - Other error → propagates (spec: "don't swallow real errors").
  *
  * The subprocess-level integration tests in `../code-history.test.ts`
@@ -23,6 +25,7 @@ import { describe, test, expect } from "bun:test";
 import {
   decorateCommitWithSession,
   SessionNotFoundError,
+  SupabaseFetchError,
   type DecorateSessionDeps,
 } from "./session-decorate";
 import type { DecoratedCommit } from "./types";
@@ -210,6 +213,42 @@ describe("decorateCommitWithSession (ENG-5043)", () => {
       expect(decorated.session!.sinceTimestampCmd).toBe(
         EXPECTED_HINT_CMD,
       );
+      // Missing-layer invariant: no extractor values when fetch failed.
+      expect(decorated.session!.intent).toBeUndefined();
+      expect(decorated.session!.trigger).toBeUndefined();
+      expect(decorated.session!.outcome).toBeUndefined();
+    },
+  );
+
+  test(
+    "ENG-6137 (AC 13): SupabaseFetchError → degrades to { id, sinceTimestampCmd }, no throw, no extractors",
+    async () => {
+      // The DISTINCT branch from "no JSONL on disk" (SessionNotFoundError):
+      // here the session is REFERENCED by a Claude-Session trailer but the
+      // cross-env Supabase fetch fails at the transport layer — e.g. a bogus
+      // session id the server rejects with HTTP 400, a 5xx, or an offline
+      // env. Before ENG-6137 this threw a bare `Error` that propagated to
+      // the CLI handler and crashed the whole command (exit 1). Now it's a
+      // typed `SupabaseFetchError` that degrades the SAME way SessionNotFound
+      // / AuthRequired do: session line + hint render, extractors omitted,
+      // no throw. The optional cross-env enrichment failing must never sink
+      // the commit history the user actually asked for.
+      const commit = makeCommit();
+      const deps = makeDeps({
+        fetchSession: async () => {
+          throw new SupabaseFetchError(FIXTURE_UUID, {
+            status: 400,
+            bodyPreview: "request failed (HTTP 400)",
+          });
+        },
+      });
+
+      // Must NOT throw — graceful degradation.
+      const decorated = await decorateCommitWithSession(commit, deps);
+
+      expect(decorated.session).toBeDefined();
+      expect(decorated.session!.id).toBe(FIXTURE_UUID);
+      expect(decorated.session!.sinceTimestampCmd).toBe(EXPECTED_HINT_CMD);
       // Missing-layer invariant: no extractor values when fetch failed.
       expect(decorated.session!.intent).toBeUndefined();
       expect(decorated.session!.trigger).toBeUndefined();

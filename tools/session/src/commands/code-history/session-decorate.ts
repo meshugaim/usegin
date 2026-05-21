@@ -12,15 +12,22 @@
  *
  * On `SessionNotFoundError` from the local+remote search OR
  * `AuthRequiredError` from the cross-env Supabase fallback (ENG-5862
- * step 7): degrades gracefully — returns `commit.session = { id,
- * sinceTimestampCmd }` with no extractors (AC 13). The auth case is
- * grouped here because from `code-history`'s POV both mean "we can't
- * inspect this session's JSONL" — propagating an auth error would
- * crash the whole command for a no-creds teammate; the
- * `sinceTimestampCmd` hint already points them at running
- * `session <id>` directly, where the auth-required prose surfaces.
- * Other errors propagate so real failures (a corrupted JSONL,
- * permission denied, etc.) remain visible.
+ * step 7) OR `SupabaseFetchError` from a Supabase transport failure
+ * (ENG-6137 — bogus session-id 400, 5xx, body-shape mismatch, or an
+ * offline env): degrades gracefully — returns `commit.session = { id,
+ * sinceTimestampCmd }` with no extractors (AC 13). All three are
+ * grouped here because from `code-history`'s POV they mean the same
+ * thing: "we can't inspect this session's JSONL". Propagating any of
+ * them would crash the whole command — and the cross-env Supabase
+ * fetch is an OPTIONAL enrichment, not load-bearing for the commit
+ * history the user asked for. The `sinceTimestampCmd` hint already
+ * points the user at running `session <id>` directly, where the
+ * auth-required / transport-error prose surfaces in full.
+ *
+ * Other errors propagate so real LOCAL failures (a corrupted JSONL,
+ * permission denied on `~/.claude/projects/`, etc.) remain visible —
+ * those are bugs in the user's environment the silent-degrade path
+ * would wrongly hide.
  *
  * Dependency injection shape (the `DecorateSessionDeps` arg) exists for testing:
  * integration tests stub `fetchSession` to throw `SessionNotFoundError`
@@ -32,7 +39,11 @@
 
 import type { ParsedSession } from "../../types";
 import type { FetchResult } from "../../fetch";
-import { AuthRequiredError, SessionNotFoundError } from "../../errors";
+import {
+  AuthRequiredError,
+  SessionNotFoundError,
+  SupabaseFetchError,
+} from "../../errors";
 import { extractIntent, extractTrigger, extractOutcome } from "./context";
 import { formatSinceTimestamp } from "./format";
 import { extractClaudeSessionTrailer } from "./trailers";
@@ -96,17 +107,23 @@ export async function decorateCommitWithSession(
   } catch (error) {
     if (
       error instanceof SessionNotFoundError ||
-      error instanceof AuthRequiredError
+      error instanceof AuthRequiredError ||
+      error instanceof SupabaseFetchError
     ) {
-      // AC 13 — session JSONL not available locally or in the archive,
-      // OR the cross-env Supabase fallback (ENG-5862 step 7) refused
-      // because credentials are missing/expired. Both degrade to
-      // `{id, sinceTimestampCmd}` without extractors so the session
-      // line + hint still render. The user can then run
-      // `session <id> --since-timestamp <ts>` directly, which will
-      // surface the auth-required remediation prose. Any OTHER error
-      // (malformed JSONL, permission denied, etc.) propagates
-      // unmodified.
+      // AC 13 — session JSONL not available locally or in the archive
+      // (`SessionNotFoundError`), OR the cross-env Supabase fallback
+      // (ENG-5862 step 7) refused because credentials are missing/expired
+      // (`AuthRequiredError`), OR the Supabase fetch hit a transport
+      // failure (ENG-6137 — a bogus session id the server rejects with
+      // HTTP 400, a 5xx, a body-shape mismatch, or an offline env;
+      // `SupabaseFetchError`). All three degrade to `{id,
+      // sinceTimestampCmd}` without extractors so the session line + hint
+      // still render and the commit history the user asked for still
+      // prints. The user can then run `session <id> --since-timestamp
+      // <ts>` directly, which will surface the auth-required / transport-
+      // error remediation prose. Any OTHER error (malformed JSONL,
+      // permission denied, etc.) propagates unmodified — those are real
+      // local failures, not "the optional cross-env fetch didn't land".
       return {
         ...commit,
         session: { id: uuid, sinceTimestampCmd },
@@ -145,4 +162,4 @@ export async function decorateCommitWithSession(
 // re-export co-located with the decorate function means consumers
 // importing from this module see the full contract (function +
 // exceptions) without reaching into `../../errors`.
-export { AuthRequiredError, SessionNotFoundError };
+export { AuthRequiredError, SessionNotFoundError, SupabaseFetchError };

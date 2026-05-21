@@ -11,7 +11,11 @@
 import { Glob } from "bun";
 import { mkdirSync } from "fs";
 import { basename, dirname, join } from "path";
-import { AuthRequiredError, SessionNotFoundError } from "./errors";
+import {
+  AuthRequiredError,
+  SessionNotFoundError,
+  SupabaseFetchError,
+} from "./errors";
 import {
   findSessionById,
   findSessionsByPrefix,
@@ -373,9 +377,19 @@ export async function fetchSession(input: string): Promise<FetchResult> {
           const count = partial.subagentPaths.length;
           partialNote = `\n\nPartial fetch: parent + ${count} subagent file${count === 1 ? "" : "s"} already placed on disk at ${partial.parentPath}. The next \`session resume\` retries from scratch.`;
         }
-        throw new Error(
-          `Cannot fetch session ${input} from Supabase: server returned ${supa.error.status}.\n\n${bodyPreview}${partialNote}`,
-        );
+        // Typed (vs the prior bare `Error`) so callers route on the class,
+        // not the message string. `code-history`'s session decorator catches
+        // `SupabaseFetchError` to degrade gracefully (ENG-6137) — a bogus
+        // session-id 400, a 5xx, or an offline env on the OPTIONAL cross-env
+        // fetch must not crash the whole command. The message (status + body
+        // excerpt + partial note) is preserved verbatim, so `resume` / `fork`
+        // / `fetch` surface the same prose and `fetch.supabase.test.ts` stays
+        // green.
+        throw new SupabaseFetchError(input, {
+          status: supa.error.status,
+          bodyPreview,
+          partialNote,
+        });
       }
     }
   }
