@@ -17,6 +17,8 @@ export interface Snapshot {
   created: string;
   description?: string;
   image_size?: number;
+  /** hcloud labels — carries `role=<name>-devbox`, the box→snapshot link. */
+  labels?: Record<string, string>;
 }
 
 export interface ServerInfo {
@@ -53,6 +55,65 @@ export interface BoxTarget {
 export function pickLatestSnapshot(images: Snapshot[]): Snapshot | null {
   if (images.length === 0) return null;
   return [...images].sort((a, b) => a.created.localeCompare(b.created)).at(-1) ?? null;
+}
+
+/**
+ * Box name behind a `role` label, or null if it isn't a devbox snapshot.
+ *
+ * The selector scheme is `role=<name>-devbox` (see `snapshotSelector`), so we
+ * strip exactly one trailing `-devbox`. The default box `effi-devbox` therefore
+ * round-trips: `effi-devbox-devbox` → `effi-devbox`.
+ */
+export function boxNameFromRole(role: string | undefined): string | null {
+  if (!role) return null;
+  const suffix = "-devbox";
+  if (!role.endsWith(suffix) || role.length <= suffix.length) return null;
+  return role.slice(0, -suffix.length);
+}
+
+/** A box's snapshot lineage, collapsed to a count + sizes — keyed by box name. */
+export interface SnapshotGroup {
+  name: string;
+  snapshotCount: number;
+  snapshotSizesGB: number[];
+}
+
+/**
+ * Group a flat snapshot list by the box that owns it (via the `role` label),
+ * sorted by box name. Snapshots without a `role=<name>-devbox` label are skipped
+ * — only devbox snapshots map to a box. Pure: list in → groups out.
+ */
+export function groupSnapshotsByBox(snapshots: Snapshot[]): SnapshotGroup[] {
+  const byName = new Map<string, Snapshot[]>();
+  for (const snap of snapshots) {
+    const name = boxNameFromRole(snap.labels?.role);
+    if (!name) continue;
+    (byName.get(name) ?? byName.set(name, []).get(name)!).push(snap);
+  }
+  return [...byName.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, snaps]) => ({
+      name,
+      snapshotCount: snaps.length,
+      snapshotSizesGB: snaps.map((s) => s.image_size ?? 0),
+    }));
+}
+
+/**
+ * Choose which snapshots to prune, keeping the latest `keep` by creation time.
+ *
+ * Returns the ids to DELETE — the oldest `count - keep`, newest-first survivors.
+ * Pure (snapshots in → ids out): the IO `box prune` does the deleting. A `keep`
+ * &gt;= the snapshot count prunes nothing; `keep = 0` prunes every snapshot
+ * (the caller's confirmation makes that footgun explicit). Negative `keep` is
+ * floored at 0.
+ */
+export function selectSnapshotsToPrune(snapshots: Snapshot[], keep: number): number[] {
+  const survivors = Math.max(0, Math.floor(keep));
+  return [...snapshots]
+    .sort((a, b) => b.created.localeCompare(a.created)) // newest first
+    .slice(survivors)
+    .map((s) => s.id);
 }
 
 /** `hcloud server create` args for recreating a box from a snapshot. */
@@ -114,40 +175,71 @@ export interface BoxSummaryRow {
   snapshotSizesGB?: number[];
 }
 
+/** Pluralise "snap"/"snaps" for a snapshot count. */
+function snapsLabel(n: number): string {
+  return `${n} snap${n === 1 ? "" : "s"}`;
+}
+
 /**
  * Render the multi-box `box status` (no-arg) summary — one line per running box
  * (name, type, status, ip, datacenter, snapshot count, and `€/hr` when a price is
- * known) plus a total footer, then (when any price/snapshot cost is known) a cost
- * footer with total €/hr across running boxes + total snapshot storage €/mo.
+ * known), then a line per DOWNED box (snapshot-only state: name, snapshot count,
+ * storage €/mo), then a sentence per group, then (when any cost is known) a cost
+ * footer with total €/hr across running boxes + total snapshot storage €/mo
+ * (counting both running and downed snapshots).
  *
- * Pure (string in → string out) so it's unit-testable against a synthetic
- * `BoxSummaryRow[]`; the command layer only feeds it live data + prints the result.
+ * Downed boxes are the ergonomic fix for "I `box down`ed it and it vanished": a
+ * box you've taken down has no live server, so it would otherwise drop out of the
+ * fleet view entirely even though you keep paying for its snapshots. Listing it
+ * (with a `box up` hint) keeps the thing you're billed for visible.
+ *
+ * Pure (data in → string out) so it's unit-testable against synthetic inputs; the
+ * command layer feeds it live data + prints the result. `downed` defaults to `[]`,
+ * so the running-only output is byte-identical to before.
  */
-export function formatAllBoxesSummary(rows: BoxSummaryRow[]): string {
-  if (rows.length === 0) {
+export function formatAllBoxesSummary(rows: BoxSummaryRow[], downed: SnapshotGroup[] = []): string {
+  if (rows.length === 0 && downed.length === 0) {
     return "No boxes running. `box up` brings the default box up from its latest snapshot.";
   }
-  const lines = rows.map(({ server, snapshotCount, price }) => {
+
+  const runningLines = rows.map(({ server, snapshotCount, price }) => {
     const type = server.server_type?.name ?? "?";
     const ip = serverIp(server) || "?";
     const dc = server.datacenter?.name ?? "?";
-    const snaps = `${snapshotCount} snap${snapshotCount === 1 ? "" : "s"}`;
     const cost = price ? `  ${formatEurHourly(price.hourlyGross)}` : "";
-    return `  ${server.name}  ${type}  ${server.status}  ${ip}  ${dc}  ${snaps}${cost}`;
+    return `  ${server.name}  ${type}  ${server.status}  ${ip}  ${dc}  ${snapsLabel(snapshotCount)}${cost}`;
   });
-  const total = `${rows.length} box${rows.length === 1 ? "" : "es"} running — billing per hour. \`box status <box>\` for detail; \`box down <box>\` to stop one.`;
+  const downedLines = downed.map((d) =>
+    `  ${d.name}  down (snapshot only)  ${snapsLabel(d.snapshotCount)}  ${formatEur(snapshotStorageCost(d.snapshotSizesGB))}/mo`,
+  );
+
+  const sentences: string[] = [];
+  if (rows.length > 0) {
+    sentences.push(`${rows.length} box${rows.length === 1 ? "" : "es"} running — billing per hour. \`box status <box>\` for detail; \`box down <box>\` to stop one.`);
+  }
+  if (downed.length > 0) {
+    sentences.push(`${downed.length} down (snapshot only) — \`box up <box>\` to revive; \`box prune <box>\` to trim snapshots.`);
+  }
+
+  const lines = [...runningLines, ...downedLines];
 
   // Cost footer only when we actually resolved some cost data — keeps the
-  // dependency-free output byte-identical when prices are unavailable.
+  // dependency-free output byte-identical when no prices and no snapshot sizes.
   const totalHourly = rows.reduce((sum, r) => sum + (r.price?.hourlyGross ?? 0), 0);
-  const allSnapshotSizes = rows.flatMap((r) => r.snapshotSizesGB ?? []);
+  const allSnapshotSizes = [
+    ...rows.flatMap((r) => r.snapshotSizesGB ?? []),
+    ...downed.flatMap((d) => d.snapshotSizesGB),
+  ];
   const hasCost = rows.some((r) => r.price) || allSnapshotSizes.length > 0;
   if (!hasCost) {
-    return [...lines, "", total].join("\n");
+    return [...lines, "", ...sentences].join("\n");
   }
   const storage = snapshotStorageCost(allSnapshotSizes);
-  const costFooter = `total ${formatEurHourly(totalHourly)} across running boxes · ${formatEur(storage)}/mo snapshot storage`;
-  return [...lines, "", total, costFooter].join("\n");
+  const footerParts: string[] = [];
+  if (rows.some((r) => r.price)) footerParts.push(`total ${formatEurHourly(totalHourly)} across running boxes`);
+  footerParts.push(`${formatEur(storage)}/mo snapshot storage`);
+  const costFooter = footerParts.join(" · ");
+  return [...lines, "", ...sentences, costFooter].join("\n");
 }
 
 /** JSON shape for one box in the all-boxes `box status --json` array. */
@@ -188,25 +280,45 @@ export function buildAllBoxesJson(rows: BoxSummaryRow[]): BoxSummaryJson[] {
 export interface BoxTotalsJson {
   /** Sum of gross hourly rates across boxes with a known price. */
   costEurHourly: number;
-  /** Total snapshot storage cost per month across all listed boxes. */
+  /** Total snapshot storage cost per month across ALL boxes (running + downed). */
   storageEurMonthly: number;
 }
 
-/** Envelope for the multi-box `box status --json` output: rows + fleet totals. */
+/** JSON shape for a downed (snapshot-only) box in the all-boxes output. */
+export interface DownedBoxJson {
+  name: string;
+  snapshotCount: number;
+  storageEurMonthly: number;
+}
+
+/** Envelope for the multi-box `box status --json` output: rows + downed + totals. */
 export interface AllBoxesJson {
   boxes: BoxSummaryJson[];
+  downed: DownedBoxJson[];
   totals: BoxTotalsJson;
 }
 
 /**
- * Build the full multi-box `box status --json` envelope — the per-box array plus
- * a `totals` object (total €/hr across running boxes, total snapshot storage €/mo).
+ * Build the full multi-box `box status --json` envelope — the running per-box
+ * array, the downed (snapshot-only) boxes, and a `totals` object (total €/hr
+ * across running boxes, total snapshot storage €/mo across running + downed).
+ *
+ * `downed` defaults to `[]`; the totals always include downed snapshot storage
+ * when present, so a downed box's ongoing cost shows up in the JSON too.
  */
-export function buildAllBoxesJsonWithTotals(rows: BoxSummaryRow[]): AllBoxesJson {
+export function buildAllBoxesJsonWithTotals(rows: BoxSummaryRow[], downed: SnapshotGroup[] = []): AllBoxesJson {
   const costEurHourly = rows.reduce((sum, r) => sum + (r.price?.hourlyGross ?? 0), 0);
-  const storageEurMonthly = snapshotStorageCost(rows.flatMap((r) => r.snapshotSizesGB ?? []));
+  const storageEurMonthly = snapshotStorageCost([
+    ...rows.flatMap((r) => r.snapshotSizesGB ?? []),
+    ...downed.flatMap((d) => d.snapshotSizesGB),
+  ]);
   return {
     boxes: buildAllBoxesJson(rows),
+    downed: downed.map((d) => ({
+      name: d.name,
+      snapshotCount: d.snapshotCount,
+      storageEurMonthly: snapshotStorageCost(d.snapshotSizesGB),
+    })),
     totals: { costEurHourly, storageEurMonthly },
   };
 }
@@ -325,6 +437,26 @@ export function listSnapshots(selector: string): Snapshot[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Every devbox snapshot in one read-only call (`--selector role` = "has a role
+ * label"), labels included so {@link groupSnapshotsByBox} can attribute each to
+ * its box. One list call for the whole fleet, instead of one per box.
+ */
+export function listAllDevboxSnapshots(): Snapshot[] {
+  const res = runHcloud(["image", "list", "--type", "snapshot", "--selector", "role", "-o", "json"]);
+  if (res.code !== 0) return [];
+  try {
+    return JSON.parse(res.stdout) as Snapshot[];
+  } catch {
+    return [];
+  }
+}
+
+/** Delete one snapshot by id (`hcloud image delete`). Destructive — `box prune` only. */
+export function deleteSnapshot(id: number): HcloudResult {
+  return runHcloud(["image", "delete", String(id)]);
 }
 
 /**

@@ -8,15 +8,24 @@ Portable bun tool; reuses your existing `hcloud` auth. Slice 2 of the
 ## Commands
 
 ```
-box up    [name]          recreate a box from its latest snapshot (fast)
-box down  [box] [-y]      snapshot + DELETE a box (the only way to stop billing)
-box work  [box]           ssh in and attach the devcontainer tmux
-box ssh   [box] [-- cmd]  shell into a box as the dev user
-box status[box] [--json]  server state + snapshots + cost reminder
+box up     [name] [--size <type>]   recreate a box from its latest snapshot (fast)
+box down   [box] [-y]               snapshot + DELETE a box (the only way to stop billing)
+box park   [box]                    snapshot but KEEP it running (freeze a checkpoint)
+box prune  [box] [--keep N] [-y]    delete OLD snapshots, keep the latest N (frees storage)
+box work   [box]                    ssh in and attach the devcontainer tmux
+box ssh    [box] [-- cmd]           shell into a box as the dev user
+box status [box] [--json]           server state + snapshots + cost (no arg = whole fleet)
 ```
 
 `[box]` is a box **name or numeric Hetzner id**; omit it to use the configured
 default box.
+
+`box status` with no arg lists the whole fleet: running boxes (with €/hr) **and
+downed boxes** — a box you `down`ed has no live server but still costs snapshot
+storage, so it shows as a `down (snapshot only)` row with a `box up` hint rather
+than vanishing. `box prune` trims a box's snapshot lineage (which `down`/`park`
+grow without bound) down to the latest N (default 3); it's destructive, so it
+takes the same `-y`/`BOX_YES` confirmation as `down`.
 
 ## Config
 
@@ -30,7 +39,7 @@ Env vars (`BOX_*` preferred; legacy `HETZNER_*` honoured so an exported
 | `BOX_LOCATION` | hcloud location | `nbg1` |
 | `BOX_BASE_IMAGE` | base image (provision) | `ubuntu-24.04` |
 | `BOX_SSH_KEY` | registered hcloud ssh-key name | — (required for `up`) |
-| `BOX_YES=1` | skip the `down` confirmation | — |
+| `BOX_YES=1` | skip the `down`/`prune` confirmation | — |
 
 Auth comes from your `hcloud context` (or `HCLOUD_TOKEN`).
 
@@ -46,7 +55,9 @@ bun test tools/box              # unit tests (pure logic)
 
 ## Status
 
-Slice 2 (core lifecycle: up/down/work/ssh/status, name|id addressing). Not yet
-done: `provision`, `park`/`snap`, Tailscale addressing, multi-box `--size`, the
-`watch`/`mgmt`/`serve` verbs (later slices). The old `hetzner.sh` + `just
-hetzner-*` recipes are retired in the cleanup slice once `box` fully covers them.
+Core lifecycle (`up`/`down`/`park`/`prune`/`work`/`ssh`/`status`, name|id
+addressing, `--size`, multi-box + downed-box status, cost figures, snapshot
+pruning) is in. Not yet done: `provision` (first-time golden base), restoring a
+*specific* (non-latest) snapshot, Tailscale addressing, the `watch`/`mgmt`/`serve`
+verbs (later slices). The old `hetzner.sh` + `just hetzner-*` recipes are retired
+in the cleanup slice once `box` fully covers them.

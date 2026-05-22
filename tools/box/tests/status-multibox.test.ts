@@ -141,8 +141,8 @@ describe("buildAllBoxesJsonWithTotals", () => {
     expect(result.totals.storageEurMonthly).toBeCloseTo(0.143, 6);
   });
 
-  it("yields zeroed totals and an empty array for no boxes", () => {
-    expect(buildAllBoxesJsonWithTotals([])).toEqual({ boxes: [], totals: { costEurHourly: 0, storageEurMonthly: 0 } });
+  it("yields zeroed totals and empty arrays for no boxes", () => {
+    expect(buildAllBoxesJsonWithTotals([])).toEqual({ boxes: [], downed: [], totals: { costEurHourly: 0, storageEurMonthly: 0 } });
   });
 
   it("omits per-row cost keys when a row has no price", () => {

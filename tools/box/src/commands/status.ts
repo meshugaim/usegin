@@ -2,8 +2,9 @@ import { Command } from "commander";
 import { resolveConfig, snapshotSelector } from "../lib/config";
 import {
   buildAllBoxesJsonWithTotals, checkPrereqs, formatAllBoxesSummary, getServer,
-  getServerTypePrice, listServers, listSnapshots, resolveTargetName, serverIp,
-  type BoxSummaryRow, type ServerInfo, type ServerTypePrice,
+  getServerTypePrice, groupSnapshotsByBox, listAllDevboxSnapshots, listServers,
+  listSnapshots, resolveTargetName, serverIp,
+  type BoxSummaryRow, type ServerInfo, type ServerTypePrice, type SnapshotGroup,
 } from "../lib/hcloud";
 import {
   formatEur, formatEurHourly, formatHours, hoursBetween, runningCostSoFar,
@@ -67,24 +68,36 @@ function priceLookup(): (server: ServerInfo) => ServerTypePrice | null {
   };
 }
 
-/** Fleet view: every running box + its snapshot count, per-box €/hr, and cost totals. */
+/**
+ * Fleet view: every running box (snapshot count, per-box €/hr) AND every downed
+ * (snapshot-only) box, plus cost totals. One `listAllDevboxSnapshots` call backs
+ * both halves — running boxes read their lineage from the grouping, and any group
+ * with no live server of that name is a downed box you're still paying storage on.
+ */
 function showAllBoxes(servers: ReturnType<typeof listServers>, json: boolean): void {
   const priceOf = priceLookup();
+  const groups = groupSnapshotsByBox(listAllDevboxSnapshots());
+  const groupByName = new Map(groups.map((g) => [g.name, g]));
+
   const rows: BoxSummaryRow[] = servers.map((server) => {
-    const snapshots = listSnapshots(snapshotSelector(server.name));
+    const group = groupByName.get(server.name);
     return {
       server,
-      snapshotCount: snapshots.length,
+      snapshotCount: group?.snapshotCount ?? 0,
       price: priceOf(server),
-      snapshotSizesGB: snapshots.map((s) => s.image_size ?? 0),
+      snapshotSizesGB: group?.snapshotSizesGB ?? [],
     };
   });
 
+  // Downed = a snapshot lineage with no live server of that name.
+  const liveNames = new Set(servers.map((s) => s.name));
+  const downed: SnapshotGroup[] = groups.filter((g) => !liveNames.has(g.name));
+
   if (json) {
-    console.log(JSON.stringify(buildAllBoxesJsonWithTotals(rows), null, 2));
+    console.log(JSON.stringify(buildAllBoxesJsonWithTotals(rows, downed), null, 2));
     return;
   }
-  console.log(formatAllBoxesSummary(rows));
+  console.log(formatAllBoxesSummary(rows, downed));
 }
 
 /** Single-box detail: server state + the full snapshot lineage + cost figures. */

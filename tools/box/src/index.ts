@@ -6,6 +6,7 @@ import { statusCommand } from "./commands/status";
 import { upCommand } from "./commands/up";
 import { downCommand } from "./commands/down";
 import { parkCommand } from "./commands/park";
+import { pruneCommand } from "./commands/prune";
 import { sshCommand } from "./commands/ssh";
 import { workCommand } from "./commands/work";
 
@@ -19,13 +20,14 @@ Config (env; BOX_* preferred, legacy HETZNER_* honoured):
   BOX_TYPE       hcloud server type      (default: cpx42)
   BOX_LOCATION   hcloud location         (default: nbg1)
   BOX_SSH_KEY    registered ssh-key name (required for 'up')
-  BOX_YES=1      skip 'down' confirmation
+  BOX_YES=1      skip 'down'/'prune' confirmation
 
 Auth comes from your existing 'hcloud context' (or HCLOUD_TOKEN).`);
 
 program.addCommand(upCommand());
 program.addCommand(downCommand());
 program.addCommand(parkCommand());
+program.addCommand(pruneCommand());
 program.addCommand(workCommand());
 program.addCommand(sshCommand());
 program.addCommand(statusCommand());
