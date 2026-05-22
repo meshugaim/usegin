@@ -96,6 +96,90 @@ async function waitForFileGone(
 
 describe("cli.ts profile re-arm after first login via atomicWriteFile", () => {
 	test(
+		"ENG-6172: daemon recovers from needs-auth via cred-watcher when only credentials.json is atomically rewritten (profile unchanged)",
+		async () => {
+			// Steady-state-correct-profile scenario: `current_profile` already
+			// points at the named profile from a prior session, so the daemon
+			// boots with `resolvedProfileName === TEST_PROFILE` and arms the
+			// cred watcher on the RIGHT dir. Creds are still missing (re-login
+			// after rotation / refresh failure) → daemon enters needs-auth.
+			//
+			// First `effi auth login` rewrites `current_profile` (always — see
+			// `tools/lib/auth/profiles.ts::setCurrentProfile`) AND
+			// `credentials.json`, both via `atomicWriteFile`. The profile
+			// watcher's `onProfileChanged` short-circuits because the resolved
+			// profile is unchanged (`cli.ts:611-614`), so the ONLY path to
+			// recovery is the cred watcher firing on the tmp+rename event.
+			//
+			// This exercises `armCredWatcher`'s filename filter independently
+			// of `armProfileWatcher` — the multi-write test above passes even
+			// with the cred filter reverted because `onProfileChanged` calls
+			// `onCredentialsChanged` directly. This test FAILS if the cred
+			// filter is reverted.
+			await mkdir(join(configDir, "profiles", TEST_PROFILE), {
+				recursive: true,
+				mode: 0o700,
+			});
+			// Pre-seed current_profile so the daemon boots with the right cache.
+			await atomicWriteFile(
+				join(configDir, "current_profile"),
+				`${TEST_PROFILE}\n`,
+				0o600,
+			);
+
+			const flagPath = join(stateDir, "needs-auth.flag");
+			const cliPath = new URL("../src/cli.ts", import.meta.url).pathname;
+			const proc = Bun.spawn(["bun", "run", cliPath, "--no-recursive-watch"], {
+				env: {
+					...process.env,
+					EFFI_CONFIG_DIR: configDir,
+					SESSION_SYNC_STATE_DIR: stateDir,
+					SESSION_SYNC_PROJECTS_DIR: projectsDir,
+					SESSION_SYNC_SAFETY_MS: "300000",
+					SESSION_SYNC_PROFILE: undefined,
+				},
+				stdout: "ignore",
+				stderr: "ignore",
+			});
+
+			try {
+				const enteredNeedsAuth = await waitForFile(flagPath, 15_000);
+				if (!enteredNeedsAuth) {
+					throw new Error(
+						`needs-auth.flag never appeared at ${flagPath} within 15s — daemon failed to enter needs-auth (setup problem, not the bug under test)`,
+					);
+				}
+
+				// Only write credentials.json — current_profile is unchanged from
+				// the pre-seed. The profile watcher will still fire (setCurrentProfile
+				// always rewrites in production, but here we skip rewriting it to
+				// PROVE the cred watcher is the load-bearing recovery path).
+				await atomicWriteFile(
+					join(configDir, "profiles", TEST_PROFILE, "credentials.json"),
+					validCredentials(),
+					0o600,
+				);
+
+				const recovered = await waitForFileGone(flagPath, 20_000);
+				if (!recovered) {
+					throw new Error(
+						`needs-auth.flag still present after 20s — daemon did not recover from an atomicWriteFile of credentials.json alone. The cred watcher's strict-equality filter discarded the tmp+rename event. (ENG-6172)`,
+					);
+				}
+				expect(existsSync(flagPath)).toBe(false);
+			} finally {
+				proc.kill("SIGTERM");
+				await proc.exited;
+				if (!proc.killed) {
+					proc.kill("SIGKILL");
+					await proc.exited;
+				}
+			}
+		},
+		45_000,
+	);
+
+	test(
 		"ENG-6172: daemon recovers from needs-auth when login uses atomicWriteFile (tmp+rename) for current_profile + credentials.json",
 		async () => {
 			const flagPath = join(stateDir, "needs-auth.flag");
