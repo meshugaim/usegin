@@ -24,14 +24,13 @@ import { stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { getCredentialsPath } from "../../lib/auth/credentials.ts";
-import { resolveProfileName } from "../../lib/auth/profiles.ts";
-import { resolveDaemonUsername } from "./username.ts";
+import { getConfigDir, resolveProfileName } from "../../lib/auth/profiles.ts";
 import {
 	type AuthContext,
 	loadAuth,
 	loadAuthWithRefresh,
-	refreshAuthIfNeeded,
 	RefreshFailedError,
+	refreshAuthIfNeeded,
 } from "./auth.ts";
 import { applyBackoff, computeLockBackoffAt } from "./backoff.ts";
 import { decideBootAuthState } from "./boot-auth.ts";
@@ -74,6 +73,7 @@ import {
 import { type LockHolder, postHeartbeat } from "./sync-client.ts";
 import type { EnvIdentity } from "./sync-flow.ts";
 import { syncSession } from "./sync-session.ts";
+import { resolveDaemonUsername } from "./username.ts";
 
 interface Config {
 	idleThresholdMs: number;
@@ -218,6 +218,22 @@ interface DaemonState {
 	 */
 	credWatcher: { close: () => void } | null;
 	/**
+	 * Watcher on `<configDir>/current_profile`, armed only while in
+	 * `needs-auth` (alongside `credWatcher`). Tracks the cred watcher's
+	 * lifecycle exactly: armed in `ok → needs-auth`, closed in
+	 * `needs-auth → ok`.
+	 *
+	 * Fixes ENG-6157: on a fresh devcontainer the daemon boots before
+	 * `current_profile` exists, so `resolvedProfileName` falls back to
+	 * "default" and `credWatcher` arms on `profiles/default/`. When the
+	 * human later runs `effi auth login`, `current_profile` is written and
+	 * creds land in the NAMED profile dir — but `credWatcher` is still on
+	 * `default/`, so recovery never fires. This watcher catches that
+	 * `current_profile` write, re-resolves the profile, and re-arms
+	 * `credWatcher` on the correct dir before retrying recovery.
+	 */
+	profileWatcher: { close: () => void } | null;
+	/**
 	 * Factory for the heartbeat loop. Stored on DaemonState so we can
 	 * stop+restart the heartbeat across needs-auth transitions without
 	 * recreating the closure manually each time.
@@ -225,9 +241,11 @@ interface DaemonState {
 	startHeartbeatLoop: () => HeartbeatLoopHandle;
 	/**
 	 * The resolved profile name (after `resolveProfileName` honored
-	 * `current_profile` / EFFI_PROFILE / etc.). Cached at boot so the
-	 * credentials watcher and recovery `loadAuth` calls hit the same
-	 * profile dir without re-reading `current_profile` on every event.
+	 * `current_profile` / EFFI_PROFILE / etc.). Resolved at boot, then
+	 * RE-RESOLVED on a `current_profile` change while in `needs-auth`
+	 * (ENG-6157) — the profile watcher updates this field and re-arms the
+	 * credentials watcher on the new dir. Readers must tolerate it changing
+	 * while in `needs-auth`; in `ok` state it is stable.
 	 */
 	resolvedProfileName: string;
 }
@@ -353,10 +371,13 @@ async function applyEffect(d: DaemonState, effect: Effect): Promise<void> {
 			return;
 		case "arm-watcher":
 			armCredWatcher(d);
+			armProfileWatcher(d);
 			return;
 		case "close-watcher":
 			d.credWatcher?.close();
 			d.credWatcher = null;
+			d.profileWatcher?.close();
+			d.profileWatcher = null;
 			return;
 		case "stop-heartbeat":
 			d.heartbeat?.stop();
@@ -491,6 +512,85 @@ async function onCredentialsChanged(d: DaemonState): Promise<void> {
 			},
 			now,
 		});
+	}
+}
+
+/**
+ * Arm a watcher on `<configDir>/current_profile`. A change/creation event →
+ * re-resolve the profile and (if it changed) re-arm the credentials watcher
+ * on the correct dir, then retry recovery. Mirrors `armCredWatcher`'s
+ * parent-dir fs.watch + filename-filter shape.
+ *
+ * Idempotent: re-arming while a watcher exists is a no-op.
+ *
+ * Fixes ENG-6157 — see the `profileWatcher` field doc on DaemonState. The
+ * cred watcher alone is insufficient because on a fresh devcontainer it arms
+ * on `profiles/default/` (no `current_profile` yet) and first login writes
+ * creds into a NAMED profile dir it isn't watching.
+ */
+function armProfileWatcher(d: DaemonState): void {
+	if (d.profileWatcher) return;
+	const configDir = getConfigDir();
+	const baseName = "current_profile";
+	let watcher: { close: () => void } | null = null;
+	try {
+		// Watch the config dir so we catch `current_profile`'s creation as well
+		// as in-place rewrites. `mkdirSync` first so the watch can arm even on a
+		// fresh devcontainer where `~/.effi` doesn't exist yet.
+		mkdirSync(configDir, { recursive: true });
+		watcher = fsWatch(configDir, (_event, filename) => {
+			if (!filename || filename !== baseName) return;
+			void onProfileChanged(d);
+		});
+	} catch (err) {
+		console.warn(
+			"[session-sync] failed to arm profile watcher:",
+			(err as Error).message,
+		);
+		return;
+	}
+	d.profileWatcher = watcher;
+	console.log(
+		"[session-sync] profile watcher armed on",
+		join(configDir, baseName),
+	);
+}
+
+/**
+ * Profile watcher callback: re-resolve `current_profile`, and if the active
+ * profile changed, re-arm the credentials watcher on the new profile's dir
+ * before retrying recovery via `onCredentialsChanged` (creds are present
+ * after login; that helper does loadAuth + dispatches `credentials-changed`,
+ * which the FSM uses to leave `needs-auth`).
+ *
+ * Scoped to `needs-auth` only — armed alongside the cred watcher and torn
+ * down on recovery. A profile-watch hiccup must not crash the daemon, so the
+ * whole body is guarded.
+ */
+async function onProfileChanged(d: DaemonState): Promise<void> {
+	if (d.authState.state !== "needs-auth") return; // stale event after recovery/teardown
+	try {
+		const resolved = await resolveProfileName(d.config.profileName);
+		if (resolved === d.resolvedProfileName) {
+			// Same profile — the cred watcher is already on the correct dir for
+			// this profile's creds. Don't add a general re-resolve-everywhere path.
+			return;
+		}
+		console.log(
+			`[session-sync] current_profile changed: ${d.resolvedProfileName} → ${resolved}; re-arming credentials watcher`,
+		);
+		d.resolvedProfileName = resolved;
+		// Re-arm the cred watcher on the new profile dir.
+		d.credWatcher?.close();
+		d.credWatcher = null;
+		armCredWatcher(d);
+		// Attempt recovery now: creds are present after `effi auth login`.
+		await onCredentialsChanged(d);
+	} catch (err) {
+		console.warn(
+			"[session-sync] profile-changed: error during re-resolve/recovery -",
+			(err as Error).message,
+		);
 	}
 }
 
@@ -997,6 +1097,12 @@ async function shutdown(d: DaemonState, signal: string): Promise<void> {
 		/* ignore */
 	}
 	d.credWatcher = null;
+	try {
+		d.profileWatcher?.close();
+	} catch {
+		/* ignore */
+	}
+	d.profileWatcher = null;
 	for (const w of d.watchers) {
 		try {
 			w.close();
@@ -1242,6 +1348,7 @@ async function main(): Promise<void> {
 		heartbeat: null,
 		authState,
 		credWatcher: null,
+		profileWatcher: null,
 		// Forward-reference: the factory is assigned after `d` is constructed
 		// (closure needs to see `d`). This is a typed placeholder.
 		startHeartbeatLoop: () => {
@@ -1263,6 +1370,7 @@ async function main(): Promise<void> {
 	// minimal; this is the structural complement).
 	if (d.authState.state === "needs-auth") {
 		armCredWatcher(d);
+		armProfileWatcher(d);
 	}
 
 	// 5. Startup scan.
