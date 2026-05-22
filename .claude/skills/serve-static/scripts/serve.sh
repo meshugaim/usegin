@@ -4,14 +4,18 @@
 #
 #   - Gitpod / Ona   -> `ona environment port open <port>` -> public URL
 #   - GitHub Codespaces -> `gh codespace ports visibility`    -> forwarded URL
+#   - Tailnet (--host tailnet) -> bind 0.0.0.0 on a published port -> private
+#       http://<tailnet-name>:<port> (only the user's own tailnet devices; for a
+#       Hetzner/remote devbox on Tailscale, where localhost won't reach the user)
 #   - Local / devcontainer / anything else -> plain http://localhost:<port>
 #
 # Prints a single URL on stdout. Stops at nothing else.
 #
 # Usage:
-#   serve.sh <path> [--name <label>] [--admission creator_only|organization|everyone] [--host auto|gitpod|codespaces|local]
+#   serve.sh <path> [--name <label>] [--admission creator_only|organization|everyone] [--host auto|gitpod|codespaces|tailnet|local]
 #
 # Defaults: --admission creator_only, --name serve-static, --host auto.
+# `tailnet` is opt-in (never auto-detected): use it on a tailnet-joined remote box.
 
 set -euo pipefail
 
@@ -72,15 +76,35 @@ if [[ "$host" == "auto" ]]; then
 fi
 
 # --- Pick a free port -------------------------------------------------------
+#
+# tailnet mode must use a port the devcontainer *publishes* (appPort), else it's
+# unreachable from the host/tailnet — so pick from the 9000-9009 ad-hoc range.
+# Every other mode can use any free ephemeral port.
 
-port=$(python3 - <<'PY'
+if [[ "$host" == "tailnet" ]]; then
+  port=$(python3 - <<'PY'
+import socket, sys
+for p in range(9000, 9010):              # 9000-9009 ad-hoc appPort range
+    s = socket.socket()
+    try:
+        s.bind(("0.0.0.0", p))
+        s.close()
+        print(p); sys.exit(0)
+    except OSError:
+        s.close()
+sys.exit(1)
+PY
+  ) || { echo "no free port in the published 9000-9009 ad-hoc range — free one or widen appPort" >&2; exit 1; }
+else
+  port=$(python3 - <<'PY'
 import socket
 s = socket.socket()
 s.bind(("127.0.0.1", 0))
 print(s.getsockname()[1])
 s.close()
 PY
-)
+  )
+fi
 
 # --- Serve ------------------------------------------------------------------
 
@@ -91,6 +115,8 @@ pidfile=/tmp/serve-static-${port}.pid
 # - Codespaces forwarding expects to reach the server; binding to 0.0.0.0 is safe
 #   because the port gate is at the Codespaces layer.
 # - Gitpod works the same way; 0.0.0.0 is fine.
+# - Tailnet: must bind 0.0.0.0 so Docker's port publish (and the tailnet) can
+#   reach it; a 127.0.0.1 bind inside the container would be unreachable.
 # - Local: 127.0.0.1 is safer (won't leak onto the LAN).
 bind_host=127.0.0.1
 [[ "$host" != "local" ]] && bind_host=0.0.0.0
@@ -117,6 +143,22 @@ case "$host" in
     # URL format used by Codespaces port forwarding.
     domain="${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
     base="https://${CODESPACE_NAME}-${port}.${domain}"
+    ;;
+  tailnet)
+    # Private over the tailnet: only the user's own Tailscale devices can reach
+    # it (never the public internet). Uses this box's MagicDNS name. Requires the
+    # box's firewall to trust tailscale0 (golden base / harden-firewall.sh bakes it).
+    # Use the MagicDNS short label (first component of Self.DNSName) — NOT
+    # Self.HostName, which can be a human-readable name with spaces/punctuation.
+    # This is the same name that resolves for `ssh dev@<box>` / http://<box>:port.
+    ts_name=$(tailscale status --json 2>/dev/null \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].split(".")[0])' 2>/dev/null \
+      || hostname)
+    if [[ -z "$ts_name" ]]; then
+      echo "could not resolve this box's tailnet name (is tailscale up?)" >&2
+      exit 1
+    fi
+    base="http://${ts_name}:${port}"
     ;;
   local)
     # No public exposure. VS Code / Cursor attached via remote dev will
