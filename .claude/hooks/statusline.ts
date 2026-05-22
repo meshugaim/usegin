@@ -22,7 +22,6 @@ const BOLD_BLACK_ON_YELLOW = "\x1b[1;30;48;2;255;255;0m";
 const DIM = "\x1b[2m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
-const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
 
 // session-sync daemon health — a *live* counterpart to the SessionStart banner
@@ -36,7 +35,9 @@ function syncSegment(): string {
     const h = probeSyncHealthSync();
     switch (h.state) {
       case "down":
-        return `${RED}❌ sync down${RESET}`;
+        // Loudest state — bold black on a solid yellow block + caps so a dead
+        // daemon (zero session persistence) jumps out of the status line.
+        return `${BOLD_BLACK_ON_YELLOW}❌ SYNC DOWN${RESET}`;
       case "auth":
         return `${YELLOW}⚠ sync auth${RESET}`;
       case "stale": {
