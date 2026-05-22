@@ -107,11 +107,19 @@ describe("cli.ts profile re-arm after first login via atomicWriteFile", () => {
 					EFFI_CONFIG_DIR: configDir,
 					SESSION_SYNC_STATE_DIR: stateDir,
 					SESSION_SYNC_PROJECTS_DIR: projectsDir,
-					// Long safety-net so the only recovery path under test is the
-					// watcher — not a backlog-drain tick that could mask the bug.
+					// Safety-net doesn't retry auth (see `safety-net.ts` — only
+					// session paths get re-emitted; `fireSync` returns early in
+					// needs-auth), so it can't rescue the daemon from this bug
+					// even at its default cadence. Set it long anyway to keep the
+					// subprocess quiet during the recovery window. The walk-subdirs
+					// path (taken under `--no-recursive-watch`) clamps this to 60s,
+					// which is still harmless for the same reason.
 					SESSION_SYNC_SAFETY_MS: "300000",
 					SESSION_SYNC_PROFILE: undefined,
 				},
+				// stdout/stderr ignored, not piped — same rationale as
+				// `profile-rearm.test.ts`: an undrained pipe to a chatty
+				// heartbeat-loop child will fill and deadlock teardown.
 				stdout: "ignore",
 				stderr: "ignore",
 			});
