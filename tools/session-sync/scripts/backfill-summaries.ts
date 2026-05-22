@@ -79,14 +79,23 @@ function parseArgs(argv: string[]): Args {
 			a.dryRun = true;
 			a.execute = false;
 		} else if (v === "--limit") {
-			const n = Number(argv[++i]);
+			const raw = argv[++i];
+			if (raw === undefined || raw.startsWith("--")) {
+				throw new Error(
+					`Expected a positive integer after --limit, got: ${raw}`,
+				);
+			}
+			const n = Number(raw);
 			if (!Number.isFinite(n) || n <= 0) {
-				throw new Error(`--limit expects a positive integer, got: ${argv[i]}`);
+				throw new Error(`Expected a positive integer after --limit, got: ${raw}`);
 			}
 			a.limit = n;
 		} else if (v === "--only") {
-			a.only = argv[++i];
-			if (!a.only) throw new Error("--only requires a session_id");
+			const raw = argv[++i];
+			if (raw === undefined || raw === "" || raw.startsWith("--")) {
+				throw new Error(`Expected a session_id after --only, got: ${raw}`);
+			}
+			a.only = raw;
 		} else if (v === "--verbose") a.verbose = true;
 		else throw new Error(`Unknown flag: ${v}`);
 	}
@@ -125,9 +134,6 @@ async function main() {
 		process.exit(0);
 	}
 
-	// Env check happens AFTER --help so --help works without doppler.
-	const { url, key } = getSupabaseEnv();
-
 	const corpusPath = resolve(
 		process.cwd(),
 		"experiments/session-summaries-backfill/summaries.json",
@@ -137,6 +143,36 @@ async function main() {
 	if (!Array.isArray(all)) {
 		throw new Error(`Corpus at ${corpusPath} is not a JSON array`);
 	}
+
+	// Validate every corpus entry before talking to the DB. A malformed entry
+	// (missing/empty session_id, non-UUID-shaped session_id, missing/empty
+	// summary) is a corpus bug — abort loudly so the bad row gets fixed
+	// upstream instead of silently no-op'ing or, worse, writing junk.
+	const UUID_RE =
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	for (let idx = 0; idx < all.length; idx++) {
+		const e = all[idx];
+		const tag =
+			typeof e?.session_id === "string" && e.session_id.trim() !== ""
+				? e.session_id
+				: `index ${idx}`;
+		if (typeof e?.session_id !== "string" || e.session_id.trim() === "") {
+			console.error(`[invalid] ${tag}: session_id missing or empty`);
+			process.exit(1);
+		}
+		if (!UUID_RE.test(e.session_id)) {
+			console.error(`[invalid] ${tag}: session_id not UUID-shaped`);
+			process.exit(1);
+		}
+		if (typeof e.summary !== "string" || e.summary.trim() === "") {
+			console.error(`[invalid] ${tag}: summary missing or empty`);
+			process.exit(1);
+		}
+	}
+
+	// Env check happens AFTER --help and AFTER validation so validation
+	// surfaces corpus bugs even without doppler creds.
+	const { url, key } = getSupabaseEnv();
 
 	let corpus: CorpusEntry[];
 	if (args.only) {
@@ -157,7 +193,8 @@ async function main() {
 	);
 
 	let matched = 0;
-	let wouldOrDid = 0;
+	let wouldUpdate = 0;
+	let updated = 0;
 	let alreadySet = 0;
 	let orphan = 0;
 	const failures: { session_id: string; error: string }[] = [];
@@ -193,33 +230,45 @@ async function main() {
 					}
 
 					if (args.dryRun) {
-						wouldOrDid++;
+						wouldUpdate++;
 						console.log(`[would] ${sid}`);
 						return;
 					}
 
-					const { error: upErr, count } = await client
+					// `summary_generated_at` is set to now() because the corpus
+					// has no embedded per-entry generation timestamp — its
+					// `_grounding` block carries only { dropped, summary_review,
+					// anchor_tokens, anchor_tokens_grounded }. Leaving the
+					// column NULL while `summary` is set would create a
+					// confusing `summary IS NOT NULL AND summary_generated_at
+					// IS NULL` state; now() is the closest honest value the
+					// script can produce and matches what a live producer would
+					// write.
+					const { data: upRows, error: upErr } = await client
 						.from("dev_sessions")
-						.update(
-							{
-								summary: entry.summary,
-								summary_generated_at: new Date().toISOString(),
-							},
-							{ count: "exact" },
-						)
+						.update({
+							summary: entry.summary,
+							summary_generated_at: new Date().toISOString(),
+						})
 						.eq("session_id", sid)
-						.is("summary", null);
+						.is("summary", null)
+						.select("id");
 
 					if (upErr) throw new Error(`UPDATE: ${upErr.message}`);
 
-					if (count === 0) {
+					if (!upRows || upRows.length === 0) {
 						// Race: someone set it between our SELECT and UPDATE.
+						// The IS NULL guard at the DB refused the write, so
+						// this is honest counter accounting, not a fix-up.
+						// This branch is only reachable in EXECUTE (DRY-RUN
+						// returns above), so log unconditionally — a race in
+						// production is worth seeing.
 						alreadySet++;
-						if (args.verbose) console.log(`[already_set:race] ${sid}`);
+						console.log(`[already_set:race] ${sid}`);
 						return;
 					}
 
-					wouldOrDid++;
+					updated++;
 					console.log(`[updated] ${sid}`);
 				} catch (e) {
 					failures.push({ session_id: sid, error: (e as Error).message });
@@ -233,13 +282,20 @@ async function main() {
 		mode,
 		total_corpus: corpus.length,
 		matched,
-		[args.execute ? "updated" : "would_update"]: wouldOrDid,
+		would_update: wouldUpdate,
+		updated,
 		already_set: alreadySet,
 		orphan_summary: orphan,
 		failures: failures.length,
 	};
 	console.log("");
 	console.log(JSON.stringify(summary));
+
+	if (orphan > 0) {
+		console.log(
+			`note: ${orphan} corpus entries have no matching dev_sessions row — these sessions need the JSONL-side backfill first (tools/session-sync/scripts/backfill.ts, ENG-5863).`,
+		);
+	}
 
 	if (failures.length > 0) {
 		console.error(
