@@ -5,6 +5,7 @@ import { enablePrefixMatching } from "../../lib/commander-prefix";
 import { statusCommand } from "./commands/status";
 import { upCommand } from "./commands/up";
 import { downCommand } from "./commands/down";
+import { parkCommand } from "./commands/park";
 import { sshCommand } from "./commands/ssh";
 import { workCommand } from "./commands/work";
 
@@ -24,6 +25,7 @@ Auth comes from your existing 'hcloud context' (or HCLOUD_TOKEN).`);
 
 program.addCommand(upCommand());
 program.addCommand(downCommand());
+program.addCommand(parkCommand());
 program.addCommand(workCommand());
 program.addCommand(sshCommand());
 program.addCommand(statusCommand());

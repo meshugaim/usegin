@@ -76,6 +76,70 @@ export function buildSnapshotArgs(p: { name: string; description: string; label:
 }
 
 /**
+ * Resolve the hcloud server type for an `up`, with `--size` overriding config.
+ *
+ * Precedence: an explicit `--size` flag  >  the configured `BOX_TYPE`/default.
+ * The flag wins for a single invocation without mutating the box's config, so a
+ * sizing experiment is `box up --size cpx31` and the default stays `BOX_TYPE`.
+ */
+export function resolveSize(p: { sizeFlag?: string; configType: string }): string {
+  const flag = p.sizeFlag?.trim();
+  return flag || p.configType;
+}
+
+/** A box plus the count of snapshots in its lineage — the unit the all-boxes summary renders. */
+export interface BoxSummaryRow {
+  server: ServerInfo;
+  snapshotCount: number;
+}
+
+/**
+ * Render the multi-box `box status` (no-arg) summary — one line per running box
+ * (name, type, status, ip, datacenter, snapshot count) plus a total footer.
+ *
+ * Pure (string in → string out) so it's unit-testable against a synthetic
+ * `BoxSummaryRow[]`; the command layer only feeds it live data + prints the result.
+ */
+export function formatAllBoxesSummary(rows: BoxSummaryRow[]): string {
+  if (rows.length === 0) {
+    return "No boxes running. `box up` brings the default box up from its latest snapshot.";
+  }
+  const lines = rows.map(({ server, snapshotCount }) => {
+    const type = server.server_type?.name ?? "?";
+    const ip = serverIp(server) || "?";
+    const dc = server.datacenter?.name ?? "?";
+    const snaps = `${snapshotCount} snap${snapshotCount === 1 ? "" : "s"}`;
+    return `  ${server.name}  ${type}  ${server.status}  ${ip}  ${dc}  ${snaps}`;
+  });
+  const total = `${rows.length} box${rows.length === 1 ? "" : "es"} running — billing per hour. \`box status <box>\` for detail; \`box down <box>\` to stop one.`;
+  return [...lines, "", total].join("\n");
+}
+
+/** JSON shape for one box in the all-boxes `box status --json` array. */
+export interface BoxSummaryJson {
+  name: string;
+  id: number;
+  type: string | null;
+  status: string;
+  ip: string;
+  datacenter: string | null;
+  snapshotCount: number;
+}
+
+/** Build the JSON array for the multi-box `box status --json` (no-arg) output. */
+export function buildAllBoxesJson(rows: BoxSummaryRow[]): BoxSummaryJson[] {
+  return rows.map(({ server, snapshotCount }) => ({
+    name: server.name,
+    id: server.id,
+    type: server.server_type?.name ?? null,
+    status: server.status,
+    ip: serverIp(server),
+    datacenter: server.datacenter?.name ?? null,
+    snapshotCount,
+  }));
+}
+
+/**
  * Resolve a {@link BoxTarget} to a concrete box NAME, given the default name and
  * the live server list. A selector that is all-digits and matches a server id
  * wins; otherwise the selector is treated as a name; otherwise the default.

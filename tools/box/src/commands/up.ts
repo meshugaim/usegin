@@ -2,14 +2,15 @@ import { Command } from "commander";
 import { resolveConfig, snapshotSelector } from "../lib/config";
 import {
   buildCreateFromSnapshotArgs, checkPrereqs, cleanHostkey, getServer,
-  listSnapshots, pickLatestSnapshot, runHcloud, serverIp,
+  listSnapshots, pickLatestSnapshot, resolveSize, runHcloud, serverIp,
 } from "../lib/hcloud";
 
 export function upCommand(): Command {
   return new Command("up")
     .description("Recreate a box from its latest snapshot (fast)")
     .argument("[name]", "box name to bring up (default: the configured box)")
-    .action((nameArg: string | undefined) => {
+    .option("--size <type>", "hcloud server type for this box, overriding BOX_TYPE (e.g. cpx31)")
+    .action((nameArg: string | undefined, opts: { size?: string }) => {
       const prereq = checkPrereqs();
       if (!prereq.ok) {
         console.error(`Error: ${prereq.error}`);
@@ -18,6 +19,7 @@ export function upCommand(): Command {
 
       const cfg = resolveConfig();
       const name = nameArg?.trim() || cfg.name;
+      const type = resolveSize({ sizeFlag: opts.size, configType: cfg.type });
 
       if (!cfg.sshKeyName) {
         console.error("Error: no ssh key configured. Set BOX_SSH_KEY (or HETZNER_SSH_KEY_NAME) to a registered hcloud ssh-key name.");
@@ -37,11 +39,11 @@ export function upCommand(): Command {
         process.exit(1);
       }
 
-      console.error(`Recreating '${name}' from snapshot ${snap.id} (${cfg.type} @ ${cfg.location}) ...`);
+      console.error(`Recreating '${name}' from snapshot ${snap.id} (${type} @ ${cfg.location}) ...`);
       const res = runHcloud(
         buildCreateFromSnapshotArgs({
           name,
-          type: cfg.type,
+          type,
           image: snap.id,
           location: cfg.location,
           sshKey: cfg.sshKeyName,
