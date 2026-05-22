@@ -1,0 +1,19 @@
+{
+  "name": "box",
+  "description": "Devbox fleet lifecycle CLI — start/stop/connect cloud dev boxes by name|id",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^6.0.2"
+  }
+}
