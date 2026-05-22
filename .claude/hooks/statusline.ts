@@ -2,6 +2,7 @@
 
 import { $ } from "bun";
 import { dirname, join } from "path";
+import { probeSyncHealthSync } from "../../tools/session-sync/src/health.ts";
 
 interface StatusLineInput {
   session_id: string;
@@ -21,7 +22,40 @@ const BOLD_BLACK_ON_YELLOW = "\x1b[1;30;48;2;255;255;0m";
 const DIM = "\x1b[2m";
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
+const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
+
+// session-sync daemon health — a *live* counterpart to the SessionStart banner
+// (banner-env-status.sh). Re-evaluated on every statusline render, so a daemon
+// that dies or drops into needs-auth mid-session is visible immediately rather
+// than only at the next session start (ENG-6158). Same ✅/⚠/❌ vocabulary and
+// severity ordering (down > auth > stale > ok) as the banner. Fail-silent, like
+// the tip CLI below — a probe error must never break the status line.
+function syncSegment(): string {
+  try {
+    const h = probeSyncHealthSync();
+    switch (h.state) {
+      case "down":
+        return `${RED}❌ sync down${RESET}`;
+      case "auth":
+        return `${YELLOW}⚠ sync auth${RESET}`;
+      case "stale": {
+        const age = h.lastUploadAgeS;
+        const pretty =
+          age == null
+            ? ""
+            : age >= 3600
+              ? ` ${Math.floor(age / 3600)}h`
+              : ` ${Math.floor(age / 60)}m`;
+        return `${YELLOW}⚠ sync stale${pretty}${RESET}`;
+      }
+      default:
+        return `${GREEN}✅ sync${RESET}`;
+    }
+  } catch {
+    return "";
+  }
+}
 
 // Git status
 async function gitStatus(): Promise<string> {
@@ -85,6 +119,9 @@ if (modelName.includes("opus")) {
 }
 
 if (git) parts.push(git);
+
+const sync = syncSegment();
+if (sync) parts.push(sync);
 
 parts.push(`${input.session_id.slice(0, 8)}`);
 
