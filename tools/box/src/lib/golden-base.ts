@@ -1,0 +1,161 @@
+/**
+ * Layer-0 golden base — pure helpers (no IO).
+ *
+ * The golden base is the *identity-less* devbox image that NEW boxes spin from
+ * (slice 5's `box up --name --size`). It carries the installed toolchain +
+ * baked creds (gh / claude / doppler) + Tailscale *installed but logged OUT*.
+ * Everything that must be unique per box is injected on first boot, not baked.
+ *
+ * The design landmine (see docs/design/slices/04-layer0-golden-base.md): a
+ * snapshot is a *clone*, so anything baked is SHARED by every spun box. Bake a
+ * *joined* Tailscale node and N boxes fight over one node key. So the base ships
+ * logged out, and each box runs a fresh `tailscale up --authkey=… --hostname=…`
+ * on first boot to register its OWN node.
+ *
+ * Where the authkey lives — the subtle bit. The golden base has public :22
+ * CLOSED (harden-firewall, baked), so a fresh box is unreachable until it's on
+ * the tailnet: it has to self-join on first boot, which means the key must be
+ * present locally. We bake the key into the IMAGE (a 0600 root file at
+ * {@link GOLDEN_BASE_AUTHKEY_PATH}) rather than passing it in spin-time
+ * user-data — keeping auth keys out of Hetzner instance metadata (the same
+ * principle scripts/hetzner/cloud-init.yaml states). The per-box NAME, which is
+ * not secret, IS passed via user-data (see {@link buildFirstBootUserData}).
+ */
+
+import { buildSnapshotArgs } from "./hcloud";
+
+/**
+ * hcloud label marking the identity-less golden base image. Distinct from the
+ * per-box `role=<name>-devbox` lineage (see config.snapshotSelector): the golden
+ * base is the fallback a brand-new box (with no per-box snapshot of its own)
+ * spins from. `box up --name <new>` (slice 5) selects on this label.
+ */
+export const GOLDEN_BASE_LABEL = "purpose=golden-base";
+
+/** The label selector to find the golden base image. */
+export function goldenBaseSelector(): string {
+  return GOLDEN_BASE_LABEL;
+}
+
+/**
+ * On-box path of the baked, reusable, non-expiring Tailscale auth key. Baked
+ * into the golden image (0600, root) so every spun box can self-join the tailnet
+ * on first boot without the key ever touching instance metadata.
+ */
+export const GOLDEN_BASE_AUTHKEY_PATH = "/etc/tailscale/authkey";
+
+/**
+ * Validate a box name as a DNS label — it becomes the OS hostname AND the
+ * Tailscale `--hostname` (which seeds the MagicDNS name). RFC-1123 label rules:
+ * 1–63 chars, lowercase letters/digits/hyphens, no leading/trailing hyphen.
+ *
+ * Guarding here keeps a bad name out of the first-boot cloud-config (where it
+ * would otherwise produce a box that's unreachable by name, or a shell-injection
+ * vector via `--hostname`).
+ */
+export function isValidBoxName(name: string): boolean {
+  return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(name);
+}
+
+/**
+ * Build the spin-time `--user-data` cloud-config for a box spun FROM the golden
+ * base. It carries the per-box identity bits (NOT the key — that's baked):
+ *
+ *   1. set the OS hostname to the box name (also seeds Tailscale's MagicDNS name),
+ *   2. run a fresh `tailscale up` reading the baked key, registering this box as
+ *      its OWN tailnet node under its own name.
+ *
+ * Reusable key ⇒ many distinct nodes; non-ephemeral ⇒ the node persists across
+ * the box's own down/up; `--hostname` ⇒ a stable, predictable MagicDNS name.
+ *
+ * Pure: name in → cloud-config string out. Throws on an invalid name so a
+ * malformed value can never reach the shell command.
+ */
+export function buildFirstBootUserData(name: string): string {
+  if (!isValidBoxName(name)) {
+    throw new Error(
+      `invalid box name "${name}": must be a DNS label (1–63 chars, lowercase a–z, 0–9, hyphens; no leading/trailing hyphen)`,
+    );
+  }
+  // The key is read from the baked file at runtime — it is NOT interpolated into
+  // this user-data, so it never lands in Hetzner instance metadata.
+  return [
+    "#cloud-config",
+    `hostname: ${name}`,
+    `fqdn: ${name}`,
+    "preserve_hostname: false",
+    "runcmd:",
+    `  - hostnamectl set-hostname ${name}`,
+    `  - tailscale up --authkey="$(cat ${GOLDEN_BASE_AUTHKEY_PATH})" --hostname=${name}`,
+    "",
+  ].join("\n");
+}
+
+/**
+ * `hcloud server create-image` args for the identity-less golden base snapshot.
+ * Same shape as a per-box park snapshot, but stamped with {@link GOLDEN_BASE_LABEL}
+ * instead of a per-box role label, so it's found as the spin-from base — not as
+ * any one box's lineage.
+ */
+export function buildGoldenSnapshotArgs(p: { name: string; description: string }): string[] {
+  return buildSnapshotArgs({ name: p.name, description: p.description, label: GOLDEN_BASE_LABEL });
+}
+
+/** One step of `box base finalize` — turning a working build box into the base. */
+export interface FinalizeStep {
+  id: "bake-key" | "harden" | "logout" | "snapshot";
+  /** Where it runs: over SSH on the box, or against the hcloud API. */
+  kind: "ssh" | "hcloud";
+  title: string;
+  /** Human-readable detail. Never contains the key material (stays out of logs). */
+  detail: string;
+  /** True for steps that can't be cleanly undone (drives the confirm gate). */
+  irreversible: boolean;
+}
+
+/**
+ * The ordered plan that turns a *working, logged-in* build box into the
+ * identity-less golden base. Pure (name in → steps out) so the sequence — and
+ * its critical ordering — is unit-tested without touching live infra.
+ *
+ * Ordering is load-bearing:
+ *   1. bake the reusable key to disk (while the box is still reachable),
+ *   2. harden the firewall — runs `harden-firewall.sh`, which REFUSES unless
+ *      tailscale is up, so it must come BEFORE logout (else it locks nothing and
+ *      bails),
+ *   3. logout — scrub the node identity; the box goes unreachable after this, so
+ *      it's the last on-box step,
+ *   4. snapshot via the hcloud API (no SSH needed) → the golden image.
+ */
+export function planGoldenFinalize(name: string): FinalizeStep[] {
+  return [
+    {
+      id: "bake-key",
+      kind: "ssh",
+      title: "Bake reusable Tailscale authkey",
+      detail: `write key → ${GOLDEN_BASE_AUTHKEY_PATH} (0600 root) so spun boxes self-join`,
+      irreversible: false,
+    },
+    {
+      id: "harden",
+      kind: "ssh",
+      title: "Harden firewall (close public :22)",
+      detail: "run harden-firewall.sh — tailnet-only ingress; runs while tailscale is still up",
+      irreversible: false,
+    },
+    {
+      id: "logout",
+      kind: "ssh",
+      title: "Scrub tailnet identity",
+      detail: "tailscale logout — base ships logged OUT; box goes unreachable after this",
+      irreversible: true,
+    },
+    {
+      id: "snapshot",
+      kind: "hcloud",
+      title: "Snapshot the golden base",
+      detail: `create-image ${name} → label ${GOLDEN_BASE_LABEL}`,
+      irreversible: false,
+    },
+  ];
+}

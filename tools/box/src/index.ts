@@ -9,6 +9,7 @@ import { parkCommand } from "./commands/park";
 import { pruneCommand } from "./commands/prune";
 import { sshCommand } from "./commands/ssh";
 import { workCommand } from "./commands/work";
+import { baseCommand } from "./commands/base";
 
 const program = new Command()
   .name("box")
@@ -31,6 +32,7 @@ program.addCommand(pruneCommand());
 program.addCommand(workCommand());
 program.addCommand(sshCommand());
 program.addCommand(statusCommand());
+program.addCommand(baseCommand());
 
 applyStandardAliases(program);
 enablePrefixMatching(program);
