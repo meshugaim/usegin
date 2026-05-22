@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import {
-  formatAllBoxesSummary, buildAllBoxesJson, resolveSize,
+  formatAllBoxesSummary, buildAllBoxesJson, buildAllBoxesJsonWithTotals, resolveSize,
   type BoxSummaryRow, type ServerInfo,
 } from "../src/lib/hcloud";
 
@@ -91,5 +91,63 @@ describe("resolveSize — --size beats BOX_TYPE beats default", () => {
 
   it("trims a padded --size value", () => {
     expect(resolveSize({ sizeFlag: " cpx51 ", configType: "cpx42" })).toBe("cpx51");
+  });
+});
+
+// Cost rows carry an optional price + snapshot sizes; without them the output is
+// byte-identical to the dependency-free view (asserted by the tests above).
+const costRows: BoxSummaryRow[] = [
+  {
+    server: srv({ id: 1, name: "effi-devbox", public_net: { ipv4: { ip: "10.0.0.1" } } }),
+    snapshotCount: 1,
+    price: { hourlyGross: 0.0494, monthlyCapGross: 30.84 },
+    snapshotSizesGB: [7],
+  },
+  {
+    server: srv({ id: 2, name: "agent-a", server_type: { name: "cpx31" }, public_net: { ipv4: { ip: "10.0.0.2" } }, datacenter: { name: "fsn1-dc14" } }),
+    snapshotCount: 1,
+    price: { hourlyGross: 0.0241, monthlyCapGross: 15.0 },
+    snapshotSizesGB: [3],
+  },
+];
+
+describe("formatAllBoxesSummary — cost", () => {
+  it("appends €/hr to each line when a price is known", () => {
+    const lines = formatAllBoxesSummary(costRows).split("\n");
+    expect(lines[0]).toBe("  effi-devbox  cpx42  running  10.0.0.1  nbg1-dc3  1 snap  €0.049/hr");
+    expect(lines[1]).toBe("  agent-a  cpx31  running  10.0.0.2  fsn1-dc14  1 snap  €0.024/hr");
+  });
+
+  it("adds a cost footer with total €/hr and total snapshot storage €/mo", () => {
+    const out = formatAllBoxesSummary(costRows);
+    // 0.0494 + 0.0241 = 0.0735/hr (toFixed(3) → 0.073); (7+3)GB × 0.0143 = €0.143/mo → €0.14.
+    expect(out).toContain("total €0.073/hr across running boxes · €0.14/mo snapshot storage");
+  });
+
+  it("omits the €/hr suffix and cost footer entirely when no price is present", () => {
+    // Same fixture used by the dependency-free tests — must stay identical.
+    const out = formatAllBoxesSummary(rows);
+    expect(out).not.toContain("/hr");
+    expect(out).not.toContain("snapshot storage");
+  });
+});
+
+describe("buildAllBoxesJsonWithTotals", () => {
+  it("wraps the per-box array and adds fleet totals", () => {
+    const result = buildAllBoxesJsonWithTotals(costRows);
+    expect(result.boxes[0]).toMatchObject({ name: "effi-devbox", costEurHourly: 0.0494, costCapEurMonthly: 30.84 });
+    expect(result.boxes[1]).toMatchObject({ name: "agent-a", costEurHourly: 0.0241, costCapEurMonthly: 15.0 });
+    expect(result.totals.costEurHourly).toBeCloseTo(0.0735, 6);
+    expect(result.totals.storageEurMonthly).toBeCloseTo(0.143, 6);
+  });
+
+  it("yields zeroed totals and an empty array for no boxes", () => {
+    expect(buildAllBoxesJsonWithTotals([])).toEqual({ boxes: [], totals: { costEurHourly: 0, storageEurMonthly: 0 } });
+  });
+
+  it("omits per-row cost keys when a row has no price", () => {
+    const result = buildAllBoxesJsonWithTotals(rows);
+    expect(result.boxes[0]).not.toHaveProperty("costEurHourly");
+    expect(result.totals.costEurHourly).toBe(0);
   });
 });
