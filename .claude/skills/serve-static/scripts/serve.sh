@@ -148,14 +148,26 @@ case "$host" in
     # Private over the tailnet: only the user's own Tailscale devices can reach
     # it (never the public internet). Uses this box's MagicDNS name. Requires the
     # box's firewall to trust tailscale0 (golden base / harden-firewall.sh bakes it).
-    # Use the MagicDNS short label (first component of Self.DNSName) — NOT
-    # Self.HostName, which can be a human-readable name with spaces/punctuation.
-    # This is the same name that resolves for `ssh dev@<box>` / http://<box>:port.
-    ts_name=$(tailscale status --json 2>/dev/null \
-      | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].split(".")[0])' 2>/dev/null \
-      || hostname)
+    #
+    # Resolving the box's tailnet name, in priority order — this matters because
+    # an agent typically runs INSIDE the devcontainer, where `tailscale` isn't
+    # installed and `hostname` is a random Docker id (NOT the tailnet name). So:
+    #   1. $BOX_TAILNET_NAME / $BOX_NAME — set per-box (devcontainer containerEnv);
+    #      the only reliable source from inside the container.
+    #   2. `tailscale status` — works on the host / a tailnet-joined machine. Uses
+    #      the MagicDNS short label (first component of Self.DNSName), NOT
+    #      Self.HostName (which can be a human-readable name with spaces).
+    # We deliberately do NOT fall back to `hostname` — it would print a working-
+    # looking but wrong URL like http://11fdae345187:PORT from inside a container.
+    ts_name="${BOX_TAILNET_NAME:-${BOX_NAME:-}}"
+    if [[ -z "$ts_name" ]] && command -v tailscale >/dev/null 2>&1; then
+      ts_name=$(tailscale status --json 2>/dev/null \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].split(".")[0])' 2>/dev/null || true)
+    fi
     if [[ -z "$ts_name" ]]; then
-      echo "could not resolve this box's tailnet name (is tailscale up?)" >&2
+      echo "could not determine this box's tailnet name." >&2
+      echo "  Inside a devcontainer (no tailscale CLI), set BOX_TAILNET_NAME=<box name>." >&2
+      echo "  On the box host / your Mac, ensure 'tailscale status' works." >&2
       exit 1
     fi
     base="http://${ts_name}:${port}"
