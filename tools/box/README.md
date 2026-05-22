@@ -27,6 +27,14 @@ than vanishing. `box prune` trims a box's snapshot lineage (which `down`/`park`
 grow without bound) down to the latest N (default 3); it's destructive, so it
 takes the same `-y`/`BOX_YES` confirmation as `down`.
 
+`box ssh`/`box work` go **tailnet-first** (slice 3): if you're on the tailnet and
+the box's name resolves, they `ssh dev@<name>` directly — no IP, no host-key churn,
+and **no hcloud token needed** (so token-free work boxes can connect). If the box
+isn't on the tailnet (or you pass a numeric id), they fall back to `hcloud server
+ssh` by IP (break-glass). A fresh box joins the tailnet via `tailscale up`
+(interactive for now; a baked reusable key comes with the golden base), then
+`scripts/hetzner/harden-firewall.sh` closes public `:22`.
+
 ## Config
 
 Env vars (`BOX_*` preferred; legacy `HETZNER_*` honoured so an exported

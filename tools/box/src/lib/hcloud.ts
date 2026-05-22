@@ -483,10 +483,50 @@ export function serverIp(server: ServerInfo | null): string {
 }
 
 /**
- * Snapshot-recreate rotates the box's SSH host key (and the IP is often reused),
- * which causes "HOST KEY CHANGED" and refuses every ssh. Drop the stale entry.
+ * Drop a stale known-hosts entry for a host token — an IP (break-glass path) or a
+ * tailnet NAME (tailnet path). cloud-init regenerates the box's SSH host key on
+ * each `up` (new instance-id), and the public IP is often reused, so without this
+ * the next connect fails with "HOST KEY CHANGED" / "REMOTE HOST IDENTIFICATION".
+ * Confirmed live in slice 3: a snapshot down/up changed the box's host key, so the
+ * tailnet name's entry churns too — hence box ssh/work clean by NAME, not just IP.
  */
-export function cleanHostkey(ip: string): void {
-  if (!ip) return;
-  Bun.spawnSync(["ssh-keygen", "-R", ip], { stdout: "ignore", stderr: "ignore" });
+export function cleanHostkey(host: string): void {
+  if (!host) return;
+  Bun.spawnSync(["ssh-keygen", "-R", host], { stdout: "ignore", stderr: "ignore" });
+}
+
+// ---------- tailnet (slice 3) ----------
+
+/**
+ * Whether a box is reachable from here by its tailnet NAME — i.e. this machine is
+ * on the tailnet and MagicDNS knows the node. Drives box ssh/work's "tailnet
+ * first, hcloud break-glass second" path, and lets token-free work boxes (slice 6)
+ * connect with no hcloud call at all. Cheap + read-only: `tailscale ip -4 <name>`.
+ */
+export function tailnetReachable(name: string): boolean {
+  if (!name) return false;
+  const proc = Bun.spawnSync(["tailscale", "ip", "-4", name], { stdout: "pipe", stderr: "ignore", stdin: "ignore" });
+  return (proc.exitCode ?? 1) === 0 && /(^|\n)100\./.test(proc.stdout?.toString() ?? "");
+}
+
+/**
+ * `ssh` argv for connecting to a box over the tailnet by name. Pure (params in →
+ * argv out) so it's unit-tested. `StrictHostKeyChecking=accept-new` plus the
+ * caller's prior `cleanHostkey(name)` together absorb the host-key churn (see
+ * {@link cleanHostkey}); the tailnet's WireGuard transport + node identity already
+ * authenticate the box, so SSH host-key TOFU is belt-only here.
+ */
+export function buildTailnetSshArgs(p: { name: string; user?: string; tty?: boolean; command?: string[] }): string[] {
+  return [
+    "-o", "StrictHostKeyChecking=accept-new",
+    ...(p.tty ? ["-t"] : []),
+    `${p.user ?? "dev"}@${p.name}`,
+    ...(p.command ?? []),
+  ];
+}
+
+/** Run a local `ssh` inheriting the terminal (interactive shells + TTY commands). */
+export function runSsh(args: string[]): HcloudResult {
+  const proc = Bun.spawnSync(["ssh", ...args], { stdout: "inherit", stderr: "inherit", stdin: "inherit" });
+  return { code: proc.exitCode ?? 1, stdout: "", stderr: "" };
 }
