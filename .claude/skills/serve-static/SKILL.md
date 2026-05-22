@@ -19,6 +19,8 @@ The script inspects env vars and available CLIs, in order:
 
 Override detection with `--host gitpod|codespaces|local` if it guesses wrong.
 
+**Plain remote box (e.g. a Hetzner server over SSH):** there's no auto-forward, so the printed `localhost:<port>` won't open in the user's browser. If `cloudflared` is on PATH, expose the running server with a quick tunnel — `cloudflared tunnel --url http://localhost:<port>` — which prints a public `https://<random>.trycloudflare.com` URL (no account needed); append the filename. It's a public (random, unlisted) URL, so keep sensitive content off it and kill the tunnel when done.
+
 ## Usage
 
 ```
