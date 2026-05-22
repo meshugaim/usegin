@@ -421,6 +421,23 @@ async function dispatchTrigger(
 }
 
 /**
+ * Match an `fs.watch` event's `filename` against the file we're actually
+ * watching, accepting BOTH the destination basename and the `atomicWriteFile`
+ * tmp-rename basename (`<baseName>.tmp.<pid>`). On Linux, a tmp+rename emits
+ * exactly one event whose `filename` is the tmp basename, never the
+ * destination — strict equality drops every real signal from `effi auth login`
+ * (ENG-6172). See `tools/lib/auth/fs-utils.ts:atomicWriteFile`.
+ */
+function isWatchedName(
+	filename: string | null,
+	baseName: string,
+): boolean {
+	if (!filename) return false;
+	if (filename === baseName) return true;
+	return filename.startsWith(`${baseName}.tmp.`);
+}
+
+/**
  * Arm a watcher on the profile's credentials.json. mtime change →
  * retry `loadAuth` and dispatch a `credentials-changed` trigger.
  *
@@ -445,7 +462,7 @@ function armCredWatcher(d: DaemonState): void {
 		mkdirSync(parent, { recursive: true });
 		const baseName = credPath.slice(credPath.lastIndexOf("/") + 1);
 		watcher = fsWatch(parent, (_event, filename) => {
-			if (!filename || filename !== baseName) return;
+			if (!isWatchedName(filename, baseName)) return;
 			let mtimeMs = 0;
 			try {
 				mtimeMs = statSync(credPath).mtimeMs;
@@ -532,6 +549,14 @@ function armProfileWatcher(d: DaemonState): void {
 	if (d.profileWatcher) return;
 	const configDir = getConfigDir();
 	const baseName = "current_profile";
+	const profilePath = join(configDir, baseName);
+	let lastMtimeMs = 0;
+	try {
+		lastMtimeMs = statSync(profilePath).mtimeMs;
+	} catch {
+		// File may not exist yet on a fresh devcontainer. First appearance
+		// will mtime-advance from 0 and fire `onProfileChanged`.
+	}
 	let watcher: { close: () => void } | null = null;
 	try {
 		// Watch the config dir so we catch `current_profile`'s creation as well
@@ -539,7 +564,19 @@ function armProfileWatcher(d: DaemonState): void {
 		// fresh devcontainer where `~/.effi` doesn't exist yet.
 		mkdirSync(configDir, { recursive: true });
 		watcher = fsWatch(configDir, (_event, filename) => {
-			if (!filename || filename !== baseName) return;
+			if (!isWatchedName(filename, baseName)) return;
+			// Mirror `armCredWatcher`'s mtime dedup. Without this, the relaxed
+			// filter (which now accepts the tmp basename) would also fire on
+			// in-flight tmp-write activity and re-entrant rewrites where the
+			// destination mtime hasn't actually advanced.
+			let mtimeMs = 0;
+			try {
+				mtimeMs = statSync(profilePath).mtimeMs;
+			} catch {
+				return;
+			}
+			if (mtimeMs === lastMtimeMs) return;
+			lastMtimeMs = mtimeMs;
 			void onProfileChanged(d);
 		});
 	} catch (err) {

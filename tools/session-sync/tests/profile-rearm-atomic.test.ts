@@ -95,7 +95,7 @@ async function waitForFileGone(
 }
 
 describe("cli.ts profile re-arm after first login via atomicWriteFile", () => {
-	test.failing(
+	test(
 		"ENG-6172: daemon recovers from needs-auth when login uses atomicWriteFile (tmp+rename) for current_profile + credentials.json",
 		async () => {
 			const flagPath = join(stateDir, "needs-auth.flag");
