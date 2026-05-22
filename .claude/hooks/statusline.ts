@@ -39,16 +39,16 @@ function syncSegment(): string {
         // daemon (zero session persistence) jumps out of the status line.
         return `${BOLD_BLACK_ON_YELLOW}❌ SYNC DOWN${RESET}`;
       case "auth":
-        return `${YELLOW}⚠ sync auth${RESET}`;
+        return `${BOLD_BLACK_ON_YELLOW}⚠ SYNC AUTH${RESET}`;
       case "stale": {
         const age = h.lastUploadAgeS;
         const pretty =
           age == null
             ? ""
             : age >= 3600
-              ? ` ${Math.floor(age / 3600)}h`
-              : ` ${Math.floor(age / 60)}m`;
-        return `${YELLOW}⚠ sync stale${pretty}${RESET}`;
+              ? ` ${Math.floor(age / 3600)}H`
+              : ` ${Math.floor(age / 60)}M`;
+        return `${BOLD_BLACK_ON_YELLOW}⚠ SYNC STALE${pretty}${RESET}`;
       }
       default:
         return `${GREEN}✅ sync${RESET}`;
