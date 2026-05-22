@@ -39,8 +39,9 @@ If it doesn't exist, bootstrap it. The OTP arrives by email:
 ```bash
 # Derive <name> from `git config user.name` (lowercased first name) — don't ask.
 effi auth login --profile dogfooding --env production --email <name>@askeffi.ai
-# Fetch the 6-digit code (see below), then:
-effi auth verify --env production --email <name>@askeffi.ai --code <code>
+# Fetch the 6-digit code (see below), then verify — keep --profile on BOTH commands
+# so the credentials land under `dogfooding`, not the auto-derived `<email>:prod`:
+effi auth verify --profile dogfooding --env production --email <name>@askeffi.ai --code <code>
 effi --profile dogfooding link \
   --workspace f757a1a3-9955-45b3-8aab-50454a7c8001 \
   --project 1bf0f507-7627-40a0-be72-8d2eacc40dec
