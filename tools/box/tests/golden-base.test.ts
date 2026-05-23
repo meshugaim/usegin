@@ -181,6 +181,27 @@ describe("planGoldenFinalize", () => {
     const logout = steps.find((s) => s.id === "logout")!;
     expect(logout.detail).toMatch(/state|wipe|scrub/i);
   });
+
+  describe("--skip-harden (bake reachable, harden last)", () => {
+    const open = planGoldenFinalize("build-box", { skipHarden: true });
+
+    it("swaps harden → open-ssh, keeping bake-key/logout/snapshot order", () => {
+      expect(open.map((s) => s.id)).toEqual(["bake-key", "open-ssh", "logout", "snapshot"]);
+      expect(open.find((s) => s.id === "harden")).toBeUndefined();
+    });
+
+    it("the open-ssh step runs on the box (ssh) before logout, and says :22 stays open", () => {
+      const openSsh = open.find((s) => s.id === "open-ssh")!;
+      expect(openSsh.kind).toBe("ssh");
+      expect(open.findIndex((s) => s.id === "open-ssh")).toBeLessThan(open.findIndex((s) => s.id === "logout"));
+      expect(`${openSsh.title} ${openSsh.detail}`).toMatch(/:22|open|not hardened/i);
+    });
+
+    it("default (no opts) still hardens — skip-harden must be opt-in", () => {
+      expect(planGoldenFinalize("b").map((s) => s.id)).toContain("harden");
+      expect(planGoldenFinalize("b").map((s) => s.id)).not.toContain("open-ssh");
+    });
+  });
 });
 
 describe("buildFinalizeLogoutCommand", () => {

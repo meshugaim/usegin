@@ -241,7 +241,7 @@ export const FINALIZE_SCRUB_WAIT_S = 15;
 
 /** One step of `box base finalize` — turning a working build box into the base. */
 export interface FinalizeStep {
-  id: "bake-key" | "harden" | "logout" | "snapshot";
+  id: "bake-key" | "harden" | "open-ssh" | "logout" | "snapshot";
   /** Where it runs: over SSH on the box, or against the hcloud API. */
   kind: "ssh" | "hcloud";
   title: string;
@@ -258,16 +258,46 @@ export interface FinalizeStep {
  *
  * Ordering is load-bearing:
  *   1. bake the reusable key to disk (while the box is still reachable),
- *   2. harden the firewall — runs `harden-firewall.sh`, which REFUSES unless
- *      tailscale is up, so it must come BEFORE logout (else it locks nothing and
- *      bails),
+ *   2. firewall step:
+ *        - default → harden: run `harden-firewall.sh`, which REFUSES unless
+ *          tailscale is up, so it must come BEFORE logout (else it locks nothing
+ *          and bails). The base ships with public :22 CLOSED (tailnet-only).
+ *        - {@link FinalizeOpts.skipHarden} → open-ssh: ensure public :22 is OPEN
+ *          instead. For the "bake reachable, harden last" workflow — a box spun
+ *          from a hardened base inherits :22 CLOSED, so we must actively re-open
+ *          it, or the unhardened base is no more reachable than a hardened one.
+ *          Lets you prove the whole spin→join→work flow on a reachable box,
+ *          then re-finalize WITHOUT --skip-harden for the production base.
  *   3. logout — scrub the node identity AND wipe local tailscaled state (see
  *      {@link buildFinalizeLogoutCommand}: logout alone leaves a snapshot that
- *      panics tailscaled on boot); the box goes unreachable after this, so it's
- *      the last on-box step,
+ *      panics tailscaled on boot); the box goes unreachable after this (over the
+ *      tailnet; still reachable by public IP when skipHarden), so it's the last
+ *      on-box step,
  *   4. snapshot via the hcloud API (no SSH needed) → the golden image.
  */
-export function planGoldenFinalize(name: string): FinalizeStep[] {
+export interface FinalizeOpts {
+  /** Leave public :22 OPEN (skip hardening) — the "bake reachable, harden last" path. */
+  skipHarden?: boolean;
+}
+
+export function planGoldenFinalize(name: string, opts: FinalizeOpts = {}): FinalizeStep[] {
+  const firewall: FinalizeStep = opts.skipHarden
+    ? {
+        id: "open-ssh",
+        kind: "ssh",
+        title: "Keep public :22 OPEN (NOT hardened)",
+        detail:
+          "ufw allow OpenSSH — base stays reachable by public IP for proving the spin→join→work flow; " +
+          "re-finalize WITHOUT --skip-harden to close :22 for production",
+        irreversible: false,
+      }
+    : {
+        id: "harden",
+        kind: "ssh",
+        title: "Harden firewall (close public :22)",
+        detail: "run harden-firewall.sh — tailnet-only ingress; runs while tailscale is still up",
+        irreversible: false,
+      };
   return [
     {
       id: "bake-key",
@@ -276,13 +306,7 @@ export function planGoldenFinalize(name: string): FinalizeStep[] {
       detail: `write key → ${GOLDEN_BASE_AUTHKEY_PATH} (0600 root) so spun boxes self-join`,
       irreversible: false,
     },
-    {
-      id: "harden",
-      kind: "ssh",
-      title: "Harden firewall (close public :22)",
-      detail: "run harden-firewall.sh — tailnet-only ingress; runs while tailscale is still up",
-      irreversible: false,
-    },
+    firewall,
     {
       id: "logout",
       kind: "ssh",

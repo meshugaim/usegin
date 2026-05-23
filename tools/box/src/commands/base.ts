@@ -45,9 +45,10 @@ function finalizeCommand(): Command {
     .option("--authkey-file <path>", "file holding the reusable, non-expiring Tailscale auth key (or set BOX_TS_AUTHKEY_FILE)")
     .option("--dry-run", "print the plan without executing anything")
     .option("--yes", "skip the irreversible-step confirmation (logout makes the box unreachable)")
-    .action((box: string, opts: { authkeyFile?: string; dryRun?: boolean; yes?: boolean }) => {
+    .option("--skip-harden", "leave public :22 OPEN (NOT hardened) — bake a reachable base to prove the flow; re-finalize without this for production")
+    .action((box: string, opts: { authkeyFile?: string; dryRun?: boolean; yes?: boolean; skipHarden?: boolean }) => {
       const name = box.trim();
-      const steps = planGoldenFinalize(name);
+      const steps = planGoldenFinalize(name, { skipHarden: opts.skipHarden });
 
       if (opts.dryRun) {
         printPlan(name, steps);
@@ -108,7 +109,14 @@ function finalizeCommand(): Command {
       // to read the piped key (verified on a throwaway — it errored with a sudo
       // usage message and wrote nothing). tee reads stdin reliably as root.
       run("bake-key", `sudo mkdir -p ${dirname(GOLDEN_BASE_AUTHKEY_PATH)} && sudo tee ${GOLDEN_BASE_AUTHKEY_PATH} >/dev/null && sudo chmod 600 ${GOLDEN_BASE_AUTHKEY_PATH} && sudo test -s ${GOLDEN_BASE_AUTHKEY_PATH}`, `${key}\n`);
-      run("harden", "sudo bash -s", readFileSync(hardenScriptPath(), "utf8"));
+      // Firewall step: harden (close :22) for production, or actively re-open :22
+      // for the reachable "prove-first" base (a box from a hardened base inherits
+      // :22 closed, so skipping isn't enough — we must allow it back).
+      if (opts.skipHarden) {
+        run("open-ssh", "sudo ufw allow OpenSSH");
+      } else {
+        run("harden", "sudo bash -s", readFileSync(hardenScriptPath(), "utf8"));
+      }
 
       // Logout + wiping tailscaled state drops the tailnet, which kills our own
       // SSH session — running it synchronously ALWAYS returns a broken-pipe
@@ -130,23 +138,28 @@ function finalizeCommand(): Command {
         console.error("identity-less. Verify with slice 5 (spin two boxes; they must get distinct nodes).");
       }
 
-      console.error("\n→ Snapshot the golden base (via hcloud API; box is now unreachable, which is fine) ...");
-      const snap = runHcloud(
-        buildGoldenSnapshotArgs({
-          name,
-          description: `slice4 golden base (identity-less) ${new Date().toISOString().replace(/\.\d+Z$/, "Z")}`,
-        }),
-        { inherit: true },
-      );
+      const stamp = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+      const description = opts.skipHarden
+        ? `slice4 golden base (identity-less, :22 OPEN — UNHARDENED) ${stamp}`
+        : `slice4 golden base (identity-less) ${stamp}`;
+      console.error("\n→ Snapshot the golden base (via hcloud API) ...");
+      const snap = runHcloud(buildGoldenSnapshotArgs({ name, description }), { inherit: true });
       if (snap.code !== 0) {
-        console.error(`Error: snapshot failed (exit ${snap.code}). The box is logged out + hardened but NOT snapshotted.`);
+        const fw = opts.skipHarden ? ":22 left open" : "hardened";
+        console.error(`Error: snapshot failed (exit ${snap.code}). The box is logged out + ${fw} but NOT snapshotted.`);
         process.exit(snap.code);
       }
 
       console.log("");
       console.log(`Golden base created from '${name}' (label purpose=golden-base, logged OUT of the tailnet).`);
       console.log("A box spun from it self-joins the tailnet on first boot under its own name.");
-      console.log(`This build box is now unreachable (identity scrubbed) — \`box down ${name}\` / hcloud to delete it.`);
+      if (opts.skipHarden) {
+        console.log("⚠ This base is NOT hardened — public :22 is OPEN on it and on every box spun from it.");
+        console.log(`  Prove the spin→join→work flow, then re-finalize WITHOUT --skip-harden for production.`);
+        console.log(`  This build box stays reachable by public IP — \`box down ${name}\` / hcloud to delete it.`);
+      } else {
+        console.log(`This build box is now unreachable (identity scrubbed) — \`box down ${name}\` / hcloud to delete it.`);
+      }
     });
 }
 
