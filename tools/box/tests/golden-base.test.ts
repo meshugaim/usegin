@@ -9,6 +9,8 @@ import {
   planGoldenFinalize,
   wrapBashC,
   chooseSpinSource,
+  summarizeGoldenBase,
+  formatGoldenBaseLine,
 } from "../src/lib/golden-base";
 import type { Snapshot } from "../src/lib/hcloud";
 
@@ -77,6 +79,28 @@ describe("buildGoldenSnapshotArgs", () => {
       "--description", "slice4 golden base",
       "--label", "purpose=golden-base",
     ]);
+  });
+});
+
+describe("summarizeGoldenBase / formatGoldenBaseLine", () => {
+  it("summarises the latest golden-base snapshot with its disk floor", () => {
+    const snaps: Snapshot[] = [
+      { id: 1, created: "2026-05-20T00:00:00Z", disk_size: 40 },
+      { id: 2, created: "2026-05-23T00:00:00Z", disk_size: 40 },
+    ];
+    expect(summarizeGoldenBase(snaps)).toEqual({ id: 2, diskSizeGB: 40, created: "2026-05-23T00:00:00Z" });
+  });
+
+  it("is null when no golden base exists, and the line says so", () => {
+    expect(summarizeGoldenBase([])).toBeNull();
+    expect(formatGoldenBaseLine(null)).toContain("none yet");
+  });
+
+  it("renders the disk floor a box spun from it would need", () => {
+    const line = formatGoldenBaseLine({ id: 389645657, diskSizeGB: 40, created: "2026-05-23T11:34:28Z" });
+    expect(line).toContain("389645657");
+    expect(line).toContain(">=40GB");
+    expect(line).toContain("2026-05-23");
   });
 });
 

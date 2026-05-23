@@ -10,6 +10,10 @@ import {
   formatEur, formatEurHourly, formatHours, hoursBetween, runningCostSoFar,
   snapshotStorageCost,
 } from "../lib/cost";
+import {
+  formatGoldenBaseLine, goldenBaseSelector, summarizeGoldenBase,
+} from "../lib/golden-base";
+import { classifyDevboxNodes, formatTailnetHygiene, readTailnetNodes } from "../lib/tailnet";
 import { shouldDefaultToJson } from "../../../lib/output-mode";
 
 export function statusCommand(): Command {
@@ -93,11 +97,29 @@ function showAllBoxes(servers: ReturnType<typeof listServers>, json: boolean): v
   const liveNames = new Set(servers.map((s) => s.name));
   const downed: SnapshotGroup[] = groups.filter((g) => !liveNames.has(g.name));
 
+  // The spin-from base + tailnet hygiene (orphan = node with no server & no
+  // snapshot to revive from). A box is "at rest" while downed — its node lingers
+  // on purpose and revives on `box up`, so it is NOT an orphan.
+  const goldenBase = summarizeGoldenBase(listSnapshots(goldenBaseSelector()));
+  const lineageNames = new Set(groups.map((g) => g.name));
+  const tailnet = classifyDevboxNodes(readTailnetNodes(), liveNames, lineageNames);
+
   if (json) {
-    console.log(JSON.stringify(buildAllBoxesJsonWithTotals(rows, downed), null, 2));
+    console.log(JSON.stringify({
+      ...buildAllBoxesJsonWithTotals(rows, downed),
+      goldenBase,
+      tailnet,
+    }, null, 2));
     return;
   }
+  console.log(formatGoldenBaseLine(goldenBase));
+  console.log("");
   console.log(formatAllBoxesSummary(rows, downed));
+  const hygiene = formatTailnetHygiene(tailnet);
+  if (hygiene) {
+    console.log("");
+    console.log(hygiene);
+  }
 }
 
 /** Single-box detail: server state + the full snapshot lineage + cost figures. */

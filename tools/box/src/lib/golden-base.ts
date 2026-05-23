@@ -22,7 +22,7 @@
  * not secret, IS passed via user-data (see {@link buildFirstBootUserData}).
  */
 
-import { buildSnapshotArgs, type Snapshot } from "./hcloud";
+import { buildSnapshotArgs, pickLatestSnapshot, type Snapshot } from "./hcloud";
 
 /**
  * hcloud label marking the identity-less golden base image. Distinct from the
@@ -35,6 +35,35 @@ export const GOLDEN_BASE_LABEL = "purpose=golden-base";
 /** The label selector to find the golden base image. */
 export function goldenBaseSelector(): string {
   return GOLDEN_BASE_LABEL;
+}
+
+/** A one-line summary of the golden base for `box status` (the spin-from seed). */
+export interface GoldenBaseInfo {
+  id: number;
+  /** Min disk (GB) any box spun from it needs; null if hcloud didn't report it. */
+  diskSizeGB: number | null;
+  created: string;
+}
+
+/**
+ * Summarise the golden base from the `purpose=golden-base` snapshot list — the
+ * latest one (what a fresh `box up` would spin from). Returns null when none
+ * exist (i.e. the base hasn't been built yet — `box status` says so explicitly).
+ * Pure: snapshots in → summary out.
+ */
+export function summarizeGoldenBase(snaps: Snapshot[]): GoldenBaseInfo | null {
+  const latest = pickLatestSnapshot(snaps);
+  if (!latest) return null;
+  return { id: latest.id, diskSizeGB: latest.disk_size ?? null, created: latest.created };
+}
+
+/** Render the golden-base line for `box status` (pure: info → string). */
+export function formatGoldenBaseLine(info: GoldenBaseInfo | null): string {
+  if (!info) {
+    return "Golden base: none yet — build one with `box base finalize <build-box>` (slice 4).";
+  }
+  const floor = info.diskSizeGB != null ? `spins onto >=${info.diskSizeGB}GB types` : "disk size unknown";
+  return `Golden base: image ${info.id} · ${floor} · built ${info.created.slice(0, 10)}`;
 }
 
 /** Where `box up` resolved its disk image from, and whether identity is fresh. */

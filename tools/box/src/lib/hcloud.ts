@@ -16,7 +16,10 @@ export interface Snapshot {
   id: number;
   created: string;
   description?: string;
+  /** GB actually used by the image (what storage is billed on). */
   image_size?: number;
+  /** Source box's disk at snapshot time — the FLOOR on types you can spin onto. */
+  disk_size?: number;
   /** hcloud labels — carries `role=<name>-devbox`, the box→snapshot link. */
   labels?: Record<string, string>;
 }
