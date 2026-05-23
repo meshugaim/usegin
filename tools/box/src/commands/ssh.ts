@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { resolveConfig } from "../lib/config";
 import {
-  buildTailnetSshArgs, checkPrereqs, cleanHostkey, getServer, listServers,
+  buildBreakGlassArgs, buildTailnetSshArgs, checkPrereqs, cleanHostkey, getServer, listServers,
   resolveTargetName, runHcloud, runSsh, serverIp, tailnetReachable,
 } from "../lib/hcloud";
 
@@ -43,7 +43,7 @@ export function sshCommand(): Command {
       }
 
       cleanHostkey(serverIp(server));
-      const res = runHcloud(["server", "ssh", bgName, "-u", "dev", ...command], { inherit: true });
+      const res = runHcloud(buildBreakGlassArgs({ name: bgName, command }), { inherit: true });
       process.exit(res.code);
     });
 }

@@ -1,6 +1,8 @@
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
-import { buildTailnetSshArgs, checkPrereqs, getServer, runHcloud, tailnetReachable } from "../lib/hcloud";
+import {
+  buildBreakGlassArgs, buildTailnetSshArgs, checkPrereqs, getServer, runHcloud, tailnetReachable,
+} from "../lib/hcloud";
 import {
   FINALIZE_SCRUB_WAIT_S, GOLDEN_BASE_AUTHKEY_PATH, buildFinalizeLogoutCommand,
   buildGoldenSnapshotArgs, planGoldenFinalize, wrapBashC, type FinalizeStep,
@@ -18,7 +20,7 @@ function sshExec(name: string, remoteCmd: string, stdin?: string): number {
   const remote = wrapBashC(remoteCmd);
   const argv = tailnetReachable(name)
     ? ["ssh", ...buildTailnetSshArgs({ name, command: [remote] })]
-    : ["hcloud", "server", "ssh", name, "-u", "dev", remote];
+    : ["hcloud", ...buildBreakGlassArgs({ name, command: [remote] })];
   const proc = Bun.spawnSync(argv, {
     stdin: stdin !== undefined ? new TextEncoder().encode(stdin) : "inherit",
     stdout: "inherit",

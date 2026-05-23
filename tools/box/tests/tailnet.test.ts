@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { buildTailnetSshArgs } from "../src/lib/hcloud";
+import { buildBreakGlassArgs, buildTailnetSshArgs } from "../src/lib/hcloud";
 import {
   parseTailnetNodes, classifyDevboxNodes, formatTailnetHygiene, type TailnetNode,
 } from "../src/lib/tailnet";
@@ -26,6 +26,34 @@ describe("buildTailnetSshArgs — ssh-by-name over the tailnet", () => {
   it("honours a custom user (break-glass / root flows)", () => {
     expect(buildTailnetSshArgs({ name: "b", user: "root" })).toEqual([
       "-o", "StrictHostKeyChecking=accept-new", "root@b",
+    ]);
+  });
+});
+
+describe("buildBreakGlassArgs — hcloud server ssh by public IP", () => {
+  it("puts -u BEFORE the server and the command after `--` (hcloud usage order)", () => {
+    // hcloud server ssh [options] <server> [--] [command]: -u after the server
+    // gets forwarded to ssh → "illegal option -- u" and the command never runs.
+    expect(buildBreakGlassArgs({ name: "v2debug", command: ["echo", "hi"] })).toEqual([
+      "server", "ssh", "-u", "dev", "v2debug", "--", "echo", "hi",
+    ]);
+  });
+
+  it("defaults to the dev user and an interactive shell (no command) when none given", () => {
+    expect(buildBreakGlassArgs({ name: "box1" })).toEqual([
+      "server", "ssh", "-u", "dev", "box1", "--",
+    ]);
+  });
+
+  it("`--` precedes the command so a leading-dash command isn't parsed as a flag", () => {
+    const args = buildBreakGlassArgs({ name: "b", command: ["-x"] });
+    expect(args.indexOf("--")).toBeLessThan(args.indexOf("-x"));
+    expect(args.indexOf("-u")).toBeLessThan(args.indexOf("b")); // user flag before server
+  });
+
+  it("honours a custom user", () => {
+    expect(buildBreakGlassArgs({ name: "b", user: "root", command: ["id"] })).toEqual([
+      "server", "ssh", "-u", "root", "b", "--", "id",
     ]);
   });
 });

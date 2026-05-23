@@ -531,6 +531,28 @@ export function buildTailnetSshArgs(p: { name: string; user?: string; tty?: bool
   ];
 }
 
+/**
+ * `hcloud server ssh` argv for the break-glass path (box not on the tailnet —
+ * connect by public IP via hcloud). Pure (params in → argv out) so it's
+ * unit-tested. Returns the args AFTER `hcloud` (i.e. starting at `server`).
+ *
+ * Flag ORDER is load-bearing and was a live bug: `hcloud server ssh`'s usage is
+ * `server ssh [options] <server> [--] [ssh options] [command…]`, so `-u <user>`
+ * MUST come BEFORE the server name and the remote command MUST come after `--`.
+ * Putting `-u dev` after the server (the old code) made hcloud forward `-u` to
+ * `ssh`, which rejected it ("illegal option -- u") — break-glass commands never
+ * ran. The `--` also stops a command that starts with `-` being parsed as a flag.
+ */
+export function buildBreakGlassArgs(p: { name: string; user?: string; command?: string[] }): string[] {
+  return [
+    "server", "ssh",
+    "-u", p.user ?? "dev",
+    p.name,
+    "--",
+    ...(p.command ?? []),
+  ];
+}
+
 /** Run a local `ssh` inheriting the terminal (interactive shells + TTY commands). */
 export function runSsh(args: string[]): HcloudResult {
   const proc = Bun.spawnSync(["ssh", ...args], { stdout: "inherit", stderr: "inherit", stdin: "inherit" });
