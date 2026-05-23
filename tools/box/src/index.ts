@@ -11,6 +11,7 @@ import { sshCommand } from "./commands/ssh";
 import { workCommand } from "./commands/work";
 import { baseCommand } from "./commands/base";
 import { mgmtCommand } from "./commands/mgmt";
+import { docsCommand, getDocsHelpText } from "./commands/docs";
 
 const program = new Command()
   .name("box")
@@ -25,7 +26,8 @@ Config (env; BOX_* preferred, legacy HETZNER_* honoured):
   BOX_SSH_KEY    registered ssh-key name (required for 'up')
   BOX_YES=1      skip 'down'/'prune' confirmation
 
-Auth comes from your existing 'hcloud context' (or HCLOUD_TOKEN).`);
+Auth comes from your existing 'hcloud context' (or HCLOUD_TOKEN).
+${getDocsHelpText()}`);
 
 program.addCommand(upCommand());
 program.addCommand(downCommand());
@@ -36,6 +38,7 @@ program.addCommand(sshCommand());
 program.addCommand(statusCommand());
 program.addCommand(baseCommand());
 program.addCommand(mgmtCommand());
+program.addCommand(docsCommand());
 
 applyStandardAliases(program);
 enablePrefixMatching(program);

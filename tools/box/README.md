@@ -15,6 +15,9 @@ box prune  [box] [--keep N] [-y]    delete OLD snapshots, keep the latest N (fre
 box work   [box]                    ssh in and attach the devcontainer tmux
 box ssh    [box] [-- cmd]           shell into a box as the dev user
 box status [box] [--json]           server state + snapshots + cost (no arg = whole fleet)
+box base   finalize <box> [...]     turn a build box into the golden base (`box docs show golden-base`)
+box mgmt   up|ssh|status            manage the always-on mgmt box
+box docs   [list|show <ref>]        browse embedded docs (golden-base, commands, troubleshooting)
 ```
 
 `[box]` is a box **name or numeric Hetzner id**; omit it to use the configured
