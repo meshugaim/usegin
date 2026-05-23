@@ -1,9 +1,15 @@
 import { Command } from "commander";
+import { writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolveConfig, snapshotSelector } from "../lib/config";
 import {
   buildCreateFromSnapshotArgs, checkPrereqs, cleanHostkey, getServer,
   listSnapshots, pickLatestSnapshot, resolveSize, runHcloud, serverIp,
 } from "../lib/hcloud";
+import {
+  buildFirstBootUserData, chooseSpinSource, goldenBaseSelector, isValidBoxName,
+} from "../lib/golden-base";
 
 export function upCommand(): Command {
   return new Command("up")
@@ -33,24 +39,46 @@ export function upCommand(): Command {
         return;
       }
 
-      const snap = pickLatestSnapshot(listSnapshots(snapshotSelector(name)));
-      if (!snap) {
-        console.error(`Error: no snapshot found for '${name}'. Provision it first (first-time setup).`);
+      // A box's own latest snapshot wins; a brand-new name falls back to the
+      // golden base. (Two cheap label-scoped lookups; see chooseSpinSource.)
+      const perBox = pickLatestSnapshot(listSnapshots(snapshotSelector(name)));
+      const golden = pickLatestSnapshot(listSnapshots(goldenBaseSelector()));
+      const choice = chooseSpinSource(perBox, golden);
+      if (!choice) {
+        console.error(`Error: no snapshot for '${name}', and no golden base (purpose=golden-base) to spin from.`);
+        console.error("  Build the base first — see `box base finalize` (slice 4).");
         process.exit(1);
       }
 
-      console.error(`Recreating '${name}' from snapshot ${snap.id} (${type} @ ${cfg.location}) ...`);
+      // Golden-base spins are identity-less → inject first-boot user-data so the
+      // box sets its hostname and joins the tailnet as its OWN node. Per-box spins
+      // keep their baked identity, so we pass NO user-data (re-running `tailscale
+      // up` would register a duplicate node fighting the existing one).
+      let userDataFile: string | undefined;
+      if (choice.identityless) {
+        if (!isValidBoxName(name)) {
+          console.error(`Error: '${name}' isn't a valid box name (DNS label: lowercase a-z, 0-9, hyphens; <=63 chars).`);
+          process.exit(1);
+        }
+        userDataFile = join(tmpdir(), `box-userdata-${name}-${Date.now()}.yaml`);
+        writeFileSync(userDataFile, buildFirstBootUserData(name), { mode: 0o600 });
+      }
+
+      const freshNote = choice.identityless ? " — fresh tailnet identity on first boot" : "";
+      console.error(`Spinning '${name}' from ${choice.source} (image ${choice.image}, ${type} @ ${cfg.location})${freshNote} ...`);
       const res = runHcloud(
         buildCreateFromSnapshotArgs({
           name,
           type,
-          image: snap.id,
+          image: choice.image,
           location: cfg.location,
           sshKey: cfg.sshKeyName,
           label: snapshotSelector(name),
+          userDataFile,
         }),
         { inherit: true },
       );
+      if (userDataFile) { try { unlinkSync(userDataFile); } catch { /* best-effort temp cleanup */ } }
       if (res.code !== 0) {
         console.error(`Error: hcloud server create failed (exit ${res.code}).`);
         process.exit(res.code);
@@ -60,7 +88,12 @@ export function upCommand(): Command {
       const ip = serverIp(server);
       cleanHostkey(ip); // snapshot-recreate rotates the host key
       console.log("");
-      console.log(`Up at ${ip || "?"}. Connect + resume the devcontainer tmux:`);
+      if (choice.identityless) {
+        console.log(`Spinning up '${name}' from the golden base. First boot runs cloud-init`);
+        console.log("(set hostname + join tailnet), so give it ~1 min before connecting:");
+      } else {
+        console.log(`Up at ${ip || "?"}. Connect + resume the devcontainer tmux:`);
+      }
       console.log(`  box work ${name === cfg.name ? "" : name}`.trimEnd());
     });
 }

@@ -8,7 +8,11 @@ import {
   buildGoldenSnapshotArgs,
   planGoldenFinalize,
   wrapBashC,
+  chooseSpinSource,
 } from "../src/lib/golden-base";
+import type { Snapshot } from "../src/lib/hcloud";
+
+const snap = (id: number): Snapshot => ({ id, created: "2026-05-23T00:00:00Z" });
 
 describe("goldenBaseSelector", () => {
   it("selects on the golden-base label, NOT a per-box role label", () => {
@@ -73,6 +77,22 @@ describe("buildGoldenSnapshotArgs", () => {
       "--description", "slice4 golden base",
       "--label", "purpose=golden-base",
     ]);
+  });
+});
+
+describe("chooseSpinSource", () => {
+  it("prefers a box's own snapshot — identity preserved, no first-boot injection", () => {
+    const c = chooseSpinSource(snap(111), snap(999))!;
+    expect(c).toEqual({ image: 111, source: "per-box", identityless: false });
+  });
+
+  it("falls back to the golden base for a new box — identity-less, needs first-boot", () => {
+    const c = chooseSpinSource(null, snap(999))!;
+    expect(c).toEqual({ image: 999, source: "golden-base", identityless: true });
+  });
+
+  it("returns null when there's neither a per-box snapshot nor a golden base", () => {
+    expect(chooseSpinSource(null, null)).toBeNull();
   });
 });
 

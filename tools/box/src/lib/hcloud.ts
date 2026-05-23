@@ -124,6 +124,8 @@ export function buildCreateFromSnapshotArgs(p: {
   location: string;
   sshKey: string;
   label: string;
+  /** Path to a cloud-init user-data file (first-boot identity for golden-base spins). */
+  userDataFile?: string;
 }): string[] {
   return [
     "server", "create",
@@ -133,6 +135,7 @@ export function buildCreateFromSnapshotArgs(p: {
     "--location", p.location,
     "--ssh-key", p.sshKey,
     "--label", p.label,
+    ...(p.userDataFile ? ["--user-data-from-file", p.userDataFile] : []),
   ];
 }
 

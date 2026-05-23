@@ -35,6 +35,23 @@ describe("buildCreateFromSnapshotArgs", () => {
       "--label", "role=effi-devbox-devbox",
     ]);
   });
+
+  it("appends --user-data-from-file for a golden-base (first-boot) spin", () => {
+    const args = buildCreateFromSnapshotArgs({
+      name: "agent-a", type: "cpx31", image: 389645657,
+      location: "nbg1", sshKey: "effi-devbox", label: "role=agent-a-devbox",
+      userDataFile: "/tmp/box-userdata-agent-a.yaml",
+    });
+    expect(args.slice(-2)).toEqual(["--user-data-from-file", "/tmp/box-userdata-agent-a.yaml"]);
+  });
+
+  it("omits user-data when none is given (per-box spin)", () => {
+    const args = buildCreateFromSnapshotArgs({
+      name: "agent-a", type: "cpx31", image: 1,
+      location: "nbg1", sshKey: "k", label: "role=agent-a-devbox",
+    });
+    expect(args).not.toContain("--user-data-from-file");
+  });
 });
 
 describe("buildSnapshotArgs", () => {

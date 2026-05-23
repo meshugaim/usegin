@@ -22,7 +22,7 @@
  * not secret, IS passed via user-data (see {@link buildFirstBootUserData}).
  */
 
-import { buildSnapshotArgs } from "./hcloud";
+import { buildSnapshotArgs, type Snapshot } from "./hcloud";
 
 /**
  * hcloud label marking the identity-less golden base image. Distinct from the
@@ -35,6 +35,34 @@ export const GOLDEN_BASE_LABEL = "purpose=golden-base";
 /** The label selector to find the golden base image. */
 export function goldenBaseSelector(): string {
   return GOLDEN_BASE_LABEL;
+}
+
+/** Where `box up` resolved its disk image from, and whether identity is fresh. */
+export interface SpinSource {
+  image: number;
+  source: "per-box" | "golden-base";
+  /**
+   * golden-base spins are identity-LESS → the box must establish a fresh tailnet
+   * identity on first boot (inject {@link buildFirstBootUserData}). per-box spins
+   * are identity-FUL (the snapshot captured the joined node) → it auto-reconnects
+   * as the SAME node, so we must NOT re-run `tailscale up` (that would duplicate it).
+   */
+  identityless: boolean;
+}
+
+/**
+ * Decide which image `box up <name>` spins from. A box's OWN latest snapshot
+ * (`role=<name>-devbox`) always wins — it carries that box's state + identity.
+ * Only a brand-new name with no lineage falls back to the golden base, and that
+ * spin needs first-boot identity injection. Returns null when neither exists.
+ *
+ * Pure (two snapshots in → choice out) so the precedence + the identityless flag
+ * are unit-tested without any hcloud calls.
+ */
+export function chooseSpinSource(perBox: Snapshot | null, golden: Snapshot | null): SpinSource | null {
+  if (perBox) return { image: perBox.id, source: "per-box", identityless: false };
+  if (golden) return { image: golden.id, source: "golden-base", identityless: true };
+  return null;
 }
 
 /**
