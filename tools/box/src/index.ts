@@ -10,6 +10,7 @@ import { pruneCommand } from "./commands/prune";
 import { sshCommand } from "./commands/ssh";
 import { workCommand } from "./commands/work";
 import { baseCommand } from "./commands/base";
+import { mgmtCommand } from "./commands/mgmt";
 
 const program = new Command()
   .name("box")
@@ -18,6 +19,7 @@ const program = new Command()
   .addHelpText("afterAll", `
 Config (env; BOX_* preferred, legacy HETZNER_* honoured):
   BOX_NAME       default box name        (default: effi-devbox)
+  BOX_MGMT_NAME  always-on mgmt box name (default: effi-mgmt; see 'box mgmt')
   BOX_TYPE       hcloud server type      (default: cpx42)
   BOX_LOCATION   hcloud location         (default: nbg1)
   BOX_SSH_KEY    registered ssh-key name (required for 'up')
@@ -33,6 +35,7 @@ program.addCommand(workCommand());
 program.addCommand(sshCommand());
 program.addCommand(statusCommand());
 program.addCommand(baseCommand());
+program.addCommand(mgmtCommand());
 
 applyStandardAliases(program);
 enablePrefixMatching(program);

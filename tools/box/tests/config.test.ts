@@ -5,6 +5,7 @@ describe("resolveConfig", () => {
   it("uses built-in defaults with an empty env", () => {
     const cfg = resolveConfig({});
     expect(cfg.name).toBe(DEFAULTS.name);
+    expect(cfg.mgmtName).toBe("effi-mgmt"); // always-on mgmt box (slice 6)
     expect(cfg.type).toBe("cpx42");
     expect(cfg.location).toBe("nbg1");
     expect(cfg.baseImage).toBe("ubuntu-24.04");
@@ -32,6 +33,17 @@ describe("resolveConfig", () => {
     });
     expect(cfg.name).toBe("new-box");
     expect(cfg.type).toBe("cax11");
+  });
+
+  it("resolves the mgmt box name from BOX_MGMT_NAME (no legacy HETZNER_* name)", () => {
+    expect(resolveConfig({}).mgmtName).toBe("effi-mgmt");
+    expect(resolveConfig({ BOX_MGMT_NAME: "ops-box" }).mgmtName).toBe("ops-box");
+  });
+});
+
+describe("snapshotSelector — mgmt box lineage", () => {
+  it("ties the mgmt box to its OWN role-labelled snapshots", () => {
+    expect(snapshotSelector("effi-mgmt")).toBe("role=effi-mgmt-devbox");
   });
 });
 

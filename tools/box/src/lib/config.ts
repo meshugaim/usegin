@@ -9,6 +9,14 @@
 export interface BoxConfig {
   /** Default box name when none is passed on the CLI. */
   name: string;
+  /**
+   * Fixed name of the always-on management box (slice 6). The mgmt box holds the
+   * hcloud token and runs the `box` CLI to manage the fleet; work boxes are
+   * token-free. It has its OWN snapshot lineage (`role=<mgmtName>-devbox`) and is
+   * a lean env, NOT the full dev devcontainer. From `BOX_MGMT_NAME` (no legacy
+   * HETZNER_* name — the mgmt box is new in this tool).
+   */
+  mgmtName: string;
   /** Hetzner server type. Defaults to cpx42: the current snapshot is locked to
    *  >=320GB-disk types, and cpx42 is the cheapest that fits. Slice 5 generalises
    *  sizing; until then this is the working default. */
@@ -22,6 +30,7 @@ export interface BoxConfig {
 
 export const DEFAULTS: Omit<BoxConfig, "sshKeyName"> = {
   name: "effi-devbox",
+  mgmtName: "effi-mgmt",
   type: "cpx42",
   location: "nbg1",
   baseImage: "ubuntu-24.04",
@@ -36,6 +45,9 @@ export function resolveConfig(env: Env = process.env): BoxConfig {
 
   return {
     name: pick("BOX_NAME", "HETZNER_SERVER_NAME", DEFAULTS.name),
+    // No legacy HETZNER_* name for the mgmt box — it's new in this tool, so we
+    // pass the BOX_* key as the (unused) legacy slot to keep `pick`'s shape.
+    mgmtName: pick("BOX_MGMT_NAME", "BOX_MGMT_NAME", DEFAULTS.mgmtName),
     type: pick("BOX_TYPE", "HETZNER_SERVER_TYPE", DEFAULTS.type),
     location: pick("BOX_LOCATION", "HETZNER_LOCATION", DEFAULTS.location),
     baseImage: pick("BOX_BASE_IMAGE", "HETZNER_BASE_IMAGE", DEFAULTS.baseImage),
