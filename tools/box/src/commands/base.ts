@@ -2,18 +2,22 @@ import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { buildTailnetSshArgs, checkPrereqs, getServer, runHcloud, tailnetReachable } from "../lib/hcloud";
 import {
-  GOLDEN_BASE_AUTHKEY_PATH, buildGoldenSnapshotArgs, planGoldenFinalize, type FinalizeStep,
+  GOLDEN_BASE_AUTHKEY_PATH, buildGoldenSnapshotArgs, planGoldenFinalize, wrapBashC, type FinalizeStep,
 } from "../lib/golden-base";
 
 /**
  * Run a command on the box over SSH — tailnet-first (by name), hcloud
  * break-glass otherwise. `stdin` pipes a payload to the remote command WITHOUT
  * it landing in argv (so a secret never shows up in a process list or log).
+ *
+ * The command goes over as a SINGLE arg (`wrapBashC`) so ssh's argv-flattening
+ * doesn't shred a multi-word command — see wrapBashC.
  */
 function sshExec(name: string, remoteCmd: string, stdin?: string): number {
+  const remote = wrapBashC(remoteCmd);
   const argv = tailnetReachable(name)
-    ? ["ssh", ...buildTailnetSshArgs({ name, command: ["bash", "-lc", remoteCmd] })]
-    : ["hcloud", "server", "ssh", name, "-u", "dev", "bash", "-lc", remoteCmd];
+    ? ["ssh", ...buildTailnetSshArgs({ name, command: [remote] })]
+    : ["hcloud", "server", "ssh", name, "-u", "dev", remote];
   const proc = Bun.spawnSync(argv, {
     stdin: stdin !== undefined ? new TextEncoder().encode(stdin) : "inherit",
     stdout: "inherit",
@@ -97,9 +101,30 @@ function finalizeCommand(): Command {
         }
       };
 
-      run("bake-key", `sudo mkdir -p ${dirname(GOLDEN_BASE_AUTHKEY_PATH)} && sudo install -m 600 /dev/stdin ${GOLDEN_BASE_AUTHKEY_PATH}`, `${key}\n`);
+      // tee + chmod, NOT `install -m 600 /dev/stdin`: under sudo the latter fails
+      // to read the piped key (verified on a throwaway — it errored with a sudo
+      // usage message and wrote nothing). tee reads stdin reliably as root.
+      run("bake-key", `sudo mkdir -p ${dirname(GOLDEN_BASE_AUTHKEY_PATH)} && sudo tee ${GOLDEN_BASE_AUTHKEY_PATH} >/dev/null && sudo chmod 600 ${GOLDEN_BASE_AUTHKEY_PATH} && sudo test -s ${GOLDEN_BASE_AUTHKEY_PATH}`, `${key}\n`);
       run("harden", "sudo bash -s", readFileSync(hardenScriptPath(), "utf8"));
-      run("logout", "sudo tailscale logout");
+
+      // Logout drops the tailnet, which kills our own SSH session — running it
+      // synchronously ALWAYS returns a broken-pipe failure even though it worked
+      // (this bit us live). So SCHEDULE it a few seconds out via systemd-run: the
+      // ssh call returns 0 first, then logout fires after we've disconnected.
+      // `--collect` cleans up the transient unit afterwards.
+      const logoutStep = steps.find((s) => s.id === "logout")!;
+      console.error(`\n→ ${logoutStep.title} (scheduled; it severs our own connection) ...`);
+      const lc = sshExec(name, "sudo systemd-run --on-active=3s --unit=box-ts-logout --collect tailscale logout");
+      if (lc !== 0) {
+        console.error(`Error: scheduling logout failed (exit ${lc}). Stopping — box untouched past harden.`);
+        process.exit(lc);
+      }
+      console.error("  waiting ~12s for logout to take effect before snapshotting ...");
+      Bun.sleepSync(12_000);
+      if (tailnetReachable(name)) {
+        console.error(`Warning: '${name}' still resolves on the tailnet after logout — the snapshot may not be`);
+        console.error("identity-less. Verify with slice 5 (spin two boxes; they must get distinct nodes).");
+      }
 
       console.error("\n→ Snapshot the golden base (via hcloud API; box is now unreachable, which is fine) ...");
       const snap = runHcloud(

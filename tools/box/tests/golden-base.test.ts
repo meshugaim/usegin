@@ -7,6 +7,7 @@ import {
   buildFirstBootUserData,
   buildGoldenSnapshotArgs,
   planGoldenFinalize,
+  wrapBashC,
 } from "../src/lib/golden-base";
 
 describe("goldenBaseSelector", () => {
@@ -72,6 +73,20 @@ describe("buildGoldenSnapshotArgs", () => {
       "--description", "slice4 golden base",
       "--label", "purpose=golden-base",
     ]);
+  });
+});
+
+describe("wrapBashC", () => {
+  it("keeps a multi-word command as one bash -c argument (the ssh-flatten bug)", () => {
+    // The whole command must stay inside one pair of quotes — so that after ssh
+    // flattens argv and the remote shell re-splits, `bash -c` still gets it whole.
+    expect(wrapBashC("sudo tee /x && sudo chmod 600 /x")).toBe(
+      "bash -c 'sudo tee /x && sudo chmod 600 /x'",
+    );
+  });
+
+  it("escapes embedded single quotes POSIX-style", () => {
+    expect(wrapBashC("echo 'hi'")).toBe(`bash -c 'echo '\\''hi'\\'''`);
   });
 });
 

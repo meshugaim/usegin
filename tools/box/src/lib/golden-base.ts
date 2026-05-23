@@ -101,6 +101,22 @@ export function buildGoldenSnapshotArgs(p: { name: string; description: string }
   return buildSnapshotArgs({ name: p.name, description: p.description, label: GOLDEN_BASE_LABEL });
 }
 
+/**
+ * Wrap a shell command so it survives SSH argv-flattening.
+ *
+ * `ssh host a b c` joins everything after the host with spaces and the REMOTE
+ * shell re-splits the result, so a multi-word command passed as separate args
+ * loses its grouping — e.g. `ssh host bash -c "x && y"` arrives as
+ * `bash -c x && y`, and `bash -c` sees only `x` (verified live: it ran `sudo`
+ * with no command → a sudo usage error). The fix: build ONE string here,
+ * single-quoting the command, and pass that as a single ssh arg; the remote
+ * `bash -c` then receives the whole thing intact. Embedded single quotes are
+ * escaped POSIX-style (`'\''`).
+ */
+export function wrapBashC(remoteCmd: string): string {
+  return `bash -c '${remoteCmd.replace(/'/g, `'\\''`)}'`;
+}
+
 /** One step of `box base finalize` — turning a working build box into the base. */
 export interface FinalizeStep {
   id: "bake-key" | "harden" | "logout" | "snapshot";
