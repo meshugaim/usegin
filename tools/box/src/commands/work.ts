@@ -8,7 +8,14 @@ import {
 // After a snapshot-recreate the devcontainer exists but is stopped — start it,
 // then attach the devcontainer tmux. (Avoids `container.sh work`, which re-runs
 // `devcontainer up`.) Falls back to a clear message if first-time setup is missing.
+//
+// We prefix `export BOX_TAILNET_NAME="$(hostname)"`: the box's OS hostname (set at
+// first boot) IS the box name, which IS its tailnet MagicDNS name. container.sh
+// forwards this env var into the devcontainer (docker exec -e), so serve-static's
+// `--host tailnet` mode can print http://<box>:<port> from inside the container,
+// where `tailscale` isn't installed and `hostname` is a random Docker id.
 const REMOTE_WORK =
+  'export BOX_TAILNET_NAME="$(hostname)"; ' +
   'cd ~/test-mvp 2>/dev/null && { ./scripts/container.sh start >/dev/null 2>&1; ./scripts/container.sh tmux; }' +
   ' || echo "Repo not in ~/test-mvp — run first-time setup (provision)."';
 
