@@ -542,13 +542,19 @@ export function buildTailnetSshArgs(p: { name: string; user?: string; tty?: bool
  * Putting `-u dev` after the server (the old code) made hcloud forward `-u` to
  * `ssh`, which rejected it ("illegal option -- u") — break-glass commands never
  * ran. The `--` also stops a command that starts with `-` being parsed as a flag.
+ *
+ * `tty` adds `-t` in the `[ssh options]` slot (after `--`, before the command) —
+ * `-t` is an ssh flag, not an hcloud one (hcloud only knows --ipv6/-p/-u), so it
+ * must reach ssh via the post-`--` passthrough. The `work` path needs it to
+ * attach an interactive devcontainer tmux session over the break-glass IP.
  */
-export function buildBreakGlassArgs(p: { name: string; user?: string; command?: string[] }): string[] {
+export function buildBreakGlassArgs(p: { name: string; user?: string; tty?: boolean; command?: string[] }): string[] {
   return [
     "server", "ssh",
     "-u", p.user ?? "dev",
     p.name,
     "--",
+    ...(p.tty ? ["-t"] : []),
     ...(p.command ?? []),
   ];
 }

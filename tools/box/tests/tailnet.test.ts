@@ -56,6 +56,14 @@ describe("buildBreakGlassArgs — hcloud server ssh by public IP", () => {
       "server", "ssh", "-u", "root", "b", "--", "id",
     ]);
   });
+
+  it("inserts -t in the [ssh options] slot after `--` for a TTY (the `work` path)", () => {
+    // hcloud only knows --ipv6/-p/-u; -t is an ssh flag, so it must pass through
+    // after `--`, before the command (work attaches an interactive tmux session).
+    expect(buildBreakGlassArgs({ name: "box1", tty: true, command: ["X"] })).toEqual([
+      "server", "ssh", "-u", "dev", "box1", "--", "-t", "X",
+    ]);
+  });
 });
 
 const node = (name: string, tagged = true): TailnetNode => ({ name, ip: "100.0.0.1", online: false, tagged });

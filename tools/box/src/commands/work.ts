@@ -1,8 +1,8 @@
 import { Command } from "commander";
 import { resolveConfig } from "../lib/config";
 import {
-  buildTailnetSshArgs, checkPrereqs, cleanHostkey, getServer, listServers,
-  resolveTargetName, runHcloud, runSsh, serverIp, tailnetReachable,
+  buildBreakGlassArgs, buildTailnetSshArgs, checkPrereqs, cleanHostkey, getServer,
+  listServers, resolveTargetName, runHcloud, runSsh, serverIp, tailnetReachable,
 } from "../lib/hcloud";
 
 // After a snapshot-recreate the devcontainer exists but is stopped — start it,
@@ -55,7 +55,7 @@ export function workCommand(): Command {
       }
 
       cleanHostkey(serverIp(server));
-      const res = runHcloud(["server", "ssh", bgName, "-u", "dev", "-t", "--", REMOTE_WORK], { inherit: true });
+      const res = runHcloud(buildBreakGlassArgs({ name: bgName, tty: true, command: [REMOTE_WORK] }), { inherit: true });
       process.exit(res.code);
     });
 }
