@@ -171,8 +171,73 @@ export function buildGoldenSnapshotArgs(p: { name: string; description: string }
  * escaped POSIX-style (`'\''`).
  */
 export function wrapBashC(remoteCmd: string): string {
-  return `bash -c '${remoteCmd.replace(/'/g, `'\\''`)}'`;
+  return `bash -c ${singleQuote(remoteCmd)}`;
 }
+
+/**
+ * POSIX single-quote a string into ONE shell word: wrap in `'…'`, and render any
+ * embedded single quote as `'\''` (close-quote, escaped-quote, reopen-quote).
+ * Safe to nest — the output of one call can be embedded in another (we rely on
+ * that for the deferred logout, which is a `bash -c` inside another `bash -c`).
+ */
+function singleQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Local Tailscale state the finalize identity-scrub must REMOVE — not just
+ * `tailscale logout`. Logout clears the node key but leaves these on disk; with
+ * the tailnet-lock (tka) state still present and the key gone, tailscaled
+ * v1.98.x PANICS on the next boot (nil-pointer in tkaSyncIfNeeded). Every box
+ * spun from such a snapshot then can't start tailscaled and never joins the
+ * tailnet — a silent brick (worse when :22 is hardened shut: unreachable).
+ * Wiping these leaves a clean slate the first-boot `tailscale up --authkey`
+ * registers fresh from. Root-caused live on a debug box (see
+ * docs/design/slices/04-layer0-golden-base.md).
+ */
+export const TAILSCALE_STATE_PATHS =
+  "/var/lib/tailscale/tailscaled.state* /var/lib/tailscale/profile-data";
+
+/** Transient systemd unit name for the deferred, self-severing logout. */
+const LOGOUT_UNIT = "box-ts-logout";
+
+/** Cap (seconds) on the best-effort `tailscale logout` so the wipe never waits on it. */
+const LOGOUT_TIMEOUT_S = 8;
+
+/**
+ * The deferred identity-scrub command for finalize's logout step. Run on the
+ * build box over SSH; it does, in order:
+ *
+ *   1. `tailscale logout`         — deregister the node control-side, so the base
+ *                                   doesn't leave an orphan tailnet node behind,
+ *   2. `systemctl stop tailscaled`+ `rm -rf` {@link TAILSCALE_STATE_PATHS}
+ *                                 — wipe the LOCAL state, or the snapshot boots
+ *                                   into the tka panic (see that constant).
+ *
+ * Deferred via `systemd-run --on-active` because step 1/2 sever our own tailnet
+ * SSH session — running synchronously returns a broken-pipe failure even on
+ * success (this bit us live). Scheduling it a few seconds out lets the ssh call
+ * return 0 first; `--collect` reaps the transient unit afterwards. The scrub is
+ * a `bash -c` (statements joined by `;`, not `&&`) so the wipe runs even if the
+ * logout fails — and the logout is `timeout`-capped: `tailscale logout` contacts
+ * the control server and can run many seconds (observed live), but the wipe must
+ * NOT wait on it, or the snapshot (taken after a fixed delay) could fire before
+ * the state is gone and re-capture the poisoned state. The wipe is fast and
+ * deterministic; logout is best-effort orphan-node hygiene.
+ *
+ * Pure (no args, no IO) → unit-tested without touching live infra.
+ */
+export function buildFinalizeLogoutCommand(): string {
+  const scrub = `timeout ${LOGOUT_TIMEOUT_S}s tailscale logout; systemctl stop tailscaled; rm -rf ${TAILSCALE_STATE_PATHS}`;
+  return `sudo systemd-run --on-active=3s --unit=${LOGOUT_UNIT} --collect bash -c ${singleQuote(scrub)}`;
+}
+
+/**
+ * Seconds to wait for the deferred scrub to complete before snapshotting:
+ * the +3s timer + the {@link LOGOUT_TIMEOUT_S}s logout cap + a margin for the
+ * (fast) stop + state wipe. base.ts sleeps this long before `create-image`.
+ */
+export const FINALIZE_SCRUB_WAIT_S = 15;
 
 /** One step of `box base finalize` — turning a working build box into the base. */
 export interface FinalizeStep {
@@ -196,8 +261,10 @@ export interface FinalizeStep {
  *   2. harden the firewall — runs `harden-firewall.sh`, which REFUSES unless
  *      tailscale is up, so it must come BEFORE logout (else it locks nothing and
  *      bails),
- *   3. logout — scrub the node identity; the box goes unreachable after this, so
- *      it's the last on-box step,
+ *   3. logout — scrub the node identity AND wipe local tailscaled state (see
+ *      {@link buildFinalizeLogoutCommand}: logout alone leaves a snapshot that
+ *      panics tailscaled on boot); the box goes unreachable after this, so it's
+ *      the last on-box step,
  *   4. snapshot via the hcloud API (no SSH needed) → the golden image.
  */
 export function planGoldenFinalize(name: string): FinalizeStep[] {
@@ -220,7 +287,9 @@ export function planGoldenFinalize(name: string): FinalizeStep[] {
       id: "logout",
       kind: "ssh",
       title: "Scrub tailnet identity",
-      detail: "tailscale logout — base ships logged OUT; box goes unreachable after this",
+      detail:
+        "tailscale logout + stop tailscaled + wipe local state — base ships logged OUT with a CLEAN " +
+        "tailscaled.state (logout alone leaves state that panics tailscaled on boot); box goes unreachable after this",
       irreversible: true,
     },
     {

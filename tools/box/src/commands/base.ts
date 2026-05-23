@@ -2,7 +2,8 @@ import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { buildTailnetSshArgs, checkPrereqs, getServer, runHcloud, tailnetReachable } from "../lib/hcloud";
 import {
-  GOLDEN_BASE_AUTHKEY_PATH, buildGoldenSnapshotArgs, planGoldenFinalize, wrapBashC, type FinalizeStep,
+  FINALIZE_SCRUB_WAIT_S, GOLDEN_BASE_AUTHKEY_PATH, buildFinalizeLogoutCommand,
+  buildGoldenSnapshotArgs, planGoldenFinalize, wrapBashC, type FinalizeStep,
 } from "../lib/golden-base";
 
 /**
@@ -107,20 +108,21 @@ function finalizeCommand(): Command {
       run("bake-key", `sudo mkdir -p ${dirname(GOLDEN_BASE_AUTHKEY_PATH)} && sudo tee ${GOLDEN_BASE_AUTHKEY_PATH} >/dev/null && sudo chmod 600 ${GOLDEN_BASE_AUTHKEY_PATH} && sudo test -s ${GOLDEN_BASE_AUTHKEY_PATH}`, `${key}\n`);
       run("harden", "sudo bash -s", readFileSync(hardenScriptPath(), "utf8"));
 
-      // Logout drops the tailnet, which kills our own SSH session — running it
-      // synchronously ALWAYS returns a broken-pipe failure even though it worked
-      // (this bit us live). So SCHEDULE it a few seconds out via systemd-run: the
-      // ssh call returns 0 first, then logout fires after we've disconnected.
-      // `--collect` cleans up the transient unit afterwards.
+      // Logout + wiping tailscaled state drops the tailnet, which kills our own
+      // SSH session — running it synchronously ALWAYS returns a broken-pipe
+      // failure even though it worked (this bit us live). So the command SCHEDULES
+      // itself a few seconds out via systemd-run: the ssh call returns 0 first,
+      // then the scrub fires after we've disconnected. The state wipe (not just
+      // `tailscale logout`) is load-bearing — see buildFinalizeLogoutCommand.
       const logoutStep = steps.find((s) => s.id === "logout")!;
       console.error(`\n→ ${logoutStep.title} (scheduled; it severs our own connection) ...`);
-      const lc = sshExec(name, "sudo systemd-run --on-active=3s --unit=box-ts-logout --collect tailscale logout");
+      const lc = sshExec(name, buildFinalizeLogoutCommand());
       if (lc !== 0) {
         console.error(`Error: scheduling logout failed (exit ${lc}). Stopping — box untouched past harden.`);
         process.exit(lc);
       }
-      console.error("  waiting ~12s for logout to take effect before snapshotting ...");
-      Bun.sleepSync(12_000);
+      console.error(`  waiting ~${FINALIZE_SCRUB_WAIT_S}s for the scrub (logout + state wipe) to finish before snapshotting ...`);
+      Bun.sleepSync(FINALIZE_SCRUB_WAIT_S * 1_000);
       if (tailnetReachable(name)) {
         console.error(`Warning: '${name}' still resolves on the tailnet after logout — the snapshot may not be`);
         console.error("identity-less. Verify with slice 5 (spin two boxes; they must get distinct nodes).");

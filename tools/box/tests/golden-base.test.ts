@@ -7,6 +7,8 @@ import {
   buildFirstBootUserData,
   buildGoldenSnapshotArgs,
   planGoldenFinalize,
+  buildFinalizeLogoutCommand,
+  TAILSCALE_STATE_PATHS,
   wrapBashC,
   chooseSpinSource,
   summarizeGoldenBase,
@@ -132,6 +134,20 @@ describe("wrapBashC", () => {
   it("escapes embedded single quotes POSIX-style", () => {
     expect(wrapBashC("echo 'hi'")).toBe(`bash -c 'echo '\\''hi'\\'''`);
   });
+
+  it("survives the nested bash -c the deferred scrub needs (the load-bearing case)", () => {
+    // sshExec wraps EVERY remote command in wrapBashC, so the deferred logout is a
+    // `bash -c` (singleQuote) nested inside wrapBashC's `bash -c`. If singleQuote
+    // didn't nest cleanly, ssh argv-flattening + remote re-split would shred the
+    // scrub and the snapshot would re-capture the poisoned state. Pin the exact
+    // wire string so a quoting regression can't pass silently.
+    const wireString = wrapBashC(buildFinalizeLogoutCommand());
+    expect(wireString).toBe(
+      "bash -c 'sudo systemd-run --on-active=3s --unit=box-ts-logout --collect bash -c " +
+        "'\\''timeout 8s tailscale logout; systemctl stop tailscaled; rm -rf " +
+        "/var/lib/tailscale/tailscaled.state* /var/lib/tailscale/profile-data'\\'''",
+    );
+  });
 });
 
 describe("planGoldenFinalize", () => {
@@ -157,5 +173,64 @@ describe("planGoldenFinalize", () => {
 
   it("never leaks key material into a step's detail", () => {
     for (const s of steps) expect(s.detail).not.toMatch(/tskey-/);
+  });
+
+  it("logout step advertises the local state wipe (so the dry-run plan is honest)", () => {
+    // The dry-run plan must say it scrubs LOCAL state, not just `tailscale
+    // logout` — logout alone leaves a snapshot that panics tailscaled on boot.
+    const logout = steps.find((s) => s.id === "logout")!;
+    expect(logout.detail).toMatch(/state|wipe|scrub/i);
+  });
+});
+
+describe("buildFinalizeLogoutCommand", () => {
+  const cmd = buildFinalizeLogoutCommand();
+
+  it("logs out AND wipes local tailscale state (logout alone bricks the snapshot)", () => {
+    // `tailscale logout` clears the node key but leaves tailscaled.state's
+    // tailnet-lock (tka) data behind — tailscaled then panics on the next boot
+    // from the snapshot (nil-pointer in tkaSyncIfNeeded), so every spun box
+    // can't start tailscaled and never joins the tailnet. Finalize must also
+    // stop the daemon and remove the local state. Root-caused live (v2debug).
+    expect(cmd).toContain("tailscale logout");
+    expect(cmd).toContain("systemctl stop tailscaled");
+    expect(cmd).toContain("rm -rf");
+    expect(cmd).toContain("/var/lib/tailscale/tailscaled.state");
+    expect(cmd).toContain("/var/lib/tailscale/profile-data");
+  });
+
+  it("wipes exactly the state paths the boot panic comes from", () => {
+    expect(cmd).toContain(TAILSCALE_STATE_PATHS);
+  });
+
+  it("defers via systemd-run so our own ssh session returns before the tailnet drops", () => {
+    // logout / stopping tailscaled severs our tailnet ssh session; running it
+    // synchronously returns a broken-pipe failure even on success. Schedule it
+    // a few seconds out so the ssh call returns 0 first; --collect reaps the unit.
+    expect(cmd).toContain("systemd-run");
+    expect(cmd).toMatch(/--on-active=\d+s/);
+    expect(cmd).toContain("--collect");
+  });
+
+  it("caps logout with `timeout` and uses `;` so a slow/failed logout never blocks the wipe", () => {
+    // `tailscale logout` contacts the control server and can run many seconds.
+    // The snapshot is taken after a fixed delay, so the wipe must NOT wait on
+    // logout — cap it and sequence with `;` (not `&&`) so the wipe always runs.
+    expect(cmd).toMatch(/timeout \d+s? tailscale logout/);
+    const wipeIdx = cmd.indexOf("rm -rf");
+    const stopIdx = cmd.indexOf("systemctl stop tailscaled");
+    const logoutIdx = cmd.indexOf("tailscale logout");
+    expect(logoutIdx).toBeLessThan(stopIdx); // logout (best-effort) before the stop
+    expect(stopIdx).toBeLessThan(wipeIdx); // stop the daemon before removing its state
+    // The separators MUST be `;` (unconditional), not `&&` (short-circuit): a
+    // failed/timed-out logout must NOT abort the wipe, or the snapshot re-captures
+    // the poisoned state and bricks every spun box. `&&` here would silently
+    // reintroduce that — pin it so a future refactor can't.
+    expect(cmd).not.toContain("&&");
+    expect(cmd).toMatch(/tailscale logout; *systemctl stop tailscaled; *rm -rf/);
+  });
+
+  it("never inlines key material", () => {
+    expect(cmd).not.toMatch(/tskey-/);
   });
 });
