@@ -8,6 +8,8 @@ import {
   buildGoldenSnapshotArgs,
   planGoldenFinalize,
   buildFinalizeLogoutCommand,
+  buildRebuildContainerCommand,
+  BOX_REPO_DIR,
   TAILSCALE_STATE_PATHS,
   wrapBashC,
   chooseSpinSource,
@@ -253,5 +255,38 @@ describe("buildFinalizeLogoutCommand", () => {
 
   it("never inlines key material", () => {
     expect(cmd).not.toMatch(/tskey-/);
+  });
+});
+
+describe("buildRebuildContainerCommand", () => {
+  it("pulls then rebuilds the container in the repo dir (default)", () => {
+    // The whole point: `container.sh rebuild` (devcontainer up --remove-existing-
+    // container) is what makes a create-time devcontainer.json change (appPort,
+    // mounts) land — `start`/`work` only reuse the frozen container.
+    expect(buildRebuildContainerCommand()).toBe(
+      `cd ${BOX_REPO_DIR} && git pull --ff-only && ./scripts/container.sh rebuild`,
+    );
+  });
+
+  it("sequences with `&&` so a failed pull stops before rebuilding from stale config", () => {
+    const cmd = buildRebuildContainerCommand();
+    expect(cmd.indexOf("git pull")).toBeLessThan(cmd.indexOf("container.sh rebuild"));
+    expect(cmd).toContain(" && ");
+  });
+
+  it("uses --ff-only (fail-loud, never a silent merge of the box's checkout)", () => {
+    expect(buildRebuildContainerCommand()).toContain("git pull --ff-only");
+  });
+
+  it("pull:false skips the pull (operator manages the repo)", () => {
+    expect(buildRebuildContainerCommand({ pull: false })).toBe(
+      `cd ${BOX_REPO_DIR} && ./scripts/container.sh rebuild`,
+    );
+  });
+
+  it("honours a custom repo dir", () => {
+    expect(buildRebuildContainerCommand({ repoDir: "/srv/test-mvp", pull: false })).toBe(
+      "cd /srv/test-mvp && ./scripts/container.sh rebuild",
+    );
   });
 });

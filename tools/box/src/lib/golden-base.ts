@@ -239,6 +239,43 @@ export function buildFinalizeLogoutCommand(): string {
  */
 export const FINALIZE_SCRUB_WAIT_S = 15;
 
+/** The repo's checkout path on a box (the dev user's home — see `box work`). */
+export const BOX_REPO_DIR = "~/test-mvp";
+
+/**
+ * Remote command to recreate the build box's devcontainer from the CURRENT
+ * committed `devcontainer.json`, BEFORE the base is finalized.
+ *
+ * Why this exists: a container's port publishing (`-p` / appPort), mounts, and
+ * runArgs are frozen at `docker create` time and are immutable for its life.
+ * `container.sh start` / `box work` only START the existing container, and
+ * `box base finalize` only snapshots the box as-is — so a create-time
+ * `devcontainer.json` change (e.g. a new appPort range) NEVER lands in the
+ * golden base no matter how many times the base is rebuilt; the stale container
+ * is carried forward into every snapshot. (Same class as the snapshot-vs-shim
+ * trap in CLAUDE.md / ENG-6037.) `container.sh rebuild` is
+ * `devcontainer up --remove-existing-container`, which DELETES and recreates the
+ * container from the current config so the change lands.
+ *
+ * The recreate WIPES in-container creds (gh/claude/doppler live in the writable
+ * layer, no home volume) — so this runs BEFORE the operator's logins, never
+ * inside `finalize` (which is post-login): re-login, then `box base finalize`.
+ * `git pull --ff-only` first so the box's `devcontainer.json` is current; it's
+ * fail-loud (a non-fast-forward stops before rebuilding from stale config), and
+ * skippable with `pull: false` when the operator manages the repo themselves.
+ *
+ * Pure (params → string) → unit-tested without touching live infra.
+ */
+export function buildRebuildContainerCommand(
+  opts: { repoDir?: string; pull?: boolean } = {},
+): string {
+  const repoDir = opts.repoDir ?? BOX_REPO_DIR;
+  const steps = [`cd ${repoDir}`];
+  if (opts.pull ?? true) steps.push("git pull --ff-only");
+  steps.push("./scripts/container.sh rebuild");
+  return steps.join(" && ");
+}
+
 /** One step of `box base finalize` — turning a working build box into the base. */
 export interface FinalizeStep {
   id: "bake-key" | "harden" | "open-ssh" | "logout" | "snapshot";

@@ -4,8 +4,9 @@ import {
   buildBreakGlassArgs, buildTailnetSshArgs, checkPrereqs, getServer, runHcloud, tailnetReachable,
 } from "../lib/hcloud";
 import {
-  FINALIZE_SCRUB_WAIT_S, GOLDEN_BASE_AUTHKEY_PATH, buildFinalizeLogoutCommand,
-  buildGoldenSnapshotArgs, planGoldenFinalize, wrapBashC, type FinalizeStep,
+  BOX_REPO_DIR, FINALIZE_SCRUB_WAIT_S, GOLDEN_BASE_AUTHKEY_PATH, buildFinalizeLogoutCommand,
+  buildGoldenSnapshotArgs, buildRebuildContainerCommand, planGoldenFinalize, wrapBashC,
+  type FinalizeStep,
 } from "../lib/golden-base";
 
 /**
@@ -173,8 +174,48 @@ function hardenScriptPath(): string {
   return new URL("../../../../scripts/hetzner/harden-firewall.sh", import.meta.url).pathname;
 }
 
+function rebuildContainerCommand(): Command {
+  return new Command("rebuild-container")
+    .description("Recreate the build box's devcontainer from the CURRENT devcontainer.json (pulls repo first) — picks up create-time changes (appPort, mounts) a running container can't. Wipes in-container creds → re-login, then `box base finalize`.")
+    .argument("<box>", "the build box to rebuild the devcontainer on")
+    .option("--repo-dir <path>", "repo checkout path on the box", BOX_REPO_DIR)
+    .option("--no-pull", "skip `git pull --ff-only` (use the box's current checkout as-is)")
+    .action((box: string, opts: { repoDir: string; pull: boolean }) => {
+      const name = box.trim();
+
+      // SSH is tailnet-first (no token needed). Only the break-glass path needs
+      // the hcloud token + a running server, so guard those only when off-tailnet.
+      if (!tailnetReachable(name)) {
+        const prereq = checkPrereqs();
+        if (!prereq.ok) {
+          console.error(`Error: '${name}' is not on the tailnet and ${prereq.error}`);
+          process.exit(1);
+        }
+        if (!getServer(name)) {
+          console.error(`Error: no running box '${name}' to rebuild. \`box status\` lists boxes.`);
+          process.exit(1);
+        }
+      }
+
+      console.error(`→ Recreating the devcontainer on '${name}' from its current devcontainer.json ...`);
+      console.error("  (this DELETES the container — in-container creds will be wiped.)");
+      const code = sshExec(name, buildRebuildContainerCommand({ repoDir: opts.repoDir, pull: opts.pull }));
+      if (code !== 0) {
+        console.error(`Error: rebuild failed (exit ${code}). The box's container may be in a partial state — re-run, or rebuild by hand with \`cont rebuild\`.`);
+        process.exit(code);
+      }
+
+      console.log("");
+      console.log(`Container on '${name}' recreated from the current devcontainer.json (appPort / mounts now live).`);
+      console.log("In-container creds were wiped. Next:");
+      console.log(`  1. re-login inside the container: gh auth login · claude setup-token · doppler login`);
+      console.log(`  2. \`box base finalize ${name}\` to snapshot the fresh, logged-in container as the golden base.`);
+    });
+}
+
 export function baseCommand(): Command {
   return new Command("base")
     .description("Layer-0 golden base — the identity-less image new boxes spin from")
+    .addCommand(rebuildContainerCommand())
     .addCommand(finalizeCommand());
 }
