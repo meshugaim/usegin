@@ -13,15 +13,27 @@
 # If only Host would print and there's nothing else, still print Host so the
 # agent has the env id at hand for the rest of the session.
 #
-# Detection mirrors .claude/skills/serve-static/scripts/serve.sh:
+# Detection mirrors .claude/skills/serve-static/scripts/serve.sh, plus a
+# devbox branch (Gitpod/Ona and Codespaces are caught first by their env vars):
 #   Gitpod/Ona : GITPOD_API_URL || GITPOD_WORKSPACE_ID + `ona` CLI
 #   Codespaces : CODESPACES == "true" + CODESPACE_NAME
+#   devbox     : /sys/class/dmi/id/sys_vendor == "Hetzner" (a tools/box cloud
+#                box; this devcontainer on Hetzner IS a devbox by definition)
 #   else       : local
 #
 # Env id resolution on Gitpod/Ona is via `ona environment list` (~500ms),
 # cached to /tmp/banner-env-id-$$ for the lifetime of the devcontainer
-# (regenerated if missing). Hook is silent on any unexpected error — this is
-# a nice-to-have, not a gate.
+# (regenerated if missing).
+#
+# Devbox name resolution: the DMI vendor read is free (no network) and gates
+# the whole thing — a laptop/CI host isn't "Hetzner" so it never touches the
+# wire. Only on a real box do we read the name (the Hetzner server name ==
+# `box up <name>`) from the cloud-metadata service at the link-local
+# 169.254.169.254, cached to /tmp/banner-box-name so only the first session
+# per container pays the curl. Overridable for tests via BANNER_DMI_VENDOR /
+# BANNER_BOX_NAME / BANNER_BOX_NAME_CACHE.
+#
+# Hook is silent on any unexpected error — this is a nice-to-have, not a gate.
 
 set -u
 
@@ -47,6 +59,28 @@ if { [ -n "${GITPOD_API_URL:-}" ] || [ -n "${GITPOD_WORKSPACE_ID:-}" ]; } && com
 elif [ "${CODESPACES:-}" = "true" ] && [ -n "${CODESPACE_NAME:-}" ]; then
   host="Codespaces"
   host_detail="$CODESPACE_NAME"
+elif [ "${BANNER_DMI_VENDOR-$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)}" = "Hetzner" ]; then
+  # A tools/box cloud devbox. The free DMI read above gated us here; now resolve
+  # the box name (== the Hetzner server name) from cloud metadata, cached so
+  # only the first session per container pays the curl.
+  host="devbox"
+  if [ -n "${BANNER_BOX_NAME+x}" ]; then
+    box_name="$BANNER_BOX_NAME"           # test override — no network
+  else
+    box_cache="${BANNER_BOX_NAME_CACHE:-/tmp/banner-box-name}"
+    if [ -s "$box_cache" ]; then
+      box_name=$(cat "$box_cache")
+    else
+      box_name=""
+      command -v curl >/dev/null 2>&1 && box_name=$(curl -s \
+        --connect-timeout 1 --max-time 1 \
+        http://169.254.169.254/hetzner/v1/metadata/hostname 2>/dev/null)
+      # Only trust + cache a clean single-token hostname.
+      [[ "$box_name" =~ ^[A-Za-z0-9._-]+$ ]] || box_name=""
+      [ -n "$box_name" ] && echo "$box_name" > "$box_cache"
+    fi
+  fi
+  host_detail="${box_name:-unknown}"
 else
   host="local"
   host_detail="$(hostname)"

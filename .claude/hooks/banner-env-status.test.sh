@@ -134,5 +134,46 @@ else
   exit 1
 fi
 
+# --- Host row: devbox detection (DMI-gated, metadata name) ------------------
+#
+# The Host row reads /sys/class/dmi/id/sys_vendor (free) to gate a Hetzner
+# devbox, then resolves the box name from cloud metadata. Both inputs are
+# stubbed (BANNER_DMI_VENDOR / BANNER_BOX_NAME) so these never touch /sys or
+# the network — important since the CI/dev machine running the test may itself
+# be a Hetzner box. Sync stubs keep the Sync row inert.
+
+assert_host_contains() {
+  local label="$1" haystack="$2" needle="$3"
+  local host_line
+  host_line=$(echo "$haystack" | grep "^Host:" || true)
+  if echo "$host_line" | grep -qF "$needle"; then
+    echo "  PASS: $label"
+  else
+    echo "  FAIL: $label"
+    echo "    expected substring: $needle"
+    echo "    got Host line:      $host_line"
+    exit 1
+  fi
+}
+
+mkdir -p "$TMPROOT/hoststate"
+HOST_SYNC_STUBS=(
+  BANNER_SYNC_DAEMON_STATE=online
+  BANNER_SYNC_EFFI_AUTH_STATUS="$AUTH_OK"
+  SESSION_SYNC_STATE_DIR="$TMPROOT/hoststate"
+)
+
+echo "Test 9: DMI vendor Hetzner + box name → Host: devbox · <name>"
+OUT=$(env "${HOST_SYNC_STUBS[@]}" BANNER_DMI_VENDOR=Hetzner BANNER_BOX_NAME=nitsan-dev bash "$HOOK_SCRIPT")
+assert_host_contains "shows devbox + box name" "$OUT" "devbox · nitsan-dev"
+
+echo "Test 10: non-Hetzner DMI vendor → Host: local · <hostname>"
+OUT=$(env "${HOST_SYNC_STUBS[@]}" BANNER_DMI_VENDOR=QEMU bash "$HOOK_SCRIPT")
+assert_host_contains "falls back to local" "$OUT" "local · $(hostname)"
+
+echo "Test 11: Hetzner but name unresolved → Host: devbox · unknown"
+OUT=$(env "${HOST_SYNC_STUBS[@]}" BANNER_DMI_VENDOR=Hetzner BANNER_BOX_NAME= bash "$HOOK_SCRIPT")
+assert_host_contains "devbox without a name shows unknown" "$OUT" "devbox · unknown"
+
 echo ""
 echo "All tests passed!"
