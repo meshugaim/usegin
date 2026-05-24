@@ -73,7 +73,11 @@ pruning) is in. `box watch` (slice 7) is built and unit-tested. It runs the
 **push-lease** model: each working box renews its own lease (`box renew` →
 `box mgmt lease-server`, which persists the lease store), and the reaper reads
 that store (`--store`, default `BOX_LEASE_STORE`) to down idle/expired boxes —
-no SSH-probing the fleet. Only the long-lived daemon loop on slice 6's mgmt box is
+no SSH-probing the fleet. To bridge the gap where a container rebuild kills the
+in-container `box renew` daemon for a few minutes, `scripts/container.sh` bumps the
+box's own lease (`/lease/renew?box=$(hostname)`) on `build`/`rebuild`/`start` —
+gated to a real Hetzner box, best-effort — so a near-idle box isn't reaped
+mid-rebuild. Only the long-lived daemon loop on slice 6's mgmt box is
 pending. Not yet done:
 `provision` (first-time golden base), restoring a *specific* (non-latest)
 snapshot, the `serve` verb, alert plumbing (slice 8). The old `hetzner.sh` + `just
