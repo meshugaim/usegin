@@ -15,6 +15,7 @@ import {
   type LeaseAction,
   type LeasePolicy,
 } from "./lease";
+import { leaseActivity, type LeaseStore } from "./lease-store";
 import { formatDuration } from "./duration";
 
 /** Per-box facts the planner reasons over (gathered by the IO layer). */
@@ -22,7 +23,7 @@ export interface WatchEntry {
   name: string;
   /** ISO time the box came up (Hetzner `created`) — the hard-cap anchor. */
   upSince: string;
-  /** ISO time of last activity, or null when unknown (see `activity.ts`). */
+  /** ISO time of last activity, or null when unknown (see `leaseWatchActivity`). */
   lastActivity: string | null;
   /** Human note about the activity reading, surfaced in the report. */
   detail?: string;
@@ -33,6 +34,49 @@ export interface WatchDecision {
   lastActivity: string | null;
   detail: string;
   action: LeaseAction;
+}
+
+/**
+ * Turn a box's persisted lease into a {@link WatchEntry}'s `lastActivity` +
+ * `detail` (push model, slice 7). Pure: (store, name, upSince) → reading. This
+ * replaces the old SSH probe (`activity.ts`) — instead of the watcher reaching
+ * INTO each box, each working box pushes "I'm alive" to mgmt (`box renew`), mgmt
+ * persists it, and the reaper reads the renewal back out of the store here.
+ *
+ * **The stale-lease guard (the load-bearing bit).** A box name can be revived:
+ * `box down nitsan-dev` then `box up nitsan-dev` gives the new server a fresh
+ * `upSince` (Hetzner `created`), but the mgmt store may still hold the PREVIOUS
+ * incarnation's lease. If we passed that stale renewal straight through, a
+ * freshly-spun box could be idle-downed on an old box's activity — a false-down,
+ * the worst failure (see lease.ts). So a lease whose `lastRenewal` predates this
+ * box's boot (`< upSince`) is treated as unknown (`null` → never idle-downed,
+ * only the hard cap applies), exactly the safe value the false-down bias wants.
+ * Boundary: `lastRenewal === upSince` counts as VALID (renewed at the moment of
+ * boot is this incarnation's lease, not a previous one's) — strictly-before only.
+ *
+ * `now`-free on purpose: the relative "ago" rendering already lives in
+ * `formatWatchReport` (via `decideLeaseAction`'s countdown); the detail here is a
+ * static note ("lease renewed <iso>") so this stays a trivially-testable pure fn.
+ */
+export function leaseWatchActivity(
+  store: LeaseStore,
+  name: string,
+  upSince: string,
+): { lastActivity: string | null; detail: string } {
+  const lastRenewal = leaseActivity(store, name);
+  if (lastRenewal == null) {
+    return { lastActivity: null, detail: "no lease yet (unknown)" };
+  }
+  // Stale-lease guard: a renewal from before this box booted belongs to a
+  // previous incarnation of the name — ignore it so we don't false-down a fresh
+  // box on a dead box's activity. `===` upSince is valid (this incarnation's).
+  // Compare epoch-ms via getTime(), NOT lexical string compare: `created` and
+  // `lastRenewal` are usually both ISO-Z, but the instant their formats differ
+  // (offset vs Z, ms precision) a string compare would silently misjudge.
+  if (new Date(lastRenewal).getTime() < new Date(upSince).getTime()) {
+    return { lastActivity: null, detail: "lease predates boot — ignored (unknown)" };
+  }
+  return { lastActivity: lastRenewal, detail: `lease renewed ${lastRenewal}` };
 }
 
 /**
@@ -79,10 +123,11 @@ export function boxesToDown(decisions: WatchDecision[]): string[] {
  * Render a watch pass as a human report — one aligned line per box:
  *   `<name>  KEEP  <reason>  [<detail>]  (down in <dur>)`  or
  *   `<name>  DOWN  <reason>  [<detail>]`
- * Pure (decisions → string). The `[<detail>]` segment is the activity-probe's
- * diagnostic note (`heartbeat 12m ago`, `unreachable (ssh failed → unknown)`,
- * `excluded — not probed`, …) — the operator's evidence for trusting the
- * keep/down call — and is omitted only when the probe gave no note. The
+ * Pure (decisions → string). The `[<detail>]` segment is the lease reading's
+ * diagnostic note (`lease renewed <iso>`, `lease predates boot — ignored
+ * (unknown)`, `no lease yet (unknown)`, `excluded — not checked`, …) — the
+ * operator's evidence for trusting the keep/down call — and is omitted only when
+ * there's no note. The
  * `(down in …)` suffix appears only when there's an upcoming deadline; a box
  * nothing will ever down (no cap + unknown activity) shows no suffix so the
  * report doesn't imply a countdown that won't fire.

@@ -14,7 +14,7 @@ box park   [box]                    snapshot but KEEP it running (freeze a check
 box prune  [box] [--keep N] [-y]    delete OLD snapshots, keep the latest N (frees storage)
 box work   [box]                    ssh in and attach the devcontainer tmux
 box ssh    [box] [-- cmd]           shell into a box as the dev user
-box watch  [--idle 30m --ttl 8h]    cost-safety daemon: down idle/expired boxes (--once, --dry-run)
+box watch  [--idle 30m --ttl 8h]    cost-safety daemon: down idle/expired boxes from the lease store (--once, --dry-run)
 box status [box] [--json]           server state + snapshots + cost (no arg = whole fleet)
 box base   finalize <box> [...]     turn a build box into the golden base (`box docs show golden-base`)
 box mgmt   up|ssh|status            manage the always-on mgmt box
@@ -69,10 +69,12 @@ bun test tools/box              # unit tests (pure logic)
 
 Core lifecycle (`up`/`down`/`park`/`prune`/`work`/`ssh`/`status`, name|id
 addressing, `--size`, multi-box + downed-box status, cost figures, snapshot
-pruning) is in. `box watch` (slice 7) is built, unit-tested, and **live-verified**
-end to end: the probe over real tailnet SSH (NONE/IDLE/ACTIVE branches) and a full
-`box watch --once` pass that read a box as idle and really snapshotted+deleted it.
-Only the long-lived daemon loop on slice 6's mgmt box is pending. Not yet done:
+pruning) is in. `box watch` (slice 7) is built and unit-tested. It runs the
+**push-lease** model: each working box renews its own lease (`box renew` →
+`box mgmt lease-server`, which persists the lease store), and the reaper reads
+that store (`--store`, default `BOX_LEASE_STORE`) to down idle/expired boxes —
+no SSH-probing the fleet. Only the long-lived daemon loop on slice 6's mgmt box is
+pending. Not yet done:
 `provision` (first-time golden base), restoring a *specific* (non-latest)
 snapshot, the `serve` verb, alert plumbing (slice 8). The old `hetzner.sh` + `just
 hetzner-*` recipes are retired in the cleanup slice once `box` fully covers them.

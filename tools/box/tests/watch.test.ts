@@ -3,9 +3,11 @@ import {
   planWatch,
   boxesToDown,
   formatWatchReport,
+  leaseWatchActivity,
   type WatchEntry,
 } from "../src/lib/watch";
 import type { LeasePolicy } from "../src/lib/lease";
+import type { LeaseStore } from "../src/lib/lease-store";
 
 const UP_SINCE = "2026-05-23T12:00:00.000Z";
 const MIN = 60_000;
@@ -131,5 +133,59 @@ describe("formatWatchReport", () => {
 
   it("handles an empty fleet", () => {
     expect(formatWatchReport([])).toBe("No running boxes to watch.");
+  });
+});
+
+describe("leaseWatchActivity — push-lease store → WatchEntry activity", () => {
+  // Boot anchor for the box we're reading. Renewals are compared against this.
+  const BOOT = "2026-05-23T12:00:00.000Z";
+  const before = (ms: number): string => new Date(Date.parse(BOOT) - ms).toISOString();
+  const after = (ms: number): string => new Date(Date.parse(BOOT) + ms).toISOString();
+
+  it("passes a valid lease (renewed after boot) straight through", () => {
+    const renewal = after(10 * MIN);
+    const store: LeaseStore = { "agent-a": { lastRenewal: renewal } };
+    const r = leaseWatchActivity(store, "agent-a", BOOT);
+    expect(r.lastActivity).toBe(renewal);
+    expect(r.detail).toContain("renewed");
+  });
+
+  it("treats a stale lease (renewed BEFORE boot) as unknown — the revived-name guard", () => {
+    // A revived box: `box up <name>` gives a fresh upSince while mgmt still holds
+    // the PREVIOUS incarnation's lease. Passing that through could false-down a
+    // freshly-spun box on a dead box's activity — the worst failure. So → null.
+    const store: LeaseStore = { "nitsan-dev": { lastRenewal: before(5 * MIN) } };
+    const r = leaseWatchActivity(store, "nitsan-dev", BOOT);
+    expect(r.lastActivity).toBeNull();
+    expect(r.detail).toContain("predates boot");
+  });
+
+  it("counts a lease renewed EXACTLY at boot as valid (inclusive boundary, strictly-before is stale)", () => {
+    // lastRenewal === upSince is this incarnation's own first renewal, not a
+    // previous one's — must be kept, not ignored. Boundary case for the < guard.
+    const store: LeaseStore = { box: { lastRenewal: BOOT } };
+    const r = leaseWatchActivity(store, "box", BOOT);
+    expect(r.lastActivity).toBe(BOOT);
+    expect(r.detail).toContain("renewed");
+  });
+
+  it("treats a box with no lease as unknown (→ never idle-downed, only the hard cap)", () => {
+    const r = leaseWatchActivity({}, "never-renewed", BOOT);
+    expect(r.lastActivity).toBeNull();
+    expect(r.detail).toContain("no lease");
+  });
+
+  it("feeds planWatch: a stale-lease box is kept (not idle-downed) like an unknown box", () => {
+    // End-to-end of the guard: the null from a stale lease must reach
+    // decideLeaseAction as "unknown", so an idle-only policy never downs it.
+    const idleOnly: LeasePolicy = { idleMs: 30 * MIN, hardCapMs: null };
+    const store: LeaseStore = { revived: { lastRenewal: before(MIN) } };
+    const a = leaseWatchActivity(store, "revived", UP_SINCE);
+    const decisions = planWatch(
+      [{ name: "revived", upSince: UP_SINCE, lastActivity: a.lastActivity, detail: a.detail }],
+      idleOnly,
+      at(99 * HOUR),
+    );
+    expect(decisions[0]!.action.action).toBe("keep");
   });
 });

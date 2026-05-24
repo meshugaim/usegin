@@ -19,7 +19,7 @@ box park   [box]                    snapshot but KEEP it running (freeze a check
 box prune  [box] [--keep N] [-y]    delete OLD snapshots, keep the latest N (frees storage)
 box work   [box]                    ssh in and attach the devcontainer tmux
 box ssh    [box] [-- cmd]           shell into a box as the dev user (break-glass: -- cmd)
-box watch  [--idle --ttl ...]       cost-safety daemon: down idle/expired boxes
+box watch  [--idle --ttl ...]       cost-safety daemon: down idle/expired boxes (reads the lease store)
 box status [box] [--json]           server state + snapshots + cost (no arg = whole fleet)
 box base finalize <box> [...]       turn a build box into the golden base (see `docs show golden-base`)
 box mgmt   up|ssh|status            manage the always-on mgmt box
@@ -38,11 +38,17 @@ IP (break-glass).
 
 ## `box watch` flags (cost-safety daemon)
 
-Runs on the always-on mgmt box. Each pass it lists running boxes, reads each
-one's activity over the tailnet, and downs the idle/expired ones (snapshot +
-delete, same path as `box down`). The **mgmt box is always excluded** so the
-watcher can't down itself. A box whose activity can't be read is **never
-idle-downed** — only the hard cap can touch it (bias against killing live work).
+Runs on the always-on mgmt box, in the **push-lease** model. Each pass it lists
+running boxes, reads each one's last lease renewal from the persisted lease store,
+and downs the idle/expired ones (snapshot + delete, same path as `box down`). It
+does **not** SSH-probe the fleet — each working box pushes "I'm alive" via
+`box renew` to `box mgmt lease-server`, which records the renewal in the store;
+`box watch` is a **reader** of that store (the lease-server is its single writer).
+Point both at the same file with `--store` (or `BOX_LEASE_STORE`). The **mgmt box
+is always excluded** so the watcher can't down itself. A box with no lease — or
+only a stale one renewed before the box's current boot (a revived name still
+carrying a previous incarnation's lease) — is **never idle-downed**; only the hard
+cap can touch it (bias against killing live work).
 
 ```
 --idle <dur>       down a box after this much inactivity        (default: 30m)
@@ -52,13 +58,15 @@ idle-downed** — only the hard cap can touch it (bias against killing live work
 --once             run a single pass and exit (cron-friendly)
 --dry-run          report decisions but never actually down a box
 --exclude <names>  comma-separated extra box names to never auto-down
+--store <path>     lease store JSON to read (overrides BOX_LEASE_STORE;
+                   point at the same file as lease-server)
 ```
 
 Durations take a number + unit (`30m`, `8h`, `90s`, `2d`, or compound `1h30m`).
-Activity = a running `claude` process, an attached tmux client, or a touched
-`~/.box-activity` heartbeat file — favouring explicit signals over raw load, and
-never counting the probe's own ssh session. With no `--ttl`, a box with
-unreadable activity will never be downed; set `--ttl` for a backstop.
+Activity = a box's last lease renewal: a working box (running `claude`, etc.)
+renews via `box renew`; the renewal time is the box's `lastActivity`. With no
+`--ttl`, a box with no (or only a stale, pre-boot) lease will never be downed; set
+`--ttl` for a backstop.
 
 ## `box base finalize` flags
 
