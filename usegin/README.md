@@ -2,6 +2,32 @@
 
 **UseGin** is the agent that works in this repo and the umbrella DX app — the workspace where everything related to our development experience lives. Tools, conventions, sub-features, sub-apps. UseGin owns its own house.
 
+## Where things live (three-repo shape)
+
+We run three independent repos. None owns the others; each clones into the others' workspaces as needed.
+
+| Repo | What it is | SoT for |
+|---|---|---|
+| **effi** (`meshugaim/test-mvp`, this repo) | Product. | `nextjs-app/`, `python-services/`, Supabase migrations, deploy infra, customer-facing code. |
+| **gin** (`meshugaim/usegin`) | Our dev agent + its workshop + the DX CLI. | `usegin/` (workshop, zettels, sub-apps), `tools/dx/` and Gin-side `tools/*` (session, daybook, fleet, …), `.claude/` agent definitions, skills, hooks, personas, commands. |
+| **ocw** (`meshugaim/oria-crazy-world`) | World substrate. | Personas (`ground/personas/`), principles, philosophy, institutions, values. |
+
+**Direction of cloning is one-way per pair:**
+- effi clones gin → `./usegin/` (working agent lives next to product code while you work on it).
+- effi clones ocw → `./oria-crazy-world/` (personas needed by `just _persona`).
+- gin clones ocw → `./oria-crazy-world/` (the agent needs its souls wherever it runs).
+- Nothing clones effi; effi is the consumer.
+
+Each clone is bootstrapped by a parallel justfile recipe: `just bootstrap-gin`, `just bootstrap-world`. Repo identity is one line in `.devcontainer/gin.conf` / `.devcontainer/world.conf`. Change the line, attach this workspace to a different gin or a different world.
+
+**Why three?** Effi is product. Gin is the dev agent and its process — useful in any repo, not just this one. OCW is who the agents *are* — useful with any gin, not just ours. Mixing them means re-shipping all three every time one moves.
+
+See `usegin/zettel/zettels/z033` for the renaming history (Claude lab → Gin lab → gin/ → usegin/) and root `CLAUDE.md` line 117 for the OCW boundary rule.
+
+---
+
+## History of this name
+
 UseGin is the new name. Earlier names this absorbed (in supersession order): "Claude lab" → "Gin lab" → "gin-lab/" → "gin/" → **`usegin/`**. Each rename was preserved in git history per principle 02. Reasoning trail: zettels `z021` (gin became umbrella) and `z033` (gin became usegin); memory entry `project_usegin_naming.md`. The agent inside the umbrella is also called UseGin — the name unifies workspace and identity.
 
 ## Sub-apps

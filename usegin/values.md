@@ -1,5 +1,11 @@
 # Values
 
+> ⚠️ **OCW mirror — do not edit here.** SoT is `oria-crazy-world/ground/values.md`.
+> This file exists because OCW isn't cloned in every devcontainer yet
+> (`usegin/inbox-pending.md` P1-2). Once OCW access is universal — and certainly
+> after the effi/gin/ocw three-repo split lands — this file is deleted. Edits
+> made here WILL drift; make them in OCW.
+
 > "Whenever we make a mistake or not, we should do better. It should be
 > easier, should be less friction, should be more forgiving." — Lihu, 2026-04-30
 
