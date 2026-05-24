@@ -1,10 +1,11 @@
 import { Command } from "commander";
-import { resolveConfig, snapshotSelector } from "../lib/config";
+import { parsePort, resolveConfig, snapshotSelector } from "../lib/config";
 import {
   buildCreateFromSnapshotArgs, buildTailnetSshArgs, checkPrereqs, cleanHostkey,
   getServer, listSnapshots, pickLatestSnapshot, resolveSize, runHcloud, runSsh,
   serverIp, tailnetReachable,
 } from "../lib/hcloud";
+import { serveLease } from "../lib/lease-server";
 
 /**
  * `box mgmt` — manage the always-on MANAGEMENT box (slice 6).
@@ -29,6 +30,7 @@ export function mgmtCommand(): Command {
   mgmt.addCommand(mgmtUpCommand());
   mgmt.addCommand(mgmtSshCommand());
   mgmt.addCommand(mgmtStatusCommand());
+  mgmt.addCommand(mgmtLeaseServerCommand());
   return mgmt;
 }
 
@@ -167,5 +169,70 @@ function mgmtStatusCommand(): Command {
       } else {
         console.log(`  down (snapshot only)  ${snaps} — \`box mgmt up\` to revive.`);
       }
+    });
+}
+
+/**
+ * Resolve a `--port` flag to a valid TCP port, failing loud on garbage. Garbage
+ * (non-numeric, zero, negative, trailing junk, out of the 1–65535 range) must NOT
+ * fall through to a broken or surprising `Bun.serve` — the operator typed a port;
+ * if it can't be one, say so and exit. The flag path exits (the operator is
+ * present and an explicit bad flag deserves a hard stop); the env path in
+ * `resolveConfig` fails soft to the default. Both share `parsePort` so the
+ * notion of "valid port" can never drift between them — including the trap that
+ * `Bun.serve({ port: 70000 })` does NOT throw but silently CLAMPS to 65535.
+ */
+function requirePort(raw: string): number {
+  const port = parsePort(raw);
+  if (port === null) {
+    console.error(`Error: invalid --port '${raw}' — expected an integer in 1–65535.`);
+    process.exit(1);
+  }
+  return port;
+}
+
+/**
+ * `box mgmt lease-server` — run the always-on push-lease HTTP server on the mgmt
+ * box (slice 7, push model). Work boxes that are actively working renew their
+ * lease by curling this server; it records each renewal in the persisted lease
+ * store, and `box watch`'s reaper reads that store to decide keep/down. Mgmt
+ * never SSHes into a work box — the inside reports out. See `lease-server.ts`.
+ *
+ * No auth, by design: the security boundary is the network, not the request. A
+ * hardened box only accepts traffic over the tailnet (`harden-firewall.sh`), so
+ * only tailnet peers can reach this port — same trust model as serve-static.
+ * Run it ONLY on the lean mgmt box behind the tailnet; never on a public
+ * interface.
+ *
+ * Long-running: `Bun.serve` keeps the process alive. SIGINT/SIGTERM stop the
+ * server and exit cleanly (mirrors `box watch`'s signal handling).
+ */
+function mgmtLeaseServerCommand(): Command {
+  return new Command("lease-server")
+    .description("Run the push-lease HTTP server on the mgmt box (no auth; tailnet-only)")
+    .option("--port <n>", "TCP port to listen on, overriding BOX_LEASE_PORT")
+    .option("--store <path>", "path to the lease store JSON, overriding BOX_LEASE_STORE")
+    .action((opts: { port?: string; store?: string }) => {
+      const cfg = resolveConfig();
+      const port = opts.port !== undefined ? requirePort(opts.port) : cfg.leasePort;
+      const storePath = opts.store ?? cfg.leaseStorePath;
+
+      const server = serveLease({ port, storePath });
+
+      console.error(`box mgmt lease-server — listening on :${port}, store ${storePath}`);
+      console.error(
+        `Work boxes renew at http://${cfg.mgmtName}:${port}/lease/renew?box=<self>`,
+      );
+
+      // Long-running: Bun.serve holds the process open. Stop cleanly on a signal
+      // so the socket is released and the process exits with success — mirrors
+      // `box watch`'s SIGINT/SIGTERM handling.
+      const stop = (): void => {
+        console.error("\nbox mgmt lease-server stopping.");
+        server.stop();
+        process.exit(0);
+      };
+      process.on("SIGINT", stop);
+      process.on("SIGTERM", stop);
     });
 }
