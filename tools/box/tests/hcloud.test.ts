@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import {
-  pickLatestSnapshot, buildCreateFromSnapshotArgs, buildSnapshotArgs, resolveTargetName,
-  parseServerTypePrice,
+  pickLatestSnapshot, buildCreateFromSnapshotArgs, buildCreateServerArgs, buildSnapshotArgs,
+  resolveTargetName, parseServerTypePrice,
   type Snapshot, type ServerInfo, type ServerTypePriceEntry,
 } from "../src/lib/hcloud";
 
@@ -51,6 +51,35 @@ describe("buildCreateFromSnapshotArgs", () => {
       location: "nbg1", sshKey: "k", label: "role=agent-a-devbox",
     });
     expect(args).not.toContain("--user-data-from-file");
+  });
+});
+
+describe("buildCreateServerArgs", () => {
+  it("builds a fresh-from-OS-image create with required user-data (the provision path)", () => {
+    expect(buildCreateServerArgs({
+      name: "effi-mgmt", type: "cx22", image: "ubuntu-24.04",
+      location: "nbg1", sshKey: "effi-devbox", label: "role=effi-mgmt-devbox",
+      userDataFile: "/repo/scripts/hetzner/cloud-init-mgmt.yaml",
+    })).toEqual([
+      "server", "create",
+      "--name", "effi-mgmt",
+      "--type", "cx22",
+      "--image", "ubuntu-24.04",
+      "--location", "nbg1",
+      "--ssh-key", "effi-devbox",
+      "--label", "role=effi-mgmt-devbox",
+      "--user-data-from-file", "/repo/scripts/hetzner/cloud-init-mgmt.yaml",
+    ]);
+  });
+
+  it("passes the OS image NAME through verbatim (not coerced like a snapshot id)", () => {
+    const args = buildCreateServerArgs({
+      name: "m", type: "cx22", image: "ubuntu-24.04",
+      location: "nbg1", sshKey: "k", label: "role=m-devbox",
+      userDataFile: "/x.yaml",
+    });
+    const i = args.indexOf("--image");
+    expect(args[i + 1]).toBe("ubuntu-24.04");
   });
 });
 

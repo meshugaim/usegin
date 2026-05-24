@@ -142,6 +142,36 @@ export function buildCreateFromSnapshotArgs(p: {
   ];
 }
 
+/**
+ * `hcloud server create` args for a FRESH box from a base OS image (not a
+ * snapshot) — the from-scratch provision path. Same shape as
+ * {@link buildCreateFromSnapshotArgs}, but `image` is an OS image NAME
+ * (`ubuntu-24.04`) rather than a snapshot id, and `userDataFile` is REQUIRED
+ * here (a fresh box has no baked state, so first-boot cloud-init does all the
+ * install + setup). Kept separate from the snapshot builder so the two intents
+ * read distinctly at the call site and each is unit-tested in isolation.
+ */
+export function buildCreateServerArgs(p: {
+  name: string;
+  type: string;
+  image: string;
+  location: string;
+  sshKey: string;
+  label: string;
+  userDataFile: string;
+}): string[] {
+  return [
+    "server", "create",
+    "--name", p.name,
+    "--type", p.type,
+    "--image", p.image,
+    "--location", p.location,
+    "--ssh-key", p.sshKey,
+    "--label", p.label,
+    "--user-data-from-file", p.userDataFile,
+  ];
+}
+
 /** `hcloud server create-image` args for snapshotting a box. */
 export function buildSnapshotArgs(p: { name: string; description: string; label: string }): string[] {
   return [

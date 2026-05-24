@@ -1,10 +1,17 @@
 import { Command } from "commander";
+import { existsSync, readFileSync } from "node:fs";
 import { parsePort, resolveConfig, snapshotSelector } from "../lib/config";
 import {
-  buildCreateFromSnapshotArgs, buildTailnetSshArgs, checkPrereqs, cleanHostkey,
-  getServer, listSnapshots, pickLatestSnapshot, resolveSize, runHcloud, runSsh,
-  serverIp, tailnetReachable,
+  buildBreakGlassArgs, buildCreateFromSnapshotArgs, buildCreateServerArgs,
+  buildTailnetSshArgs, checkPrereqs, cleanHostkey, getServer, listSnapshots,
+  pickLatestSnapshot, resolveSize, runHcloud, runSsh, serverIp, tailnetReachable,
 } from "../lib/hcloud";
+import { isValidBoxName, wrapBashC } from "../lib/golden-base";
+import {
+  buildCloudInitDoneCheck, buildRunSetupCommand, buildTailscaleUpCommand,
+  buildTokenInstallCommand, buildTokenScpArgs, localHcloudConfigPath,
+  MGMT_DEFAULT_SIZE, MGMT_HCLOUD_CONFIG_PATH, mgmtCloudInitPath, setupMgmtScriptPath,
+} from "../lib/mgmt-provision";
 import { serveLease } from "../lib/lease-server";
 
 /**
@@ -27,11 +34,231 @@ export function mgmtCommand(): Command {
   const mgmt = new Command("mgmt")
     .description("Manage the always-on, token-holding management box (lean; recreate/ssh/status)");
 
+  mgmt.addCommand(mgmtProvisionCommand());
   mgmt.addCommand(mgmtUpCommand());
   mgmt.addCommand(mgmtSshCommand());
   mgmt.addCommand(mgmtStatusCommand());
   mgmt.addCommand(mgmtLeaseServerCommand());
   return mgmt;
+}
+
+/**
+ * Run a command on the mgmt box over the BREAK-GLASS path (public IP via
+ * `hcloud server ssh`) — used during provisioning, BEFORE the box is on the
+ * tailnet. `stdin` pipes a payload to the remote command WITHOUT it landing in
+ * argv (so a streamed script, or any secret, never shows in a process list/log).
+ *
+ * The command goes over as a SINGLE arg (`wrapBashC`) so ssh's argv-flattening
+ * doesn't shred a multi-word command — same reasoning as base.ts's sshExec.
+ * `inheritOut: false` captures output (for the marker poll); otherwise inherits.
+ */
+function breakGlassExec(
+  name: string,
+  remoteCmd: string,
+  opts: { stdin?: string; inheritOut?: boolean } = {},
+): { code: number; stdout: string } {
+  const remote = wrapBashC(remoteCmd);
+  const argv = ["hcloud", ...buildBreakGlassArgs({ name, command: [remote] })];
+  const inheritOut = opts.inheritOut ?? true;
+  const proc = Bun.spawnSync(argv, {
+    stdin: opts.stdin !== undefined ? new TextEncoder().encode(opts.stdin) : "inherit",
+    stdout: inheritOut ? "inherit" : "pipe",
+    stderr: "inherit",
+  });
+  return { code: proc.exitCode ?? 1, stdout: inheritOut ? "" : (proc.stdout?.toString() ?? "") };
+}
+
+/**
+ * `box mgmt provision` — stand up the always-on, lean mgmt box FROM SCRATCH.
+ *
+ * Orchestration (pure arg-builders in lib/mgmt-provision.ts; IO here):
+ *   1. create a fresh Ubuntu server (cloud-init-mgmt.yaml installs the lean
+ *      toolchain — bun/hcloud/tailscale/git, NO docker/node/devcontainer),
+ *   2. wait for ssh + cloud-init-done (over break-glass public IP),
+ *   3. `tailscale up --authkey=… --hostname=<mgmtName>` (key over ssh, not metadata),
+ *   4. run setup-mgmt.sh (clone repo, install + enable the two push-lease units),
+ *   5. place the hcloud token (scp the local cli.toml; never echo it) — `box watch`
+ *      needs it to list/down servers.
+ *
+ * It does NOT auto-snapshot (see the closing note): snapshotting is left as an
+ * explicit next step so the operator can verify the box is healthy + hardened
+ * first, then snapshot it as the `effi-mgmt` lineage that `box mgmt up` revives.
+ *
+ * Secrets stay OUT of instance metadata: the tailscale authkey rides in via the
+ * `tailscale up` ssh command (a single ssh arg), and the hcloud token rides in as
+ * an scp'd FILE — neither is ever written to cloud-init user-data. Same principle
+ * golden-base.ts states for the work boxes.
+ */
+function mgmtProvisionCommand(): Command {
+  return new Command("provision")
+    .description("Provision the always-on lean mgmt box from scratch (fresh Ubuntu → tailnet → push-lease units → token)")
+    .option("--size <type>", "hcloud server type — the lean mgmt box doesn't need a big disk", MGMT_DEFAULT_SIZE)
+    .option("--authkey <key>", "reusable Tailscale auth key (or set BOX_TS_AUTHKEY) — passed over ssh, never into metadata")
+    .option("--no-place-token", "skip scp'ing the local hcloud token to the box (place it yourself later)")
+    .option("--wait <seconds>", "max seconds to wait for cloud-init first-boot to finish", "240")
+    .action((opts: { size: string; authkey?: string; placeToken: boolean; wait: string }) => {
+      const prereq = checkPrereqs();
+      if (!prereq.ok) {
+        console.error(`Error: ${prereq.error}`);
+        process.exit(1);
+      }
+
+      const cfg = resolveConfig();
+      const name = cfg.mgmtName;
+      const type = resolveSize({ sizeFlag: opts.size, configType: cfg.type });
+
+      if (!isValidBoxName(name)) {
+        console.error(`Error: mgmt box name '${name}' isn't a valid DNS label (lowercase a-z, 0-9, hyphens; <=63 chars).`);
+        process.exit(1);
+      }
+      if (!cfg.sshKeyName) {
+        console.error("Error: no ssh key configured. Set BOX_SSH_KEY (or HETZNER_SSH_KEY_NAME) to a registered hcloud ssh-key name.");
+        console.error("  Register one: hcloud ssh-key create --name <name> --public-key-from-file ~/.ssh/id_ed25519.pub");
+        process.exit(1);
+      }
+
+      // The tailscale authkey is a SECRET — read from a flag or env, passed over
+      // ssh at `tailscale up` time, NEVER baked into instance metadata. Mint a
+      // reusable, non-expiring key in the Tailscale admin console.
+      const authkey = (opts.authkey ?? process.env.BOX_TS_AUTHKEY)?.trim();
+      if (!authkey) {
+        console.error("Error: no Tailscale auth key. Pass --authkey <key> (or set BOX_TS_AUTHKEY).");
+        console.error("  Mint a reusable key: Tailscale admin → Settings → Keys. Keep it out of chat/logs.");
+        process.exit(1);
+      }
+      if (!authkey.startsWith("tskey-")) {
+        console.error("Error: --authkey doesn't look like a Tailscale auth key (expected to start with 'tskey-').");
+        process.exit(1);
+      }
+
+      const existing = getServer(name);
+      if (existing) {
+        console.error(`Error: mgmt box '${name}' already exists at ${serverIp(existing) || "?"}.`);
+        console.error("  Provision is for a FROM-SCRATCH box. Use `box mgmt ssh` / `box mgmt up`, or delete it first.");
+        process.exit(1);
+      }
+
+      // 1. Create the fresh box. cloud-init-mgmt.yaml runs first-boot.
+      console.error(`Creating fresh mgmt box '${name}' (${type} @ ${cfg.location}) from ${cfg.baseImage} ...`);
+      const create = runHcloud(
+        buildCreateServerArgs({
+          name,
+          type,
+          image: cfg.baseImage,
+          location: cfg.location,
+          sshKey: cfg.sshKeyName,
+          label: snapshotSelector(name),
+          userDataFile: mgmtCloudInitPath(),
+        }),
+        { inherit: true },
+      );
+      if (create.code !== 0) {
+        console.error(`Error: hcloud server create failed (exit ${create.code}).`);
+        process.exit(create.code);
+      }
+      const server = getServer(name);
+      const ip = serverIp(server);
+      cleanHostkey(ip); // fresh instance → fresh host key
+
+      // 2. Wait for cloud-init first-boot to finish (the marker file). We poll
+      // over break-glass ssh (public IP) because the box isn't on the tailnet yet.
+      const waitS = Math.max(0, Number.parseInt(opts.wait, 10) || 240);
+      console.error(`Waiting up to ${waitS}s for cloud-init first-boot (bun/hcloud/tailscale install) ...`);
+      const deadline = Date.now() + waitS * 1_000;
+      let ready = false;
+      // Give sshd a moment to come up before the first probe.
+      Bun.sleepSync(15_000);
+      while (Date.now() < deadline) {
+        const probe = breakGlassExec(name, buildCloudInitDoneCheck(), { inheritOut: false });
+        if (probe.code === 0) { ready = true; break; }
+        Bun.sleepSync(10_000);
+      }
+      if (!ready) {
+        console.error(`Error: cloud-init didn't finish within ${waitS}s. The box is up at ${ip || "?"};`);
+        console.error("  inspect with `hcloud server ssh " + name + "` (check /var/log/cloud-init-output.log),");
+        console.error("  then re-run provisioning steps by hand or `box mgmt provision` after deleting it.");
+        process.exit(1);
+      }
+      console.error("cloud-init first-boot done.");
+
+      // 3. Join the tailnet. Authkey passed as a SINGLE ssh arg (not split by
+      // ssh's argv-flatten) and never logged. We log the command WITHOUT the key.
+      console.error(`Joining the tailnet as '${name}' (tailscale up; authkey passed over ssh, not metadata) ...`);
+      const tsCode = breakGlassExec(name, buildTailscaleUpCommand({ name, authkey })).code;
+      if (tsCode !== 0) {
+        console.error(`Error: tailscale up failed (exit ${tsCode}). The box is up but not on the tailnet.`);
+        process.exit(tsCode);
+      }
+
+      // 4. Run setup-mgmt.sh: clone the repo + install/enable the push-lease
+      // units. The script is STREAMED over ssh stdin (so a fresh box needn't have
+      // it yet), with the repo URL as a positional arg. NOTE the private-repo gap
+      // below — git auth on the box is the operator's responsibility.
+      console.error("Running setup-mgmt.sh (clone repo + install push-lease systemd units) ...");
+      const setupBody = readFileSync(setupMgmtScriptPath(), "utf8");
+      const setupCode = breakGlassExec(
+        name,
+        buildRunSetupCommand({ repoUrl: cfg.repoUrl }),
+        { stdin: setupBody },
+      ).code;
+      if (setupCode !== 0) {
+        console.error(`Error: setup-mgmt.sh failed (exit ${setupCode}). See the output above.`);
+        console.error("  Common cause: the private repo clone needs git auth on the box (gh login / a deploy key).");
+        console.error("  Fix auth on the box, then re-run `box mgmt provision` (after deleting this box) or run setup-mgmt.sh by hand.");
+        process.exit(setupCode);
+      }
+
+      // 5. Place the hcloud token (the mgmt box is the ONE host that holds it).
+      // scp the local cli.toml as a FILE — its contents never touch argv/logs.
+      if (opts.placeToken) {
+        const localToken = localHcloudConfigPath(process.env.HOME);
+        if (!existsSync(localToken)) {
+          console.error(`Warning: local hcloud token not found at ${localToken} — skipping token placement.`);
+          console.error("  Place it yourself so `box watch` can list + down servers:");
+          console.error(`    scp ${localToken} dev@${name}:${MGMT_HCLOUD_CONFIG_PATH}  (chmod 600 on the box)`);
+          console.error("  Or set HCLOUD_TOKEN in /home/dev/.box/box.env (loaded by box-watch.service).");
+        } else {
+          console.error("Placing the hcloud token (scp; the token is never echoed) ...");
+          cleanHostkey(name); // now on the tailnet — scp by name
+          const scp = Bun.spawnSync(["scp", ...buildTokenScpArgs({ name, localPath: localToken })], {
+            stdout: "inherit", stderr: "inherit", stdin: "ignore",
+          });
+          if ((scp.exitCode ?? 1) !== 0) {
+            console.error(`Error: scp of the token failed (exit ${scp.exitCode}). Place it by hand (see MGMT.md).`);
+            process.exit(scp.exitCode ?? 1);
+          }
+          // Install it into place + lock to 0600 over the tailnet ssh path.
+          cleanHostkey(name);
+          const installCode = runSsh(
+            buildTailnetSshArgs({ name, command: [wrapBashC(buildTokenInstallCommand())] }),
+          ).code;
+          if (installCode !== 0) {
+            console.error(`Error: installing the token on the box failed (exit ${installCode}). Place it by hand (see MGMT.md).`);
+            process.exit(installCode);
+          }
+          // Restart box-watch so it picks up the now-present token (it may have
+          // crash-looped on a missing context before the token landed).
+          runSsh(buildTailnetSshArgs({ name, command: [wrapBashC("sudo systemctl restart box-watch.service")] }));
+        }
+      } else {
+        console.error("Skipping token placement (--no-place-token). `box watch` needs it — place it before relying on the reaper:");
+        console.error(`  scp ~/.config/hcloud/cli.toml dev@${name}:${MGMT_HCLOUD_CONFIG_PATH}  (chmod 600 on the box)`);
+      }
+
+      // Snapshotting is a deliberate, explicit NEXT step (not auto): the operator
+      // should verify the box is healthy + harden it (close public :22) BEFORE
+      // snapshotting, so the `effi-mgmt` lineage that `box mgmt up` revives ships
+      // hardened. Auto-snapshotting here would bake the still-:22-open box.
+      console.log("");
+      console.log(`Mgmt box '${name}' provisioned and on the tailnet at ${ip || "?"}.`);
+      console.log("Push-lease units (box-lease-server, box-watch) installed + enabled.");
+      console.log("");
+      console.log("Next steps (make it revivable + hardened):");
+      console.log(`  1. verify:  box mgmt ssh systemctl is-active box-lease-server box-watch`);
+      console.log(`  2. harden:  box mgmt ssh -- sudo bash -s < scripts/hetzner/harden-firewall.sh  (closes public :22; tailnet-only)`);
+      console.log(`  3. snapshot the lineage so \`box mgmt up\` can revive it:`);
+      console.log(`       hcloud server create-image ${name} --type snapshot --label ${snapshotSelector(name)} --description "mgmt box"`);
+    });
 }
 
 /**
@@ -43,7 +270,11 @@ export function mgmtCommand(): Command {
 function mgmtUpCommand(): Command {
   return new Command("up")
     .description("Recreate the mgmt box from its latest snapshot (fast; no golden-base fallback)")
-    .option("--size <type>", "hcloud server type for the mgmt box, overriding BOX_TYPE (e.g. cpx11)")
+    // Default to the SAME lean size `provision` used, not the work-box BOX_TYPE
+    // (cpx42): the mgmt box is snapshotted as a lean cx22, so reviving it on the
+    // heavy work-box default would silently make the always-on box ~6x more
+    // expensive than what was provisioned. `--size` still overrides per call.
+    .option("--size <type>", "hcloud server type for the mgmt box (default: the lean mgmt size)", MGMT_DEFAULT_SIZE)
     .action((opts: { size?: string }) => {
       const prereq = checkPrereqs();
       if (!prereq.ok) {
