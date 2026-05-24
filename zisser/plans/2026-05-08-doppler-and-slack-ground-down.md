@@ -207,3 +207,73 @@ If you don't reply, on the next session-touch I:
 - Treat the team-internal Slack flow (`Slacker` / `useginslack`
   reorg) as a parallel track; will not let it block customer launch.
 
+---
+
+# 2026-05-24 — Blocker #1 greenlit (Doppler-Railway staging cutover) — HALT, human-only steps
+
+Oria greenlit blocker #1 path (a): wire Railway → Doppler so `effi/{stg,prod}`
+becomes authoritative. Scope: **staging only**; prod parked until staging is
+verified.
+
+## What Zisser tried
+
+1. `doppler me` — authed as `oria 24.5` CLI token, workplace `AskEffi (75315c2234b3b6cde79c)`. **OK.**
+2. `doppler projects --json` → **`length == 0`**. The CLI token sees zero projects despite the workplace being AskEffi.
+3. `doppler secrets --project effi --config stg --only-names` → `Could not find requested project 'effi'`. Confirms (2): the token has no project-level grant on `effi`.
+4. `railway whoami` → `Unauthorized. Please login with railway login`. Railway CLI is browser-OAuth; no headless path.
+
+No `DOPPLER_TOKEN` in env, no service-account token available to Zisser. The
+bootstrap SA token `zisser-bootstrap-2026-05` from the May 6 migration is on
+the "revoke" clean-list — wrong tool to reuse even if available.
+
+## Halt — exact human-only clicks needed
+
+Pick one of the two unlock paths. Each takes Oria ~3-5 minutes; everything
+after is fully delegable to Zisser/Gin.
+
+### Unlock path A — grant Oria's user account project access (preferred, lower blast radius)
+
+In Doppler dashboard:
+
+1. **Doppler dashboard → Access → Members** → confirm `oria@askeffi.ai` is a workplace member.
+2. **Projects → `effi` → Access** → grant `oria@askeffi.ai` the role needed to read/write all configs (Admin or Project Admin). Today his CLI sees the workplace but zero projects; this fixes that.
+3. Tell Zisser "go" — `doppler projects` will then list `effi`, and Zisser can read `effi/stg`, populate placeholders, etc.
+
+In Railway dashboard (separate step, also Oria-only):
+
+4. **Railway → AskEffi project → Settings → Integrations → Doppler** → install the Doppler integration on the **staging** service only. Authorize against the AskEffi Doppler workplace and point it at project `effi`, config `stg`. Choose "sync on change" / "values flow once" (the language the May 6 note used).
+5. Do **not** yet remove the existing Railway env vars on staging — leave them as the source-of-truth fallback until Zisser confirms Doppler-side values are populated.
+
+### Unlock path B — mint a scoped service-account token for Zisser
+
+In Doppler dashboard:
+
+1. **Service Accounts → Create** → name `zisser-cutover-2026-05`, scope `effi` project (all configs read+write), not workplace-admin.
+2. Paste the token into Zisser's chat (single-use; Zisser will write it to a local-only file and revoke after staging is green).
+
+This is faster but the token outlives the cutover unless explicitly revoked.
+Path A is the preferred one.
+
+Either way, Railway step (4) above is still required — the Doppler→Railway
+integration install is a one-time dashboard authorization no CLI replaces.
+
+## What Zisser will do once unlocked (no further questions)
+
+1. `doppler secrets --project effi --config stg --only-names` → confirm the 19 `TODO_FROM_RAILWAY` placeholders.
+2. With Railway authed (or with Oria reading Railway's staging vars to Zisser), source each value and `doppler secrets set --project effi --config stg <NAME>` for each. Mask in any output (`--only-names` on probes; never raw printenv).
+3. Once `effi/stg` is fully populated AND the Railway Doppler integration is installed on staging: trigger a staging redeploy (`railway redeploy --service <staging-service>` or wait for next push).
+4. Verify the running container loaded from Doppler — read a non-secret value Doppler holds that differs from Railway's old env, or check the Doppler integration's sync log on Railway side.
+5. Write the two-faces cutover doc → `zisser/notes/2026-05-24-doppler-railway-staging-cutover.md`. Include the prod-cutover gate (what we need to see on staging before doing prod).
+6. Report back. Prod is parked until then.
+
+## Halt boundaries (honored)
+
+- No touches to `effi/prod` or Railway production env.
+- No migrations applied to staging DB.
+- No force-push, no unrelated deploys, no fold-in of other parked blockers.
+- Read-only on Railway during placeholder population — existing Railway vars stay until step (4) verification proves Doppler is loading.
+
+## Log
+
+- 2026-05-24 — Oria greenlit blocker #1 path (a). Zisser confirmed both prerequisite credentials are absent (Doppler CLI token has no project grant; Railway CLI is unauthenticated). Halted with exact unlock clicks above; awaiting Oria.
+
