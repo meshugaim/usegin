@@ -69,10 +69,10 @@ bun test tools/box              # unit tests (pure logic)
 
 Core lifecycle (`up`/`down`/`park`/`prune`/`work`/`ssh`/`status`, name|id
 addressing, `--size`, multi-box + downed-box status, cost figures, snapshot
-pruning) is in. `box watch` (slice 7) is code-complete + unit-tested: the
-lease/hard-cap decision core, the activity probe parser, and the daemon loop all
-pass, and `--once --dry-run` is exercised live; the activity-probe-over-SSH and
-the real auto-down await live verification against a running box. Not yet done:
+pruning) is in. `box watch` (slice 7) is built, unit-tested, and **live-verified**
+end to end: the probe over real tailnet SSH (NONE/IDLE/ACTIVE branches) and a full
+`box watch --once` pass that read a box as idle and really snapshotted+deleted it.
+Only the long-lived daemon loop on slice 6's mgmt box is pending. Not yet done:
 `provision` (first-time golden base), restoring a *specific* (non-latest)
 snapshot, the `serve` verb, alert plumbing (slice 8). The old `hetzner.sh` + `just
 hetzner-*` recipes are retired in the cleanup slice once `box` fully covers them.
