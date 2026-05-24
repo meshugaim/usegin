@@ -26,6 +26,7 @@ async function actionSelfTest(opts: { keepTemp?: boolean }) {
     CLAUDE_SESSION_ID: sid,
     DX_OUTPUT: "json",
     DX_HIS_QUIET: "1",
+    DX_HIS_FORCE_STOP: "1",
   };
   const dxBin = resolveDxBin();
   const steps: Step[] = [];
@@ -41,8 +42,9 @@ async function actionSelfTest(opts: { keepTemp?: boolean }) {
   let r = run(["his", "hook-stop"], JSON.stringify({ session_id: sid }));
   steps.push(stepFromHookOutput("fresh-stop allows", r.stdout, (j) => j.continue === true));
 
-  // 2. arm via end.
-  r = run(["his", "end"]);
+  // 2. arm via end. `--json` so we can read state off stdout; `--no-hold` so
+  // the test doesn't leak a detached hold-until-rated daemon.
+  r = run(["his", "end", "--json", "--no-hold"]);
   steps.push({
     name: "end arms force_rate",
     ok: r.status === 0 && safeJson(r.stdout)?.state?.force_rate === true,

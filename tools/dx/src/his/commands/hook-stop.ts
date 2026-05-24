@@ -15,6 +15,20 @@ type HookInput = {
   hook_event_name?: string;
 };
 
+/**
+ * The hard Stop-block is opt-out per user. It's ON by default for the team; an
+ * individual disables it via `users.<me>.overrides` in .dx/config.json or
+ * `dx disable his.force_stop`. `DX_HIS_FORCE_STOP` is an explicit escape that
+ * wins over config (1/true forces on, 0/false forces off) — the self-test sets
+ * it so its block assertion is deterministic regardless of who runs it.
+ */
+function forceStopEnabled(): boolean {
+  const override = process.env.DX_HIS_FORCE_STOP;
+  if (override === "1" || override === "true") return true;
+  if (override === "0" || override === "false") return false;
+  return dx.isEnabled("his.force_stop");
+}
+
 async function actionHookStop() {
   const payload = await readStdinJson<HookInput>();
   const sessionId =
@@ -61,6 +75,12 @@ async function actionHookStop() {
         return;
       }
     }
+    process.stdout.write(JSON.stringify({ continue: true }) + "\n");
+    return;
+  }
+
+  // force_rate is armed, but the hard block is opt-out per user.
+  if (!forceStopEnabled()) {
     process.stdout.write(JSON.stringify({ continue: true }) + "\n");
     return;
   }
