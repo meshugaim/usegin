@@ -564,3 +564,18 @@ export function runSsh(args: string[]): HcloudResult {
   const proc = Bun.spawnSync(["ssh", ...args], { stdout: "inherit", stderr: "inherit", stdin: "inherit" });
   return { code: proc.exitCode ?? 1, stdout: "", stderr: "" };
 }
+
+/**
+ * Run a local `ssh` and CAPTURE its output (vs {@link runSsh}, which inherits the
+ * terminal). The non-interactive sibling for probes like `box watch`'s activity
+ * read, where we need the remote command's stdout, not a live shell. stdin is
+ * ignored so a probe can never hang waiting on input.
+ */
+export function runSshCapture(args: string[]): HcloudResult {
+  const proc = Bun.spawnSync(["ssh", ...args], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+  return {
+    code: proc.exitCode ?? 1,
+    stdout: proc.stdout?.toString() ?? "",
+    stderr: proc.stderr?.toString() ?? "",
+  };
+}

@@ -1,8 +1,9 @@
 import { Command } from "commander";
-import { resolveConfig, snapshotSelector } from "../lib/config";
+import { resolveConfig } from "../lib/config";
 import {
-  buildSnapshotArgs, checkPrereqs, getServer, listServers, resolveTargetName, runHcloud,
+  checkPrereqs, getServer, listServers, resolveTargetName,
 } from "../lib/hcloud";
+import { snapshotAndDeleteServer } from "../lib/down";
 import { isHeadless } from "../../../lib/headless";
 
 export function downCommand(): Command {
@@ -44,25 +45,10 @@ export function downCommand(): Command {
         }
       }
 
-      console.error(`Snapshotting '${name}' (captures the built devcontainer image + repo) ...`);
-      const snap = runHcloud(
-        buildSnapshotArgs({
-          name,
-          description: `${name} ${new Date().toISOString().replace(/\.\d+Z$/, "Z")}`,
-          label: snapshotSelector(name),
-        }),
-        { inherit: true },
-      );
-      if (snap.code !== 0) {
-        console.error(`Error: snapshot failed (exit ${snap.code}); NOT deleting the server.`);
-        process.exit(snap.code);
-      }
-
-      console.error("Deleting server (snapshot is kept) ...");
-      const del = runHcloud(["server", "delete", name], { inherit: true });
-      if (del.code !== 0) {
-        console.error(`Error: server delete failed (exit ${del.code}). The snapshot was created; the server still exists and is billing.`);
-        process.exit(del.code);
+      const res = snapshotAndDeleteServer(name);
+      if (!res.ok) {
+        console.error(`Error: ${res.error}`);
+        process.exit(res.code ?? 1);
       }
 
       console.log(`Down. You now pay only snapshot storage (~cents/month). Bring it back with: box up ${name === cfg.name ? "" : name}`.trimEnd());

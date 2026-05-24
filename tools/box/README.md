@@ -14,6 +14,7 @@ box park   [box]                    snapshot but KEEP it running (freeze a check
 box prune  [box] [--keep N] [-y]    delete OLD snapshots, keep the latest N (frees storage)
 box work   [box]                    ssh in and attach the devcontainer tmux
 box ssh    [box] [-- cmd]           shell into a box as the dev user
+box watch  [--idle 30m --ttl 8h]    cost-safety daemon: down idle/expired boxes (--once, --dry-run)
 box status [box] [--json]           server state + snapshots + cost (no arg = whole fleet)
 box base   finalize <box> [...]     turn a build box into the golden base (`box docs show golden-base`)
 box mgmt   up|ssh|status            manage the always-on mgmt box
@@ -68,7 +69,10 @@ bun test tools/box              # unit tests (pure logic)
 
 Core lifecycle (`up`/`down`/`park`/`prune`/`work`/`ssh`/`status`, name|id
 addressing, `--size`, multi-box + downed-box status, cost figures, snapshot
-pruning) is in. Not yet done: `provision` (first-time golden base), restoring a
-*specific* (non-latest) snapshot, Tailscale addressing, the `watch`/`mgmt`/`serve`
-verbs (later slices). The old `hetzner.sh` + `just hetzner-*` recipes are retired
-in the cleanup slice once `box` fully covers them.
+pruning) is in. `box watch` (slice 7) is code-complete + unit-tested: the
+lease/hard-cap decision core, the activity probe parser, and the daemon loop all
+pass, and `--once --dry-run` is exercised live; the activity-probe-over-SSH and
+the real auto-down await live verification against a running box. Not yet done:
+`provision` (first-time golden base), restoring a *specific* (non-latest)
+snapshot, the `serve` verb, alert plumbing (slice 8). The old `hetzner.sh` + `just
+hetzner-*` recipes are retired in the cleanup slice once `box` fully covers them.

@@ -19,6 +19,7 @@ box park   [box]                    snapshot but KEEP it running (freeze a check
 box prune  [box] [--keep N] [-y]    delete OLD snapshots, keep the latest N (frees storage)
 box work   [box]                    ssh in and attach the devcontainer tmux
 box ssh    [box] [-- cmd]           shell into a box as the dev user (break-glass: -- cmd)
+box watch  [--idle --ttl ...]       cost-safety daemon: down idle/expired boxes
 box status [box] [--json]           server state + snapshots + cost (no arg = whole fleet)
 box base finalize <box> [...]       turn a build box into the golden base (see `docs show golden-base`)
 box mgmt   up|ssh|status            manage the always-on mgmt box
@@ -34,6 +35,30 @@ IP (break-glass).
 
 `box ssh <box> -- <cmd>` runs a one-shot command (break-glass plumbing fixed in
 `0283b28ef` — hcloud arg order).
+
+## `box watch` flags (cost-safety daemon)
+
+Runs on the always-on mgmt box. Each pass it lists running boxes, reads each
+one's activity over the tailnet, and downs the idle/expired ones (snapshot +
+delete, same path as `box down`). The **mgmt box is always excluded** so the
+watcher can't down itself. A box whose activity can't be read is **never
+idle-downed** — only the hard cap can touch it (bias against killing live work).
+
+```
+--idle <dur>       down a box after this much inactivity        (default: 30m)
+--ttl <dur>        hard cap: down a box after this much uptime
+                   regardless of activity                       (default: none)
+--interval <dur>   time between watch passes                     (default: 60s)
+--once             run a single pass and exit (cron-friendly)
+--dry-run          report decisions but never actually down a box
+--exclude <names>  comma-separated extra box names to never auto-down
+```
+
+Durations take a number + unit (`30m`, `8h`, `90s`, `2d`, or compound `1h30m`).
+Activity = a running `claude` process, an attached tmux client, or a touched
+`~/.box-activity` heartbeat file — favouring explicit signals over raw load, and
+never counting the probe's own ssh session. With no `--ttl`, a box with
+unreadable activity will never be downed; set `--ttl` for a backstop.
 
 ## `box base finalize` flags
 
