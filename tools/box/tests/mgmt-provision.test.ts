@@ -2,10 +2,14 @@ import { describe, it, expect } from "bun:test";
 import {
   mgmtCloudInitPath,
   setupMgmtScriptPath,
+  repoRootPath,
   MGMT_DEFAULT_SIZE,
   MGMT_HCLOUD_CONFIG_PATH,
+  MGMT_REPO_DEST,
+  MGMT_REPO_RSYNC_PATHS,
   localHcloudConfigPath,
   buildTailscaleUpCommand,
+  buildRepoRsyncArgs,
   buildRunSetupCommand,
   buildTokenScpArgs,
   buildTokenInstallCommand,
@@ -67,12 +71,78 @@ describe("buildTailscaleUpCommand", () => {
 });
 
 describe("buildRunSetupCommand", () => {
-  it("streams the script via `bash -s` and passes the repo URL as a positional arg", () => {
-    // `-s` reads the script from stdin (so a fresh box needn't have it yet);
-    // everything after `--` becomes the script's $1 (the repo URL).
-    expect(buildRunSetupCommand({ repoUrl: "https://github.com/AskEffi/test-mvp.git" })).toBe(
-      "bash -s -- https://github.com/AskEffi/test-mvp.git",
-    );
+  it("streams the script via `bash -s` with no args (the tree is rsync'd in first)", () => {
+    // `-s` reads the script from stdin (so the box needn't have it on PATH). No
+    // repo-URL arg: setup-mgmt.sh no longer clones — `box mgmt provision` rsyncs
+    // the working tree to the box before this runs.
+    expect(buildRunSetupCommand()).toBe("bash -s");
+  });
+});
+
+describe("buildRepoRsyncArgs", () => {
+  it("rsyncs the working tree to the box over ssh, auth-free (accept-new host key)", () => {
+    const args = buildRepoRsyncArgs({ host: "203.0.113.5", repoRoot: "/local/repo" });
+    expect(args).toEqual([
+      "-az",
+      "--delete",
+      "-e", "ssh -o StrictHostKeyChecking=accept-new",
+      "--exclude", "node_modules",
+      "--exclude", ".git",
+      "/local/repo/tools",
+      "/local/repo/scripts",
+      "/local/repo/package.json",
+      "/local/repo/bun.lock",
+      "/local/repo/tsconfig.json",
+      "dev@203.0.113.5:/home/dev/test-mvp/",
+    ]);
+  });
+
+  it("excludes node_modules and .git (reinstalled on the box; .git not needed)", () => {
+    const args = buildRepoRsyncArgs({ host: "1.2.3.4" });
+    expect(args).toContain("node_modules");
+    expect(args).toContain(".git");
+    // each exclude is preceded by an --exclude flag
+    expect(args[args.indexOf("node_modules") - 1]).toBe("--exclude");
+    expect(args[args.indexOf(".git") - 1]).toBe("--exclude");
+  });
+
+  it("uses the SAME accept-new host-key opt as the break-glass ssh (fresh-box host key)", () => {
+    const args = buildRepoRsyncArgs({ host: "1.2.3.4" });
+    expect(args).toContain("-e");
+    expect(args[args.indexOf("-e") + 1]).toBe("ssh -o StrictHostKeyChecking=accept-new");
+  });
+
+  it("targets the repo-root dest and honours a custom user", () => {
+    const args = buildRepoRsyncArgs({ host: "box", user: "ops", repoRoot: "/r" });
+    expect(args.at(-1)).toBe(`ops@box:${MGMT_REPO_DEST}`);
+    expect(MGMT_REPO_DEST).toBe("/home/dev/test-mvp/");
+  });
+
+  it("syncs exactly the lean source paths the box needs (not the whole repo)", () => {
+    const args = buildRepoRsyncArgs({ host: "h", repoRoot: "/r" });
+    for (const rel of MGMT_REPO_RSYNC_PATHS) {
+      expect(args).toContain(`/r/${rel}`);
+    }
+    // no nextjs-app / python-services — the mgmt box never builds or runs them
+    expect(args.join(" ")).not.toContain("nextjs-app");
+    expect(args.join(" ")).not.toContain("python-services");
+  });
+
+  it("trims a trailing slash on repoRoot so joins don't double up", () => {
+    const args = buildRepoRsyncArgs({ host: "h", repoRoot: "/r/" });
+    expect(args).toContain("/r/tools");
+    expect(args).not.toContain("/r//tools");
+  });
+});
+
+describe("repoRootPath", () => {
+  it("resolves to an absolute local repo root that contains the synced artifacts", () => {
+    const root = repoRootPath();
+    expect(root.startsWith("/")).toBe(true);
+    expect(root.endsWith("/")).toBe(false); // trailing slash trimmed for clean joins
+    // the artifact paths live under this root (cwd-independent, import.meta-relative)
+    expect(setupMgmtScriptPath()).toBe(`${root}/scripts/hetzner/setup-mgmt.sh`);
+    expect(mgmtCloudInitPath()).toBe(`${root}/scripts/hetzner/cloud-init-mgmt.yaml`);
   });
 });
 

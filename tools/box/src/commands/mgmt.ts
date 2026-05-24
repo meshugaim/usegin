@@ -8,9 +8,9 @@ import {
 } from "../lib/hcloud";
 import { isValidBoxName, wrapBashC } from "../lib/golden-base";
 import {
-  buildCloudInitDoneCheck, buildRunSetupCommand, buildTailscaleUpCommand,
+  buildCloudInitDoneCheck, buildRepoRsyncArgs, buildRunSetupCommand, buildTailscaleUpCommand,
   buildTokenInstallCommand, buildTokenScpArgs, localHcloudConfigPath,
-  MGMT_DEFAULT_SIZE, MGMT_HCLOUD_CONFIG_PATH, mgmtCloudInitPath, setupMgmtScriptPath,
+  MGMT_DEFAULT_SIZE, MGMT_HCLOUD_CONFIG_PATH, mgmtCloudInitPath, repoRootPath, setupMgmtScriptPath,
 } from "../lib/mgmt-provision";
 import { serveLease } from "../lib/lease-server";
 
@@ -73,11 +73,12 @@ function breakGlassExec(
  *
  * Orchestration (pure arg-builders in lib/mgmt-provision.ts; IO here):
  *   1. create a fresh Ubuntu server (cloud-init-mgmt.yaml installs the lean
- *      toolchain — bun/hcloud/tailscale/git, NO docker/node/devcontainer),
+ *      toolchain — bun/hcloud/tailscale/rsync, NO docker/node/devcontainer),
  *   2. wait for ssh + cloud-init-done (over break-glass public IP),
  *   3. `tailscale up --authkey=… --hostname=<mgmtName>` (key over ssh, not metadata),
- *   4. run setup-mgmt.sh (clone repo, install + enable the two push-lease units),
- *   5. place the hcloud token (scp the local cli.toml; never echo it) — `box watch`
+ *   4. rsync the local working tree onto the box (auth-free; no private-repo clone),
+ *   5. run setup-mgmt.sh (install deps + enable the two push-lease units),
+ *   6. place the hcloud token (scp the local cli.toml; never echo it) — `box watch`
  *      needs it to list/down servers.
  *
  * It does NOT auto-snapshot (see the closing note): snapshotting is left as an
@@ -190,25 +191,40 @@ function mgmtProvisionCommand(): Command {
         process.exit(tsCode);
       }
 
-      // 4. Run setup-mgmt.sh: clone the repo + install/enable the push-lease
-      // units. The script is STREAMED over ssh stdin (so a fresh box needn't have
-      // it yet), with the repo URL as a positional arg. NOTE the private-repo gap
-      // below — git auth on the box is the operator's responsibility.
-      console.error("Running setup-mgmt.sh (clone repo + install push-lease systemd units) ...");
+      // 4. Place the repo by RSYNC, not a git clone: the repo is private and a
+      // fresh lean box has no git auth, so a clone would fail. rsync over ssh (by
+      // public IP — break-glass; same accept-new host-key opt as the poll, paired
+      // with cleanHostkey) needs no repo credentials and lands the exact local
+      // working tree (incl. uncommitted fixes). setup-mgmt.sh then just installs.
+      console.error("Rsyncing the local working tree to the box (auth-free; no git clone) ...");
+      cleanHostkey(ip); // fresh box / reused IP → drop any stale key before rsync's ssh
+      const rsync = Bun.spawnSync(
+        ["rsync", ...buildRepoRsyncArgs({ host: ip, repoRoot: repoRootPath() })],
+        { stdout: "inherit", stderr: "inherit", stdin: "ignore" },
+      );
+      if ((rsync.exitCode ?? 1) !== 0) {
+        console.error(`Error: rsync of the working tree failed (exit ${rsync.exitCode}). The box is up at ${ip || "?"};`);
+        console.error("  ensure rsync is installed locally + on the box (cloud-init installs it), then re-run.");
+        process.exit(rsync.exitCode ?? 1);
+      }
+
+      // 5. Run setup-mgmt.sh: install deps + enable the push-lease units against
+      // the rsync'd tree. The script is STREAMED over ssh stdin (so the box needn't
+      // have it on PATH); it takes no repo-URL arg now — the tree is already here.
+      console.error("Running setup-mgmt.sh (install deps + push-lease systemd units) ...");
       const setupBody = readFileSync(setupMgmtScriptPath(), "utf8");
       const setupCode = breakGlassExec(
         name,
-        buildRunSetupCommand({ repoUrl: cfg.repoUrl }),
+        buildRunSetupCommand(),
         { stdin: setupBody },
       ).code;
       if (setupCode !== 0) {
         console.error(`Error: setup-mgmt.sh failed (exit ${setupCode}). See the output above.`);
-        console.error("  Common cause: the private repo clone needs git auth on the box (gh login / a deploy key).");
-        console.error("  Fix auth on the box, then re-run `box mgmt provision` (after deleting this box) or run setup-mgmt.sh by hand.");
+        console.error("  Re-run `box mgmt provision` (after deleting this box), or fix on the box + re-run setup-mgmt.sh by hand.");
         process.exit(setupCode);
       }
 
-      // 5. Place the hcloud token (the mgmt box is the ONE host that holds it).
+      // 6. Place the hcloud token (the mgmt box is the ONE host that holds it).
       // scp the local cli.toml as a FILE — its contents never touch argv/logs.
       if (opts.placeToken) {
         const localToken = localHcloudConfigPath(process.env.HOME);

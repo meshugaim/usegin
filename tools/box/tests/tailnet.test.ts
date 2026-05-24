@@ -32,16 +32,19 @@ describe("buildTailnetSshArgs — ssh-by-name over the tailnet", () => {
 
 describe("buildBreakGlassArgs — hcloud server ssh by public IP", () => {
   it("puts -u BEFORE the server and the command after `--` (hcloud usage order)", () => {
-    // hcloud server ssh [options] <server> [--] [command]: -u after the server
-    // gets forwarded to ssh → "illegal option -- u" and the command never runs.
+    // hcloud server ssh [options] <server> [--] [ssh opts] [command]: -u after the
+    // server gets forwarded to ssh → "illegal option -- u" and the command never
+    // runs. The accept-new host-key opt rides in the post-`--` ssh-options slot.
     expect(buildBreakGlassArgs({ name: "v2debug", command: ["echo", "hi"] })).toEqual([
-      "server", "ssh", "-u", "dev", "v2debug", "--", "echo", "hi",
+      "server", "ssh", "-u", "dev", "v2debug", "--",
+      "-o", "StrictHostKeyChecking=accept-new", "echo", "hi",
     ]);
   });
 
   it("defaults to the dev user and an interactive shell (no command) when none given", () => {
     expect(buildBreakGlassArgs({ name: "box1" })).toEqual([
       "server", "ssh", "-u", "dev", "box1", "--",
+      "-o", "StrictHostKeyChecking=accept-new",
     ]);
   });
 
@@ -53,16 +56,33 @@ describe("buildBreakGlassArgs — hcloud server ssh by public IP", () => {
 
   it("honours a custom user", () => {
     expect(buildBreakGlassArgs({ name: "b", user: "root", command: ["id"] })).toEqual([
-      "server", "ssh", "-u", "root", "b", "--", "id",
+      "server", "ssh", "-u", "root", "b", "--",
+      "-o", "StrictHostKeyChecking=accept-new", "id",
     ]);
   });
 
   it("inserts -t in the [ssh options] slot after `--` for a TTY (the `work` path)", () => {
     // hcloud only knows --ipv6/-p/-u; -t is an ssh flag, so it must pass through
     // after `--`, before the command (work attaches an interactive tmux session).
+    // -t follows the accept-new opt, still in the post-`--` ssh-options slot.
     expect(buildBreakGlassArgs({ name: "box1", tty: true, command: ["X"] })).toEqual([
-      "server", "ssh", "-u", "dev", "box1", "--", "-t", "X",
+      "server", "ssh", "-u", "dev", "box1", "--",
+      "-o", "StrictHostKeyChecking=accept-new", "-t", "X",
     ]);
+  });
+
+  it("passes StrictHostKeyChecking=accept-new so a fresh/reused-IP box's new host key is accepted non-interactively", () => {
+    // Without this, the cloud-init poll / tailscale-up / setup / rsync all hang or
+    // fail "Host key verification failed" on a fresh box (or a reused public IP
+    // whose stale key cleanHostkey just removed). accept-new + cleanHostkey is the
+    // exact pairing buildTailnetSshArgs uses; the opt lives AFTER `--` (it's an ssh
+    // option, not an hcloud one) and BEFORE -t and the remote command.
+    const args = buildBreakGlassArgs({ name: "fresh-box", command: ["uptime"] });
+    expect(args).toContain("StrictHostKeyChecking=accept-new");
+    const optIdx = args.indexOf("StrictHostKeyChecking=accept-new");
+    expect(args[optIdx - 1]).toBe("-o");
+    expect(args.indexOf("--")).toBeLessThan(optIdx); // ssh option, so after `--`
+    expect(optIdx).toBeLessThan(args.indexOf("uptime")); // before the remote command
   });
 });
 

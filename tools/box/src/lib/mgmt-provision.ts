@@ -54,8 +54,36 @@ export function setupMgmtScriptPath(): string {
   return new URL("../../../../scripts/hetzner/setup-mgmt.sh", import.meta.url).pathname;
 }
 
+/**
+ * Absolute path to the LOCAL repo root, resolved relative to THIS module (same
+ * four-`..` scheme as the artifact paths) so it works from any cwd. This is the
+ * source `box mgmt provision` rsyncs onto the box — the operator's working tree,
+ * including any uncommitted local fixes. Trailing slash trimmed for clean joins.
+ */
+export function repoRootPath(): string {
+  return new URL("../../../../", import.meta.url).pathname.replace(/\/$/, "");
+}
+
 /** On-box path of the dev user's hcloud config (token lives here). */
 export const MGMT_HCLOUD_CONFIG_PATH = "/home/dev/.config/hcloud/cli.toml";
+
+/** On-box destination the local working tree is rsync'd to (the repo root). */
+export const MGMT_REPO_DEST = "/home/dev/test-mvp/";
+
+/**
+ * The working-tree paths rsync'd onto the mgmt box — the minimum the lean box
+ * needs to run the `box` CLI straight from source: the `tools/` workspace, the
+ * `scripts/` (systemd units + setup), and the workspace-root manifest/lockfile +
+ * tsconfig so `bun install` resolves the same dep tree. NOT the whole repo (no
+ * nextjs-app/python-services — the mgmt box never builds or runs them).
+ */
+export const MGMT_REPO_RSYNC_PATHS = [
+  "tools",
+  "scripts",
+  "package.json",
+  "bun.lock",
+  "tsconfig.json",
+] as const;
 
 /** Local source the token is read from when scp-placing it (hcloud's default). */
 export function localHcloudConfigPath(home: string | undefined): string {
@@ -93,16 +121,55 @@ export function buildTailscaleUpCommand(p: { name: string; authkey: string }): s
 }
 
 /**
+ * `rsync` argv to push the local working tree onto the box, AUTH-FREE. Pure
+ * (params in → argv out) so it's unit-tested. Returns the args AFTER `rsync`.
+ *
+ * Why rsync, not `git clone`: the repo is PRIVATE and a fresh lean box has no git
+ * auth (no gh, no deploy key) — a clone fails before setup can run. rsync over the
+ * existing ssh connection needs no repo credentials, so the box gets the exact
+ * local tree (including uncommitted local fixes) without any auth plumbing.
+ *
+ *   -a   archive (recursive, preserves perms/times) — a faithful copy
+ *   -z   compress on the wire
+ *   --delete   make the dest mirror the source (drop files removed locally), so a
+ *              re-provision/re-run doesn't leave stale files on the box
+ *   -e "ssh -o StrictHostKeyChecking=accept-new"   transport over ssh with the
+ *              SAME host-key opt buildBreakGlassArgs uses — a fresh box's new host
+ *              key is accepted non-interactively (paired with the caller's
+ *              cleanHostkey); otherwise rsync's ssh child hangs on the prompt.
+ *   --exclude node_modules / .git   skip the heavy/irrelevant trees: node_modules
+ *              is reinstalled on the box (`bun install`), and .git isn't needed (and
+ *              its absence is WHY setup uses `bun install --ignore-scripts` — the
+ *              root `prepare`/husky hook needs .git).
+ *
+ * `host` is the box's public IP (break-glass path — rsync runs before/independent
+ * of the tailnet name resolving). Dest is the repo root {@link MGMT_REPO_DEST}.
+ */
+export function buildRepoRsyncArgs(p: { host: string; user?: string; repoRoot?: string }): string[] {
+  const root = (p.repoRoot ?? ".").replace(/\/$/, "");
+  return [
+    "-az",
+    "--delete",
+    "-e", "ssh -o StrictHostKeyChecking=accept-new",
+    "--exclude", "node_modules",
+    "--exclude", ".git",
+    ...MGMT_REPO_RSYNC_PATHS.map((rel) => `${root}/${rel}`),
+    `${p.user ?? "dev"}@${p.host}:${MGMT_REPO_DEST}`,
+  ];
+}
+
+/**
  * The remote command that runs setup-mgmt.sh on the box. The script is streamed
  * to the box's `bash -s` over ssh stdin (so we don't depend on it already being
- * present on a fresh box), with the repo URL passed as a positional arg.
+ * present on a fresh box). The repo is already present on the box (rsync'd by the
+ * provision command before this runs), so setup-mgmt.sh takes no repo-URL arg — it
+ * just installs deps + the units against the rsync'd tree.
  *
- * `bash -s -- <repoUrl>` — `-s` reads the script from stdin; everything after
- * `--` becomes the script's positional args ($1 = repoUrl). Pure: the caller
- * pipes the script body via stdin and this is the command.
+ * `bash -s` reads the script from stdin. Pure: the caller pipes the script body
+ * via stdin and this is the command.
  */
-export function buildRunSetupCommand(p: { repoUrl: string }): string {
-  return `bash -s -- ${p.repoUrl}`;
+export function buildRunSetupCommand(): string {
+  return `bash -s`;
 }
 
 /**

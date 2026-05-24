@@ -577,6 +577,16 @@ export function buildTailnetSshArgs(p: { name: string; user?: string; tty?: bool
  * `-t` is an ssh flag, not an hcloud one (hcloud only knows --ipv6/-p/-u), so it
  * must reach ssh via the post-`--` passthrough. The `work` path needs it to
  * attach an interactive devcontainer tmux session over the break-glass IP.
+ *
+ * `StrictHostKeyChecking=accept-new` rides in the same post-`--` ssh-options slot
+ * (it's an ssh option, not an hcloud one), BEFORE `-t` and the command. Without it
+ * a fresh box — or a reused public IP whose stale key `cleanHostkey` just removed
+ * — has an unknown host key, and default `ssh` can't accept it non-interactively:
+ * it fails "Host key verification failed" (and spawns ssh-askpass), so every
+ * break-glass command (the cloud-init poll, `tailscale up`, setup, the rsync) hangs
+ * or errors. `accept-new` trusts a NEW key on first contact but still rejects a
+ * CHANGED one, so combined with the caller's `cleanHostkey` it absorbs host-key
+ * churn non-interactively — the exact pairing {@link buildTailnetSshArgs} uses.
  */
 export function buildBreakGlassArgs(p: { name: string; user?: string; tty?: boolean; command?: string[] }): string[] {
   return [
@@ -584,6 +594,7 @@ export function buildBreakGlassArgs(p: { name: string; user?: string; tty?: bool
     "-u", p.user ?? "dev",
     p.name,
     "--",
+    "-o", "StrictHostKeyChecking=accept-new",
     ...(p.tty ? ["-t"] : []),
     ...(p.command ?? []),
   ];
