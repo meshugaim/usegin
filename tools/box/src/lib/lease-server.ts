@@ -103,9 +103,19 @@ export function parseLeaseRequest(url: string): LeaseRequest {
  * concurrent renewals can't interleave a read-modify-write — Bun runs the JS
  * handler to completion per request — so this process is the single serializer
  * the file store needs (see the lost-update note in lease-store.ts).
+ *
+ * `log` is injectable so tests can pass a no-op and not pollute the suite output
+ * with per-renew lines; it defaults to `console.error` so the real mgmt-box
+ * server logs as before. (Injecting is race-free across Bun's concurrent test
+ * files, unlike stubbing the global console.error.)
  */
-export function serveLease(opts: { port: number; storePath: string }): Server<undefined> {
+export function serveLease(opts: {
+  port: number;
+  storePath: string;
+  log?: (msg: string) => void;
+}): Server<undefined> {
   let store = readLeaseStore(opts.storePath);
+  const log = opts.log ?? ((msg: string): void => console.error(msg));
 
   return Bun.serve({
     port: opts.port,
@@ -116,7 +126,7 @@ export function serveLease(opts: { port: number; storePath: string }): Server<un
         store = res.store;
         writeLeaseStore(opts.storePath, store);
         if (req.box) {
-          console.error(`[${new Date().toISOString()}] renew ${req.box}`);
+          log(`[${new Date().toISOString()}] renew ${req.box}`);
         }
       }
       return Response.json(res.body, { status: res.status });

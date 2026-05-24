@@ -222,13 +222,13 @@ describe("serveLease — the Bun.serve wrapper (persist-on-change, over a socket
 
   it("loads an existing store from disk at startup (in-memory is seeded, not empty)", async () => {
     writeFileSync(storePath, JSON.stringify({ pre: { lastRenewal: T_OLD } }));
-    server = serveLease({ port: 0, storePath });
+    server = serveLease({ port: 0, storePath, log: () => {} });
     const { body } = await get("/lease/status");
     expect(body.leases).toEqual({ pre: { lastRenewal: T_OLD } });
   });
 
   it("a renew writes the stamp through to disk", async () => {
-    server = serveLease({ port: 0, storePath });
+    server = serveLease({ port: 0, storePath, log: () => {} });
     const { status, body } = await get("/lease/renew?box=worker");
     expect(status).toBe(200);
     expect(body.ok).toBe(true);
@@ -238,7 +238,7 @@ describe("serveLease — the Bun.serve wrapper (persist-on-change, over a socket
   });
 
   it("a read route (/lease/status) does NOT create or write the store file", async () => {
-    server = serveLease({ port: 0, storePath });
+    server = serveLease({ port: 0, storePath, log: () => {} });
     expect(existsSync(storePath)).toBe(false); // empty start, nothing loaded
     const { status, body } = await get("/lease/status");
     expect(status).toBe(200);
@@ -248,14 +248,14 @@ describe("serveLease — the Bun.serve wrapper (persist-on-change, over a socket
   });
 
   it("a 400 (missing box) does NOT write the store file", async () => {
-    server = serveLease({ port: 0, storePath });
+    server = serveLease({ port: 0, storePath, log: () => {} });
     const { status } = await get("/lease/renew?box=");
     expect(status).toBe(400);
     expect(existsSync(storePath)).toBe(false);
   });
 
   it("serves in-memory state across requests without re-reading disk per request", async () => {
-    server = serveLease({ port: 0, storePath });
+    server = serveLease({ port: 0, storePath, log: () => {} });
     await get("/lease/renew?box=a");
     await get("/lease/renew?box=b");
     // Both renewals are visible from the in-memory source of truth.
@@ -266,7 +266,7 @@ describe("serveLease — the Bun.serve wrapper (persist-on-change, over a socket
   });
 
   it("an unknown path is a 404 and leaves no file behind", async () => {
-    server = serveLease({ port: 0, storePath });
+    server = serveLease({ port: 0, storePath, log: () => {} });
     const { status, body } = await get("/nope");
     expect(status).toBe(404);
     expect(body.ok).toBe(false);
