@@ -8,7 +8,7 @@ We run three independent repos. None owns the others; each clones into the other
 
 | Repo | What it is | SoT for |
 |---|---|---|
-| **effi** (`meshugaim/test-mvp`, this repo) | Product. | `nextjs-app/`, `python-services/`, Supabase migrations, deploy infra, customer-facing code. |
+| **effi** (`AskEffi/test-mvp`) | Product. | `nextjs-app/`, `python-services/`, Supabase migrations, deploy infra, customer-facing code. |
 | **gin** (`meshugaim/usegin`) | Our dev agent + its workshop + the DX CLI. | `usegin/` (workshop, zettels, sub-apps), `tools/dx/` and Gin-side `tools/*` (session, daybook, fleet, …), `.claude/` agent definitions, skills, hooks, personas, commands. |
 | **ocw** (`meshugaim/oria-crazy-world`) | World substrate. | Personas (`ground/personas/`), principles, philosophy, institutions, values. |
 
