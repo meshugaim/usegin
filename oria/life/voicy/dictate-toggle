@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# dictate-toggle — Wayland-native push-to-toggle dictation.
+# 1st press: start recording. 2nd press: stop, transcribe (whisper.cpp),
+# and paste the text into the currently-focused app via ydotool.
+#
+# Bound to a GNOME custom keyboard shortcut (Ctrl+Space).
+
+set -uo pipefail
+
+# ---- config -----------------------------------------------------------------
+MODEL="${WHISPER_MODEL:-$HOME/.local/share/whisper-dictation/ggml-small.bin}"
+LANG_MODE="${WHISPER_LANG:-auto}"          # "auto", "he", "en", ...
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+WAV="$RUNTIME/dictate.wav"
+OUTBASE="$RUNTIME/dictate"                  # whisper writes $OUTBASE.txt
+PIDFILE="$RUNTIME/dictate-record.pid"
+export YDOTOOL_SOCKET="${YDOTOOL_SOCKET:-/run/.ydotool_socket}"
+
+notify() { command -v notify-send >/dev/null && notify-send -t "${2:-2500}" -a Dictate "$1" >/dev/null 2>&1 || true; }
+ding()   { [ -f "$1" ] && command -v pw-play >/dev/null && pw-play "$1" >/dev/null 2>&1 & }
+
+find_whisper() {
+  for b in whisper-cli whisper-cpp whisper main; do
+    command -v "$b" >/dev/null && { echo "$b"; return; }
+  done
+  return 1
+}
+
+# ---- STOP path: a recording is in progress ----------------------------------
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; then
+  REC_PID="$(cat "$PIDFILE")"
+  kill -INT "$REC_PID" 2>/dev/null
+  for _ in $(seq 1 20); do kill -0 "$REC_PID" 2>/dev/null || break; sleep 0.1; done
+  kill -KILL "$REC_PID" 2>/dev/null
+  rm -f "$PIDFILE"
+  ding /usr/share/sounds/freedesktop/stereo/complete.oga
+
+  if [ ! -s "$WAV" ]; then notify "✗ No audio captured"; exit 0; fi
+  WBIN="$(find_whisper)" || { notify "✗ whisper-cpp not installed"; exit 1; }
+  notify "⏳ Transcribing…" 1500
+
+  rm -f "$OUTBASE.txt"
+  "$WBIN" -m "$MODEL" -f "$WAV" -l "$LANG_MODE" -nt -np \
+          -t "$(nproc)" -otxt -of "$OUTBASE" >/dev/null 2>&1
+
+  TEXT="$(cat "$OUTBASE.txt" 2>/dev/null)"
+  # strip whisper non-speech markers + collapse whitespace
+  TEXT="$(printf '%s' "$TEXT" | sed -E 's/\[[^]]*\]//g; s/\([^)]*\)//g' \
+            | tr '\n' ' ' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:space:]]+/ /g')"
+
+  if [ -z "$TEXT" ]; then notify "… (nothing recognized)"; exit 0; fi
+
+  # paste via clipboard (reliable unicode incl. Hebrew), then restore clipboard
+  OLD_CLIP="$(wl-paste -n 2>/dev/null || true)"
+  printf '%s' "$TEXT" | wl-copy
+  sleep 0.05
+  ydotool key 29:1 47:1 47:0 29:0   # Ctrl+V
+  ( sleep 0.6; printf '%s' "$OLD_CLIP" | wl-copy ) >/dev/null 2>&1 &
+  notify "✓ ${TEXT:0:60}"
+  exit 0
+fi
+
+# ---- START path: begin recording --------------------------------------------
+rm -f "$WAV"
+ding /usr/share/sounds/freedesktop/stereo/message.oga
+notify "🎤 Recording… (Ctrl+Space to stop)" 4000
+pw-record --rate 16000 --channels 1 --format s16 "$WAV" &
+echo $! > "$PIDFILE"

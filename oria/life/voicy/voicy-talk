@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# voicy-talk — bring Voicy to the front and toggle its recording.
+# Bound to GNOME Ctrl+Space. Voicy on Wayland can only record while focused;
+# its result lands on the clipboard, so paste with Ctrl+V (Ctrl+Shift+V in a terminal).
+#
+# Voicy's own recording shortcut must be set to Ctrl+Alt+Space (private combo,
+# so it doesn't clash with the global Ctrl+Space that runs this script).
+
+set -uo pipefail
+export YDOTOOL_SOCKET="${YDOTOOL_SOCKET:-/run/.ydotool_socket}"
+
+VOICY=/opt/Voicy/voicy
+
+# Bring Voicy to the front (launch if needed). Re-running it triggers Voicy's
+# single-instance handler, which shows + focuses the existing window.
+if pgrep -f "$VOICY" >/dev/null 2>&1; then
+  setsid -f "$VOICY" --no-sandbox >/dev/null 2>&1 || true
+  sleep 0.35
+else
+  setsid -f "$VOICY" --no-sandbox >/dev/null 2>&1 || true
+  # wait for a Voicy window to exist
+  for _ in $(seq 1 60); do
+    pgrep -f "$VOICY" >/dev/null 2>&1 && break
+    sleep 0.25
+  done
+  sleep 1.5
+fi
+
+# Toggle Voicy recording via its remapped accelerator: Ctrl+Alt+Space
+# Linux input codes: LEFTCTRL=29  LEFTALT=56  SPACE=57
+ydotool key 29:1 56:1 57:1 57:0 56:0 29:0
